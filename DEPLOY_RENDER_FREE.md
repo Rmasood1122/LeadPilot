@@ -67,6 +67,35 @@ what `docker-compose.prod.yml` does (`context: .`). Anyone running
 secrets baked into a layer. `.dockerignore` closes that, and as a bonus makes
 local builds byte-for-byte comparable to what Render produces.
 
+### Blueprint schema — three fields that Render rejects
+
+The first Blueprint import failed with Render's generic *"A Blueprint file was
+found, but there was an issue."* — no line number, no message. The YAML itself
+was valid (confirmed with a local parser); the problem was three fields checked
+against Render's current Blueprint spec:
+
+| What we had | Why Render rejects it | Fix |
+|---|---|---|
+| `dockerTarget: production` | **No such field exists.** Build-stage targeting has been an open feature request since 2021 and is not in the spec. | Removed |
+| `startCommand: …` | Spec: *"Docker-based services set the optional `dockerCommand` field instead of this field."* | `dockerCommand:` |
+| `preDeployCommand: …` | Spec: *"The pre-deploy command is available for **paid** web services…"* — a paid-only feature on a `plan: free` service | Removed; migrations moved into `dockerCommand` |
+
+Removing `dockerTarget` costs nothing: **the Dockerfile has exactly one stage**,
+`production`, which is also the final stage — so Render builds precisely the
+image we wanted anyway.
+
+Dropping `preDeployCommand` means migrations run inline at container start
+(`python -m app.db.migrate && uvicorn …`), which is what
+`docker-compose.prod.yml` already does. The race that pre-deploy avoided is
+covered by the advisory lock in `app/db/migrate.py` — and that lock only
+actually works when `MIGRATION_DATABASE_URL` points at Neon's **direct**
+endpoint (see Part 3).
+
+Verified before re-import: the exact `dockerCommand` above was run against the
+built image with the real Neon and Upstash credentials — advisory lock
+acquired, migration to head, uvicorn up, `/health` reporting
+`database: ok, redis: ok`.
+
 ### Environment variables — Render dashboard → leadpilot-api → Environment
 
 Every name below is what the code actually reads (`app/config.py` and
@@ -183,10 +212,37 @@ forgotten on the worker — the production guard runs on both.
 3. Optionally add a second job against the **api**'s `/health` to keep
    first-request latency down. Cosmetic, not correctness.
 
-Ten-minute pings ≈ 4,320 requests/month, comfortably inside Render's free
-750 instance-hours (one always-awake service is ~730 h/month, so two free
-services being pinged constantly will exceed the shared allowance — pin the
-worker and let the api sleep if you need to economise).
+#### The instance-hour arithmetic — read before choosing a ping schedule
+
+Render gives **750 free instance hours per calendar month, shared across the
+whole workspace**, and a service consumes them **only while awake**
+(*"spun-down services don't consume Free instance hours"*).
+
+A calendar month is about **730 hours**. So:
+
+| Setup | Hours/month | Fits in 750? |
+|---|---|---|
+| Worker pinged 24/7 | ~730 | Yes, but uses **97%** of the allowance |
+| Worker + API both awake 24/7 | ~1,460 | **No — nearly double** |
+| Worker pinged 12h/day + API on real traffic | ~365 + usage | Comfortably |
+
+**Pinging the worker around the clock consumes almost the entire monthly
+allowance and leaves roughly 20 hours for the API.** When the 750 are gone,
+*"Render suspends all of your Free web services until the start of the next
+month"* — the whole stack goes down, not just the worker.
+
+So do **not** ping both services 24/7. Pick one:
+
+* **Recommended:** ping the worker only during the hours you actually expect
+  work — e.g. 08:00–20:00 gives ~365 h/month and leaves ~385 h for the API.
+  cron-job.org supports restricting a job to a time window.
+* Or ping the worker 24/7 and accept that the API is effectively unavailable
+  once the allowance runs out.
+* Or pay the $7/mo for a Background Worker, whose hours are not drawn from the
+  free pool at all.
+
+This is the single biggest planning constraint of the free stack, and it is
+arithmetic, not opinion.
 
 ---
 
@@ -326,6 +382,54 @@ restart; that needs object storage before it is a real feature.
 `preDeployCommand: python -m app.db.migrate` is on the api, not the worker, so
 they cannot race. It is wrapped in a `pg_advisory_lock` regardless (session
 update 11: 3 of 4 concurrent migrators died without it).
+
+### BILLING SAFETY — what a card on file changes
+
+You added a card because Render required one for identity verification. That
+card changes Render's overage behaviour for **one** of the two limits. Both
+figures below are from Render's own docs.
+
+| Limit | Amount | Exceeded WITHOUT a card | Exceeded WITH a card |
+|---|---|---|---|
+| Free instance hours | **750 / month / workspace** | Free services suspended until next month | **Same — suspended.** Render's wording is unconditional: *"If you consume all of your Free instance hours during a given month, Render suspends all of your Free web services until the start of the next month."* |
+| Outbound bandwidth | **100 GB / month** | *"Render instead suspends all of your Free services for the remainder of the month"* | **BILLED** — *"Render bills you for a supplementary amount"*, at **$0.15/GB** |
+
+**So the one and only way this stack can charge the card is exceeding 100 GB of
+outbound bandwidth in a month.** Instance-hour exhaustion suspends; it does not
+bill.
+
+How realistic is 100 GB? Render serves only the JSON API here — the frontend is
+on Vercel and does not touch this allowance. The keep-alive pinger sends a few
+hundred bytes every 10 minutes (~4,300 requests/month, a rounding error).
+Reaching 100 GB of API JSON would take roughly a million heavy responses. Under
+normal use this is not a realistic risk. The realistic paths to it are abnormal:
+a scraping loop, a runaway client retrying forever, or a DDoS.
+
+**There is no account-wide spending cap.** Render offers a spend limit only for
+build-pipeline minutes (Workspace Settings → Build Pipeline → *Set spend
+limit*); an account-level limit covering bandwidth is still an open feature
+request. Render does send email warnings as you approach and exceed a limit.
+
+#### What to check in the dashboard yourself
+
+1. **Usage**: Render Dashboard → your **Workspace** → **Billing** →
+   *Monthly Included Usage*. This shows instance hours and bandwidth consumed
+   against the included amounts. Check it in week one, then monthly.
+2. **Build pipeline spend limit**: Workspace Settings → Build Pipeline →
+   *Set spend limit*. Set it to the minimum. It does not cover bandwidth, but
+   it closes the one capped-spend surface Render does expose.
+3. **Confirm the workspace is on the free/hobby plan**, not a trial that lapses
+   into a paid plan.
+4. **Verify email notifications are on** so the usage warnings actually reach
+   you.
+5. If you ever want the hard guarantee back: **removing the payment method**
+   restores "suspend" behaviour for bandwidth too. Only do that if Render lets
+   you remove it after verification — it may not.
+
+`render.yaml` itself is audited clean: both services are `plan: free`, there is
+no `disk:`, no `numInstances`, no `type: worker`/`pserv`/`cron`, and the one
+paid-only field that was present (`preDeployCommand`) has been removed. Nothing
+in the file can select a paid resource.
 
 ### Upgrade order, when money exists
 1. **Render Background Worker — $7/mo.** Removes the pinger dependency.

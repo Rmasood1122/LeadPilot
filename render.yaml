@@ -40,27 +40,29 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    # The stage is named in the Dockerfile; build it explicitly rather than
-    # relying on "last stage wins".
-    dockerTarget: production
+    # NO dockerTarget: Render's Blueprint spec has no such field (build-stage
+    # targeting has been an open feature request since 2021). Harmless here —
+    # the Dockerfile has exactly ONE stage, `production`, which is also the
+    # final stage, so Render builds precisely the image we want anyway.
 
-    # Render supplies $PORT and requires the process to bind it. --proxy-headers
-    # plus --forwarded-allow-ips is what makes request.client.host the real
-    # client IP behind Render's proxy — app/core/rate_limiting.py::client_ip
-    # keys the auth rate limiter on that, so without these flags every request
-    # would share one bucket.
-    startCommand: >-
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port $PORT
-      --proxy-headers
-      --forwarded-allow-ips='*'
-
-    # Migrations run before the new instance takes traffic. app/db/migrate.py
-    # wraps `alembic upgrade head` in a pg_advisory_lock, so concurrent
-    # instances serialise instead of racing (see CLAUDE_CODE_HANDOFF.md
-    # session update 11 — 3 of 4 concurrent migrators died without it).
-    preDeployCommand: python -m app.db.migrate
+    # dockerCommand, NOT startCommand: the spec says "Docker-based services set
+    # the optional dockerCommand field instead of this field."
+    #
+    # Migrations run here rather than in preDeployCommand, because pre-deploy is
+    # "available for PAID web services" only — using it on plan: free is both a
+    # validation error and a paid-feature reference. Running them inline is what
+    # docker-compose.prod.yml already does.
+    #
+    # The race that preDeployCommand avoided is handled by the advisory lock in
+    # app/db/migrate.py, and that lock now actually works: set
+    # MIGRATION_DATABASE_URL to Neon's DIRECT endpoint (session update 17 —
+    # the lock does NOT serialise through Neon's pooler).
+    #
+    # --proxy-headers + --forwarded-allow-ips is what makes request.client.host
+    # the real client IP behind Render's proxy. app/core/rate_limiting.py's
+    # client_ip() keys the auth rate limiter on it; without these flags every
+    # request on the internet would share one bucket.
+    dockerCommand: sh -c "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
 
     healthCheckPath: /health
 
@@ -112,16 +114,15 @@ services:
     region: oregon
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    dockerTarget: production
+    # See the api service above for why there is no dockerTarget.
 
     # Invoked through `bash` rather than executed directly: the file is authored
     # on Windows, where git does not reliably preserve the +x bit, and a
     # missing execute permission would fail the deploy for a silly reason.
-    startCommand: bash scripts/render_worker_entrypoint.sh
+    dockerCommand: bash scripts/render_worker_entrypoint.sh
 
-    # No preDeployCommand here on purpose. The api service already runs
-    # migrations, and running them from two services doubles the advisory-lock
-    # contention for no benefit.
+    # Deliberately does NOT migrate. The api service does that; running it from
+    # both would put two migrators in contention for no benefit.
 
     # Points at app/worker_health.py, which reports 503 when the Celery child
     # processes have died — so a crashed worker triggers a Render restart

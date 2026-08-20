@@ -2656,6 +2656,39 @@ absent from all history, `.env` and `.runlogs/` both ignored.
 
 Root suite after all of the above: **467 passed / 5 skipped**, no regression.
 
+### Blueprint import failed — three schema errors (fixed)
+
+Render rejected the first import with its generic *"A Blueprint file was found,
+but there was an issue."* The YAML was valid; three fields were not, checked
+against Render's current Blueprint spec rather than guessed:
+
+* `dockerTarget` — **no such field exists** (build-stage targeting is still an
+  open feature request). Harmless to drop: the Dockerfile has exactly one
+  stage, `production`, which is also the final stage.
+* `startCommand` — Docker services must use `dockerCommand`.
+* `preDeployCommand` — *"available for PAID web services"*, so it is a
+  paid-only feature on a `plan: free` service. Migrations moved inline into
+  `dockerCommand`, as docker-compose.prod.yml already does; the advisory lock
+  (with MIGRATION_DATABASE_URL on Neon's direct endpoint) covers the race.
+
+Verified by running the exact new `dockerCommand` against the built image with
+the real Neon and Upstash credentials: lock acquired, migrated to head, uvicorn
+up, `/health` = database ok / redis ok.
+
+### Billing: 750 instance-hours is the real constraint
+
+750 free instance hours per month **per workspace**, consumed only while awake.
+A month is ~730 hours, so pinging the worker 24/7 to keep it from sleeping
+burns ~97% of the allowance and leaves ~20 hours for the API — and exhausting
+the pool suspends **all** free services until the next month. Ping the worker
+on a restricted daily window instead.
+
+With a card on file, the ONLY billable overage is outbound bandwidth
+(100 GB/month, then $0.15/GB). Instance-hour exhaustion suspends rather than
+bills, card or not. There is no account-wide spending cap on Render — only a
+build-pipeline-minutes limit.
+
+
 ## Open items as of session update 7 — the full list
 
 > **SUPERSEDED 2026-08-20 (session update 9).** Item 0's credit blocker is
