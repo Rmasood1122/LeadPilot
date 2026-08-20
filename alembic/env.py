@@ -17,7 +17,15 @@ from app.db.base import Base
 import app.db.models  # noqa: F401  (registers all tables on Base.metadata)
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+
+# app/db/migrate.py may hand us a DIFFERENT url than settings.database_url:
+# migrations must run on Neon's DIRECT endpoint, because session-scoped
+# pg_advisory_lock does not serialise through the PgBouncer POOLER. Measured
+# against the live database on 2026-08-20 — pooled: a second migrator acquired
+# a lock the first was holding; direct: correctly refused. Falls back to
+# settings when nothing was passed, so every existing caller is unaffected.
+_url_override = config.attributes.get("migration_url")
+config.set_main_option("sqlalchemy.url", _url_override or settings.database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -27,7 +35,7 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=settings.database_url,
+        url=_url_override or settings.database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

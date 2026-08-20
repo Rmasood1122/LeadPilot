@@ -23,6 +23,17 @@ dependencies = [
     "cryptography>=42.0",
     "python-multipart>=0.0.9",
     "pyjwt>=2.8",
+    # structlog is imported UNCONDITIONALLY by app/core/logging.py, which six
+    # app/api/* modules import, which app.main imports. It was never declared,
+    # so `pip install .` in the Dockerfile never installed it and
+    # `import app.main` raised ModuleNotFoundError inside the production image
+    # — the API could not boot in ANY container, Railway included. It only
+    # worked locally because dev machines had it from somewhere else.
+    "structlog>=24.1",
+    # typer + rich back app/cli/create_admin.py, which DEPLOY_RAILWAY.md's
+    # first-deploy sequence tells you to run inside the container.
+    "typer>=0.12",
+    "rich>=13.7",
 ]
 
 [project.optional-dependencies]

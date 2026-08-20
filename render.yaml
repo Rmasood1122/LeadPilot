@@ -1,0 +1,168 @@
+# Render Blueprint — FREE-tier deployment of the LeadPilot backend.
+#
+# This is ADDITIVE. railway/*.json and DEPLOY_RAILWAY.md remain the documented
+# paid-tier path and are untouched; nothing here replaces them.
+#
+# Topology (see DEPLOY_RENDER_FREE.md for the full walkthrough):
+#
+#   leadpilot-api      Render Web Service (Docker)   <- this file
+#   leadpilot-worker   Render Web Service (Docker)   <- this file, see note below
+#   Postgres           Neon          (external, free)
+#   Redis              Upstash       (external, free)
+#   Frontend           Vercel        (external, free)
+#
+# WHY THE WORKER IS A "WEB SERVICE" AND NOT A WORKER
+# Render's free plan has no free `worker` service type — `type: worker` is a
+# paid-only feature. A free Web Service must bind $PORT and answer HTTP, so the
+# Celery worker and beat run behind a one-route health server
+# (app/worker_health.py) purely to qualify. See scripts/render_worker_entrypoint.sh.
+#
+#   >>> Both free services SLEEP after ~15 minutes without an inbound HTTP
+#   >>> request, and a sleeping service runs NO processes. For the worker that
+#   >>> means queued tasks are silently not consumed. An external pinger on
+#   >>> /health every ~10 minutes is REQUIRED. Details and the exact cron-job.org
+#   >>> setup are in DEPLOY_RENDER_FREE.md.
+#
+# ENV VARS
+# Everything secret is `sync: false`, which tells Render "prompt for this, do
+# not store it in the repo". Nothing below contains a credential. The full list
+# of what to paste, and where each name comes from in the codebase, is in
+# DEPLOY_RENDER_FREE.md.
+
+services:
+  # ---------------------------------------------------------------------------
+  # API — the public FastAPI service
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: leadpilot-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # The stage is named in the Dockerfile; build it explicitly rather than
+    # relying on "last stage wins".
+    dockerTarget: production
+
+    # Render supplies $PORT and requires the process to bind it. --proxy-headers
+    # plus --forwarded-allow-ips is what makes request.client.host the real
+    # client IP behind Render's proxy — app/core/rate_limiting.py::client_ip
+    # keys the auth rate limiter on that, so without these flags every request
+    # would share one bucket.
+    startCommand: >-
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port $PORT
+      --proxy-headers
+      --forwarded-allow-ips='*'
+
+    # Migrations run before the new instance takes traffic. app/db/migrate.py
+    # wraps `alembic upgrade head` in a pg_advisory_lock, so concurrent
+    # instances serialise instead of racing (see CLAUDE_CODE_HANDOFF.md
+    # session update 11 — 3 of 4 concurrent migrators died without it).
+    preDeployCommand: python -m app.db.migrate
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # --- pasted by hand in the Render dashboard ---------------------------
+      - key: DATABASE_URL          # Neon POOLED endpoint, include ?sslmode=require
+        sync: false
+      # Neon's DIRECT (non-pooled) endpoint, for migrations only.
+      # pg_advisory_lock is session-scoped and does NOT serialise through
+      # Neon's PgBouncer pooler — measured 2026-08-20: a second migrator
+      # acquired a lock the first was holding. Migrating on the direct
+      # endpoint restores the mutual exclusion. See DEPLOY_RENDER_FREE.md.
+      - key: MIGRATION_DATABASE_URL
+        sync: false
+      - key: REDIS_URL             # Upstash rediss://
+        sync: false
+      - key: CELERY_BROKER_URL     # Upstash rediss:// + ?ssl_cert_reqs=required
+        sync: false
+      - key: CELERY_RESULT_BACKEND # same as CELERY_BROKER_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CORS_ORIGINS          # comma-separated, NEVER a JSON array
+        sync: false
+      - key: PUBLIC_BASE_URL       # this service's own https URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: SENDER_IDENTITY       # CAN-SPAM postal address
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # Worker — Celery worker + beat + health server in one free service
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: leadpilot-worker
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerTarget: production
+
+    # Invoked through `bash` rather than executed directly: the file is authored
+    # on Windows, where git does not reliably preserve the +x bit, and a
+    # missing execute permission would fail the deploy for a silly reason.
+    startCommand: bash scripts/render_worker_entrypoint.sh
+
+    # No preDeployCommand here on purpose. The api service already runs
+    # migrations, and running them from two services doubles the advisory-lock
+    # contention for no benefit.
+
+    # Points at app/worker_health.py, which reports 503 when the Celery child
+    # processes have died — so a crashed worker triggers a Render restart
+    # instead of sitting there looking healthy and consuming nothing.
+    healthCheckPath: /health
+
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # Free instances are 512 MB. Each Celery child is a full Python process
+      # with the app imported; 2 is what fits with headroom.
+      - key: CELERY_CONCURRENCY
+        value: "2"
+      # --- must match the api service exactly ------------------------------
+      # app/core/production_guard.py refuses to boot when any of SECRET_KEY,
+      # ENCRYPTION_KEY, CORS_ORIGINS, PUBLIC_BASE_URL or SENDER_IDENTITY is
+      # missing or unsafe. A first-deploy failure here is almost always a
+      # variable set on the api and forgotten on the worker.
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: SENDER_IDENTITY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false

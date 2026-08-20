@@ -2538,6 +2538,124 @@ touched:
 None is security-critical the way `RATE_LIMIT_AUTH` was; the paid-endpoint and
 credential-attack surfaces are now both covered.
 
+## Session update 17 — 2026-08-20 (free-tier stack: Render + Neon + Upstash + Vercel)
+
+Additive deployment path alongside Railway. `railway/*.json` and
+`DEPLOY_RAILWAY.md` are untouched. New files: `render.yaml`, `.dockerignore`,
+`app/worker_health.py`, `scripts/render_worker_entrypoint.sh`,
+`DEPLOY_RENDER_FREE.md`.
+
+### Three defects the Docker build exposed — all would have broken Railway too
+
+The image had never actually been built and run before this session.
+
+1. **`app.main` could not import inside the image.** `structlog` is imported
+   unconditionally by `app/core/logging.py`, which six `app/api/*` modules
+   import — and it was never declared in `pyproject.toml`, so `pip install .`
+   never installed it. The API could not boot in ANY container. It worked
+   locally only because dev machines had structlog from elsewhere. `typer` and
+   `rich` were missing the same way, which would have broken the documented
+   `python -m app.cli.create_admin` first-deploy step. All three now declared.
+
+2. **No `.dockerignore`.** `COPY . .` produced an 877 MB `/code` containing
+   `/code/.env`. Now 4.8 MB with no `.env`; build context 213 MB+ → 22 kB.
+   **Scope correction:** Render builds from a git clone and `.env` is
+   gitignored (verified: never committed, key absent from all history), so
+   Render was never going to receive it. The real exposure was builds from a
+   local working tree — which is what `docker-compose.prod.yml` does
+   (`context: .`).
+
+3. **`app/workers/webhook_tasks.py` imported `services.webhook_delivery`** —
+   no such top-level package; it is `app/services/webhook_delivery.py`. Every
+   SIGNED outbound webhook raised `ModuleNotFoundError` and retried forever
+   while unsigned deliveries worked and hid it. One-line fix.
+
+### The worker runs as a "web service" because Render's free tier has no worker
+
+`scripts/render_worker_entrypoint.sh` runs Celery worker
+(`-Q pipeline,outreach,learning,default`), beat, and a one-route health server
+on `$PORT`, under a `wait -n` supervisor: if any child exits, the rest are
+killed and the service exits non-zero so Render restarts it.
+
+`app/worker_health.py` deliberately does NOT mount `app.main` — that would
+publish all ~97 routes on a second origin nobody reasoned about.
+
+**`/health` reports real liveness, not a constant 200.** An earlier test run
+had both Celery processes dead on the missing-structlog error while `/health`
+happily reported `{"worker":"ok","beat":"ok"}` — because `os.kill(pid, 0)`
+succeeds for an unreaped zombie. It now reads `/proc/<pid>/stat` and treats
+state `Z` as down. Exactly the silent-green-while-broken shape this project
+keeps hitting.
+
+Verified against the built image: worker `ready` on all four queues,
+`leadpilot.ping` round-tripped through the container with no other worker
+running, `kill -9` → container exit 137.
+
+**The free worker sleeps after ~15 min idle and a sleeping service runs no
+processes.** An external cron-job.org ping on `/health` every ~10 min is
+REQUIRED, not optional. Documented in both the script and
+`DEPLOY_RENDER_FREE.md` as an accepted $0 trade-off, not a bug to fix in code.
+The real fix is a $7/mo Render Background Worker — the first paid upgrade to
+make.
+
+### Part 3 — Neon and Upstash, verified live
+
+All four connections confirmed working: Neon (server 18.6, `neondb`), Celery
+broker, Celery result backend (`PING → PONG`, `SSLConnection`,
+`ssl_cert_reqs=2`), and the app's own Redis client.
+
+Alembic chain applied clean on the first run — 17 revisions,
+`0001_initial_models` → `0014_strategy_pattern_inputs`, exit 0. Resulting
+schema: 26 tables, 85 indexes, 25 foreign keys, zero model tables missing.
+
+**`?ssl_cert_reqs=required` is mandatory for Celery** and was reproduced, not
+assumed: the Redis result backend raises
+`ValueError: A rediss:// URL must have parameter ssl_cert_reqs` on a bare
+`rediss://`. The broker and `redis-py` both tolerate it, so plain `REDIS_URL`
+needs nothing — only `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND`.
+
+**`pg_stat_ssl` reports `ssl = false` on Neon.** Not an unencrypted connection
+— proved by attempting `sslmode=disable`, which Neon refuses. TLS is mandatory
+on the wire; the false reading is Neon terminating TLS at its proxy.
+
+### MIGRATION_DATABASE_URL — the important Part 3 finding
+
+`pg_advisory_lock` is **session-scoped**, and Neon's pooled endpoint is
+PgBouncer in transaction mode, which hands each statement whatever server
+connection is free. Measured against the live database with two migrators
+behaving exactly as `app/db/migrate.py` does:
+
+| Endpoint | second migrator's `pg_try_advisory_lock` | verdict |
+|---|---|---|
+| pooled (`-pooler`) | **acquired a lock the first was holding** | lock does nothing |
+| direct (no `-pooler`) | correctly refused | works |
+
+So the migration-race protection added in session update 11 is **silently
+inert** on the pooled endpoint — instance fifteen of this project's
+"two things that must agree, don't" pattern, here between a session-scoped
+lock and a transaction-pooling proxy.
+
+Fix: `app/db/migrate.py::_migration_url()` prefers `MIGRATION_DATABASE_URL`
+(Neon's DIRECT endpoint) while `DATABASE_URL` stays pooled for app traffic,
+and `_run_alembic_upgrade(url)` threads it into Alembic via
+`config.attributes["migration_url"]` so the lock and the migration act on the
+same endpoint. `alembic/env.py` falls back to `settings.database_url` when the
+attribute is absent, so every existing caller is unaffected. Unset, behaviour
+is exactly as before.
+
+`tests/test_migration_lock.py` updated (not weakened): its source tripwire
+still requires the unlock in a `finally` around the upgrade call, now allowing
+the call to carry an argument.
+
+### Also worth knowing
+
+The project acquired a `.git` repo with a GitHub remote
+(`Rmasood1122/LeadPilot`) partway through the session — Render and Vercel both
+deploy from it. Verified: one commit, `.env` never committed, the live key
+absent from all history, `.env` and `.runlogs/` both ignored.
+
+Root suite after all of the above: **467 passed / 5 skipped**, no regression.
+
 ## Open items as of session update 7 — the full list
 
 > **SUPERSEDED 2026-08-20 (session update 9).** Item 0's credit blocker is

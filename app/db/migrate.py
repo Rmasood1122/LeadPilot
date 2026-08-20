@@ -65,21 +65,49 @@ def _database_url() -> str:
     return os.getenv("DATABASE_URL") or settings.database_url
 
 
+def _migration_url() -> str:
+    """The url migrations run on — NOT necessarily the one the app runs on.
+
+    MIGRATION_DATABASE_URL exists for connection poolers. The advisory lock
+    below is session-scoped, and a transaction-pooling proxy hands each
+    statement whatever server connection is free, so the lock is taken on one
+    backend and the next statement runs on another. It does not serialise.
+
+    Measured against the live Neon database on 2026-08-20, two migrators
+    running exactly as this module does:
+
+        POOLED  (…-pooler…)  migrator B acquired a lock A was holding  -> BROKEN
+        DIRECT  (no -pooler) migrator B was correctly refused          -> OK
+
+    So set MIGRATION_DATABASE_URL to the DIRECT endpoint while DATABASE_URL
+    keeps pointing at the pooler for normal traffic. Neon's own guidance is the
+    same: use the direct connection for migrations and DDL.
+
+    Unset, this returns the ordinary url and behaviour is exactly as before.
+    """
+    return os.getenv("MIGRATION_DATABASE_URL") or _database_url()
+
+
 def _is_postgres(url: str) -> bool:
     return url.startswith("postgresql") or url.startswith("postgres://")
 
 
-def _run_alembic_upgrade() -> None:
+def _run_alembic_upgrade(url: str | None = None) -> None:
     """Upgrade to head using Alembic's own API.
 
-    alembic/env.py overwrites sqlalchemy.url from settings.database_url, so the
-    config file's value is irrelevant here — DATABASE_URL governs.
+    alembic/env.py reads config.attributes["migration_url"] when present and
+    falls back to settings.database_url otherwise, so passing `url` here is
+    what makes alembic migrate the SAME database the advisory lock was taken
+    on. Without that they could target different endpoints and the lock would
+    guard nothing.
     """
     from alembic import command
     from alembic.config import Config
 
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     config = Config(os.path.join(root, "alembic.ini"))
+    if url:
+        config.attributes["migration_url"] = url
     command.upgrade(config, "head")
 
 
@@ -89,11 +117,11 @@ def run_migrations(url: str | None = None) -> str:
     Non-PostgreSQL databases (SQLite in the unit-test suite) have no advisory
     locks and no concurrent-start problem, so they migrate directly.
     """
-    url = url or _database_url()
+    url = url or _migration_url()
 
     if not _is_postgres(url):
         logger.info("migrate: non-postgres url, running without advisory lock")
-        _run_alembic_upgrade()
+        _run_alembic_upgrade(url)
         return "migrated (no lock: not postgres)"
 
     engine = create_engine(url, isolation_level="AUTOCOMMIT", pool_pre_ping=True)
@@ -110,7 +138,7 @@ def run_migrations(url: str | None = None) -> str:
         )
         logger.info("migrate: lock acquired, upgrading to head")
         try:
-            _run_alembic_upgrade()
+            _run_alembic_upgrade(url)
         finally:
             connection.execute(
                 text("SELECT pg_advisory_unlock(:lock_id)"),

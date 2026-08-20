@@ -55,8 +55,11 @@ class TestBlockingSemantics:
         """A failed migration must not leave the lock held for the next deploy."""
         source = _read(os.path.join("app", "db", "migrate.py"))
         # The unlock must sit in a finally block attached to the upgrade call.
+        # `_run_alembic_upgrade` takes the migration url since 2026-08-20 (it
+        # must migrate the same endpoint the lock was taken on), so the call
+        # may carry an argument — the `finally` is what this guards.
         assert re.search(
-            r"try:\s*\n\s*_run_alembic_upgrade\(\)\s*\n\s*finally:", source
+            r"try:\s*\n\s*_run_alembic_upgrade\([^)]*\)\s*\n\s*finally:", source
         ), "the advisory unlock is not in a finally around the upgrade"
         assert "pg_advisory_unlock" in source
 
@@ -67,7 +70,7 @@ class TestNonPostgresPath:
         unit suite must not need a PostgreSQL server to migrate."""
         called = {}
         monkeypatch.setattr(migrate, "_run_alembic_upgrade",
-                            lambda: called.setdefault("ran", True))
+                            lambda url=None: called.setdefault("ran", True))
 
         status = migrate.run_migrations("sqlite:///:memory:")
 

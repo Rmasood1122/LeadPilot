@@ -1,0 +1,97 @@
+# Docker build context exclusions.
+#
+# WHY THIS FILE EXISTS
+# The Dockerfile ends with `COPY . .`. Without a .dockerignore that copies the
+# ENTIRE working tree into the image. Verified on 2026-08-20 by building
+# `--target production` and inspecting the result:
+#
+#   /code/.env   5205 bytes   <- present
+#   /code        877 MB       <- frontend/node_modules + frontend/.next
+#
+# Two separate problems, both serious for a registry-hosted deploy (Render,
+# Railway, anything that stores the built image):
+#
+#   1. SECRETS SHIPPED. .env holds the live ANTHROPIC_API_KEY, SECRET_KEY and
+#      ENCRYPTION_KEY. Anyone who can pull or inspect the image has them, and
+#      image layers persist after the file is "deleted" in a later layer.
+#
+#   2. SILENT CONFIG FALLBACK, which is the subtler one. pydantic-settings
+#      reads .env when a variable is absent from the environment. Real env vars
+#      win, so the dashboard still governs whatever it sets — but anything the
+#      dashboard FORGETS silently falls back to the development value instead
+#      of failing. A production container could quietly point DATABASE_URL at
+#      localhost:5433 or boot with the dev SECRET_KEY, and
+#      app/core/production_guard.py would see a populated value and pass.
+#      Excluding .env makes a missing variable an immediate, loud failure.
+#
+# Rule of thumb: if it is generated, secret, or only used on a developer's
+# machine, it does not belong in the image.
+
+# ---------------------------------------------------------------------------
+# Secrets — never in an image
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.production.example
+*.pem
+*.key
+secrets/
+
+# ---------------------------------------------------------------------------
+# Frontend build artefacts and dependencies (~820 MB of the 877 MB above).
+# The API image never runs the frontend; Vercel builds it from source.
+# ---------------------------------------------------------------------------
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+frontend/android/
+**/node_modules/
+
+# ---------------------------------------------------------------------------
+# Python caches and local venvs
+# ---------------------------------------------------------------------------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+htmlcov/
+.coverage
+.coverage.*
+
+# ---------------------------------------------------------------------------
+# VCS and editor
+# ---------------------------------------------------------------------------
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+
+# ---------------------------------------------------------------------------
+# Local runtime state — logs, schedules, scratch. Celery beat recreates its
+# schedule file; shipping a stale one confuses the scheduler.
+# ---------------------------------------------------------------------------
+.runlogs/
+.phasec/
+logs/
+*.log
+celerybeat-schedule*
+media/
+
+# ---------------------------------------------------------------------------
+# Docs and local-only compose files. Keep the image to what runs.
+# ---------------------------------------------------------------------------
+docs/
+*.md
+!README.md
+docker-compose*.yml
+Dockerfile
+.dockerignore

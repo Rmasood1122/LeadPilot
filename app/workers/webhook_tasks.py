@@ -78,7 +78,11 @@ def deliver_webhook(self, delivery_id: str) -> dict:
             "User-Agent": "ClientHunter-Enterprise/1.0",
         }
         if secret:
-            from services.webhook_delivery import _sign_payload
+            # `app.` prefix: there is no top-level `services` package — the module
+            # is app/services/webhook_delivery.py. Without it every SIGNED webhook
+            # delivery raised ModuleNotFoundError and then retried forever, while
+            # unsigned deliveries worked fine and hid the breakage.
+            from app.services.webhook_delivery import _sign_payload
             headers["X-ClientHunter-Signature"] = _sign_payload(secret, payload_bytes)
 
         # HTTP delivery
