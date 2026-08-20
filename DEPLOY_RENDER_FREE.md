@@ -377,7 +377,81 @@ keys**, and zero model tables missing versus `Base.metadata`.
 
 ## Part 4 — Vercel (frontend)
 
-*(filled in during Part 4)*
+The API went live at `https://leadpilot-api-ph3t.onrender.com` on 2026-08-20
+(`/health` 200 in 0.89s, `database: ok`, `redis: ok`).
+
+### Static export stays — do not switch to Vercel's Next.js runtime
+
+`next.config.js` sets `output: 'export'` with `trailingSlash: true` and
+`images.unoptimized`. That is **required by the Capacitor mobile build**
+(`npm run mobile:build` runs `next build && cap sync`, which needs a real `out/`
+directory of static files). Switching to Vercel's server runtime would break
+the Android path, so Vercel serves the exported static site instead. No feature
+is lost here — the app has no SSR, no API routes and no ISR; it is a pure SPA
+talking to the Render API.
+
+### Vercel project settings
+
+| Setting | Value | Why |
+|---|---|---|
+| Framework Preset | **Next.js** | Auto-detected. |
+| **Root Directory** | **`frontend`** | The Next app is not at the repo root. Settings → Build and Deployment → Root Directory → Save. |
+| Build Command | *leave default* | Vercel uses the `build` script, which is exactly `next build`. |
+| Output Directory | *leave default* | *"If Vercel detects a framework, the output directory will automatically be configured."* With `output: 'export'` Next writes `out/` and the Next.js preset picks it up. If a deploy ever serves a blank page, override it to `out` — that is the only fallback needed. |
+| Install Command | *leave default* | |
+| Node.js Version | default | `package.json` pins no `engines`; Next 14.2.35 is fine on Vercel's default. |
+
+### The one environment variable
+
+| Name | Value | Environments |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `https://leadpilot-api-ph3t.onrender.com` | Production, Preview, Development |
+
+Set it under Project Settings → **Environment Variables** *before* the first
+deploy. It is **baked in at build time**, not read at runtime, so changing it
+later requires a redeploy, not just a restart.
+
+`frontend/.env` (which holds the localhost value locally) is **gitignored and
+untracked**, so Vercel never sees it. That means an unset variable on Vercel is
+genuinely unset — and the build guard fails loudly rather than silently baking
+a broken origin.
+
+### Verified locally before any of the above was written
+
+Built with the real Render URL and inspected the output:
+
+* URL baked into **8 bundle files** as `a="https://leadpilot-api-ph3t.onrender.com"` — correct scheme, no trailing slash.
+* **Zero** files containing `localhost:8000` or `127.0.0.1:8000`.
+* 20 HTML pages, `out/index.html` present, 2.2 MB total, `<title>LeadPilot</title>`, manifest name `LeadPilot`.
+* Served the export over HTTP: `/`, `/login/`, `/strategies/`, `/settings/` all 200.
+
+Build guard exercised in all three states:
+
+| `NEXT_PUBLIC_API_URL` | Result |
+|---|---|
+| the real Render URL | builds, URL baked in |
+| `http://localhost:8000` | `BUILD FAILED: … is a local origin` |
+| unset (with `frontend/.env` moved aside, i.e. Vercel's situation) | `BUILD FAILED: … is not set` |
+
+### After the Vercel deploy: update CORS on Render
+
+The live API currently accepts exactly one origin — `https://leadpilot.vercel.app`
+— and rejects everything else. Confirmed it is **not** a wildcard: `evil.example.com`,
+`attacker.test` and `random-9f2k.vercel.app` are all refused, which matters because
+the API sends `access-control-allow-credentials: true`.
+
+So if the Vercel project is named `leadpilot`, CORS already works. If Vercel
+assigns any other production domain, update on **both** Render services:
+
+| Variable | New value |
+|---|---|
+| `CORS_ORIGINS` | the real Vercel domain (comma-separated, **never** a JSON array) |
+| `FRONTEND_URL` | the same domain |
+
+`PUBLIC_BASE_URL` stays pointing at the **API's own** URL — it builds unsubscribe
+links that must resolve to the backend, not the frontend.
+
+Both services need the change: `production_guard` runs on the worker too.
 
 ---
 
