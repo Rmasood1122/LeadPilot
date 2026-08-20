@@ -457,6 +457,51 @@ the reason above, but it will not refuse to boot without it.
 quoted. `app/main.py` splits on commas and unions the result with the Capacitor
 origins.
 
+### REDIS_URL must be set on the WORKER too — and it fails silently if not
+
+Symptom seen on 2026-08-20: the worker deployed cleanly, its logs showed
+`[entrypoint] starting Celery beat` and `Your service is live`, and yet the
+API's `/health` sat at `celery: {"status":"degraded","reason":"no heartbeat key
+found"}` indefinitely. Both services independently reported `redis: ok`.
+
+**Why "redis: ok" on both sides proves nothing.** It only proves each process
+can reach *a* Redis — not the *same* one.
+
+The trap, confirmed in code:
+
+* Celery reads **`CELERY_BROKER_URL`** / **`CELERY_RESULT_BACKEND`**.
+* Everything else — the beat heartbeat, the response cache, the circuit
+  breakers, the auth rate limiter — goes through
+  `app/core/redis_client.py::get_sync_redis()`, which reads **`REDIS_URL`**.
+* `_redis_url()` returns `settings.redis_url`, and `app/config.py` gives that a
+  **non-empty default of `redis://localhost:6379/0`**. So the `if url:` check
+  is satisfied and the `os.getenv` fallback never runs.
+
+Net effect: **an unset `REDIS_URL` does not fail.** The process connects to a
+localhost Redis that does not exist inside the container. Celery is completely
+unaffected, so beat keeps scheduling the heartbeat every 60 seconds and every
+write fails — while the deploy, the logs and the worker's own health endpoint
+all look fine.
+
+`REDIS_URL`, `CELERY_BROKER_URL` and `CELERY_RESULT_BACKEND` are three separate
+`sync: false` entries in `render.yaml`, prompted **per service**. Setting them
+on the api does nothing for the worker. Render does not share environment
+variables between services unless you use an env group.
+
+Two code changes now make this loud instead of silent:
+
+1. `app/worker_health.py` reports a **`redis`** component alongside `worker` and
+   `beat`, including whether the heartbeat key is present. Previously it checked
+   PIDs only — which is exactly why two live-but-useless Celery processes read
+   as healthy.
+2. `app/core/production_guard.py` rejects an unset or loopback `REDIS_URL` in
+   production. (API only — the worker does not run the guard; change 1 covers it.)
+
+**Diagnosing this class of problem:** connect to the Redis you *believe* both
+services use and run `DBSIZE`. A Celery-connected Redis is never empty — the
+broker creates `_kombu.binding.*` keys on connection. An empty database means
+nothing is talking to it.
+
 ### If a service returns a bare 502: check its Docker Command first
 
 `leadpilot-worker` returned a consistent 502 (0.7–2.5s, so not a cold start)

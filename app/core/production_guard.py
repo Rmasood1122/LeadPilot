@@ -177,6 +177,46 @@ def _check_public_base_url(problems: list[str]) -> None:
         )
 
 
+def _check_redis_url(problems: list[str]) -> None:
+    """REDIS_URL must not silently fall back to localhost.
+
+    This one is sneaky because NOTHING ELSE BREAKS. Celery reads
+    CELERY_BROKER_URL / CELERY_RESULT_BACKEND, so an unset REDIS_URL still
+    leaves the broker, beat and every worker perfectly healthy. Only the things
+    that go through app/core/redis_client.py suffer: the beat heartbeat, the
+    response cache, the circuit breakers and the auth rate limiter.
+
+    And it cannot fail loudly on its own, because settings.redis_url has a
+    NON-EMPTY default of redis://localhost:6379/0 — so `if url:` in
+    _redis_url() is satisfied and the os.getenv fallback never runs. The
+    process just connects to a Redis that does not exist inside the container.
+
+    Observed live on 2026-08-20: the Render worker's beat scheduled the
+    heartbeat every 60s, every write failed against localhost, and the API's
+    /health reported "no heartbeat key found" for hours with nothing pointing
+    at the cause.
+
+    Note this guard runs on the API only (app/main.py). The worker does not
+    import it — app/worker_health.py carries the equivalent check instead.
+    """
+    value = os.getenv("REDIS_URL", "").strip()
+    if not value:
+        problems.append(
+            "REDIS_URL is not set. It defaults to redis://localhost:6379/0, and "
+            "because that default is non-empty the app connects to it silently "
+            "rather than failing. Celery keeps working (it reads "
+            "CELERY_BROKER_URL), so the only symptoms are a missing beat "
+            "heartbeat, a dead response cache and an inert rate limiter."
+        )
+        return
+    if "localhost" in value or "127.0.0.1" in value or "[::1]" in value:
+        problems.append(
+            "REDIS_URL points at a loopback address, which is unreachable from "
+            "a deployed container. The beat heartbeat, response cache, circuit "
+            "breakers and auth rate limiter all depend on it."
+        )
+
+
 _PLACEHOLDER_SENDER_MARKERS = ("123 main st", "city, country", "your address")
 
 
@@ -223,6 +263,7 @@ def validate_production_config(app_env: str | None = None) -> None:
     _check_encryption_key(problems)
     _check_cors_origins(problems)
     _check_public_base_url(problems)
+    _check_redis_url(problems)
     _check_sender_identity(problems)
 
     if problems:

@@ -89,6 +89,44 @@ def _check(pid_file_env: str) -> dict:
     return {"status": "down", "pid": pid, "reason": "process is gone"}
 
 
+def _check_heartbeat_redis() -> dict:
+    """Can this container reach the Redis the heartbeat is written to?
+
+    THIS EXISTS BECAUSE PID CHECKS WERE NOT ENOUGH. On 2026-08-20 both Celery
+    processes were alive and this endpoint reported {"worker":"ok","beat":"ok"}
+    while the beat heartbeat was silently failing on every tick — so the API's
+    /health sat at "no heartbeat key found" and nothing anywhere said why.
+
+    The cause is a trap worth naming: Celery uses CELERY_BROKER_URL, but
+    app/core/redis_client.py uses REDIS_URL, and settings.redis_url has a
+    NON-EMPTY default of redis://localhost:6379/0. So an unset REDIS_URL does
+    not fail — it quietly points at a localhost Redis that does not exist
+    inside the container. Celery keeps working (different variable), beat keeps
+    scheduling, and only the heartbeat write dies.
+
+    Reporting it here makes the worker's own health endpoint tell the truth,
+    which is the whole point of this file.
+    """
+    try:
+        from app.core.redis_client import get_sync_redis
+        from app.workers.beat_heartbeat import HEARTBEAT_KEY
+
+        client = get_sync_redis()
+        client.ping()
+    except Exception as exc:
+        return {"status": "down", "reason": f"{type(exc).__name__}"}
+
+    info = {"status": "ok"}
+    try:
+        ttl = client.ttl(HEARTBEAT_KEY)
+        info["heartbeat_key"] = "present" if ttl and ttl > 0 else "absent"
+        if ttl and ttl > 0:
+            info["heartbeat_ttl"] = ttl
+    except Exception:
+        pass
+    return info
+
+
 @app.get("/health")
 def health() -> JSONResponse:
     """Liveness for Render's health check AND for the external keep-alive ping.
@@ -99,6 +137,7 @@ def health() -> JSONResponse:
     components = {
         "worker": _check("WORKER_PID_FILE"),
         "beat": _check("BEAT_PID_FILE"),
+        "redis": _check_heartbeat_redis(),
     }
     degraded = [n for n, c in components.items() if c["status"] == "down"]
     body = {

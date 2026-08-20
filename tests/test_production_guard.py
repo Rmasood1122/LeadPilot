@@ -24,6 +24,10 @@ _GOOD_BASE_URL = "https://api.example.com"
 _GOOD_SENDER = "Example Ltd, 42 Real Street, Manchester, M1 2AB, UK"
 
 
+# Any non-loopback redis URL. The guard only rejects unset/loopback values.
+_GOOD_REDIS_URL = "rediss://default:token@example.upstash.io:6379"
+
+
 def _prod_env(monkeypatch, **overrides):
     """A fully valid production environment, with selective overrides.
 
@@ -36,6 +40,7 @@ def _prod_env(monkeypatch, **overrides):
         "CORS_ORIGINS": _GOOD_CORS,
         "PUBLIC_BASE_URL": _GOOD_BASE_URL,
         "SENDER_IDENTITY": _GOOD_SENDER,
+        "REDIS_URL": _GOOD_REDIS_URL,
     }
     env.update(overrides)
     for key, value in env.items():
@@ -52,7 +57,7 @@ class TestNonProductionIsUntouched:
         none of these set."""
         monkeypatch.setenv("APP_ENV", env)
         for key in ("SECRET_KEY", "ENCRYPTION_KEY", "CORS_ORIGINS",
-                    "PUBLIC_BASE_URL", "SENDER_IDENTITY"):
+                    "PUBLIC_BASE_URL", "SENDER_IDENTITY", "REDIS_URL"):
             monkeypatch.delenv(key, raising=False)
         validate_production_config()  # must not raise
 
@@ -139,6 +144,37 @@ class TestCorsOrigins:
             monkeypatch,
             CORS_ORIGINS="https://app.example.com,https://www.app.example.com",
         )
+        validate_production_config()  # must not raise
+
+
+class TestRedisUrl:
+    """REDIS_URL must not silently fall back to localhost.
+
+    The failure this guards against is invisible by construction: Celery reads
+    CELERY_BROKER_URL, so broker, beat and workers all stay healthy while only
+    the beat heartbeat, response cache, circuit breakers and rate limiter
+    break. settings.redis_url has a NON-EMPTY localhost default, so nothing
+    errors — the app just talks to a Redis that is not there. Observed live on
+    the Render worker, 2026-08-20.
+    """
+
+    def test_unset_is_rejected(self, monkeypatch):
+        _prod_env(monkeypatch, REDIS_URL=None)
+        with pytest.raises(ProductionConfigError, match="REDIS_URL is not set"):
+            validate_production_config()
+
+    @pytest.mark.parametrize("url", [
+        "redis://localhost:6379/0",
+        "redis://127.0.0.1:6379/0",
+        "rediss://localhost:6379",
+    ])
+    def test_loopback_is_rejected(self, monkeypatch, url):
+        _prod_env(monkeypatch, REDIS_URL=url)
+        with pytest.raises(ProductionConfigError, match="loopback"):
+            validate_production_config()
+
+    def test_real_remote_url_passes(self, monkeypatch):
+        _prod_env(monkeypatch, REDIS_URL="rediss://default:tok@real.upstash.io:6379")
         validate_production_config()  # must not raise
 
 
