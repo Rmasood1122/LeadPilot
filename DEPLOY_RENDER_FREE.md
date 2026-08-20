@@ -433,25 +433,50 @@ Build guard exercised in all three states:
 | `http://localhost:8000` | `BUILD FAILED: … is a local origin` |
 | unset (with `frontend/.env` moved aside, i.e. Vercel's situation) | `BUILD FAILED: … is not set` |
 
-### After the Vercel deploy: update CORS on Render
+### Live domain and the env vars that actually matter
 
-The live API currently accepts exactly one origin — `https://leadpilot.vercel.app`
-— and rejects everything else. Confirmed it is **not** a wildcard: `evil.example.com`,
-`attacker.test` and `random-9f2k.vercel.app` are all refused, which matters because
-the API sends `access-control-allow-credentials: true`.
+Production frontend: **`https://lead-pilot-coral.vercel.app`** (live 2026-08-20;
+the deployed bundle was confirmed baked with the Render API URL).
 
-So if the Vercel project is named `leadpilot`, CORS already works. If Vercel
-assigns any other production domain, update on **both** Render services:
+Traced through the code rather than assumed — the three variables do NOT all
+belong on both services:
 
-| Variable | New value |
-|---|---|
-| `CORS_ORIGINS` | the real Vercel domain (comma-separated, **never** a JSON array) |
-| `FRONTEND_URL` | the same domain |
+| Variable | leadpilot-api | leadpilot-worker | Why |
+|---|---|---|---|
+| `CORS_ORIGINS` | **REQUIRED** — the Vercel domain | **not used** | `app/main.py:101` reads it via `os.getenv(...).split(",")`. The worker runs `app.worker_health`, which has no CORS middleware and never imports `app.main`. |
+| `PUBLIC_BASE_URL` | the **API's own** URL | **REQUIRED** — the API's own URL | `app/services/sequence_engine.py:383` builds every unsubscribe link from it, and that runs on the worker's send path. A wrong value puts a dead link in every outbound email (CAN-SPAM). Also drives `/media/*` and WhatsApp opt-in links. **Never** the Vercel domain. |
+| `FRONTEND_URL` | inert | inert | Defined at `app/core/config.py:261` and read **nowhere else** — zero references in the codebase. Cosmetic. Same "configured but unwired" pattern as the four inert `RATE_LIMIT_*` settings. |
 
-`PUBLIC_BASE_URL` stays pointing at the **API's own** URL — it builds unsubscribe
-links that must resolve to the backend, not the frontend.
+**Correction to an earlier claim in this file:** it previously said
+"production_guard runs on the worker too". It does not —
+`validate_production_config()` is called only from `app/main.py:74`, and the
+worker never imports that module. The worker still needs `PUBLIC_BASE_URL` for
+the reason above, but it will not refuse to boot without it.
 
-Both services need the change: `production_guard` runs on the worker too.
+`CORS_ORIGINS` is a **plain comma-separated string** — never a JSON array, never
+quoted. `app/main.py` splits on commas and unions the result with the Capacitor
+origins.
+
+### Env var changes need a deploy, not just a save
+
+Render's save dialog offers three choices:
+
+* **Save, rebuild, and deploy** — full rebuild. Only needed if code changed.
+* **Save and deploy** — redeploys the existing build. **Use this** for an env-var-only change.
+* **Save only** — *"Your service will not use the new variables until its next deploy."* The change silently does nothing.
+
+`CORS_ORIGINS` is read at **module import time**, so a running process never
+picks up a new value — the service must actually restart.
+
+### Historical note on the first placeholder
+
+`CORS_ORIGINS` was initially set to a guessed `https://leadpilot.vercel.app`;
+Vercel assigned `lead-pilot-coral.vercel.app` instead. Worth recording that the
+guessed value was verified **not** to be a wildcard — `evil.example.com`,
+`attacker.test` and `random-9f2k.vercel.app` were all refused while only the
+configured origin was echoed. That matters because the API sends
+`access-control-allow-credentials: true`, where echoing any origin would be a
+serious hole.
 
 ---
 
