@@ -48,21 +48,23 @@ services:
     # dockerCommand, NOT startCommand: the spec says "Docker-based services set
     # the optional dockerCommand field instead of this field."
     #
-    # Migrations run here rather than in preDeployCommand, because pre-deploy is
-    # "available for PAID web services" only — using it on plan: free is both a
-    # validation error and a paid-feature reference. Running them inline is what
-    # docker-compose.prod.yml already does.
+    # KEEP THIS TO BARE TOKENS — no quotes, no &&, no shell operators.
+    # It previously read:
+    #   dockerCommand: sh -c "python -m app.db.migrate && uvicorn app.main:app …"
+    # and Render exited 127 with the ENTIRE string looked up as one program
+    # name: Render's tokenizer did not preserve the nested quotes, so the shell
+    # never saw `&&`. The spec documents no escaping for this, and every example
+    # it gives is a single operator-free command. All shell logic therefore
+    # lives in the script.
     #
-    # The race that preDeployCommand avoided is handled by the advisory lock in
-    # app/db/migrate.py, and that lock now actually works: set
-    # MIGRATION_DATABASE_URL to Neon's DIRECT endpoint (session update 17 —
-    # the lock does NOT serialise through Neon's pooler).
-    #
-    # --proxy-headers + --forwarded-allow-ips is what makes request.client.host
-    # the real client IP behind Render's proxy. app/core/rate_limiting.py's
-    # client_ip() keys the auth rate limiter on it; without these flags every
-    # request on the internet would share one bucket.
-    dockerCommand: sh -c "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'"
+    # Migrations run there rather than in preDeployCommand, because pre-deploy
+    # is "available for PAID web services" only — on plan: free that is both a
+    # validation error and a paid-feature reference. The race pre-deploy would
+    # have avoided is handled by the advisory lock in app/db/migrate.py, which
+    # only actually works when MIGRATION_DATABASE_URL points at Neon's DIRECT
+    # endpoint (session update 17 — the lock does NOT serialise through the
+    # pooler).
+    dockerCommand: bash scripts/render_api_entrypoint.sh
 
     healthCheckPath: /health
 

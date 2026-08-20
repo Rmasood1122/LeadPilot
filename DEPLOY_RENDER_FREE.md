@@ -78,18 +78,57 @@ against Render's current Blueprint spec:
 |---|---|---|
 | `dockerTarget: production` | **No such field exists.** Build-stage targeting has been an open feature request since 2021 and is not in the spec. | Removed |
 | `startCommand: …` | Spec: *"Docker-based services set the optional `dockerCommand` field instead of this field."* | `dockerCommand:` |
-| `preDeployCommand: …` | Spec: *"The pre-deploy command is available for **paid** web services…"* — a paid-only feature on a `plan: free` service | Removed; migrations moved into `dockerCommand` |
+| `preDeployCommand: …` | Spec: *"The pre-deploy command is available for **paid** web services…"* — a paid-only feature on a `plan: free` service | Removed; migrations moved into the entrypoint script |
+| `dockerCommand: sh -c "… && …"` | Render exited **127**, looking up the ENTIRE string as one program name — its tokenizer does not preserve nested quotes, so the shell never saw `&&` | Replaced with `bash scripts/render_api_entrypoint.sh` |
 
 Removing `dockerTarget` costs nothing: **the Dockerfile has exactly one stage**,
 `production`, which is also the final stage — so Render builds precisely the
 image we wanted anyway.
 
-Dropping `preDeployCommand` means migrations run inline at container start
-(`python -m app.db.migrate && uvicorn …`), which is what
-`docker-compose.prod.yml` already does. The race that pre-deploy avoided is
-covered by the advisory lock in `app/db/migrate.py` — and that lock only
-actually works when `MIGRATION_DATABASE_URL` points at Neon's **direct**
-endpoint (see Part 3).
+Dropping `preDeployCommand` means migrations run at container start instead.
+The race pre-deploy avoided is covered by the advisory lock in
+`app/db/migrate.py` — and that lock only actually works when
+`MIGRATION_DATABASE_URL` points at Neon's **direct** endpoint (see Part 3).
+
+#### Keep every command field to bare tokens
+
+The first attempt put the compound command inline:
+
+```yaml
+dockerCommand: sh -c "python -m app.db.migrate && uvicorn app.main:app …"
+```
+
+Render deployed that as **status 127**, reporting the whole string — flags,
+`&&` and all — as a single missing program. Its tokenizer did not preserve the
+nested double quotes, so no shell ever parsed the `&&`. The spec documents no
+escaping rules for `dockerCommand`, and every example it gives is a single
+operator-free command, so there is nothing to "get right" here.
+
+**Both services therefore point at a script**, and every command field in
+`render.yaml` is now two bare tokens with no quotes, `$`, `&&` or `;`:
+
+| Service | `dockerCommand` |
+|---|---|
+| leadpilot-api | `bash scripts/render_api_entrypoint.sh` |
+| leadpilot-worker | `bash scripts/render_worker_entrypoint.sh` |
+
+`scripts/render_api_entrypoint.sh` uses `set -e` (a failed migration aborts the
+boot, so a half-migrated schema never serves traffic) and `exec uvicorn` (so
+uvicorn is PID 1 and Render's SIGTERM reaches it rather than a bash wrapper).
+
+Verified locally against the built image with the real Neon and Upstash
+credentials, running the exact `dockerCommand` Render runs:
+
+```
+[api-entrypoint] running database migrations
+migrate: acquiring advisory lock … / lock acquired, upgrading to head
+[api-entrypoint] migrations complete; starting uvicorn on 0.0.0.0:10000
+INFO:     Application startup complete.
+```
+
+`/health` returned `database: ok, redis: ok`; `/proc/1/cmdline` confirmed
+uvicorn is PID 1; and a deliberately broken `DATABASE_URL` exited **1** with
+uvicorn never starting — the `&&` guarantee, proven rather than assumed.
 
 Verified before re-import: the exact `dockerCommand` above was run against the
 built image with the real Neon and Upstash credentials — advisory lock
