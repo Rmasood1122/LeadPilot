@@ -457,6 +457,38 @@ the reason above, but it will not refuse to boot without it.
 quoted. `app/main.py` splits on commas and unions the result with the Capacitor
 origins.
 
+### If a service returns a bare 502: check its Docker Command first
+
+`leadpilot-worker` returned a consistent 502 (0.7–2.5s, so not a cold start)
+while the api was fine. Reproduced locally: **a service whose Docker Command is
+empty falls back to the Dockerfile's `CMD`.** That used to hardcode port 8000,
+so the container bound 8000 while Render routed to `$PORT` — a bare 502 with
+nothing useful in the logs — and it ran `app.main` (the API) instead of Celery,
+so no task was ever consumed and no beat heartbeat was ever written.
+
+Two things came out of that:
+
+1. **The Dockerfile `CMD` now honours `$PORT`**
+   (`uvicorn … --port ${PORT:-8000}`), so a service that loses its command
+   answers on the right port instead of failing invisibly. The 8000 fallback
+   keeps docker-compose working unchanged. Verified: with `PORT=10000` and no
+   command override the container now reports
+   `Uvicorn running on http://0.0.0.0:10000` and `/health` returns 200.
+2. **That is a safety net, not the fix.** A worker running the API is still the
+   wrong process. Confirm in Render → **leadpilot-worker → Settings → Deploy →
+   Docker Command** that it reads exactly:
+
+   ```
+   bash scripts/render_worker_entrypoint.sh
+   ```
+
+   A Blueprint sync does not always overwrite a setting on an already-created
+   service, so this can silently stay empty after the yaml is corrected.
+
+Note that a first boot against Neon takes roughly **60 seconds** before
+`Application startup complete` appears — measured locally. Do not judge a
+deploy failed at 20 seconds.
+
 ### Env var changes need a deploy, not just a save
 
 Render's save dialog offers three choices:

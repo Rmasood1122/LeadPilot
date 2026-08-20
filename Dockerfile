@@ -27,5 +27,16 @@ RUN pip install --no-deps .
 
 EXPOSE 8000
 
-# Default command = API; worker/beat override `command` in docker-compose.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Default command = API; worker/beat override it (docker-compose `command`,
+# Render `dockerCommand`).
+#
+# ${PORT:-8000} is load-bearing, not decoration. This CMD used to hardcode
+# 8000. On 2026-08-20 the Render worker service came up without its
+# dockerCommand set, fell back to this line, and bound 8000 while Render was
+# routing to $PORT — producing a bare 502 with nothing useful in the logs, and
+# silently running the API instead of Celery so no task was ever consumed.
+#
+# Honouring $PORT means a service that loses its command still answers on the
+# right port instead of failing invisibly. The 8000 fallback keeps
+# docker-compose (which sets no PORT) working exactly as before.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
