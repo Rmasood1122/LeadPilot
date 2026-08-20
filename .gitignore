@@ -1,0 +1,27 @@
+# Secrets — never commit a real env file.
+# `.env` alone did not cover .env.local / .env.production / .env.prod etc.,
+# which matters now that this repo gets pushed to GitHub for Railway deploys.
+# The two *.example files are the documented templates and stay tracked.
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Local production-secrets reference, if one is ever placed in-tree by mistake.
+*-secrets.txt
+*.secrets
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Local Phase C run artifacts (uvicorn/celery logs, scratch harness state).
+.phasec/
+
+# Local run logs from `run my full system` sessions (API, workers, beat,
+# frontend, pytest output). Scratch only — never commit.
+.runlogs/

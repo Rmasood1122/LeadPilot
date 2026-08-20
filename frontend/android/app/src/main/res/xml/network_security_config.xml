@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  network_security_config.xml — ClientHunter Enterprise
+  Android API 28+ blocks cleartext (HTTP) traffic by default.
+
+  DEV PROFILE: When NEXT_PUBLIC_API_URL=http://10.0.2.2:8000, the app makes
+  HTTP (not HTTPS) requests to the dev backend on the host machine.
+  This config permits cleartext ONLY to 10.0.2.2 (the emulator's host alias).
+
+  PRODUCTION: All API calls go to https://api.clienthunter.app (or your cloud URL).
+  No cleartext is needed in production — this config does not loosen HTTPS elsewhere.
+
+  If you ONLY build for production and your dev backend also uses HTTPS,
+  you can remove the <domain-config> block entirely.
+-->
+<network-security-config>
+
+    <!-- Default: trust system CAs only, no cleartext. -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!--
+      Allow cleartext HTTP to the Android emulator's host alias.
+      10.0.2.2 = your development machine's localhost as seen from the emulator.
+      This ONLY affects debug builds where you point NEXT_PUBLIC_API_URL at http://10.0.2.2:8000.
+      TODO: verify port mapping guidance in current Android emulator docs.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+
+</network-security-config>

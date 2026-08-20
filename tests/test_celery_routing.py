@@ -1,0 +1,208 @@
+"""Architecture tripwire: the queue a task is PUBLISHED to must be a queue a
+worker actually CONSUMES.
+
+This caught a total production outage. celery_app.py had no `task_routes`, so
+every task went to Celery's implicit "celery" queue, while
+docker-compose.prod.yml starts its workers bound to -Q pipeline / -Q outreach /
+-Q learning,default. Nothing consumed "celery" and nothing was published to the
+four declared queues, so in production the entire async backend — strategy
+generation, outreach dispatch, reply polling, the learning loop, the beat
+heartbeat — would have silently done nothing. It passed unnoticed in dev only
+because the dev worker is started without -Q and therefore consumes "celery".
+
+Do not delete these tests. If you add a task or rename a queue, fix the routing
+or the compose file, not the assertion.
+"""
+
+import json
+import re
+from pathlib import Path
+
+import pytest
+import yaml
+
+# Importing the task modules is what registers them on the app.
+import app.workers.beat_heartbeat  # noqa: F401
+import app.workers.lead_tasks  # noqa: F401
+import app.workers.learning_tasks  # noqa: F401
+import app.workers.outreach_tasks  # noqa: F401
+import app.workers.send_tasks  # noqa: F401
+import app.workers.tasks  # noqa: F401
+import app.workers.webhook_tasks  # noqa: F401
+from app.workers.celery_app import celery_app
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_COMPOSE_FILES = ["docker-compose.yml", "docker-compose.prod.yml"]
+
+
+def _app_task_names() -> list[str]:
+    """Every task this project registers (Celery's own internals excluded)."""
+    return sorted(n for n in celery_app.tasks if not n.startswith("celery."))
+
+
+def _queue_of(task_name: str) -> str:
+    return celery_app.amqp.router.route({}, task_name)["queue"].name
+
+
+def _consumed_queues(compose_file: str) -> set[str]:
+    """Queues named by `-Q a,b,c` across every worker service in a compose file."""
+    data = yaml.safe_load((_REPO_ROOT / compose_file).read_text(encoding="utf-8"))
+    queues: set[str] = set()
+    for service in (data.get("services") or {}).values():
+        command = service.get("command")
+        if not command:
+            continue
+        if isinstance(command, list):
+            command = " ".join(str(c) for c in command)
+        if " worker" not in command:
+            continue
+        match = re.search(r"-Q\s+([A-Za-z0-9_,.-]+)", command)
+        assert match, (
+            f"{compose_file}: worker started without -Q, so it consumes only the "
+            f"implicit 'celery' queue and will process nothing: {command.strip()}"
+        )
+        queues.update(q for q in match.group(1).split(",") if q)
+    return queues
+
+
+def test_every_task_has_an_explicit_route():
+    """No task may fall through to the default queue by accident."""
+    unrouted = [
+        name for name in _app_task_names()
+        if celery_app.amqp.router.route({}, name).get("queue") is None
+    ]
+    assert not unrouted, f"tasks with no resolvable queue: {unrouted}"
+
+
+@pytest.mark.parametrize("compose_file", _COMPOSE_FILES)
+def test_every_task_lands_in_a_consumed_queue(compose_file):
+    """The bug this file exists for: published-to but never consumed-from."""
+    consumed = _consumed_queues(compose_file)
+    assert consumed, f"{compose_file}: no worker consumes any queue"
+
+    stranded = {}
+    for name in _app_task_names():
+        queue = _queue_of(name)
+        if queue not in consumed:
+            stranded[name] = queue
+    assert not stranded, (
+        f"{compose_file}: these tasks are published to queues no worker consumes "
+        f"(consumed={sorted(consumed)}): {stranded}"
+    )
+
+
+@pytest.mark.parametrize("compose_file", _COMPOSE_FILES)
+def test_no_worker_listens_to_a_queue_nothing_publishes_to(compose_file):
+    """The mirror image: a worker burning a container on an always-empty queue
+    is the symptom that tells you the routing drifted."""
+    consumed = _consumed_queues(compose_file)
+    published = {_queue_of(name) for name in _app_task_names()}
+    # `default` is deliberately allowed to be consumed-but-empty: it is the
+    # catch-all for any future task added without an explicit route.
+    idle = consumed - published - {"default"}
+    assert not idle, (
+        f"{compose_file}: workers consume {sorted(idle)} but no task is routed "
+        f"there (published={sorted(published)})"
+    )
+
+
+def test_beat_scheduled_tasks_are_registered_and_routed():
+    """A beat entry naming a task that does not exist fails silently at runtime:
+    beat publishes it, no worker can execute it."""
+    registered = set(celery_app.tasks)
+    for entry_name, entry in (celery_app.conf.beat_schedule or {}).items():
+        task_name = entry["task"]
+        assert task_name in registered, (
+            f"beat entry {entry_name!r} schedules unregistered task {task_name!r}"
+        )
+        assert _queue_of(task_name), f"beat task {task_name!r} has no queue"
+
+
+def test_default_queue_is_not_celerys_implicit_one():
+    """`celery` is the name nothing in this project consumes."""
+    assert celery_app.conf.task_default_queue == "default", (
+        "task_default_queue fell back to Celery's implicit 'celery' queue, which "
+        "no worker in any compose file consumes"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Railway per-service configs
+# ---------------------------------------------------------------------------
+# The queue list is the one deployment detail no test could reach while it was
+# typed into the Railway dashboard: a worker started without -Q consumes only
+# the implicit "celery" queue and sits idle, healthy, processing nothing.
+# Moving each service's startCommand into railway/*.json puts it back under
+# review — and under these tests. Railway resolves config-as-code over dashboard
+# values, so the file wins even if someone edits the dashboard field.
+
+_RAILWAY_DIR = _REPO_ROOT / "railway"
+
+
+def _railway_configs() -> dict[str, dict]:
+    return {p.name: json.loads(p.read_text(encoding="utf-8"))
+            for p in sorted(_RAILWAY_DIR.glob("*.json"))}
+
+
+def test_railway_config_dir_exists():
+    assert _RAILWAY_DIR.is_dir(), "railway/ per-service configs are missing"
+    assert _railway_configs(), "no railway/*.json files found"
+
+
+def test_no_root_railway_json():
+    """A root config is inherited by any service without an explicit path — a
+    worker picking up the API's uvicorn startCommand would serve HTTP and
+    consume no queues at all."""
+    assert not (_REPO_ROOT / "railway.json").exists(), (
+        "root railway.json would be inherited by worker services; give every "
+        "service an explicit railway/<service>.json instead"
+    )
+
+
+def test_every_railway_worker_declares_queues():
+    for name, cfg in _railway_configs().items():
+        start = cfg["deploy"]["startCommand"]
+        if " worker" not in start:
+            continue
+        match = re.search(r"-Q\s+([A-Za-z0-9_,.-]+)", start)
+        assert match, (
+            f"railway/{name}: celery worker started without -Q — it would "
+            f"consume only the implicit 'celery' queue and process nothing: "
+            f"{start}"
+        )
+
+
+def test_railway_queues_match_task_routes():
+    """Union of every Railway worker's -Q must cover every routed queue."""
+    consumed: set[str] = set()
+    for cfg in _railway_configs().values():
+        start = cfg["deploy"]["startCommand"]
+        if " worker" not in start:
+            continue
+        match = re.search(r"-Q\s+([A-Za-z0-9_,.-]+)", start)
+        if match:
+            consumed.update(q for q in match.group(1).split(",") if q)
+    published = {_queue_of(n) for n in _app_task_names()}
+    missing = published - consumed
+    assert not missing, (
+        f"railway/*.json consume {sorted(consumed)} but tasks are routed to "
+        f"{sorted(missing)} — those tasks would never run in production"
+    )
+
+
+def test_railway_beat_takes_no_queue_flag():
+    """Beat publishes; it consumes nothing. A -Q there signals a copy-paste."""
+    for name, cfg in _railway_configs().items():
+        start = cfg["deploy"]["startCommand"]
+        if " beat" in start:
+            assert "-Q" not in start, f"railway/{name}: beat should not take -Q"
+
+
+def test_only_api_runs_migrations():
+    """Migrations belong in exactly one pre-deploy command."""
+    migrators = [n for n, c in _railway_configs().items()
+                 if any("app.db.migrate" in cmd
+                        for cmd in c["deploy"].get("preDeployCommand", []))]
+    assert migrators == ["api.json"], (
+        f"expected only api.json to run migrations, got {migrators}"
+    )

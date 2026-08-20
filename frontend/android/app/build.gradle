@@ -1,0 +1,170 @@
+// android/app/build.gradle — ClientHunter Enterprise
+// M7 Chunk 4: signing config, product flavors, build types.
+//
+// Signing values are read from local.properties (gitignored) for local builds
+// and from environment variables (set by CI via GITHUB_ENV) for CI builds.
+// The keystore path and passwords are NEVER hard-coded here.
+
+apply plugin: 'com.android.application'
+
+// ── Load local.properties ─────────────────────────────────────────────────────
+Properties localProps = new Properties()
+def localPropsFile = rootProject.file('local.properties')
+if (localPropsFile.exists()) {
+    localProps.load(localPropsFile.newDataInputStream())
+}
+
+// Helper: read from local.properties first, fall back to environment variable.
+// This allows both local development (local.properties) and CI (env vars set by
+// the workflow's GITHUB_ENV step) to use the same build.gradle without changes.
+def signingProp = { String key ->
+    return localProps.getProperty(key) ?: System.getenv(key) ?: ''
+}
+
+android {
+    // TODO: verify compileSdk / minSdk / targetSdk required by current Capacitor version
+    // These values match Capacitor 6 defaults; update android/variables.gradle to change them.
+    namespace "com.clienthunter.app"
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        applicationId "com.clienthunter.app"
+        minSdk rootProject.ext.minSdkVersion
+        targetSdk rootProject.ext.targetSdkVersion
+        versionCode 1            // increment before every Play Store release
+        versionName "0.7.0"     // matches package.json version
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        aaptOptions {
+            // Standard Capacitor asset packaging config — do not remove
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+
+    // ── Signing configuration ─────────────────────────────────────────────────
+    signingConfigs {
+        debug {
+            // Android SDK default debug keystore — already present after `cap add android`
+            // No configuration needed here; Gradle uses the debug keystore automatically.
+        }
+
+        release {
+            def keystorePath = signingProp('KEYSTORE_PATH')
+            if (keystorePath) {
+                storeFile     file(keystorePath)
+                storePassword signingProp('KEYSTORE_PASSWORD')
+                keyAlias      signingProp('KEY_ALIAS')
+                keyPassword   signingProp('KEY_PASSWORD')
+            } else {
+                // Signing values not found — release builds will fail at signing time.
+                // This is intentional: never silently skip signing.
+                println "WARNING: KEYSTORE_PATH not set in local.properties or environment."
+                println "         Release builds will fail. See SIGNING.md for setup instructions."
+            }
+        }
+    }
+
+    // ── Build types ───────────────────────────────────────────────────────────
+    buildTypes {
+        debug {
+            // debuggable is true by default for debug type — no need to set it
+            // applicationIdSuffix is set per flavor below (.dev.debug for devDebug)
+        }
+
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            // TODO: verify proguard config does not break Capacitor WebView bridge
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // debuggable false is the default for release type
+        }
+    }
+
+    // ── Product flavors ───────────────────────────────────────────────────────
+    // Dimension: "environment" — dev (local/staging) vs prod (cloud backend).
+    //
+    // Combined variant matrix:
+    //   devDebug    → assembleDevDebug    (local dev on emulator)
+    //   devRelease  → assembleDevRelease  (staging QA — rare)
+    //   prodDebug   → assembleProdDebug   (prod API, debuggable — rare)
+    //   prodRelease → assembleProdRelease / bundleProdRelease (Play Store)
+    //
+    // The npm scripts `mobile:build:dev` and `mobile:build:prod` drive
+    // the Next.js build with the correct NEXT_PUBLIC_API_URL before calling
+    // cap sync + the appropriate Gradle task.
+
+    flavorDimensions "environment"
+
+    productFlavors {
+        dev {
+            dimension "environment"
+            // .dev suffix on applicationId allows dev + prod to coexist on the same device
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+            // The "DEV BUILD" banner overlay is rendered in the app via the
+            // NEXT_PUBLIC_BUILD_TARGET=mobile-dev environment variable baked
+            // into the Next.js static export — Gradle doesn't inject it; the
+            // npm script does (see mobile:build:dev in package.json).
+        }
+
+        prod {
+            dimension "environment"
+            // No suffix — this IS the production app identity
+        }
+    }
+
+    // ── Java source compatibility ─────────────────────────────────────────────
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        // TODO: verify Java version required by current Capacitor / Firebase SDK
+    }
+}
+
+// ── Repositories ─────────────────────────────────────────────────────────────
+repositories {
+    flatDir {
+        dirs '../capacitor-cordova-android-plugins'
+    }
+}
+
+// ── Dependencies ─────────────────────────────────────────────────────────────
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+
+    // AndroidX
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+
+    // Capacitor
+    implementation project(':capacitor-android')
+
+    // Capacitor plugins (added by `npx cap sync` from the installed npm packages)
+    implementation project(':capacitor-app')
+    implementation project(':capacitor-haptics')
+    implementation project(':capacitor-keyboard')
+    implementation project(':capacitor-status-bar')
+    implementation project(':capacitor-network')
+    implementation project(':capacitor-preferences')
+    implementation project(':capacitor-splash-screen')
+    implementation project(':capacitor-push-notifications')
+
+    // Firebase (required by @capacitor/push-notifications for FCM)
+    // TODO: verify Firebase BoM version compatible with current @capacitor/push-notifications
+    implementation platform('com.google.firebase:firebase-bom:33.0.0')
+    implementation 'com.google.firebase:firebase-messaging'
+
+    // Testing
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+}
+
+// Required by Capacitor — do not remove
+apply from: 'capacitor.build.gradle'
+
+// Required by Firebase (google-services plugin processes google-services.json)
+// TODO: verify this is still the correct apply location for current Firebase / Gradle versions
+apply plugin: 'com.google.gms.google-services'

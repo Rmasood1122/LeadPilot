@@ -1,0 +1,64 @@
+# ─── ClientHunter Enterprise — Backend Requirements ───────────────────────────
+# Pin major versions; update with care (run full test suite after any change).
+# Install: pip install -r requirements.txt --break-system-packages
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi>=0.111.0,<0.112
+uvicorn[standard]>=0.30.0,<0.31
+python-multipart>=0.0.9       # file uploads (theme background images)
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy>=2.0.30,<2.1
+asyncpg>=0.29.0               # async PostgreSQL driver
+alembic>=1.13.0,<1.14
+
+# ── Task queue ────────────────────────────────────────────────────────────────
+celery[redis]>=5.4.0,<5.5
+redis>=5.0.0,<6.0
+
+# ── Pydantic ──────────────────────────────────────────────────────────────────
+pydantic>=2.7.0,<3.0
+pydantic-settings>=2.3.0
+
+# ── AI (research pipeline + strategy generation + verification) ───────────────
+anthropic>=0.28.0
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+python-jose[cryptography]>=3.3.0   # JWT
+passlib[bcrypt]>=1.7.4             # password hashing
+
+# ── Lead sourcing / enrichment (M2) ───────────────────────────────────────────
+httpx>=0.27.0                       # async HTTP client for Apollo + Hunter APIs
+
+# ── Email (M3) ────────────────────────────────────────────────────────────────
+google-auth>=2.30.0
+google-auth-oauthlib>=1.2.0
+google-api-python-client>=2.133.0
+
+# ── Calendly webhooks (M3) ────────────────────────────────────────────────────
+# No dedicated SDK — uses httpx
+
+# ── WhatsApp Business Cloud API (M4) ─────────────────────────────────────────
+# No dedicated SDK — uses httpx
+
+# ── Push notifications / Firebase Admin (M7 Chunk 3) ──────────────────────────
+# TODO: verify latest stable firebase-admin version compatible with Python 3.11+
+firebase-admin>=6.5.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv>=1.0.1
+tenacity>=8.4.1        # retry logic with exponential backoff
+
+# ── Dev / test only ──────────────────────────────────────────────────────────
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+httpx                  # already listed above — also used by pytest test client
+respx>=0.21.0          # httpx mock transport — imported by tests/conftest.py
+faker>=25.0.0          # test data generation
+
+# ── Combined-build additions (verified against actual imports) ───────────────
+psycopg2-binary>=2.9          # sync PostgreSQL driver (app/db/base.py engine)
+structlog>=24.1.0             # structured JSON logging (app/core/logging.py, M8-C3)
+typer>=0.12.0                 # admin CLI (app/cli/create_admin.py, M8-C3)
+rich>=13.7.0                  # admin CLI tables
+cryptography>=42.0            # Fernet token encryption (app/core/crypto.py, M8-C3)

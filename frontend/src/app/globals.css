@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Defaults = the Light preset. The ThemeProvider (and the no-flash inline
+   script) overwrite these on <html> — components ONLY consume variables. */
+:root {
+  --background: 248 250 252;
+  --foreground: 17 24 39;
+  --card: 255 255 255;
+  --card-foreground: 17 24 39;
+  --primary: 29 78 216;
+  --primary-foreground: 255 255 255;
+  --accent: 8 145 178;
+  --accent-foreground: 255 255 255;
+  --muted: 226 232 240;
+  --muted-foreground: 100 116 139;
+  --border: 203 213 225;
+  --destructive: 220 38 38;
+  --success: 22 163 74;
+  --warning: 217 119 6;
+  --radius: 8px;
+  --font-family: "Inter";
+  --density-gutter: 1rem;
+  --bg-image: none;
+  --bg-overlay: 0;
+}
+
+body {
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-family: var(--font-family), system-ui, sans-serif;
+}
+
+/* Background image with the readability overlay (dim slider). */
+.app-bg {
+  position: relative;
+  min-height: 100dvh;
+}
+.app-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+}
+.app-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgb(var(--background) / var(--bg-overlay));
+  backdrop-filter: blur(calc(var(--bg-overlay) * 6px));
+}
+
+/* Print stylesheet: strategy/GTM document export-to-PDF (Chunk 4). */
+@media print {
+  .no-print { display: none !important; }
+  .print-doc { max-width: none !important; padding: 0 !important; }
+  body { background: white !important; color: black !important; }
+}

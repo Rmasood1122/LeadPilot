@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest.xml — ClientHunter Enterprise
+  M7 Chunk 4: Play Store release audit.
+
+  PERMISSIONS AUDIT (Play Store rejects apps that declare unused permissions):
+
+  ✅ INTERNET              — required; app makes all network calls to cloud backend
+  ✅ POST_NOTIFICATIONS    — required on Android 13+ (API 33+) for FCM push notifications
+  ✅ VIBRATE               — required for FCM notification vibration on Android < 8
+                             TODO: verify if @capacitor/push-notifications still needs this
+                             or if it is declared via its own manifest merger
+
+  ❌ RECEIVE_BOOT_COMPLETED — NOT included. Modern FCM (via Firebase SDK + Google Play
+                              Services) does not need this; it receives pushes through
+                              Google's persistent connection, not a boot receiver.
+                              TODO: verify with current @capacitor/push-notifications plugin.
+  ❌ READ_PHONE_STATE       — NOT included. Not used.
+  ❌ CAMERA / STORAGE       — NOT included. Not used in M7 scope.
+
+  ANDROID 12+ EXPORTED AUDIT (android:exported required on all components with intent-filters):
+  ✅ MainActivity             — android:exported="true" (launcher + deep link receiver)
+  ✅ FileProvider             — android:exported="false" (intentional — content URI only)
+  ✅ FCM service/receiver     — handled by firebase-messaging SDK manifest merger
+                               TODO: verify via `./gradlew processDebugManifest` output
+
+  FCM DECLARATIONS:
+  The firebase-messaging SDK and @capacitor/push-notifications declare their own
+  services and receivers via manifest merger (AndroidManifest.xml in the AAR).
+  No explicit FCM service entry is needed here unless you add a custom service.
+  TODO: after first build, run `./gradlew processDebugManifest` and check the merged
+  manifest at build/intermediates/merged_manifests/ to confirm FCM entries are present.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Required: all network calls go to the cloud backend via HTTPS -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Required on Android 13+ (API 33+) for push notification delivery.
+         @capacitor/push-notifications requests this at runtime via .requestPermissions()
+         but the manifest declaration is also required for some Android 13 devices.
+         TODO: verify @capacitor/push-notifications handles this via manifest merger. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!-- Required for FCM vibration on Android < 8 (API < 26).
+         On Android 8+, notification channels handle vibration without this permission.
+         TODO: verify if @capacitor/push-notifications declares this via its own manifest merger. -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <!--
+          MainActivity — Capacitor WebView host.
+
+          android:launchMode="singleTask":
+            Required for deep links. Ensures that tapping a deep link when the app is
+            already open brings the existing activity to front (onNewIntent) rather than
+            creating a second instance. Required for @capacitor/app 'appUrlOpen' to fire.
+
+          android:configChanges:
+            Standard Capacitor list. Prevents Activity recreation on rotation/keyboard,
+            allowing the WebView to handle these itself.
+
+          android:exported="true":
+            REQUIRED on Android 12+ (API 31+) for activities that receive external intents
+            (launcher intent + deep link intent-filters). Play Store enforces this.
+        -->
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:exported="true"
+            android:label="@string/title_activity_main"
+            android:launchMode="singleTask"
+            android:name=".MainActivity"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
+
+            <!-- Launcher intent — required for the app to appear in the home screen -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+              Custom scheme deep links: clienthunter://
+              Works immediately, no domain verification required.
+              Used by: backend push notification data payloads (deepLink field).
+              Examples:
+                clienthunter:///strategies/123   → strategy detail
+                clienthunter:///campaigns/456    → campaign detail
+                clienthunter:///leads/789        → lead detail
+                clienthunter:///                 → dashboard
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="clienthunter" />
+            </intent-filter>
+
+            <!--
+              Android App Links: https://app.clienthunter.com
+              Requires:
+                1. Domain ownership: app.clienthunter.com
+                   TODO: confirm production domain — must match APP_LINKS_HOST in deeplinks.ts
+                2. assetlinks.json served at:
+                   https://app.clienthunter.com/.well-known/assetlinks.json
+                   (static file in frontend/public/.well-known/assetlinks.json)
+                3. sha256_cert_fingerprints in assetlinks.json = SHA-256 from:
+                   keytool -list -v -keystore clienthunter-release.keystore
+                   (fill this in Chunk 4 / SIGNING.md Step 6)
+
+              android:autoVerify="true":
+                Android will attempt to verify the digital asset link on first install.
+                If verification succeeds, tapping https://app.clienthunter.com links
+                opens the app directly (no browser chooser dialog).
+                If verification fails, links fall back to the browser — not a crash.
+
+              Used by: backend outreach email "view in app" links.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <!-- TODO: confirm production domain before Chunk 4 release -->
+                <data
+                    android:scheme="https"
+                    android:host="app.clienthunter.com" />
+            </intent-filter>
+
+        </activity>
+
+        <!--
+          FileProvider — required by Capacitor Camera / Filesystem plugins.
+          android:exported="false": correct — FileProvider uses grantUriPermissions,
+          not exported access. This is the correct value and Play Store auditors check it.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

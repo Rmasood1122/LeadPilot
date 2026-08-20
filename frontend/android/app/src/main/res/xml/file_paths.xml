@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  file_paths.xml — FileProvider paths for ClientHunter.
+  Required by the FileProvider declared in AndroidManifest.xml.
+  Capacitor plugins (Camera, Filesystem) use this when added in Chunk 2.
+-->
+<paths>
+    <external-path name="my_images" path="." />
+    <cache-path name="my_cache_images" path="." />
+    <external-cache-path name="my_external_cache" path="." />
+    <files-path name="my_files" path="." />
+</paths>

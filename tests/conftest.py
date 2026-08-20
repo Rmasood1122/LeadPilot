@@ -1,0 +1,733 @@
+"""Shared test fixtures for the root test modules.
+
+This is the SQLite/in-process fixture library that the 22 root test
+modules were written against. It was previously replaced wholesale by a
+real-PostgreSQL conftest, which left every module importing NOW /
+FakeLeadSource / make_raw / wa_outbound unable to even import. That
+PostgreSQL harness is used only by tests/integration/, so it now lives in
+tests/integration/conftest.py where it belongs - see the note there.
+
+Rules enforced here:
+- ZERO real Anthropic API usage: every module-level `get_client` binding is
+  monkeypatched to a scriptable FakeClaude.
+- ZERO real broker usage: `run_pipeline.delay` is stubbed and recorded.
+- SQLite in-memory database built from the same models/metadata as prod.
+"""
+
+import os
+import re
+
+os.environ["APP_ENV"] = "test"
+os.environ["ANTHROPIC_API_KEY"] = "test-key-never-used"
+os.environ["DATABASE_URL"] = "sqlite://"
+from cryptography.fernet import Fernet as _Fernet
+os.environ.setdefault("TOKEN_ENCRYPTION_KEY", _Fernet.generate_key().decode())
+# M4: WhatsApp config — fake values; no test ever reaches the real Graph API.
+os.environ.setdefault("WHATSAPP_ACCESS_TOKEN", "test-wa-token")
+os.environ.setdefault("WHATSAPP_PHONE_NUMBER_ID", "5550001")
+os.environ.setdefault("WHATSAPP_BUSINESS_ACCOUNT_ID", "waba-test")
+os.environ.setdefault("WHATSAPP_APP_SECRET", "test-app-secret")
+os.environ.setdefault("WHATSAPP_VERIFY_TOKEN", "test-verify-token")
+
+# ── Enterprise-app env requirements ───────────────────────────────────────
+# app/core/crypto.py builds a MultiFernet from ENCRYPTION_KEY and raises
+# EncryptionKeyError at import-time-of-use if it is unset or not a valid
+# Fernet key, which is why 40 tests errored before this was added. Generate
+# a real key per run rather than hardcoding a string - a hand-written
+# "32 characters long!!" placeholder is *not* valid base64-url and fails
+# Fernet() just as loudly as a missing one.
+os.environ.setdefault("ENCRYPTION_KEY", _Fernet.generate_key().decode())
+os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
+os.environ.setdefault("APOLLO_API_KEY", "apollo-test-key")
+os.environ.setdefault("HUNTER_API_KEY", "hunter-test-key")
+os.environ.setdefault("CALENDLY_WEBHOOK_SECRET", "calendly-secret-test")
+os.environ.setdefault("FIREBASE_CREDENTIALS_JSON", "{}")
+os.environ.setdefault("CELERY_ALWAYS_EAGER", "true")
+os.environ.setdefault("CELERY_EAGER_PROPAGATES", "true")
+# Mount the test-only debug router (app/api/debug.py). This is the ONLY place
+# in the repo that turns it on; app_env stays non-production so main.py's
+# defence-in-depth check also passes. See app/api/debug.py for the guard.
+os.environ.setdefault("ENABLE_DEBUG_ROUTES", "true")
+os.environ.setdefault("APP_ENV", "test")
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.db.base import Base, get_db
+from app.db import models as m  # noqa: F401  (registers tables)
+
+
+# --------------------------------------------------------------------------
+# Database
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def db_session():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    TestingSession = sessionmaker(bind=engine, expire_on_commit=False)
+    session = TestingSession()
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
+
+
+# --------------------------------------------------------------------------
+# FakeClaude — scriptable stand-in for every model call
+# --------------------------------------------------------------------------
+
+
+class FakeClaude:
+    """Deterministic Claude stand-in.
+
+    - `fail_after=N`: the (N+1)th `complete` call raises (crash simulation).
+    - `judge_script[pass_no] = [("FAIL", "fix ..."), ("PASS", None)]`:
+      scripted verdicts per verification pass; default verdict is PASS.
+    - `pattern_result`: dict returned for pattern-extraction calls.
+    """
+
+    def __init__(self):
+        self.completions = 0
+        self.fail_after: int | None = None
+        self.judge_script: dict[int, list[tuple[str, str | None]]] = {}
+        self.judge_calls: list[int] = []
+        self.fix_calls: list[int] = []
+        self.reply_verdicts: dict[str, str] = {}
+        self.default_reply_class = "interested"
+        self.pattern_result = {
+            "industry": "fire protection",
+            "company_size": "11-50",
+            "buyer_role": "Owner",
+            "deal_size": "$3,000/mo",
+            "acquisition_channel": "referral",
+            "trigger_event": "failed inspection",
+            "sales_cycle_length": "3 weeks",
+        }
+
+    # ---- text completions (pipeline steps + fixes) ----
+    def complete(self, system: str, prompt: str, max_tokens: int | None = None) -> str:
+        if self.fail_after is not None and self.completions >= self.fail_after:
+            raise RuntimeError("simulated crash: model call failed")
+        self.completions += 1
+        if "strategy editor" in system:  # FIXER_SYSTEM
+            match = re.search(r"criterion #(\d+)", prompt)
+            if match:
+                self.fix_calls.append(int(match.group(1)))
+            return f"REVISED DOCUMENT v{self.completions}\n(fix applied)"
+        return f"Mock research output #{self.completions}"
+
+    # ---- JSON completions (patterns + verification judge) ----
+    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None) -> dict:
+        self.completions += 1
+        if "sales analyst" in system:  # pattern recognition
+            return dict(self.pattern_result)
+        if "personalization engine" in system:  # M3 message rendering
+            return {"subject": f"Subject v{self.completions}",
+                    "body": f"Hello, this is rendered body v{self.completions}."}
+        if "template drafter" in system:  # M4 template generation
+            return {"templates": [{
+                "name": "generated_intro",
+                "language": "en_US",
+                "category": "marketing",
+                "body": "Hi {{1}}, this is Sam from LeadPilot about {{2}}. "
+                        "Reply STOP to opt out.",
+                "variable_descriptions": {"1": "first name", "2": "pain point"},
+            }]}
+        if "variable filler" in system:  # M4 template variables
+            import re as _re
+            numbers = _re.findall(r"\{\{(\d+)\}\} ->", prompt)
+            return {n: f"value{n}" for n in numbers}
+        if "reply classifier" in system:  # M3 inbound classification
+            body_part = prompt.split("BODY:", 1)[-1]
+            for needle, cls in self.reply_verdicts.items():
+                if needle in body_part:
+                    return {"classification": cls}
+            return {"classification": self.default_reply_class}
+        if "ICP extraction" in system:  # M2 criteria extraction
+            return {
+                "titles": ["Owner", "Operations Manager"],
+                "industries": ["fire protection services"],
+                "locations": ["Texas, US", "Georgia, US"],
+                "company_size_ranges": ["11,50"],
+                "keywords": ["fire inspection", "ITM", "NFPA"],
+            }
+        if "reviewer" in system:  # verification judge
+            pass_no = int(re.search(r"CRITERION #(\d+)", prompt).group(1))
+            self.judge_calls.append(pass_no)
+            script = self.judge_script.get(pass_no)
+            result, fix = script.pop(0) if script else ("PASS", None)
+            out = {"result": result}
+            if fix is not None:
+                out["fix_description"] = fix
+            return out
+        return {}
+
+
+@pytest.fixture()
+def fake_claude(monkeypatch):
+    fake = FakeClaude()
+    # Patch every module-level binding of get_client.
+    for target in (
+        "app.services.anthropic_client.get_client",
+        "app.services.pattern_recognition.get_client",
+        "app.services.icp_extraction.get_client",
+        "app.services.message_personalization.get_client",
+        "app.services.reply_classification.get_client",
+        "app.services.whatsapp_templates.get_client",
+        "app.pipeline.engine.get_client",
+        "app.verification.loop.get_client",
+    ):
+        monkeypatch.setattr(target, lambda: fake)
+    return fake
+
+
+# --------------------------------------------------------------------------
+# API client (DB override + stubbed Celery enqueue)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def enqueued():
+    return []
+
+
+# --------------------------------------------------------------------------
+# Authentication
+# --------------------------------------------------------------------------
+#
+# Phase A added ownership/tenancy checks to every route, so an unauthenticated
+# client no longer reaches any handler - it just collects 401s. Authenticating
+# is not enough either: the ownership checks compare the JWT's user against the
+# row's owner, so a client authenticated as a DIFFERENT user than the one the
+# object fixtures build data under gets 404 instead. Both clients and every
+# object builder therefore share ONE canonical user.
+
+
+@pytest.fixture()
+def test_user(db_session):
+    user = m.User(email="test@leadpilot.dev")
+    db_session.add(user)
+    db_session.commit()
+    return user
+
+
+def auth_headers(user) -> dict[str, str]:
+    """Real signed access token - exercises get_current_user rather than
+    stubbing it out, so the auth path itself stays under test."""
+    from app.services.auth import issue_tokens
+    return {"Authorization": f"Bearer {issue_tokens(user.id)['access_token']}"}
+
+
+@pytest.fixture()
+def user_tokens(test_user):
+    """{"access_token", "refresh_token", "user_id"} for the canonical user.
+
+    tests/test_devices.py passes these headers explicitly per request rather
+    than relying on the client's default header.
+    """
+    from app.services.auth import issue_tokens
+    tokens = issue_tokens(test_user.id)
+    return {**tokens, "user_id": test_user.id}
+
+
+@pytest.fixture()
+def anon_client(client):
+    """`client` with the Authorization header stripped.
+
+    For the handful of tests that assert an endpoint REJECTS unauthenticated
+    requests - they need a client that genuinely sends no token, which the
+    authenticated `client` no longer is.
+    """
+    client.headers.pop("Authorization", None)
+    return client
+
+
+@pytest.fixture()
+def client(db_session, test_user, fake_claude, enqueued, monkeypatch):
+    from app.main import app
+    from app.workers import tasks as worker_tasks
+
+    monkeypatch.setattr(
+        worker_tasks.run_pipeline, "delay",
+        lambda strategy_id: enqueued.append(strategy_id),
+        raising=False,
+    )
+    app.dependency_overrides[get_db] = lambda: db_session
+    try:
+        with TestClient(app) as c:
+            c.headers.update(auth_headers(test_user))
+            yield c
+    finally:
+        app.dependency_overrides.clear()
+
+
+# --------------------------------------------------------------------------
+# Common object builders
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def product_with_strategy(db_session, test_user):
+    def _make(flow_type: m.FlowType, with_past_client: bool = True):
+        product = m.Product(
+            user=test_user, name="SEO System X",
+            description="Local SEO audits for fire protection companies",
+            type=m.ProductType.SKILL,
+        )
+        db_session.add(product)
+        db_session.flush()
+        if with_past_client:
+            db_session.add(m.PastClient(
+                product_id=product.id,
+                details="Texas fire ITM company, 30 staff",
+                acquisition_story="Referral after a failed audit",
+                extracted_patterns_json={"industry": "fire protection",
+                                         "acquisition_channel": "referral"},
+            ))
+        strategy = m.Strategy(product_id=product.id, flow_type=flow_type)
+        db_session.add(strategy)
+        db_session.commit()
+        return product, strategy
+    return _make
+
+
+# --------------------------------------------------------------------------
+# M2 fixtures — fake adapters, fake redis, verified strategy, lead batch
+# --------------------------------------------------------------------------
+
+import fakeredis
+
+from app.integrations.base import (
+    EmailVerificationStatus,
+    EmailVerifier,
+    EnrichedLead,
+    LeadSource,
+    RawLead,
+    VerificationResult,
+)
+
+
+@pytest.fixture()
+def fake_redis():
+    return fakeredis.FakeRedis(decode_responses=True)
+
+
+@pytest.fixture(autouse=True)
+def isolated_rate_limiter(monkeypatch):
+    """Give every root test its own empty rate-limit store.
+
+    Two problems this solves, both surfaced the moment RATE_LIMIT_AUTH was
+    wired to /auth/signup and /auth/login on 2026-08-20:
+
+    1. SHARED STATE. TestClient reports a client host of "testclient" for every
+       request in the process, so all tests share one `rate:ip:testclient:*`
+       bucket. Dozens of root tests sign up a user as setup; past the 10th, the
+       rest got 429 instead of 201. That is a test-ordering landmine, not a
+       product bug — verified as exactly this failure in
+       test_m5_backend.py::TestTheme::test_background_upload_serves_url.
+
+    2. A HIDDEN EXTERNAL DEPENDENCY. get_sync_redis() connects to the REAL
+       Redis, so the root suite — documented at the top of this file as the
+       in-process SQLite library, and deliberately needing neither PostgreSQL
+       nor Redis (see tests/integration/conftest.py) — had quietly acquired a
+       live Redis requirement via the limiter.
+
+    Autouse so it cannot be forgotten. Tests that want to assert on limiter
+    behaviour just patch get_sync_redis again with their own instance; the
+    later patch wins.
+    """
+    store = fakeredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr("app.core.redis_client.get_sync_redis", lambda: store)
+    return store
+
+
+class FakeLeadSource(LeadSource):
+    """Deterministic in-memory LeadSource. `enrich_fail_after=N` makes the
+    (N+1)th enrich call raise, to simulate a mid-batch crash."""
+
+    provider = "fakesource"
+
+    def __init__(self, feed: list[RawLead] | None = None):
+        self.feed = feed if feed is not None else []
+        self.search_calls = 0
+        self.enrich_calls = 0
+        self.enrich_fail_after: int | None = None
+
+    def search(self, icp_criteria: dict, max_leads: int) -> list[RawLead]:
+        self.search_calls += 1
+        return self.feed[:max_leads]
+
+    def enrich(self, lead: RawLead) -> EnrichedLead:
+        if self.enrich_fail_after is not None and self.enrich_calls >= self.enrich_fail_after:
+            raise RuntimeError("simulated enrichment crash")
+        self.enrich_calls += 1
+        domain = lead.company_domain or f"{(lead.company or 'acme').lower().replace(' ', '')}.com"
+        enriched = EnrichedLead.from_raw(lead, enrichment={"provider": "fakesource"})
+        enriched.company_domain = domain
+        return enriched
+
+    def health_check(self) -> bool:
+        return True
+
+
+class FakeVerifier(EmailVerifier):
+    """find_email derives an address from name+domain; verify is scripted
+    per email via `verdicts`, defaulting to deliverable."""
+
+    provider = "fakeverifier"
+
+    def __init__(self):
+        self.verdicts: dict[str, EmailVerificationStatus] = {}
+        self.findable: dict[tuple[str, str], str | None] = {}
+        self.find_calls = 0
+        self.verify_calls = 0
+
+    def find_email(self, full_name: str, domain: str) -> str | None:
+        self.find_calls += 1
+        if (full_name, domain) in self.findable:
+            return self.findable[(full_name, domain)]
+        if not full_name or not domain:
+            return None
+        slug = full_name.lower().replace(" ", ".")
+        return f"{slug}@{domain}"
+
+    def verify(self, email: str) -> VerificationResult:
+        self.verify_calls += 1
+        status = self.verdicts.get(email, EmailVerificationStatus.DELIVERABLE)
+        return VerificationResult(email=email, status=status, score=90, raw={"result": status.value})
+
+    def health_check(self) -> bool:
+        return True
+
+
+@pytest.fixture()
+def fake_source():
+    return FakeLeadSource()
+
+
+@pytest.fixture()
+def fake_verifier():
+    return FakeVerifier()
+
+
+def make_raw(i: int, email: str | None = None, phone: str | None = None,
+             company: str = None, domain: str | None = None) -> RawLead:
+    return RawLead(
+        source="fakesource",
+        external_id=f"p{i}",
+        full_name=f"Person {i}",
+        first_name="Person",
+        last_name=str(i),
+        title="Owner",
+        company=company or f"Acme {i}",
+        company_domain=domain,
+        email=email,
+        phone=phone,
+        raw={"id": f"p{i}"},
+    )
+
+
+@pytest.fixture()
+def verified_strategy(db_session, product_with_strategy):
+    _, strategy = product_with_strategy(m.FlowType.WITH_CLIENTS)
+    strategy.status = m.StrategyStatus.VERIFIED
+    strategy.strategy_document = "# Strategy\nverified"
+    db_session.commit()
+    return strategy
+
+
+@pytest.fixture()
+def lead_batch(db_session, verified_strategy):
+    batch = m.LeadBatch(
+        strategy_id=verified_strategy.id,
+        requested_leads=50,
+        icp_criteria_json={"titles": ["Owner"]},
+        source_provider="fakesource",
+        verifier_provider="fakeverifier",
+    )
+    db_session.add(batch)
+    db_session.commit()
+    return batch
+
+
+@pytest.fixture()
+def chain_calls():
+    return []
+
+
+@pytest.fixture()
+def leads_client(db_session, test_user, fake_claude, chain_calls, monkeypatch):
+    """API client with the Celery lead chain stubbed and recorded."""
+    from app.main import app
+    from app.workers import lead_tasks
+
+    monkeypatch.setattr(lead_tasks, "start_lead_chain",
+                        lambda batch_id: chain_calls.append(batch_id))
+    app.dependency_overrides[get_db] = lambda: db_session
+    try:
+        with TestClient(app) as c:
+            c.headers.update(auth_headers(test_user))
+            yield c
+    finally:
+        app.dependency_overrides.clear()
+
+
+# --------------------------------------------------------------------------
+# M3 fixtures — fake outreach channel, sequences, connected gmail account
+# --------------------------------------------------------------------------
+
+from datetime import datetime, timedelta, timezone
+
+from app.integrations.outreach_base import (
+    InboundMessage,
+    OutboundMessage,
+    OutreachChannel,
+    SendResult,
+)
+
+# A weekday inside the 9-17 UTC send window, used everywhere for determinism.
+NOW = datetime(2026, 8, 11, 10, 0, tzinfo=timezone.utc)  # Tuesday 10:00 UTC
+
+
+class FakeChannel(OutreachChannel):
+    """Records every send; results are scriptable via result_queue."""
+
+    channel = "email"
+    provider = "fakechannel"
+
+    def __init__(self):
+        self.sent: list[OutboundMessage] = []
+        self.result_queue: list[SendResult] = []
+        self.inbox: list[InboundMessage] = []
+
+    def send(self, message: OutboundMessage) -> SendResult:
+        self.sent.append(message)
+        if self.result_queue:
+            return self.result_queue.pop(0)
+        n = len(self.sent)
+        return SendResult(ok=True, provider_message_id=f"pm{n}", thread_ref=f"th{n}")
+
+    def fetch_replies(self, since=None):
+        return list(self.inbox)
+
+    def status(self, provider_message_id):
+        return {}
+
+    def health_check(self):
+        return True
+
+
+@pytest.fixture()
+def fake_channel():
+    return FakeChannel()
+
+
+@pytest.fixture()
+def gmail_account(db_session, verified_strategy):
+    from app.services import crypto
+    product = db_session.get(m.Product, verified_strategy.product_id)
+    account = m.GmailAccount(
+        user_id=product.user_id,
+        email_address="sender@leadpilot.dev",
+        token_ciphertext=crypto.encrypt_json({"access_token": "at", "refresh_token": "rt"}),
+        token_expires_at=NOW + timedelta(hours=1),
+        scopes="send read",
+    )
+    # created_at drives the warm-up ramp; backdate far enough that the
+    # ramp reaches the full daily cap unless a test overrides it.
+    db_session.add(account)
+    db_session.commit()
+    account.created_at = NOW - timedelta(days=365)
+    db_session.commit()
+    return account
+
+
+@pytest.fixture()
+def verified_leads(db_session, verified_strategy):
+    leads = []
+    for i in range(3):
+        lead = m.Lead(
+            strategy_id=verified_strategy.id, source="apollo", external_id=f"L{i}",
+            full_name=f"Lead {i}", title="Owner", company=f"Co {i}",
+            email=f"lead{i}@co{i}.com", status=m.LeadStatus.VERIFIED,
+            enrichment_json={"company_domain": f"co{i}.com"},
+        )
+        db_session.add(lead)
+        leads.append(lead)
+    db_session.commit()
+    return leads
+
+
+@pytest.fixture()
+def email_sequence(db_session, verified_strategy):
+    seq = m.Sequence(strategy_id=verified_strategy.id, channel=m.ChannelType.EMAIL,
+                     name="Intro sequence", status=m.SequenceStatus.ACTIVE,
+                     booking_url="https://calendly.com/founder/intro")
+    db_session.add(seq)
+    db_session.flush()
+    for step_no, delay in [(1, 0), (2, 3), (3, 4)]:
+        db_session.add(m.SequenceStep(sequence_id=seq.id, step_no=step_no,
+                                      template=f"Step {step_no} brief", delay_days=delay))
+    db_session.commit()
+    return seq
+
+
+@pytest.fixture()
+def enrolled(db_session, fake_claude, email_sequence, verified_leads, gmail_account):
+    """Sequence with all verified leads enrolled at NOW (step-1 scheduled)."""
+    from app.services.sequence_engine import enroll_leads
+    count = enroll_leads(db_session, email_sequence, now=NOW)
+    assert count == 3
+    return email_sequence
+
+
+# --------------------------------------------------------------------------
+# M4 fixtures — WhatsApp templates, opt-ins, multi-channel sequences,
+# fake Graph API HTTP, webhook signing. ZERO real Meta/Anthropic calls.
+# --------------------------------------------------------------------------
+
+import hashlib
+import hmac
+import json as _json
+
+
+@pytest.fixture()
+def approved_template(db_session):
+    """An APPROVED template with two variables (created as draft, then
+    approved the way Meta would — via apply_meta_status)."""
+    from app.services import whatsapp_templates as tmpl_svc
+    t = tmpl_svc.create_draft(
+        db_session,
+        name="intro_v1", language="en_US",
+        category=m.WhatsAppTemplateCategory.MARKETING,
+        body="Hi {{1}}, Sam from LeadPilot about {{2}}. Reply STOP to opt out.",
+        variable_descriptions={"1": "first name", "2": "pain point"},
+    )
+    t.status = m.WhatsAppTemplateStatus.SUBMITTED
+    db_session.commit()
+    tmpl_svc.apply_meta_status(db_session, t, "APPROVED", meta_template_id="meta-1")
+    return t
+
+
+@pytest.fixture()
+def wa_lead(db_session, verified_strategy):
+    """A verified lead with phone + email and a REAL recorded opt-in."""
+    from app.services import whatsapp_optin as optin_svc
+    lead = m.Lead(
+        strategy_id=verified_strategy.id, source="apollo", external_id="WA1",
+        full_name="Sara Khan", title="CTO", company="Acme",
+        email="sara@acme.com", phone="+923001234567",
+        status=m.LeadStatus.VERIFIED,
+        enrichment_json={"company_domain": "acme.com"},
+    )
+    db_session.add(lead)
+    db_session.commit()
+    optin_svc.record_opt_in(db_session, lead, source=m.OptInSource.API,
+                            evidence="test fixture consent")
+    return lead
+
+
+@pytest.fixture()
+def wa_lead_no_optin(db_session, verified_strategy):
+    lead = m.Lead(
+        strategy_id=verified_strategy.id, source="apollo", external_id="WA2",
+        full_name="Ali Raza", title="COO", company="Beta",
+        email="ali@beta.com", phone="+923009998877",
+        status=m.LeadStatus.VERIFIED,
+        enrichment_json={"company_domain": "beta.com"},
+    )
+    db_session.add(lead)
+    db_session.commit()
+    return lead
+
+
+@pytest.fixture()
+def multichannel_sequence(db_session, verified_strategy, approved_template):
+    """email step 1 -> WhatsApp template step 2 -> email step 3."""
+    seq = m.Sequence(strategy_id=verified_strategy.id, channel=m.ChannelType.EMAIL,
+                     name="Multi", status=m.SequenceStatus.ACTIVE)
+    db_session.add(seq)
+    db_session.flush()
+    db_session.add(m.SequenceStep(sequence_id=seq.id, step_no=1,
+                                  template="email intro", delay_days=0))
+    db_session.add(m.SequenceStep(
+        sequence_id=seq.id, step_no=2, template="wa follow", delay_days=0,
+        channel=m.ChannelType.WHATSAPP,
+        whatsapp_kind=m.WhatsAppStepKind.TEMPLATE,
+        whatsapp_template_id=approved_template.id,
+        variable_mapping_json={"1": "lead.first_name", "2": "brief: their pain"},
+    ))
+    db_session.add(m.SequenceStep(sequence_id=seq.id, step_no=3,
+                                  template="email close", delay_days=0))
+    db_session.commit()
+    return seq
+
+
+class FakeGraphHTTP:
+    """Scriptable stand-in for httpx.Client hitting the Meta Graph API."""
+
+    class _Resp:
+        def __init__(self, status_code: int, data: dict):
+            self.status_code = status_code
+            self.headers: dict = {}
+            self._data = data
+            self.text = _json.dumps(data)
+
+        def json(self):
+            return self._data
+
+    def __init__(self):
+        self.requests: list[tuple[str, str, dict | None]] = []
+        self.queue: list[tuple[int, dict]] = []
+
+    def request(self, method, endpoint, params=None, json=None, headers=None):
+        self.requests.append((method, endpoint, json))
+        if self.queue:
+            status, data = self.queue.pop(0)
+            return self._Resp(status, data)
+        return self._Resp(200, {"messages": [{"id": f"wamid.{len(self.requests)}"}]})
+
+
+@pytest.fixture()
+def fake_graph_http():
+    return FakeGraphHTTP()
+
+
+@pytest.fixture()
+def wa_channel(db_session, fake_redis, fake_graph_http):
+    from app.integrations.whatsapp import WhatsAppChannel
+    return WhatsAppChannel(session=db_session, redis=fake_redis,
+                           http=fake_graph_http)
+
+
+def wa_signed_post(client, payload: dict, secret: str = "test-app-secret"):
+    """POST a Meta-style signed delivery to /webhooks/whatsapp."""
+    raw = _json.dumps(payload).encode()
+    sig = "sha256=" + hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
+    return client.post("/webhooks/whatsapp", content=raw,
+                       headers={"X-Hub-Signature-256": sig,
+                                "Content-Type": "application/json"})
+
+
+def wa_outbound(lead, *, kind="template", template="intro_v1",
+                language="en_US", body="hello", message_id=None):
+    from app.integrations.outreach_base import OutboundMessage
+    import uuid as _uuid
+    metadata = {"kind": kind}
+    if kind == "template":
+        metadata.update(template_name=template, language=language)
+    return OutboundMessage(
+        message_id=str(message_id or _uuid.uuid4()),
+        lead_id=lead.id, to_address=lead.phone or "", body=body,
+        metadata=metadata,
+    )

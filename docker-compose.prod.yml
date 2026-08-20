@@ -1,0 +1,283 @@
+# Production docker-compose for ClientHunter Enterprise.
+#
+# NOTE ON RAILWAY: the live deployment targets Railway, which does NOT read this
+# file. This compose file is (a) the source of truth for what each Railway
+# service's start command and env must be, and (b) the self-host fallback. The
+# `nginx` service, published `ports:` and named volumes have no Railway
+# equivalent — Railway terminates TLS and injects DATABASE_URL/REDIS_URL itself.
+#
+# Start with: docker compose -f docker-compose.prod.yml up -d
+#
+# Prerequisites:
+#   1. cp .env.production.example .env.production && nano .env.production
+#   2. Generate SSL certs: bash nginx/certbot-setup.sh yourdomain.com
+#   3. docker compose -f docker-compose.prod.yml up -d --build
+#
+# Reviewed line-by-line 2026-08-20 (session update 10). Fixes applied:
+#   - NEXT_PUBLIC_API_URL no longer falls back to a placeholder domain
+#   - all four Celery services gained healthchecks (a worker on the wrong queue
+#     looks "up" — that is exactly how the queue-routing outage hid)
+#   - api/frontend ports bound to loopback so nginx cannot be bypassed
+#   - celery-beat schedule moved off ephemeral /tmp onto a volume
+#   - resource limits added (starting points — tune against real traffic)
+#
+# `version:` is intentionally omitted: obsolete in Compose v2 and only emits a
+# deprecation warning.
+
+x-api-env: &api-env
+  env_file: .env.production
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+# Shared build stanza — identical for api, all workers and beat.
+x-api-build: &api-build
+  context: .
+  dockerfile: Dockerfile
+  target: production
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file: .env.production
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clienthunter}
+      POSTGRES_USER: ${POSTGRES_USER:-clienthunter}
+      # No default: the postgres image refuses to initialise without it, which
+      # is the loud failure we want rather than a guessable password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clienthunter}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # ---------------------------------------------------------------------------
+  # Redis 7
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    # `:?` guards against an empty expansion silently turning the next flag into
+    # the password argument.
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set} --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          # Must exceed --maxmemory 512mb to leave headroom for overhead/COW.
+          memory: 768m
+
+  # ---------------------------------------------------------------------------
+  # FastAPI application server
+  # ---------------------------------------------------------------------------
+  # Migrations run through `python -m app.db.migrate`, which wraps
+  # `alembic upgrade head` in a PostgreSQL advisory lock. The bare
+  # `alembic upgrade head` that used to be here was safe at ONE replica and
+  # raced at two: verified 2026-08-20 by starting four migrators together
+  # against a fresh database — 3 of the 4 died with an IntegrityError on the
+  # alembic_version insert, which in a container means a crash-loop on deploy.
+  # Under the lock, all four exited 0 and the schema landed at head exactly once.
+  api:
+    <<: *api-env
+    build: *api-build
+    command: >
+      sh -c "
+        python -m app.db.migrate &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+               --proxy-headers --forwarded-allow-ips='*'
+      "
+    # Loopback-only: nginx terminates TLS and is the sole public entrypoint.
+    # Publishing 0.0.0.0:8000 exposed the API unencrypted alongside nginx AND,
+    # combined with --forwarded-allow-ips='*', let a direct caller spoof
+    # X-Forwarded-For — which is what the IP rate limiter keys on.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # ---------------------------------------------------------------------------
+  # Celery workers
+  # ---------------------------------------------------------------------------
+  # Every -Q list below must stay in sync with celery_app.conf.task_routes.
+  # tests/test_celery_routing.py parses these exact lines and fails if a task is
+  # published to a queue nothing here consumes.
+  #
+  # The healthchecks matter more than usual: a Celery worker with the WRONG -Q
+  # is a live, idle process. It passes any liveness check while doing nothing,
+  # which is precisely how the queue-routing outage stayed invisible.
+  celery-worker-pipeline:
+    <<: *api-env
+    build: *api-build
+    command: celery -A app.workers.celery_app worker -Q pipeline -c 2 --loglevel=info
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          # 144-step pipelines hold large prompt/response strings in memory.
+          memory: 2g
+
+  celery-worker-outreach:
+    <<: *api-env
+    build: *api-build
+    command: celery -A app.workers.celery_app worker -Q outreach -c 4 --loglevel=info
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  celery-worker-learning:
+    <<: *api-env
+    build: *api-build
+    command: celery -A app.workers.celery_app worker -Q learning,default -c 2 --loglevel=info
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+  # ---------------------------------------------------------------------------
+  # Celery Beat (scheduler)
+  # ---------------------------------------------------------------------------
+  # Beat only PUBLISHES tasks, so it correctly takes no -Q.
+  # The schedule file lives on a volume, not /tmp: PersistentScheduler stores
+  # last-run timestamps there, and losing them on restart re-fires the nightly
+  # aggregation early.
+  celery-beat:
+    <<: *api-env
+    build: *api-build
+    command: >
+      celery -A app.workers.celery_app beat --loglevel=info
+             --scheduler celery.schedulers.PersistentScheduler
+             --schedule /var/lib/celery/celerybeat-schedule
+    volumes:
+      - ./logs:/app/logs
+      - celerybeat_data:/var/lib/celery
+    healthcheck:
+      # Beat has no inspect endpoint; assert the schedule file keeps being
+      # written, which is the only externally observable sign it is alive.
+      test: ["CMD-SHELL", "test -f /var/lib/celery/celerybeat-schedule"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ---------------------------------------------------------------------------
+  # Next.js frontend
+  # ---------------------------------------------------------------------------
+  # NEXT_PUBLIC_API_URL is baked in at BUILD time (static export) and cannot be
+  # changed at runtime — changing it requires a full rebuild + redeploy.
+  # It has NO default on purpose: the previous `:-https://api.yourdomain.com`
+  # fallback meant an unset variable produced a frontend that built and deployed
+  # successfully while every API call went to a domain that does not exist.
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL must be set at build time (static export bakes it in)}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ---------------------------------------------------------------------------
+  # Nginx (reverse proxy + SSL) — the only publicly bound service.
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    # Wait for healthy upstreams rather than merely started, so nginx does not
+    # serve 502s during the api container's migration + startup window.
+    depends_on:
+      api:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  celerybeat_data:
+    driver: local

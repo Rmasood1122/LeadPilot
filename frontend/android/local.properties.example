@@ -1,0 +1,36 @@
+# ─── android/local.properties.example ────────────────────────────────────────
+#
+# Copy this file to local.properties (gitignored) and fill in real values.
+# local.properties is NEVER committed — it contains machine-specific paths
+# and signing secrets.
+#
+# This file (local.properties.example) IS committed — it shows teammates
+# what values are needed without exposing any secrets.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Android SDK location (required by Android Studio / Gradle) ────────────────
+# Android Studio usually writes this automatically. If it is missing, set it
+# to the path shown in: Android Studio → Settings → SDK Manager → Android SDK Location.
+#
+# Windows example:
+# sdk.dir=C\:\\Users\\<yourname>\\AppData\\Local\\Android\\Sdk
+#
+# Linux/macOS example:
+# sdk.dir=/home/<yourname>/Android/Sdk
+
+sdk.dir=REPLACE_WITH_YOUR_ANDROID_SDK_PATH
+
+
+# ── Release signing (used by Gradle when building release variants) ────────────
+# See SIGNING.md for:
+#   - How to generate the keystore
+#   - Where to store it securely
+#   - How to encode it for CI (KEYSTORE_BASE64)
+#
+# In CI (GitHub Actions), these are supplied via GITHUB_ENV (decoded from secrets)
+# and do not need to be in local.properties. local.properties is for LOCAL builds.
+
+KEYSTORE_PATH=C\:\\Users\\<yourname>\\secrets\\clienthunter-release.keystore
+KEYSTORE_PASSWORD=REPLACE_WITH_KEYSTORE_PASSWORD
+KEY_ALIAS=clienthunter
+KEY_PASSWORD=REPLACE_WITH_KEY_PASSWORD
