@@ -1,7 +1,8 @@
 # Email Verification on Signup (Feature 1)
 
-Status: **implemented and verified locally.** Live-send against Resend is
-**not yet verified** — see [Outstanding](#outstanding) at the bottom.
+Status: **implemented, verified locally, and committed** (`e602e6b`).
+Live send, domain verification and the production migration are **DEFERRED by
+decision** until real credentials exist — see [Outstanding](#outstanding).
 
 ---
 
@@ -263,9 +264,68 @@ rows intact.
 
 ## Outstanding
 
-| # | Item | Severity |
+Items 1–3 are **DEFERRED by decision** (2026-08-29), not blocked by anything in
+the code. `EMAIL_PROVIDER=console` until real credentials exist, which means
+**no email is delivered to anyone** — that is the intended state for now.
+
+| # | Item | Status |
 |---|---|---|
-| 1 | **Live send through Resend is UNVERIFIED.** The credentials supplied were placeholder text (`[tumhara key yahan]`), so no real message has been delivered to a real inbox. Everything up to and including the transport call is proven; the transport call itself is not. | HIGH |
-| 2 | **The `calendarharvest.com` sending domain must be verified in Resend** (SPF + DKIM published) before the first real signup, or mail is silently spam-foldered. | HIGH |
-| 3 | Render free-tier cold starts make a clicked link take ~30–60 s. | MEDIUM |
-| 4 | Password reset uses none of this yet. `email_sender.py` is the natural home for it when it is built. | LOW |
+| 1 | **Live send through Resend is unverified.** No real message has reached a real inbox; the supplied credentials were placeholder text. Everything up to the transport call is proven. | **DEFERRED** — verify when a real `RESEND_API_KEY` is added |
+| 2 | **`calendarharvest.com` is not verified in Resend** (SPF + DKIM unpublished), so live mail would be spam-foldered. | **DEFERRED** — do together with #1 |
+| 3 | **The live Neon database is still at revision `0014`.** Migration 0015 has only ever run against throwaway databases. Production is untouched apart from a read-only probe. | **DEFERRED** — do not migrate until instructed |
+| 4 | Render free-tier cold starts make a clicked link take ~30–60 s to answer. | Known, documented |
+| 5 | Password reset uses none of this yet. `email_sender.py` is the natural home when it is built. | Future work |
+
+### Turning it on later
+
+1. Put the real key in the environment and switch the transport:
+   ```
+   EMAIL_PROVIDER=resend
+   RESEND_API_KEY=<real key>
+   ```
+2. Verify `calendarharvest.com` in the Resend dashboard (publish SPF + DKIM).
+3. Back up and migrate production:
+   ```bash
+   pg_dump "<DIRECT Neon URL>" -Fc -f leadpilot_pre0015.dump
+   pg_restore --list leadpilot_pre0015.dump | head    # verify the dump
+   python -m app.db.migrate
+   ```
+4. Run the production checklist in
+   [How to test it in production](#how-to-test-it-in-production).
+
+Nothing in the code changes for any of this — step 1 is two environment
+variables.
+
+---
+
+## Test coverage
+
+| Layer | Tests | What it proves |
+|---|---|---|
+| `tests/test_email_verification.py` | 28 | Signup state, token hashing, 24 h expiry (incl. the `<= now` boundary), the gate across three routes, 403-not-401, kill switch, backfilled users, click/replay/expire/garbage, resend + invalidation, no account enumeration, transport misconfiguration |
+| `tests/test_production_guard.py` | 8 new (49 total) | Production refuses to boot on a transport that delivers nothing |
+| `tests/` (whole suite) | 509 | No regression from the `get_current_user` change |
+| `tests/integration/` | 116 | Real PostgreSQL + Redis, whole app |
+| `frontend/e2e/email-verification.spec.ts` | 28 (14 × Chromium + Mobile Safari) | Signup → check-email routing, failed-send messaging, resend + rate limit, all four `/auth/verify` redirect outcomes, login routing by verification state, the Shell gate on a bookmarked URL, and that a 403 never triggers a token refresh or clears the session |
+
+Run them all:
+
+```bash
+python -m pytest tests/ --ignore=tests/integration
+TEST_DATABASE_URL=<pg> TEST_REDIS_URL=<redis> python -m pytest tests/integration
+cd frontend && npx vitest run
+cd frontend && NEXT_PUBLIC_API_URL=https://api.example.com npx next build   && npx playwright test e2e/email-verification.spec.ts
+```
+
+> The Playwright spec sets a 90 s per-test timeout. WebKit hydrating a static
+> export at `workers: 2` regularly needs 5–15 s per navigation, and the suite
+> runs with `retries: 0` — so the budget is raised to something the slow
+> browser can actually meet rather than retrying until it looks green.
+> Measured: the file completes in ~50 s on an idle machine, and three
+> consecutive full runs passed 28/28.
+>
+> **Unrelated pre-existing flakiness:** `e2e/happy-paths.spec.ts` fails on
+> Mobile Safari independently of this feature — measured on a clean tree with
+> Feature 1 removed: **7 failed / 7 passed**. With Feature 1 present the same
+> file does better, not worse. It is not caused by this work and is not fixed
+> by it.
