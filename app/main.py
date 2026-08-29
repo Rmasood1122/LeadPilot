@@ -35,6 +35,7 @@ from app.api.whatsapp_optin import router as whatsapp_optin_router
 from app.api.leads import router as leads_router
 from app.api.products import router as products_router
 from app.api.strategies import router as strategies_router
+from app.api.tutorials import router as tutorials_router   # Feature 2
 
 # M7
 from app.api.devices import router as devices_router
@@ -162,6 +163,7 @@ app.include_router(devices_router, prefix="/devices", tags=["devices"])  # M7
 app.include_router(admin_router)                 # /admin/* (M8-C3)
 app.include_router(playbook_router)              # /playbook/* (M8)
 app.include_router(onboarding_router)            # /onboarding/* (M8-C5)
+app.include_router(tutorials_router)             # /tutorials/* (Feature 2)
 
 
 # ---------------------------------------------------------------------------

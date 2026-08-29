@@ -26,6 +26,71 @@ export interface TokenBundle {
   verification_email_sent?: boolean;
 }
 
+// --------------------------------------------------------------------------
+// Learn LeadPilot — tutorials (Feature 2)
+// --------------------------------------------------------------------------
+
+export type TutorialLevel = "beginner" | "intermediate" | "advanced";
+
+export interface TutorialProgress {
+  position_seconds: number;
+  duration_seconds: number | null;
+  /** Furthest point reached, 0-100. Monotonic: scrubbing back never lowers it. */
+  percent: number;
+  completed: boolean;
+  completed_at: string | null;
+  last_watched_at: string | null;
+  /** false when the user has no progress row at all — "not started". */
+  started: boolean;
+}
+
+export interface Tutorial {
+  slug: string;
+  title: string;
+  description: string;
+  level: TutorialLevel;
+  order: number;
+  /** null until a real video exists. See is_placeholder. */
+  youtube_id: string | null;
+  duration_seconds: number | null;
+  /** true => show a "coming soon" panel, NOT an iframe pointing at nothing. */
+  is_placeholder: boolean;
+  progress: TutorialProgress;
+}
+
+export interface TutorialLevelSummary {
+  label: string;
+  total: number;
+  completed: number;
+}
+
+export interface TutorialSummary {
+  total: number;
+  completed: number;
+  percent: number;
+  by_level: Record<TutorialLevel, TutorialLevelSummary>;
+}
+
+export interface TutorialBadge {
+  slug: string;
+  label: string;
+  description: string;
+  level: TutorialLevel | null;
+  earned: boolean;
+  earned_at: string | null;
+  required_total: number;
+  required_completed: number;
+}
+
+export interface TutorialCatalogue {
+  tutorials: Tutorial[];
+  levels: { level: TutorialLevel; label: string }[];
+  /** Always describes the WHOLE catalogue — never the filtered result set. */
+  summary: TutorialSummary;
+  badges: TutorialBadge[];
+  query: { q: string | null; level: string | null };
+}
+
 export type FlowType = "with_clients" | "no_clients";
 
 export interface StrategyOut {

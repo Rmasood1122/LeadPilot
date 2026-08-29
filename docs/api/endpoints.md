@@ -178,6 +178,116 @@ rendering the dashboard.
 
 ---
 
+## Learn LeadPilot — tutorials 🔒 (Feature 2)
+
+The video catalogue is **not** a database table — it lives in
+`app/services/tutorials.py`. Endpoints therefore address tutorials by **slug**,
+never by a row id, and an unknown slug is a clean `404 unknown tutorial`
+rather than a silently-stored orphan row. See
+[`docs/features/tutorial-section.md`](../features/tutorial-section.md).
+
+### `GET /tutorials?q=&level=` → `200`
+
+| Param | Notes |
+|---|---|
+| `q` | Case-insensitive substring over title **and** description. Blank is ignored. |
+| `level` | `beginner` \| `intermediate` \| `advanced`. An unknown value returns an empty list, **not** a 422 — it is a browse filter, and a validation error is a strange answer to a typo in a shared URL. |
+
+```jsonc
+{
+  "tutorials": [{
+    "slug": "understanding-your-icp",
+    "title": "Understanding Your ICP",
+    "description": "…",
+    "level": "beginner",
+    "order": 3,
+    "youtube_id": null,        // null until the real video exists
+    "duration_seconds": null,
+    "is_placeholder": true,    // => render "coming soon", NOT an <iframe>
+    "progress": {
+      "position_seconds": 0, "duration_seconds": null, "percent": 0.0,
+      "completed": false, "completed_at": null, "last_watched_at": null,
+      "started": false         // no progress row exists — not an error
+    }
+  }],
+  "levels":  [{ "level": "beginner", "label": "Beginner" }],
+  "summary": { "total": 9, "completed": 0, "percent": 0.0,
+               "by_level": { "beginner": { "label": "Beginner", "total": 3, "completed": 0 } } },
+  "badges":  [{ "slug": "beginner-complete", "label": "Beginner Complete",
+                "description": "…", "level": "beginner", "earned": false,
+                "earned_at": null, "required_total": 3, "required_completed": 0 }],
+  "query":   { "q": null, "level": null }
+}
+```
+
+> **`summary` and `badges` describe the WHOLE catalogue and deliberately
+> ignore `q`/`level`.** The summary answers "how far through the course am I",
+> so it must not move while the user types in the search box. Only `tutorials`
+> is filtered.
+
+> **Badges are derived from progress, never stored.** A stored badge can
+> disagree with the progress meant to justify it. This is also why
+> `DELETE .../progress` correctly revokes one.
+
+### `GET /tutorials/{slug}` → `200`
+
+One tutorial in the same shape as a `tutorials[]` entry. `404 unknown tutorial`
+for a slug not in the catalogue.
+
+### `PUT /tutorials/{slug}/progress` → `200`
+
+```jsonc
+{ "position_seconds": 108, "duration_seconds": 120 }   // duration optional
+```
+
+Called repeatedly by the player; cheap and safe to repeat. One row per user per
+video is guaranteed by `UNIQUE (user_id, tutorial_slug)`.
+
+| Field | Update rule | Why |
+|---|---|---|
+| `position_seconds` | **latest** value wins | It answers "where do I resume" — scrubbing back should resume back. |
+| `percent` | **maximum** value wins | It answers "how much have I seen" — scrubbing back must not erase watched progress or undo a completion. |
+
+Crossing **90%** marks the tutorial complete (`COMPLETION_THRESHOLD_PERCENT`).
+Not 100%: almost nobody reaches the final frame, and a 100% rule strands users
+at "8 of 9" and teaches them to scrub. Completion is never revoked here — only
+`DELETE .../progress` does that. `completed_at` keeps the **first** completion
+time, so rewatching does not move it.
+
+Errors: `404` unknown slug · `422` negative or absurd position.
+
+### `POST /tutorials/{slug}/complete` → `200`
+
+Marks finished without watching to the threshold. Needed for two real cases,
+not convenience: a placeholder video cannot be watched at all, and a user who
+already knows the material must still be able to reach the badge. Idempotent.
+
+### `DELETE /tutorials/{slug}/progress` → `200`
+
+Resets one tutorial to not-started and deletes the row, so "not started" has
+exactly one representation. Returns the reset tutorial (not `204`) so the
+client can update its cache without a second round trip. Not an error on a
+tutorial that was never started.
+
+### `GET /admin/tutorials/completions` → `200` 🔒 admin
+
+```jsonc
+{
+  "active_learners": 1,        // distinct users with any progress row
+  "total_completions": 2,
+  "tutorials": [{ "slug": "…", "title": "…", "level": "beginner",
+                  "started_count": 1, "completed_count": 1,
+                  "in_progress_count": 0 }]
+}
+```
+
+**Numbers only.** The response carries no user id, no email, and no way to
+learn which videos a named person watched — that was the product decision, and
+it is enforced by the payload containing no user identifier at all rather than
+by a UI that declines to render one. `403` for non-admins.
+
+---
+
 ## Theme 🔒
 
 | Endpoint | Notes |
@@ -197,6 +307,7 @@ All 🔒 routes are subject to the `EMAIL_NOT_VERIFIED` gate.
 | `/unsubscribe` | `app/api/unsubscribe.py` | public (token in URL) |
 | `/webhooks/calendly`, `/webhooks/whatsapp` | `webhooks.py`, `webhooks_whatsapp.py` | signature-verified |
 | `/products`, `/strategies`, `/leads`, `/sequences`, `/analytics`, `/integrations`, `/onboarding`, `/devices`, `/webhooks/targets`, `/whatsapp/*` | respective modules | 🔒 |
+| `/tutorials` | `app/api/tutorials.py` | 🔒 |
 | `/admin/*`, `/playbook/*` | `admin.py`, `playbook.py` | 🔒 + `is_admin` |
 | `/debug/*` | `debug.py` | **test only** — never mounted in a deployed environment |
 

@@ -274,6 +274,73 @@ class User(TimestampMixin, Base):
     email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    tutorial_progress: Mapped[list["TutorialProgress"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class TutorialProgress(TimestampMixin, Base):
+    """One user's progress through one tutorial video (Feature 2).
+
+    The video CATALOGUE is not in the database -- it lives in
+    app/services/tutorials.py, and this table references it by `tutorial_slug`.
+    See that module's docstring for why. The practical consequence is that a
+    slug is a permanent identifier: RENAMING ONE ORPHANS every progress row
+    pointing at it. Titles can change freely; slugs cannot.
+
+    There is deliberately NO foreign key to a tutorials table, because there is
+    no such table. The API validates the slug against the catalogue before
+    writing, so an unknown slug is a 404 rather than a silently-stored orphan.
+
+    UNIQUE (user_id, tutorial_slug): one row per user per video. Without it a
+    client that fires two progress updates in quick succession -- which a video
+    player does constantly -- creates duplicate rows, and "have I finished
+    this?" stops having a single answer.
+
+    WHY percent AND position_seconds BOTH EXIST, AND WHY THEY UPDATE
+    DIFFERENTLY:
+      position_seconds is "where do I resume", so it takes the LATEST value --
+        a user who scrubs back to the start expects to resume at the start.
+      percent is "how much of this have I seen", so it takes the MAXIMUM --
+        scrubbing back must not erase what has already been watched, or a
+        rewatch would undo a completion.
+    Storing only one of them cannot express both behaviours.
+    """
+
+    __tablename__ = "tutorial_progress"
+    __table_args__ = (
+        UniqueConstraint("user_id", "tutorial_slug",
+                         name="uq_tutorial_progress_user_id_tutorial_slug"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    tutorial_slug: Mapped[str] = mapped_column(String(100), index=True,
+                                               nullable=False)
+    # Resume point, in seconds. Latest value wins.
+    position_seconds: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    # Reported by the player; nullable because the catalogue may not know it
+    # and the player has not loaded yet on the first update.
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Furthest point reached, 0-100. Monotonic; only a reset lowers it.
+    percent: Mapped[float] = mapped_column(
+        Float, default=0.0, server_default="0", nullable=False
+    )
+    completed: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_watched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="tutorial_progress")
 
 
 class EmailVerificationToken(Base):

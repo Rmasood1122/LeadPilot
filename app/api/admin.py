@@ -16,9 +16,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
+from app.db.models import User
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.services.admin_service import AdminService
@@ -360,6 +362,65 @@ async def list_webhook_deliveries(
 # ---------------------------------------------------------------------------
 # Celery stats
 # ---------------------------------------------------------------------------
+
+@router.get("/tutorials/completions")
+def tutorial_completions(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Aggregate tutorial completion counts. NUMBERS ONLY.
+
+    Deliberately scoped: an admin sees HOW MANY users finished each video and
+    how many are in progress. There is no endpoint anywhere that tells an
+    admin which videos a NAMED user watched, or how far through one they got
+    -- that was the explicit product decision (progress is private per user,
+    admins see completion counts only), and it is enforced by this endpoint
+    returning no user identifier at all rather than by a UI that declines to
+    render one.
+
+    `active_learners` is a distinct count of users with any progress row, so
+    the denominator is "people who opened the section", not "people who have
+    an account".
+    """
+    from app.db.models import TutorialProgress
+    from app.services import tutorials as catalogue
+
+    completed_rows = dict(
+        db.query(TutorialProgress.tutorial_slug, func.count(TutorialProgress.id))
+        .filter(TutorialProgress.completed.is_(True))
+        .group_by(TutorialProgress.tutorial_slug)
+        .all()
+    )
+    started_rows = dict(
+        db.query(TutorialProgress.tutorial_slug, func.count(TutorialProgress.id))
+        .group_by(TutorialProgress.tutorial_slug)
+        .all()
+    )
+    active_learners = (
+        db.query(func.count(func.distinct(TutorialProgress.user_id))).scalar() or 0
+    )
+
+    per_tutorial = []
+    for tutorial in catalogue.CATALOGUE:
+        started = int(started_rows.get(tutorial.slug, 0))
+        completed = int(completed_rows.get(tutorial.slug, 0))
+        per_tutorial.append({
+            "slug": tutorial.slug,
+            "title": tutorial.title,
+            "level": tutorial.level,
+            "started_count": started,
+            "completed_count": completed,
+            # Not "started minus completed" as a separate concept: a completed
+            # row is also a started row, so in_progress is the remainder.
+            "in_progress_count": max(0, started - completed),
+        })
+
+    return {
+        "active_learners": int(active_learners),
+        "tutorials": per_tutorial,
+        "total_completions": int(sum(completed_rows.values())),
+    }
+
 
 @router.get("/celery-stats")
 async def celery_stats(_admin=Depends(require_admin)) -> dict:
