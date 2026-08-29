@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { LogoMark } from "@/components/ui/Logo";
 import {
-  Users, AlertCircle, Shield, BookOpen, Heart, Zap, List
+  Users, AlertCircle, Shield, BookOpen, Heart, Zap, List,
+  GraduationCap, LifeBuoy
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -14,6 +15,8 @@ const NAV_ITEMS = [
   { href: "/admin/circuit-breakers", label: "Circuit Breakers",  icon: Zap        },
   { href: "/admin/suppression-list", label: "Suppression List",  icon: List       },
   { href: "/admin/playbook",         label: "Playbook Scores",   icon: BookOpen   },
+  { href: "/admin/support-tickets",  label: "Support Tickets",   icon: LifeBuoy   },
+  { href: "/admin/tutorials",        label: "Tutorials",         icon: GraduationCap },
   { href: "/admin/health",           label: "System Health",     icon: Heart      },
 ];
 

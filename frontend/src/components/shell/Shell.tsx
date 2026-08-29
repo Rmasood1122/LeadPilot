@@ -10,6 +10,7 @@ import { hasSession } from "@/lib/api/client";
 import { isUnverifiedError, logout, me } from "@/lib/api/auth";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/ui/Logo";
+import { ChatWidget } from "@/components/support/ChatWidget";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
@@ -132,6 +133,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </header>
         <main className="flex-1 p-gutter pb-20 md:pb-gutter">{children}</main>
       </div>
+
+      {/* AI support chat (Feature 3).
+          Mounted HERE, once, rather than per page: the widget has to be
+          reachable from every dashboard screen, and eight pages each
+          remembering to render it is eight chances to forget. It sits outside
+          <main> so page content cannot scroll it away, and it is only ever
+          rendered past the auth + verification gate above -- an unverified
+          user hitting /support/chat would just collect 403s. */}
+      <ChatWidget />
 
       {/* Bottom tabs (mobile) */}
       <nav

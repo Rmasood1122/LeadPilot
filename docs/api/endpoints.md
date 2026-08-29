@@ -288,6 +288,102 @@ by a UI that declines to render one. `403` for non-admins.
 
 ---
 
+## AI support chat (Feature 3)
+
+All routes require auth. See
+[`docs/features/ai-support-chat.md`](../features/ai-support-chat.md).
+
+### `GET /support/faq`
+
+The curated knowledge base plus `chat_enabled`. Exposed so the widget can
+offer real starter questions, and so "what can this thing help with?" has an
+honest answer: it is the same list the model is restricted to.
+
+### `POST /support/chat`
+
+```jsonc
+// request
+{ "message": "How does outreach work?", "session_id": "uuid (optional)" }
+// 200
+{
+  "session_id": "uuid",
+  "answer": {
+    "text": "...", "on_topic": true, "confidence": 0.92,
+    "faq_ids": ["how-outreach-works"], "suggest_ticket": false,
+    "reason": "answered"
+  },
+  "message": { "id": "...", "role": "assistant" }
+}
+```
+
+`reason` records WHY the user got this text, and is persisted so a confusing
+answer can be explained later without reproducing it:
+
+| `reason` | Meaning | What `text` contains |
+|---|---|---|
+| `answered` | Grounded, above the confidence floor | the model's answer |
+| `off_topic` | Not about LeadPilot | the **refusal constant** |
+| `low_confidence` | On topic, model unsure | the ticket suggestion |
+| `model_error` | API unreachable or failed | the ticket suggestion |
+| `malformed_response`, `empty_answer` | Unusable response | the ticket suggestion |
+
+> **The model never writes its own refusal.** On `off_topic` the answer it
+> produced is discarded and a constant returned — given the chance to write a
+> sentence about a topic, a model writes a sentence about that topic.
+
+Omitting `session_id` continues the most recent conversation. Both turns are
+persisted, refusals included.
+
+Rate limited **per user per day** (`RATE_LIMIT_SUPPORT_CHAT`, default 30) — a
+cost ceiling first, since every message spends the account's Anthropic key.
+Keyed on the user id, not the IP, so colleagues behind one office NAT do not
+share a budget. The limiter runs after validation, so an invalid body costs
+no quota.
+
+Errors: `422` blank or over-long message, `429` daily budget spent,
+`503` kill switch (`SUPPORT_CHAT_ENABLED=false`).
+
+### `GET|POST /support/chat/sessions` and `GET|DELETE /support/chat/sessions/{id}`
+
+List, start, read and delete conversations.
+
+Transcripts are ordered by `chat_messages.seq`, **not** `created_at`: both
+turns of one exchange are written in a single request and can share a
+timestamp, which left a random UUID as the tiebreak and could render the
+answer before the question.
+
+Another user's session returns **404, not 403** — otherwise the status code is
+an oracle for "does this session id exist?".
+
+Deleting a session cascades its messages but **nulls**, never deletes, any
+ticket raised from it.
+
+### `POST /support/tickets` and `GET /support/tickets`
+
+```jsonc
+{ "subject": "min 3 chars", "body": "min 10 chars",
+  "chat_session_id": "uuid (optional, must be yours)" }
+```
+
+Stored in the database; **not emailed anywhere**. Deliberately **not** subject
+to the chat budget — someone who has run out of messages is exactly the person
+who most needs a human.
+
+### `GET /admin/support/tickets?status=` (admin)
+
+Carries `user_email`, unlike `/admin/tutorials/completions`. Not an
+inconsistency: a ticket you cannot reply to is useless, and the user wrote
+that text deliberately, addressed to support. Ordered oldest-first, because
+the queue is worked from the front.
+
+### `POST /admin/support/tickets/{id}/resolve` (admin)
+
+Idempotent — resolving twice keeps the original `resolved_at`, so a second
+click cannot rewrite the response-time record. `404` on an unknown or
+malformed id.
+
+---
+
 ## Theme 🔒
 
 | Endpoint | Notes |
@@ -308,6 +404,7 @@ All 🔒 routes are subject to the `EMAIL_NOT_VERIFIED` gate.
 | `/webhooks/calendly`, `/webhooks/whatsapp` | `webhooks.py`, `webhooks_whatsapp.py` | signature-verified |
 | `/products`, `/strategies`, `/leads`, `/sequences`, `/analytics`, `/integrations`, `/onboarding`, `/devices`, `/webhooks/targets`, `/whatsapp/*` | respective modules | 🔒 |
 | `/tutorials` | `app/api/tutorials.py` | 🔒 |
+| `/support` | `app/api/support.py` | 🔒 |
 | `/admin/*`, `/playbook/*` | `admin.py`, `playbook.py` | 🔒 + `is_admin` |
 | `/debug/*` | `debug.py` | **test only** — never mounted in a deployed environment |
 

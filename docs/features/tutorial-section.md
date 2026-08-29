@@ -101,7 +101,7 @@ having put that check in one dependency rather than per router.
 1. Open `app/services/tutorials.py`.
 2. For each entry, set `youtube_id` to the 11-character id from the URL:
    ```
-   https://www.youtube.com/watch?v=dQw4w9WgXcQ
+   https://www.youtube.com/watch?v=AbCdEfGhIjK
                                    ^^^^^^^^^^^
    ```
    and set `duration_seconds` if you know it.
@@ -110,7 +110,7 @@ having put that check in one dependency rather than per router.
        slug="getting-started-with-leadpilot",   # <- DO NOT CHANGE
        title="Getting Started with LeadPilot",
        ...
-       youtube_id="dQw4w9WgXcQ",                # <- was None
+       youtube_id="AbCdEfGhIjK",                # <- was None
        duration_seconds=424,                    # <- optional
    ),
    ```

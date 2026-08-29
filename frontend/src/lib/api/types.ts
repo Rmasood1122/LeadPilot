@@ -91,6 +91,97 @@ export interface TutorialCatalogue {
   query: { q: string | null; level: string | null };
 }
 
+// --------------------------------------------------------------------------
+// AI support chat (Feature 3)
+// --------------------------------------------------------------------------
+
+export interface FaqEntry {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface SupportFaq {
+  faq: FaqEntry[];
+  /** false => the kill switch is on; the widget offers tickets only. */
+  chat_enabled: boolean;
+}
+
+/** Why the user got this text. Mirrors app/services/support_chat.py. */
+export type AnswerReason =
+  | "answered"
+  | "off_topic"
+  | "low_confidence"
+  | "model_error"
+  | "malformed_response"
+  | "empty_answer"
+  | "empty_question";
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  reason: AnswerReason | null;
+  confidence: number | null;
+  faq_ids: string[];
+  suggest_ticket: boolean;
+  created_at: string | null;
+}
+
+export interface ChatAnswer {
+  text: string;
+  on_topic: boolean;
+  confidence: number;
+  faq_ids: string[];
+  suggest_ticket: boolean;
+  reason: AnswerReason;
+}
+
+export interface ChatReply {
+  session_id: string;
+  answer: ChatAnswer;
+  message: ChatMessage;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string | null;
+  created_at: string | null;
+  last_message_at: string | null;
+  messages?: ChatMessage[];
+}
+
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  body: string;
+  status: "open" | "resolved";
+  chat_session_id: string | null;
+  created_at: string | null;
+  resolved_at: string | null;
+  resolution_note: string | null;
+}
+
+export interface AdminSupportTicket extends SupportTicket {
+  user_id: string;
+  user_email: string | null;
+}
+
+export interface AdminTutorialCompletion {
+  slug: string;
+  title: string;
+  level: string;
+  started_count: number;
+  completed_count: number;
+  in_progress_count: number;
+}
+
+export interface AdminTutorialCompletions {
+  active_learners: number;
+  total_completions: number;
+  tutorials: AdminTutorialCompletion[];
+}
+
 export type FlowType = "with_clients" | "no_clients";
 
 export interface StrategyOut {

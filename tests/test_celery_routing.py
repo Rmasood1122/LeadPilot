@@ -28,6 +28,7 @@ import app.workers.learning_tasks  # noqa: F401
 import app.workers.outreach_tasks  # noqa: F401
 import app.workers.send_tasks  # noqa: F401
 import app.workers.tasks  # noqa: F401
+import app.workers.support_tasks  # noqa: F401  (Feature 3 retention purge)
 import app.workers.webhook_tasks  # noqa: F401
 from app.workers.celery_app import celery_app
 

@@ -12,7 +12,7 @@ All others from M8-C3 unchanged.
 from __future__ import annotations
 
 from typing import Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone as datetime_timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -420,6 +420,100 @@ def tutorial_completions(
         "tutorials": per_tutorial,
         "total_completions": int(sum(completed_rows.values())),
     }
+
+
+@router.get("/support/tickets")
+def list_support_tickets(
+    status: Optional[str] = Query(default=None,
+                                  description="open | resolved; omit for all"),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """The support ticket queue (Feature 3).
+
+    Unlike /admin/tutorials/completions, this one DOES carry a user identifier
+    — a support ticket you cannot reply to is useless, so the requester's email
+    is the entire point. That is a different privacy question from tutorial
+    watch history: the user wrote this text deliberately, addressed to support.
+
+    Ordered oldest-first within open tickets, because the queue is worked from
+    the front and the oldest unanswered ticket is the one closest to breaking
+    the 24-hour promise made in the chat.
+    """
+    from app.db.models import SupportTicket
+
+    query = db.query(SupportTicket)
+    if status:
+        query = query.filter(SupportTicket.status == status.strip().lower())
+    rows = query.order_by(SupportTicket.created_at.asc()).limit(limit).all()
+
+    def _iso(value):
+        if value is None:
+            return None
+        return (value if value.tzinfo else value.replace(tzinfo=datetime_timezone.utc)).isoformat()
+
+    users = {}
+    if rows:
+        user_rows = db.query(User.id, User.email).filter(
+            User.id.in_({r.user_id for r in rows})
+        ).all()
+        users = {uid: email for uid, email in user_rows}
+
+    open_count = db.query(func.count(SupportTicket.id)).filter(
+        SupportTicket.status == "open").scalar() or 0
+
+    return {
+        "open_count": int(open_count),
+        "tickets": [{
+            "id": str(t.id),
+            "user_id": str(t.user_id),
+            "user_email": users.get(t.user_id),
+            "subject": t.subject,
+            "body": t.body,
+            "status": t.status,
+            "chat_session_id": str(t.chat_session_id) if t.chat_session_id else None,
+            "created_at": _iso(t.created_at),
+            "resolved_at": _iso(t.resolved_at),
+            "resolution_note": t.resolution_note,
+        } for t in rows],
+    }
+
+
+class TicketResolveRequest(BaseModel):
+    note: str = ""
+
+
+@router.post("/support/tickets/{ticket_id}/resolve")
+def resolve_support_ticket(
+    ticket_id: str,
+    payload: TicketResolveRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Close a ticket. Idempotent — resolving an already-resolved ticket keeps
+    the ORIGINAL resolved_at, so the response-time record cannot be rewritten
+    by a second click."""
+    import uuid as _uuid
+
+    from app.db.models import SupportTicket
+
+    try:
+        parsed = _uuid.UUID(ticket_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket = db.query(SupportTicket).filter(SupportTicket.id == parsed).first()
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    if ticket.status != "resolved":
+        ticket.status = "resolved"
+        ticket.resolved_at = datetime.now(datetime_timezone.utc)
+    if payload.note:
+        ticket.resolution_note = payload.note
+    db.commit()
+    return {"id": str(ticket.id), "status": ticket.status}
 
 
 @router.get("/celery-stats")

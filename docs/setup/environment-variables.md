@@ -51,6 +51,24 @@ received a link — invisible to every health check.
 
 ---
 
+## AI support chat (Feature 3)
+
+See [`docs/features/ai-support-chat.md`](../features/ai-support-chat.md).
+
+| Variable | Owner | Default | Description |
+|---|---|---|---|
+| `SUPPORT_CHAT_ENABLED` | `app/config.py` | `true` | **KILL SWITCH.** `false` makes `POST /support/chat` return 503 and the widget offer tickets only. The lever to pull if the assistant ever says something it should not. |
+| `SUPPORT_CHAT_MIN_CONFIDENCE` | `app/config.py` | `0.5` | Below this the model's answer is **discarded** and a ticket offered. A hedged wrong answer still reads as an answer. |
+| `SUPPORT_CHAT_MAX_TOKENS` | `app/config.py` | `1024` | Output ceiling per reply — a second line of defence against a runaway generation billed to your key. |
+| `SUPPORT_CHAT_HISTORY_TURNS` | `app/config.py` | `6` | Prior turns replayed. History is re-sent on every message, so this is a direct multiplier on input cost. |
+| `SUPPORT_CHAT_RETENTION_DAYS` | `app/config.py` | `30` | Chat history lifetime, enforced nightly at 03:20 UTC by `app.workers.support_tasks.purge_old_chats`. `0` disables it. Tickets are never purged. |
+| `RATE_LIMIT_SUPPORT_CHAT` | **`app/core/config.py`** | `30` | Messages per user **per day**. Note the owner — that is the settings object `enforce_rate_limit` actually reads. |
+
+`ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` are shared with the strategy
+pipeline; the chat introduces no new credential.
+
+---
+
 ## Application
 
 Owner: `app/config.py`.
@@ -95,6 +113,7 @@ Owner: `app/config.py`.
 | `JWT_REFRESH_TTL_SECONDS` | `app/config.py` | `1209600` | 14 days |
 | `RATE_LIMIT_AUTH` | **`app/core/config.py`** | `10` | Per 15-min window, on **two** independent keys: `ip:<addr>` and `acct:<email>`. Governs `/auth/login`, `/auth/signup` **and `/auth/resend-verification`**. |
 | `RATE_LIMIT_GET`, `RATE_LIMIT_STRATEGIES`, `RATE_LIMIT_LEADS_SOURCE`, `RATE_LIMIT_WA_TEMPLATES`, `RATE_LIMIT_PLAYBOOK_RECOMPUTE` | `app/core/config.py` | see `.env.example` | |
+| `RATE_LIMIT_SUPPORT_CHAT` | `app/core/config.py` | `30` | Per user per **day** — a cost ceiling on the Anthropic key |
 
 ## Outreach, integrations, compliance
 

@@ -277,6 +277,148 @@ class User(TimestampMixin, Base):
     tutorial_progress: Mapped[list["TutorialProgress"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    chat_sessions: Mapped[list["ChatSession"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    support_tickets: Mapped[list["SupportTicket"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class ChatSession(TimestampMixin, Base):
+    """One support-chat conversation (Feature 3).
+
+    Sessions exist so a follow-up like "what about the second one?" has
+    something to resolve against, and so "start a new chat" can mean something
+    other than deleting history.
+
+    RETENTION: purged after SUPPORT_CHAT_RETENTION_DAYS by
+    app/workers/support_tasks.py, keyed on last_message_at rather than
+    created_at -- an old session someone is still using is not stale, and
+    deleting a live conversation out from under a user is worse than keeping it
+    a few days longer.
+    """
+
+    __tablename__ = "chat_sessions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
+
+    user: Mapped["User"] = relationship(back_populates="chat_sessions")
+    messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan",
+        order_by="ChatMessage.seq",
+    )
+    # NO delete cascade -- deleting a session must NULL the tickets that
+    # reference it, never delete them. The database says the same thing via
+    # ON DELETE SET NULL, but SQLite only enforces FK actions with
+    # PRAGMA foreign_keys=ON (off in the unit-test harness), so without this
+    # relationship the ORM left a dangling session id behind on SQLite and
+    # the two databases disagreed. Declaring it here makes the ORM null the
+    # column itself, identically everywhere.
+    tickets: Mapped[list["SupportTicket"]] = relationship(
+        back_populates="chat_session"
+    )
+
+
+class ChatMessage(Base):
+    """One turn in a support chat.
+
+    `role` is 'user' or 'assistant'. Both are stored: an assistant reply that
+    cannot be read back is a reply nobody can audit, and the whole point of
+    grounding the bot is being able to answer "why did it say that?".
+
+    The diagnostic columns exist for exactly that question:
+      reason      why the user got this text (answered / off_topic /
+                  low_confidence / model_error / malformed_response ...)
+      confidence  what the model claimed about itself
+      faq_ids     which knowledge-base entries were actually cited, filtered
+                  to ids that really exist so a hallucinated citation is never
+                  stored as a real one
+
+    NO TimestampMixin: a chat message is immutable once written, so an
+    updated_at column would only ever record that something went wrong.
+    """
+
+    __tablename__ = "chat_messages"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("chat_sessions.id", ondelete="CASCADE"), index=True,
+        nullable=False,
+    )
+    # Position within the conversation, 0-based.
+    #
+    # Ordering by created_at ALONE is not safe: both turns of one exchange are
+    # written inside a single request and can land on the same timestamp, at
+    # which point the tiebreak was a random UUID primary key -- so a transcript
+    # could come back with the answer before the question. It failed
+    # intermittently, which is exactly how an ordering bug reaches production.
+    #
+    # Message order within a conversation is a real domain concept, so it gets
+    # a real column rather than depending on clock resolution.
+    seq: Mapped[int] = mapped_column(Integer, default=0, server_default="0",
+                                     nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Assistant messages only; NULL on user turns.
+    reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    faq_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    suggest_ticket: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True,
+        nullable=False,
+    )
+
+    session: Mapped["ChatSession"] = relationship(back_populates="messages")
+
+
+class SupportTicket(TimestampMixin, Base):
+    """A question the AI could not answer, escalated to a human.
+
+    Stored in the database and NOT emailed. Email delivery is deferred with the
+    rest of Feature 1's transport work -- and a ticket that is only emailed is
+    a ticket that is lost when the relay is down, so storing it is the durable
+    half regardless of whether mail is ever added on top.
+
+    `chat_session_id` is nullable and ON DELETE SET NULL: a ticket must outlive
+    the 30-day chat purge. Losing the conversation that produced a ticket is
+    acceptable; losing the ticket is not.
+    """
+
+    __tablename__ = "support_tickets"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    chat_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("chat_sessions.id", ondelete="SET NULL"), nullable=True
+    )
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="open", server_default="open", index=True,
+        nullable=False,
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    resolution_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    user: Mapped["User"] = relationship(back_populates="support_tickets")
+    chat_session: Mapped["ChatSession | None"] = relationship(
+        back_populates="tickets"
+    )
 
 
 class TutorialProgress(TimestampMixin, Base):

@@ -173,6 +173,26 @@ class Settings(BaseSettings):
     # setting so an expiry test does not have to wait a day.
     email_verification_ttl_hours: int = 24
 
+    # --- AI support chat (Feature 3) ---------------------------------------
+    # Output ceiling for one support reply. Small on purpose: the system prompt
+    # caps the answer at 120 words, and a low ceiling is the second line of
+    # defence against a runaway generation billed to your key.
+    support_chat_max_tokens: int = 1024
+    # How many prior turns are replayed for context. Every turn is re-sent on
+    # every message, so this is a direct multiplier on input cost -- 6 is
+    # enough for "what about the second one?" without carrying a whole session.
+    support_chat_history_turns: int = 6
+    # Below this self-reported confidence the answer is DISCARDED and the user
+    # is offered a ticket. A wrong answer delivered confidently is the failure
+    # this feature must not produce; an unnecessary ticket is an annoyance.
+    support_chat_min_confidence: float = 0.5
+    # Chat history is deleted after this many days by the nightly purge task.
+    support_chat_retention_days: int = 30
+    # Kill switch, matching REQUIRE_EMAIL_VERIFICATION. Turns the chat off
+    # without a deploy if it ever starts costing or saying something it should
+    # not. The widget hides itself and the endpoint returns 503.
+    support_chat_enabled: bool = True
+
     # KILL SWITCH. get_current_user rejects unverified users only while this is
     # true. It exists because that dependency is the single chokepoint every
     # authenticated route shares: if verification ever locks real users out,

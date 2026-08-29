@@ -119,6 +119,17 @@ services:
       # the escape hatch if this ever locks real users out. Leave true.
       - key: REQUIRE_EMAIL_VERIFICATION
         value: "true"
+      # --- AI support chat (Feature 3) ------------------------------------
+      # Kill switch; "false" disables the chat platform-wide without a deploy.
+      - key: SUPPORT_CHAT_ENABLED
+        value: "true"
+      # Messages per user per DAY. Every one spends ANTHROPIC_API_KEY.
+      - key: RATE_LIMIT_SUPPORT_CHAT
+        value: "30"
+      - key: SUPPORT_CHAT_RETENTION_DAYS
+        value: "30"
+      - key: SUPPORT_CHAT_MIN_CONFIDENCE
+        value: "0.5"
         sync: false
       - key: SENDER_IDENTITY       # CAN-SPAM postal address
         sync: false
@@ -202,6 +213,17 @@ services:
       # the escape hatch if this ever locks real users out. Leave true.
       - key: REQUIRE_EMAIL_VERIFICATION
         value: "true"
+      # --- AI support chat (Feature 3) ------------------------------------
+      # Kill switch; "false" disables the chat platform-wide without a deploy.
+      - key: SUPPORT_CHAT_ENABLED
+        value: "true"
+      # Messages per user per DAY. Every one spends ANTHROPIC_API_KEY.
+      - key: RATE_LIMIT_SUPPORT_CHAT
+        value: "30"
+      - key: SUPPORT_CHAT_RETENTION_DAYS
+        value: "30"
+      - key: SUPPORT_CHAT_MIN_CONFIDENCE
+        value: "0.5"
         sync: false
       - key: SENDER_IDENTITY
         sync: false

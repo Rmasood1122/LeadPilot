@@ -50,6 +50,23 @@ export const adminApi = {
   // -------------------------------------------------------------------
   // Circuit breakers
   // -------------------------------------------------------------------
+  // ── Feature 2/3 admin surfaces ─────────────────────────────────────────
+  // Tutorial completions are AGGREGATE ONLY — the payload deliberately
+  // carries no user identifier. Support tickets DO carry the requester's
+  // email, because a ticket you cannot reply to is useless.
+  getTutorialCompletions: async () =>
+    apiClient.get<import("./types").AdminTutorialCompletions>(
+      "/admin/tutorials/completions"),
+
+  listSupportTickets: async (status?: string) =>
+    apiClient.get<{ open_count: number;
+                    tickets: import("./types").AdminSupportTicket[] }>(
+      `/admin/support/tickets${status ? `?status=${status}` : ""}`),
+
+  resolveSupportTicket: async (ticketId: string, note: string) =>
+    apiClient.post<{ id: string; status: string }>(
+      `/admin/support/tickets/${ticketId}/resolve`, { note }),
+
   listCircuitBreakers: async () =>
     apiClient.get("/admin/circuit-breakers").then((r: any) => r.data),
 

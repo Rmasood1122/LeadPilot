@@ -110,6 +110,11 @@ class FakeClaude:
         self.judge_calls: list[int] = []
         self.fix_calls: list[int] = []
         self.reply_verdicts: dict[str, str] = {}
+        # Feature 3: what complete_json returns for a support-chat call.
+        # A dict is returned verbatim; an Exception instance is raised, so a
+        # test can simulate the API being down without patching anything else.
+        self.support_response: object | None = None
+        self.support_prompts: list[str] = []
         self.default_reply_class = "interested"
         self.pattern_result = {
             "industry": "fire protection",
@@ -136,6 +141,16 @@ class FakeClaude:
     # ---- JSON completions (patterns + verification judge) ----
     def complete_json(self, system: str, prompt: str, max_tokens: int | None = None) -> dict:
         self.completions += 1
+        if "LeadPilot in-app support assistant" in system:  # Feature 3
+            self.support_prompts.append(prompt)
+            if isinstance(self.support_response, Exception):
+                raise self.support_response
+            if self.support_response is not None:
+                return self.support_response
+            # Default: a confident, on-topic, grounded answer.
+            return {"on_topic": True, "confidence": 0.9,
+                    "answer": "LeadPilot runs a 72-step research pipeline.",
+                    "faq_ids": ["what-is-leadpilot"]}
         if "sales analyst" in system:  # pattern recognition
             return dict(self.pattern_result)
         if "personalization engine" in system:  # M3 message rendering
@@ -191,6 +206,10 @@ def fake_claude(monkeypatch):
         "app.services.message_personalization.get_client",
         "app.services.reply_classification.get_client",
         "app.services.whatsapp_templates.get_client",
+        # Feature 3 reaches get_client through the MODULE at call time
+        # (anthropic_client.get_client()), so patching the module attribute
+        # below is what actually takes effect. Listed anyway so the intent is
+        # visible and a future refactor to a `from` import fails loudly here.
         "app.pipeline.engine.get_client",
         "app.verification.loop.get_client",
     ):

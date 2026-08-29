@@ -99,7 +99,10 @@ git reset --hard <anchor-commit>
 
 | Timestamp | Label | Anchor commit | Files |
 |---|---|---|---|
-| `20260829_170115` | `pre-email-verification` | `bd7d54c` | 15 — `app/config.py`, `app/db/models.py`, `app/api/auth.py`, `app/services/auth.py`, `app/core/production_guard.py`, `.env`, `.env.example`, `.env.production.example`, `render.yaml`, `requirements.txt`, and 5 frontend files. All diff-verified. |
+| `20260829_170115` | `pre-email-verification` | `bd7d54c` | 16 — `app/config.py`, `app/db/models.py`, `app/api/auth.py`, `app/services/auth.py`, `app/core/production_guard.py`, `.env`, `.env.example`, `.env.production.example`, `render.yaml`, `requirements.txt`, `tests/integration/conftest.py`, and 5 frontend files. All diff-verified. |
+| `20260829_183822` | `pre-tutorial-section` | `f307b68` | 5 — `app/main.py`, `app/db/models.py`, `app/api/admin.py`, `frontend/src/components/shell/nav.ts`, `frontend/src/lib/api/types.ts`. All diff-verified. |
+| `20260829_212808` | `pre-ai-support-chat` | `5e5777a` | 12 — `app/main.py`, `app/config.py`, `app/core/config.py`, `app/db/models.py`, `app/api/admin.py`, `app/workers/celery_app.py`, `app/services/tutorials.py`, `tests/conftest.py`, `tests/test_celery_routing.py`, and 3 frontend files. All diff-verified. |
+| `20260830_024655` | `pre-offline-activation` | *(see Feature 3 commit)* | 18 — `app/config.py`, `app/core/config.py`, `app/db/models.py`, `app/api/admin.py`, `app/api/tutorials.py`, `app/api/support.py`, `app/services/tutorials.py`, `app/services/support_chat.py`, `app/main.py`, `tests/test_tutorials.py`, `tests/test_support_chat.py`, `tests/conftest.py`, `frontend/e2e/tutorials.spec.ts`, and 5 more. 18/18 diff-verified. Covers the DB-backed tutorial catalogue (0018), mock AI mode, and the activation script. |
 
 ---
 
@@ -195,6 +198,8 @@ alembic downgrade <previous_revision_id>
 | Revision | Downgrade | Lossy? |
 |---|---|---|
 | `0015_email_verification` | Verified on PostgreSQL 16 and SQLite: drops `users.email_verified`, `users.email_verified_at`, `email_verification_tokens`; all user rows intact. | **Yes.** Discards *which* users had verified — the old schema has nowhere to keep it. Re-upgrading backfills everyone to verified again: safe (nobody locked out) but not the same data. |
+| `0016_tutorial_progress` | Verified on PostgreSQL 16: drops `tutorial_progress`; `users` and every other table intact. | **Yes.** Discards all tutorial watch progress and therefore every earned badge (badges are derived from progress, so there is nothing else to lose). |
+| `0017_ai_support_chat` | Verified on PostgreSQL 16: drops `chat_sessions`, `chat_messages`, `support_tickets`; `tutorial_progress` and `users` intact. | **Yes, and worse than the others.** Discards all chat history **and every support ticket, including open ones a user is waiting on**. Take a dump first. |
 
 ---
 

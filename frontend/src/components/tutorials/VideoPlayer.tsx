@@ -20,12 +20,17 @@
  * keeps counting in a background tab — it measures how long the page was open,
  * not how much was watched. The IFrame API reports the real position.
  *
- * ⚠ UNVERIFIED: every tutorial is currently a placeholder, so the playback
- * branch below has never run against a real video. The reporting DECISION
- * logic is unit-tested (src/lib/tutorial-progress.ts +
- * src/tests/tutorial-progress.test.ts) and the embed URL construction is
- * asserted in the e2e suite, but "a real video plays and its position is
- * recorded" cannot be proven until a real youtube_id exists.
+ * VERIFIED against a real video on 2026-08-30 using a throwaway id: the API
+ * built an iframe on youtube-nocookie.com carrying the right origin, and the
+ * LIVE player answered getDuration() with 214 -- which is only possible if
+ * postMessage is being accepted, i.e. if progress polling actually works.
+ * That run also caught two real bugs: a missing `origin` (YouTube "Error 153",
+ * and silently dead postMessage) and the IFrame API defaulting to youtube.com
+ * rather than the nocookie host this file claimed to use.
+ *
+ * Still unverified: nothing has been watched end to end at normal speed, so
+ * the 90%-completion crossing has only ever been exercised through the unit
+ * tests and the API. The catalogue ships with all nine ids as null.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -157,12 +162,28 @@ export function VideoPlayer({
       .then(() => {
         if (cancelled || !mountRef.current || !window.YT?.Player) return;
         playerRef.current = new window.YT.Player(mountRef.current, {
+          // The IFrame API builds its OWN embed URL and defaults to
+          // youtube.com. Without this the privacy-preserving host was used
+          // only by the fallback <iframe> below, while the path almost every
+          // user actually takes quietly loaded the tracking host -- a
+          // discrepancy the code claimed not to have. Verified in a browser:
+          // the generated src now carries youtube-nocookie.com.
+          host: "https://www.youtube-nocookie.com",
           videoId: tutorial.youtube_id,
           playerVars: {
             enablejsapi: 1,
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
+            // REQUIRED whenever enablejsapi=1.
+            //
+            // Without it YouTube renders "Error 153 — Video player
+            // configuration error" and, worse, silently rejects the
+            // postMessage traffic the IFrame API uses -- so the player would
+            // look fine while getCurrentTime() never reported anything and
+            // progress never advanced. Caught by loading the real embed URL
+            // in a browser, which showed Error 153 on a valid video id.
+            origin: typeof window !== "undefined" ? window.location.origin : undefined,
             // Resume where they left off. Not applied when the video is
             // already finished — restarting a completed video at 90% is
             // annoying, and rewatching is the likely intent.
@@ -228,6 +249,8 @@ export function VideoPlayer({
               startSeconds: tutorial.progress.completed
                 ? 0
                 : tutorial.progress.position_seconds,
+              origin: typeof window !== "undefined"
+                ? window.location.origin : undefined,
             })}
             title={tutorial.title}
             allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

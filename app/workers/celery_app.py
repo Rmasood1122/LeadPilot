@@ -26,6 +26,7 @@ celery_app = Celery(
         "app.workers.send_tasks",       # C4 send-time-aware sending
         "app.workers.webhook_tasks",    # C5 reliable outbound webhooks
         "app.workers.beat_heartbeat",   # C3 beat liveness key
+        "app.workers.support_tasks",    # Feature 3 chat retention purge
     ],
 )
 
@@ -57,6 +58,7 @@ celery_app.conf.task_routes = {
     # Everything else: heartbeat, outbound webhooks, ping.
     "app.workers.beat_heartbeat.*": {"queue": "default"},
     "app.workers.webhook_tasks.*": {"queue": "default"},
+    "app.workers.support_tasks.*": {"queue": "default"},
     "leadpilot.ping": {"queue": "default"},
 }
 
@@ -116,6 +118,13 @@ celery_app.conf.beat_schedule = {
     "beat-heartbeat": {
         "task": "app.workers.beat_heartbeat.refresh_celery_heartbeat",
         "schedule": 60.0,
+    },
+    # Feature 3: delete chat history past SUPPORT_CHAT_RETENTION_DAYS.
+    # 03:20 UTC — after the learning-loop jobs at :05 and :35 so a slow
+    # aggregation never delays the purge, and vice versa.
+    "support-chat-retention-purge": {
+        "task": "app.workers.support_tasks.purge_old_chats",
+        "schedule": crontab(hour=3, minute=20),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

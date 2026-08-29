@@ -25,7 +25,7 @@ REPLACING THE PLACEHOLDERS
 --------------------------
 Set `youtube_id` on each entry to the 11-character id from the video's URL:
 
-    https://www.youtube.com/watch?v=dQw4w9WgXcQ
+    https://www.youtube.com/watch?v=AbCdEfGhIjK
                                    ^^^^^^^^^^^ this part
 
 Leave it None until the video exists. `None` is deliberately not an empty
