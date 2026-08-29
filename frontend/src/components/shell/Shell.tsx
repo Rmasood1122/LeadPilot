@@ -7,13 +7,13 @@ import { LogOut, Menu } from "lucide-react";
 import { NAV } from "./nav";
 import { cn } from "@/lib/utils";
 import { hasSession } from "@/lib/api/client";
-import { logout } from "@/lib/api/auth";
+import { isUnverifiedError, logout, me } from "@/lib/api/auth";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/ui/Logo";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
- *  gate: no session -> /login. */
+ *  gate: no session -> /login, unverified email -> /check-email. */
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -21,8 +21,44 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!hasSession()) router.replace("/login");
-    else setReady(true);
+    if (!hasSession()) {
+      router.replace("/login");
+      return;
+    }
+    // A session is not the same as a usable account. Someone can arrive here
+    // with valid tokens and an unverified address -- a bookmarked /pipeline, a
+    // second tab, a restored mobile session -- and every data fetch on the
+    // page would then fail with 403 EMAIL_NOT_VERIFIED, rendering a dashboard
+    // full of errors with nothing explaining why.
+    //
+    // GET /auth/me is the cheapest request that goes through the same
+    // get_current_user dependency as everything else, so it gives the same
+    // answer the rest of the page would get, once, before anything renders.
+    let mounted = true;
+    me()
+      .then((user) => {
+        if (!mounted) return;
+        if (user.email_verified === false) {
+          router.replace(`/check-email?email=${encodeURIComponent(user.email)}`);
+          return;
+        }
+        setReady(true);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        if (isUnverifiedError(err)) {
+          router.replace("/check-email");
+          return;
+        }
+        // Anything else -- expired refresh token, backend down -- is the
+        // pre-existing behaviour: render, and let the page's own queries
+        // surface the failure. Blocking on it would white-screen the app
+        // every time the API hiccups.
+        setReady(true);
+      });
+    return () => {
+      mounted = false;
+    };
   }, [router]);
 
   if (!ready) return null;

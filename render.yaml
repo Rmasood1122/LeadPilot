@@ -100,6 +100,25 @@ services:
       - key: PUBLIC_BASE_URL       # this service's own https URL
         sync: false
       - key: FRONTEND_URL
+      # --- Email delivery, signup verification (Feature 1) ---------------
+      # NOT `console`/`memory` in production: both accept the send and deliver
+      # nothing, so signup keeps returning 201 while no user ever gets a link.
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: EMAIL_FROM
+        value: noreply@calendarharvest.com
+      - key: EMAIL_FROM_NAME
+        value: LeadPilot
+      # Secret — paste in the Render dashboard. The sending DOMAIN must be
+      # verified in Resend (SPF + DKIM) or mail is dropped downstream.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_VERIFICATION_TTL_HOURS
+        value: "24"
+      # Kill switch. "false" disables signup verification platform-wide —
+      # the escape hatch if this ever locks real users out. Leave true.
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
         sync: false
       - key: SENDER_IDENTITY       # CAN-SPAM postal address
         sync: false
@@ -164,6 +183,25 @@ services:
       - key: PUBLIC_BASE_URL
         sync: false
       - key: FRONTEND_URL
+      # --- Email delivery, signup verification (Feature 1) ---------------
+      # NOT `console`/`memory` in production: both accept the send and deliver
+      # nothing, so signup keeps returning 201 while no user ever gets a link.
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: EMAIL_FROM
+        value: noreply@calendarharvest.com
+      - key: EMAIL_FROM_NAME
+        value: LeadPilot
+      # Secret — paste in the Render dashboard. The sending DOMAIN must be
+      # verified in Resend (SPF + DKIM) or mail is dropped downstream.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_VERIFICATION_TTL_HOURS
+        value: "24"
+      # Kill switch. "false" disables signup verification platform-wide —
+      # the escape hatch if this ever locks real users out. Leave true.
+      - key: REQUIRE_EMAIL_VERIFICATION
+        value: "true"
         sync: false
       - key: SENDER_IDENTITY
         sync: false

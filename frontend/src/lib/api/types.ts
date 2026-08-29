@@ -4,6 +4,12 @@ export interface UserOut {
   id: string;
   email: string;
   plan: string;
+  is_admin?: boolean;
+  /** Feature 1. Until this is true every authenticated endpoint answers 403
+   *  EMAIL_NOT_VERIFIED, so the UI routes the user to /check-email instead of
+   *  the dashboard. Optional because a cached response from a backend that
+   *  predates the feature will not carry it. */
+  email_verified?: boolean;
 }
 
 export interface TokenBundle {
@@ -12,6 +18,12 @@ export interface TokenBundle {
   refresh_token: string;
   token_type: string;
   expires_in: number;
+  /** Present on the /auth/signup response only. */
+  email_verification_required?: boolean;
+  /** False when the account was created but the mail transport was down —
+   *  the check-email screen says so rather than telling the user to look for
+   *  a message that was never sent. */
+  verification_email_sent?: boolean;
 }
 
 export type FlowType = "with_clients" | "no_clients";

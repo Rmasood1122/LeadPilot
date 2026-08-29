@@ -136,6 +136,50 @@ class Settings(BaseSettings):
     # Where theme background images are stored + served from.
     media_dir: str = "media"
 
+    # --- Email verification (Feature 1) ------------------------------------
+    # Where the browser is sent AFTER GET /auth/verify has done its work.
+    # FRONTEND_URL is already set in .env / render.yaml but was never read by
+    # this module; it is read here so the redirect target is configuration,
+    # not a constant compiled into the redirect handler.
+    frontend_url: str = "http://localhost:3000"
+
+    # Which transport actually delivers mail. Deliberately explicit rather than
+    # "use resend if a key is present": a production process with a typo'd key
+    # name must FAIL LOUDLY, not silently degrade to logging every
+    # verification link to stdout where no user will ever see it.
+    #   resend  — HTTPS POST to api.resend.com (production)
+    #   smtp    — plain SMTP; this is the Mailtrap sandbox path for local tests
+    #   console — log the message, deliver nothing (local dev without creds)
+    #   memory  — append to an in-process list (the test suite asserts on it)
+    email_provider: str = "console"
+    email_send_timeout_seconds: float = 15.0
+
+    # Resend
+    resend_api_key: str = ""
+    resend_api_url: str = "https://api.resend.com/emails"
+    # MUST be on a domain verified in the Resend dashboard, or every message is
+    # accepted by the API and then dropped or spam-foldered downstream.
+    email_from: str = "noreply@calendarharvest.com"
+    email_from_name: str = "LeadPilot"
+
+    # SMTP (Mailtrap sandbox in development; any SMTP relay in production)
+    smtp_host: str = ""
+    smtp_port: int = 2525
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_starttls: bool = True
+
+    # Verification token lifetime. 24h is the product requirement; it is a
+    # setting so an expiry test does not have to wait a day.
+    email_verification_ttl_hours: int = 24
+
+    # KILL SWITCH. get_current_user rejects unverified users only while this is
+    # true. It exists because that dependency is the single chokepoint every
+    # authenticated route shares: if verification ever locks real users out,
+    # this turns enforcement off from the Render dashboard with a restart,
+    # instead of needing a code change and a redeploy.
+    require_email_verification: bool = True
+
     # --- Pipeline engine -------------------------------------------------
     pipeline_step_timeout_seconds: int = 300
     # Verification loop: max fix→re-run attempts per pass before the

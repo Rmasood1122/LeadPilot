@@ -23,6 +23,13 @@ _GOOD_CORS = "https://app.example.com"
 _GOOD_BASE_URL = "https://api.example.com"
 _GOOD_SENDER = "Example Ltd, 42 Real Street, Manchester, M1 2AB, UK"
 
+# Feature 1: a production process that cannot deliver signup verification mail
+# is misconfigured in exactly the invisible way this guard exists to catch, so
+# a "fully valid production environment" now has to include a real transport.
+_GOOD_EMAIL_PROVIDER = "resend"
+_GOOD_RESEND_KEY = "re_test_key_not_real"
+_GOOD_EMAIL_FROM = "noreply@example.com"
+
 
 # Any non-loopback redis URL. The guard only rejects unset/loopback values.
 _GOOD_REDIS_URL = "rediss://default:token@example.upstash.io:6379"
@@ -41,6 +48,9 @@ def _prod_env(monkeypatch, **overrides):
         "PUBLIC_BASE_URL": _GOOD_BASE_URL,
         "SENDER_IDENTITY": _GOOD_SENDER,
         "REDIS_URL": _GOOD_REDIS_URL,
+        "EMAIL_PROVIDER": _GOOD_EMAIL_PROVIDER,
+        "RESEND_API_KEY": _GOOD_RESEND_KEY,
+        "EMAIL_FROM": _GOOD_EMAIL_FROM,
     }
     env.update(overrides)
     for key, value in env.items():
@@ -57,7 +67,8 @@ class TestNonProductionIsUntouched:
         none of these set."""
         monkeypatch.setenv("APP_ENV", env)
         for key in ("SECRET_KEY", "ENCRYPTION_KEY", "CORS_ORIGINS",
-                    "PUBLIC_BASE_URL", "SENDER_IDENTITY", "REDIS_URL"):
+                    "PUBLIC_BASE_URL", "SENDER_IDENTITY", "REDIS_URL",
+                    "EMAIL_PROVIDER", "RESEND_API_KEY", "EMAIL_FROM"):
             monkeypatch.delenv(key, raising=False)
         validate_production_config()  # must not raise
 
@@ -178,18 +189,66 @@ class TestRedisUrl:
         validate_production_config()  # must not raise
 
 
+class TestEmailDelivery:
+    """Feature 1. A production process that cannot send verification mail is
+    broken in a way NOTHING else detects: /health stays green, signup keeps
+    returning 201, and users simply never receive a link."""
+
+    def test_unset_provider_is_blocked(self, monkeypatch):
+        _prod_env(monkeypatch, EMAIL_PROVIDER=None)
+        with pytest.raises(ProductionConfigError, match="EMAIL_PROVIDER is not set"):
+            validate_production_config()
+
+    @pytest.mark.parametrize("provider", ["console", "memory"])
+    def test_non_delivering_transports_are_blocked(self, monkeypatch, provider):
+        _prod_env(monkeypatch, EMAIL_PROVIDER=provider)
+        with pytest.raises(ProductionConfigError, match="does not deliver mail"):
+            validate_production_config()
+
+    def test_unknown_transport_is_blocked(self, monkeypatch):
+        """A typo must fail at startup, not at the first signup."""
+        _prod_env(monkeypatch, EMAIL_PROVIDER="resnd")
+        with pytest.raises(ProductionConfigError, match="not a known transport"):
+            validate_production_config()
+
+    def test_resend_without_a_key_is_blocked(self, monkeypatch):
+        _prod_env(monkeypatch, RESEND_API_KEY=None)
+        with pytest.raises(ProductionConfigError, match="RESEND_API_KEY is empty"):
+            validate_production_config()
+
+    def test_smtp_without_a_host_is_blocked(self, monkeypatch):
+        _prod_env(monkeypatch, EMAIL_PROVIDER="smtp", RESEND_API_KEY=None)
+        with pytest.raises(ProductionConfigError, match="SMTP_HOST is empty"):
+            validate_production_config()
+
+    def test_missing_from_address_is_blocked(self, monkeypatch):
+        _prod_env(monkeypatch, EMAIL_FROM=None)
+        with pytest.raises(ProductionConfigError, match="EMAIL_FROM is not set"):
+            validate_production_config()
+
+    def test_malformed_from_address_is_blocked(self, monkeypatch):
+        _prod_env(monkeypatch, EMAIL_FROM="noreply-at-example.com")
+        with pytest.raises(ProductionConfigError, match="is not an email address"):
+            validate_production_config()
+
+    def test_correct_email_config_passes(self, monkeypatch):
+        _prod_env(monkeypatch)
+        validate_production_config()  # must not raise
+
+
 class TestReporting:
     def test_all_problems_reported_together(self, monkeypatch):
         """Fixing one var per redeploy is a slow way to learn about three."""
         _prod_env(monkeypatch, SECRET_KEY=None, ENCRYPTION_KEY=None,
-                  CORS_ORIGINS=None)
+                  CORS_ORIGINS=None, EMAIL_PROVIDER=None)
         with pytest.raises(ProductionConfigError) as exc:
             validate_production_config()
         message = str(exc.value)
-        assert "3 unsafe production" in message
+        assert "4 unsafe production" in message
         assert "SECRET_KEY" in message
         assert "ENCRYPTION_KEY" in message
         assert "CORS_ORIGINS" in message
+        assert "EMAIL_PROVIDER" in message
 
 
 class TestPublicBaseUrl:

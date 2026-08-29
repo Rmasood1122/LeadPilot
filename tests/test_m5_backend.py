@@ -9,13 +9,29 @@ from sqlalchemy import select
 
 from app.db import models as m
 from app.services import auth as auth_svc
-from tests.conftest import NOW
+from tests.conftest import NOW, complete_verification
 
 
 def _signup(client, email="ui@x.com", password="hunter22!"):
+    """Sign up and leave the account UNVERIFIED — the raw post-signup state."""
     r = client.post("/auth/signup", json={"email": email, "password": password})
     assert r.status_code == 201
     return r.json()
+
+
+def _signup_verified(client, mailbox, email="ui@x.com", password="hunter22!"):
+    """Sign up, then click the emailed link — a usable account.
+
+    Feature 1 made signup alone insufficient: the tokens it returns are valid
+    but every authenticated route answers 403 EMAIL_NOT_VERIFIED until the link
+    is clicked. Tests below that care about theme/analytics/etc. need a working
+    account, so they go through the REAL link from the REAL email body rather
+    than flipping the column directly — which would leave the endpoint, the
+    template and the token round-trip untested by every one of them.
+    """
+    tokens = _signup(client, email, password)
+    assert complete_verification(client, mailbox) == 302
+    return tokens
 
 
 def _auth_headers(tokens):
@@ -23,11 +39,21 @@ def _auth_headers(tokens):
 
 
 class TestAuth:
-    def test_signup_login_me_roundtrip(self, client, db_session):
+    def test_signup_login_me_roundtrip(self, client, db_session, mailbox):
+        """Signup -> blocked -> verify -> allowed. The whole Feature 1 arc."""
         tokens = _signup(client)
+
+        # The tokens are real, but the account is not usable yet.
+        blocked = client.get("/auth/me", headers=_auth_headers(tokens))
+        assert blocked.status_code == 403
+        assert blocked.json()["detail"] == "EMAIL_NOT_VERIFIED"
+
+        assert complete_verification(client, mailbox) == 302
+
         me = client.get("/auth/me", headers=_auth_headers(tokens))
         assert me.status_code == 200
         assert me.json()["email"] == "ui@x.com"
+        assert me.json()["email_verified"] is True
         login = client.post("/auth/login", json={"email": "ui@x.com",
                                                  "password": "hunter22!"})
         assert login.status_code == 200
@@ -70,8 +96,8 @@ class TestAuth:
 
 class TestTheme:
     def test_theme_persist_roundtrip_with_contrast_flag(self, client,
-                                                        db_session):
-        tokens = _signup(client)
+                                                        db_session, mailbox):
+        tokens = _signup_verified(client, mailbox)
         theme = {"preset": "custom", "background_color": "#101014",
                  "primary_color": "#ffaa00", "accent_color": "#00ccaa",
                  "font_family": "Sora", "font_size_scale": 1.1,
@@ -84,16 +110,17 @@ class TestTheme:
         # the user was demonstrably informed — the flag is persisted
         assert saved["theme"]["contrast_warnings"] == theme["contrast_warnings"]
 
-    def test_invalid_hex_rejected(self, client):
-        tokens = _signup(client)
+    def test_invalid_hex_rejected(self, client, mailbox):
+        tokens = _signup_verified(client, mailbox)
         r = client.put("/me/theme", json={"background_color": "red"},
                        headers=_auth_headers(tokens))
         assert r.status_code == 422
 
-    def test_background_upload_serves_url(self, client, tmp_path, monkeypatch):
+    def test_background_upload_serves_url(self, client, tmp_path, monkeypatch,
+                                          mailbox):
         from app.config import settings
         monkeypatch.setattr(settings, "media_dir", str(tmp_path))
-        tokens = _signup(client)
+        tokens = _signup_verified(client, mailbox)
         r = client.post("/me/theme/background",
                         headers=_auth_headers(tokens),
                         files={"file": ("bg.png", io.BytesIO(b"\x89PNG rest"),

@@ -49,6 +49,13 @@ os.environ.setdefault("CELERY_EAGER_PROPAGATES", "true")
 # defence-in-depth check also passes. See app/api/debug.py for the guard.
 os.environ.setdefault("ENABLE_DEBUG_ROUTES", "true")
 os.environ.setdefault("APP_ENV", "test")
+# Feature 1: the in-process mail transport. Tests need to READ the verification
+# link, not just assert that something was sent, and "memory" is the only
+# transport that keeps the rendered message where a test can reach it. It is
+# also the only one that cannot accidentally contact a real relay from CI.
+os.environ.setdefault("EMAIL_PROVIDER", "memory")
+os.environ.setdefault("PUBLIC_BASE_URL", "http://testserver")
+os.environ.setdefault("FRONTEND_URL", "http://frontend.test")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -215,7 +222,20 @@ def enqueued():
 
 @pytest.fixture()
 def test_user(db_session):
-    user = m.User(email="test@leadpilot.dev")
+    """The canonical established user every object fixture builds data under.
+
+    email_verified=True is set EXPLICITLY, not inherited. This fixture stands
+    for an account that has been in the product for a while, which is exactly
+    the population migration 0015 backfills to verified -- and every test that
+    uses it is testing something other than signup verification. Leaving it
+    False would make ~45 unrelated tests fail with 403 EMAIL_NOT_VERIFIED and
+    say nothing useful about the feature.
+
+    The unverified path has its own dedicated coverage in
+    tests/test_email_verification.py, which asserts the 403 against this same
+    get_current_user dependency.
+    """
+    user = m.User(email="test@leadpilot.dev", email_verified=True)
     db_session.add(user)
     db_session.commit()
     return user
@@ -226,6 +246,59 @@ def auth_headers(user) -> dict[str, str]:
     stubbing it out, so the auth path itself stays under test."""
     from app.services.auth import issue_tokens
     return {"Authorization": f"Bearer {issue_tokens(user.id)['access_token']}"}
+
+
+# --------------------------------------------------------------------------
+# Feature 1 — email verification helpers
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def mailbox():
+    """The in-process inbox, emptied around every test.
+
+    autouse because SENT_MESSAGES is module-level state: without a reset a test
+    that asserts "exactly one email was sent" passes alone and fails in a full
+    run, which is the worst kind of flake to chase.
+    """
+    from app.services.email_sender import SENT_MESSAGES, reset_sent_messages
+
+    reset_sent_messages()
+    yield SENT_MESSAGES
+    reset_sent_messages()
+
+
+def verification_link(mailbox_messages) -> str:
+    """Pull the verification URL out of the most recent email.
+
+    Reads the rendered TEXT BODY rather than reaching into the database,
+    because what actually has to work is the link a human receives. A test that
+    fabricated its own URL from a token row would still pass if the email
+    template shipped a broken link.
+    """
+    import re
+
+    assert mailbox_messages, "no email was sent"
+    body = mailbox_messages[-1]["text"]
+    match = re.search(r"https?://\S+/auth/verify\?token=\S+", body)
+    assert match, "no verification link in email body:\n" + body
+    return match.group(0)
+
+
+def complete_verification(client, mailbox_messages) -> int:
+    """Click the emailed link. Returns the redirect status code.
+
+    follow_redirects=False on purpose: the endpoint 302s to FRONTEND_URL, which
+    is a different origin with no ASGI app behind it. Following it inside
+    TestClient would leave the test asserting against a 404 from the wrong
+    server.
+    """
+    from urllib.parse import urlparse
+
+    link = verification_link(mailbox_messages)
+    path_and_query = urlparse(link).path + "?" + urlparse(link).query
+    resp = client.get(path_and_query, follow_redirects=False)
+    return resp.status_code
 
 
 @pytest.fixture()

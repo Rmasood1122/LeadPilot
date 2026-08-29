@@ -251,8 +251,72 @@ class User(TimestampMixin, Base):
     )
     # M8-C5 (migration 0011_m8c5): 7-step onboarding state
     onboarding_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Feature 1 (migration 0015_email_verification): signup email verification.
+    #
+    # server_default="0" (not just `default=False`) is deliberate. `default` is
+    # applied by Python on INSERT; rows written by anything that is not this
+    # ORM — a migration backfill, a psql session, a future bulk import — would
+    # get NULL, and `not None` is falsy, so those users would be locked out by
+    # the get_current_user gate. The server default makes the database itself
+    # answer the question.
+    #
+    # Pre-existing rows are backfilled to TRUE by migration 0015: they signed
+    # up before this feature existed and must not be locked out of an account
+    # they already own. Only signups from 0015 onward start FALSE.
+    email_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     products: Mapped[list["Product"]] = relationship(back_populates="user")
+    email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+
+
+class EmailVerificationToken(Base):
+    """One outstanding signup-verification link.
+
+    THE RAW TOKEN IS NEVER STORED. Only sha256(token) is, in `token_hash`.
+    A verification link is a bearer credential — anyone holding it can mark an
+    account verified — so a leaked database dump must not hand an attacker a
+    working link for every pending signup. The raw value exists exactly twice:
+    in the email, and in the query string of the click. Lookup is by hash.
+
+    Single use: `used_at` is stamped on the first successful click, and the
+    verify endpoint refuses a token that already has one. Without that, a
+    forwarded email or a mail-scanner prefetch keeps re-verifying an account
+    the user may since have had suspended.
+
+    Rows are kept after use rather than deleted, so "this link was already
+    used" is distinguishable from "this link never existed" — the difference
+    between a helpful message and a confusing one.
+    """
+
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    # sha256 hex digest of the raw token — 64 chars, unique so a hash
+    # collision or a duplicated insert surfaces as an error, not a silent
+    # second live link for the same value.
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True,
+                                            nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="email_verification_tokens")
 
 
 class Product(TimestampMixin, Base):

@@ -370,6 +370,26 @@ def all_mocks(mock_transports):
 # User fixtures
 # ---------------------------------------------------------------------------
 
+def _mark_verified(db_session, email: str) -> None:
+    """Flip email_verified on a freshly signed-up integration user.
+
+    Feature 1 made /auth/signup produce an UNVERIFIED account, and
+    get_current_user answers 403 EMAIL_NOT_VERIFIED for one -- so without this
+    every authenticated call in this directory would 403 while testing
+    something unrelated to verification.
+
+    Flipping the column directly is the same shortcut admin_tokens already
+    takes for is_admin, and for the same reason: the fixture's job is to hand
+    back a usable account, not to re-test the signup flow. The verification
+    flow itself is covered end to end in tests/test_email_verification.py.
+    """
+    from app.db.models import User
+
+    user = db_session.query(User).filter(User.email == email).one()
+    user.email_verified = True
+    db_session.commit()
+
+
 @pytest_asyncio.fixture()
 async def admin_tokens(api_client: AsyncClient, db_session) -> dict[str, str]:
     """Register, PROMOTE and authenticate a fresh admin user.
@@ -392,6 +412,7 @@ async def admin_tokens(api_client: AsyncClient, db_session) -> dict[str, str]:
 
     user = db_session.query(User).filter(User.email == email).one()
     user.is_admin = True
+    user.email_verified = True   # Feature 1 — see _mark_verified
     db_session.commit()
 
     resp = await api_client.post("/auth/login", json={
@@ -406,17 +427,19 @@ async def admin_tokens(api_client: AsyncClient, db_session) -> dict[str, str]:
 
 
 @pytest_asyncio.fixture()
-async def user_a_tokens(api_client: AsyncClient) -> dict[str, str]:
+async def user_a_tokens(api_client: AsyncClient, db_session) -> dict[str, str]:
     email = f"usera_{uuid.uuid4().hex[:6]}@test.io"
     await api_client.post("/auth/signup", json={"email": email, "password": "UserA1234!"})
+    _mark_verified(db_session, email)
     resp = await api_client.post("/auth/login", json={"email": email, "password": "UserA1234!"})
     return resp.json()
 
 
 @pytest_asyncio.fixture()
-async def user_b_tokens(api_client: AsyncClient) -> dict[str, str]:
+async def user_b_tokens(api_client: AsyncClient, db_session) -> dict[str, str]:
     email = f"userb_{uuid.uuid4().hex[:6]}@test.io"
     await api_client.post("/auth/signup", json={"email": email, "password": "UserB1234!"})
+    _mark_verified(db_session, email)
     resp = await api_client.post("/auth/login", json={"email": email, "password": "UserB1234!"})
     return resp.json()
 

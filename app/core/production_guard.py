@@ -244,6 +244,70 @@ def _check_sender_identity(problems: list[str]) -> None:
         )
 
 
+# Transports that accept a send and deliver nothing. Fine locally; catastrophic
+# in production, where they make signup keep returning 201 while not one user
+# ever receives a verification link.
+_UNDELIVERABLE_EMAIL_PROVIDERS = {"console", "memory"}
+_VALID_EMAIL_PROVIDERS = {"resend", "smtp", "console", "memory"}
+
+
+def _check_email_delivery(problems: list[str]) -> None:
+    """Signup verification must be able to actually send mail.
+
+    Without this check the failure is invisible from outside: /health is green,
+    POST /auth/signup returns 201, the account row is created -- and the user
+    sits in front of an empty inbox unable to enter the product, with the only
+    evidence a log line nobody is watching. Every other check in this file
+    exists for the same reason, which is why this one belongs here.
+    """
+    provider = os.getenv("EMAIL_PROVIDER", "").strip().lower()
+
+    if not provider:
+        problems.append(
+            "EMAIL_PROVIDER is not set. It defaults to 'console', which LOGS "
+            "verification emails instead of sending them -- signup would "
+            "succeed and no user would ever receive a link. Set it to "
+            "'resend' (or 'smtp')."
+        )
+        return
+
+    if provider not in _VALID_EMAIL_PROVIDERS:
+        problems.append(
+            f"EMAIL_PROVIDER={provider!r} is not a known transport. Valid "
+            f"values: {', '.join(sorted(_VALID_EMAIL_PROVIDERS))}."
+        )
+        return
+
+    if provider in _UNDELIVERABLE_EMAIL_PROVIDERS:
+        problems.append(
+            f"EMAIL_PROVIDER={provider!r} does not deliver mail -- it only "
+            f"records the message in-process. Signup verification emails would "
+            f"never reach a user. Set EMAIL_PROVIDER=resend in production."
+        )
+        return
+
+    if provider == "resend" and not os.getenv("RESEND_API_KEY", "").strip():
+        problems.append(
+            "EMAIL_PROVIDER=resend but RESEND_API_KEY is empty. Every "
+            "verification email would fail to send."
+        )
+    if provider == "smtp" and not os.getenv("SMTP_HOST", "").strip():
+        problems.append(
+            "EMAIL_PROVIDER=smtp but SMTP_HOST is empty. Every verification "
+            "email would fail to send."
+        )
+
+    sender = os.getenv("EMAIL_FROM", "").strip()
+    if not sender:
+        problems.append(
+            "EMAIL_FROM is not set. Verification emails have no From address."
+        )
+    elif "@" not in sender:
+        problems.append(
+            f"EMAIL_FROM={sender!r} is not an email address."
+        )
+
+
 def is_production(app_env: str | None = None) -> bool:
     env = (app_env if app_env is not None else os.getenv("APP_ENV", "")).strip().lower()
     return env in _PRODUCTION_ENVS
@@ -265,6 +329,7 @@ def validate_production_config(app_env: str | None = None) -> None:
     _check_public_base_url(problems)
     _check_redis_url(problems)
     _check_sender_identity(problems)
+    _check_email_delivery(problems)
 
     if problems:
         numbered = "\n".join(f"  {i}. {p}" for i, p in enumerate(problems, 1))

@@ -21,8 +21,16 @@ export default function SignupPage() {
     setBusy(true);
     setError(null);
     try {
-      await signup(email, password);
-      router.replace("/pipeline");
+      const bundle = await signup(email, password);
+      // NOT /pipeline any more. The account exists and the tokens are real,
+      // but every dashboard request would come back 403 EMAIL_NOT_VERIFIED
+      // until the emailed link is clicked -- so sending them to the dashboard
+      // would show a broken page instead of an explanation.
+      // `sent=false` tells the next screen the mail transport failed, so it
+      // leads with "resend" instead of "check your inbox".
+      const params = new URLSearchParams({ email });
+      if (bundle.verification_email_sent === false) params.set("sent", "false");
+      router.replace(`/check-email?${params.toString()}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Could not sign up");
     } finally {

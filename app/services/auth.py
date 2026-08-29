@@ -119,7 +119,38 @@ def decode_token(token: str, expected_typ: str) -> uuid.UUID:
 # --------------------------------------------------------------------------
 
 
+# The exact string every unverified-user rejection carries. The frontend
+# matches on it to decide "send this person to the check-your-email screen"
+# rather than "log them out", so it is a contract, not a message: changing it
+# silently breaks that branch. It lives here, next to the raise, so the two
+# cannot drift.
+EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED"
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    """Resolve the bearer token to a User, or raise.
+
+    THIS IS THE SINGLE EMAIL-VERIFICATION CHOKEPOINT.
+
+    Every authenticated route in the application resolves its user through this
+    one function (app/api/deps.py re-exports it rather than reimplementing it,
+    and require_admin builds on it). Putting the check here means an unverified
+    account is refused everywhere at once, including routes added later that
+    nobody remembered to guard. The alternative considered and rejected was
+    adding a dependency to each router: ~30 files, ~30 chances to miss one, and
+    a miss is a silent hole rather than a visible error.
+
+    It is a 403, not a 401: the credentials ARE valid. A 401 would send
+    frontend/src/lib/api/client.ts into its refresh-then-retry path, which would
+    succeed at refreshing, retry, get 401 again, and eventually clear the
+    session -- logging out a user whose only problem is an unread email.
+
+    REQUIRE_EMAIL_VERIFICATION=false disables the gate without a code change.
+    That switch exists because this is the highest-blast-radius line in the
+    feature: if verification ever wrongly locks real users out of a running
+    production system, the fix must be an environment variable and a restart,
+    not a deploy.
+    """
     header = request.headers.get("Authorization") or ""
     if not header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="missing bearer token")
@@ -127,4 +158,6 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=401, detail="user not found")
+    if settings.require_email_verification and not user.email_verified:
+        raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED)
     return user
