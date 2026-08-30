@@ -100,12 +100,97 @@ the model's text.
 | `SUPPORT_CHAT_MAX_TOKENS` | `1024` | Output ceiling per reply. |
 | `SUPPORT_CHAT_HISTORY_TURNS` | `6` | Prior turns replayed. A direct multiplier on input cost. |
 | `SUPPORT_CHAT_RETENTION_DAYS` | `30` | Chat history lifetime. `0` disables the purge. |
-| `RATE_LIMIT_SUPPORT_CHAT` | `30` | Messages per user **per day**. Lives on `app/core/config.py` — the settings object `enforce_rate_limit` actually reads. |
+| `AI_MODE` | *(empty — auto)* | `console` \| `mock` \| `live`. Empty resolves to `live` when `ANTHROPIC_API_KEY` is set and `mock` when it is not. See **AI_MODE** below. |
+| `RATE_LIMIT_SUPPORT_CHAT` | `20` | Messages per user **per day**. Lives on `app/core/config.py` — the settings object `enforce_rate_limit` actually reads. |
 | `ANTHROPIC_API_KEY` | *(existing)* | **Currently invalid — see Outstanding.** |
 
-30 rather than 20: a user troubleshooting a real problem sends 15–20 messages
+**20, lowered from 30 on 2026-08-30** at the product owner's instruction. The
+case for 30 was that a user troubleshooting a real problem sends 15–20 messages
 in one sitting, and being cut off mid-thread pushes them into a ticket — the
-exact outcome the chat exists to avoid.
+exact outcome the chat exists to avoid. At 20 that user is cut off right at the
+edge of a normal session, so expect some tickets a higher cap would have
+absorbed. Raise it if ticket volume from exhausted sessions shows up.
+
+The cap applies in **every** mode, including mock, where a message costs
+nothing. Deliberate: a user must not build a habit against a limit that
+tightens the day a real key is added.
+
+---
+
+## AI_MODE
+
+`answer_question` dispatches on `AI_MODE`. Every mode returns the same shape,
+so persistence, the daily cap and the ticket flow are identical in all three
+— the mode only decides where the answer *text* comes from.
+
+| Mode | Anthropic call | Answer text | Use it for |
+|---|---|---|---|
+| `live` | yes | model, grounded in the FAQ, three guards | production, once the key is real |
+| `mock` | **never** | a curated FAQ answer, **verbatim** | before the key arrives; demos; capping spend |
+| `console` | **never** | same as `mock` | debugging *why* mock matched what it did |
+| *(empty)* | — | resolves to `live` with a key, `mock` without | the default, and the recommended setting |
+
+**Why mock exists.** With an absent or invalid key the widget used to show an
+error to every user who opened it. A product that has not launched yet is
+exactly when the key is missing, so the pre-launch state was the broken one.
+Auto-resolution means the same build runs mock today and live the moment a
+real key lands, with nothing to remember to change.
+
+**Mock's guarantee is stronger than live's, not weaker.** Live lets the model
+rephrase FAQ content, which is the one remaining place an invented fact can
+enter. Mock returns the human-written answer byte for byte, so hallucination
+is not reduced — it is structurally impossible.
+
+**What mock gives up is comprehension.** It matches keywords, so it cannot
+combine two entries, cannot follow "what about the second one?", and cannot
+recognise a question phrased in words the FAQ does not use. When it cannot
+match it offers a ticket rather than guessing.
+
+**The match threshold is 4** (`support_kb.MIN_MOCK_MATCH_SCORE`), chosen by
+measurement against 20 on-topic and 15 off-topic questions:
+
+| Threshold | On-topic answered | Off-topic **wrongly** answered |
+|---|---|---|
+| 2 | 18/20 | **2/15** |
+| 3 | 18/20 | 0/15 |
+| **4** | **18/20** | **0/15** |
+| 5 | 16/20 | 0/15 |
+
+4 is the highest threshold that costs no recall, and it lands on a meaningful
+boundary: exactly one keyword hit. The battery is
+`tests/test_support_chat.py::TestMockMatching`, so the threshold cannot be
+nudged later without a failing test.
+
+Two on-topic questions are not answered. `"pricing plans"` is correct — there
+is no pricing entry, so a ticket is the right outcome. `"who is it for"` is a
+genuine miss: it is in the FAQ but consists entirely of stopwords once `who`
+and `for` are removed, and admitting `who` would match "who won the world cup"
+against that entry. The miss costs one unnecessary ticket; the alternative
+costs a confidently wrong answer.
+
+**A dead key in `live` mode falls back to the FAQ, not to a ticket.**
+Auto-resolution picks `live` whenever a key is *present*, and it cannot know
+the key is dead without spending a call to find out. The `.env` on this machine
+holds an invalid key, so it resolves to `live` and every message hits the
+model's failure path. A **permanent** failure there — 401 invalid/revoked key,
+403, an exhausted balance, an unknown model — is a configuration problem that
+retrying and waiting cannot fix, so the answer degrades to the mock answerer
+and the user gets the curated FAQ text. It is logged at ERROR naming
+`ANTHROPIC_API_KEY`, because serving the FAQ is the right behaviour *and* the
+key is still broken.
+
+A **transient** failure — an overloaded API, a timeout — still degrades to a
+ticket. Quietly serving keyword-matched answers through a five-minute blip
+would hide a real incident behind a slightly worse product.
+
+**`reason` on every stored message records which path produced it** —
+`mock_faq_match`, `mock_no_match`, `answered`, `off_topic`, `low_confidence`,
+`model_error` — so history is never ambiguous about whether a model was
+involved.
+
+**No FAQ match pre-fills the ticket subject** with
+`Question not in FAQ: <the question>`, truncated to the 200 characters the API
+accepts (`frontend/src/lib/support/ticketSubject.ts`).
 
 ---
 
@@ -245,9 +330,10 @@ open ones**. Take a `pg_dump` first — see
 
 | # | Item | Severity |
 |---|---|---|
-| 1 | **`ANTHROPIC_API_KEY` in `.env` is INVALID** — the live API returns `401 authentication_error: API key is invalid`. The assistant therefore returns the ticket fallback for **every** question, and its refusal behaviour has never been measured against a real model. This also affects the strategy pipeline, which uses the same key. | **HIGH** |
+| 1 | **`ANTHROPIC_API_KEY` in `.env` is INVALID** — the live API returns `401 authentication_error: API key is invalid`. **Mitigated for the chat as of 2026-08-30:** with no valid key `AI_MODE` auto-resolves to `mock`, so the widget answers from the FAQ instead of failing on every question. Still HIGH because the strategy pipeline uses the same key and has no mock mode, and because the model's refusal behaviour remains unmeasured. | **HIGH** |
 | 2 | **Refusal behaviour is UNVERIFIED end to end.** The code-level guards have 67 tests, and a live run confirmed that with a dead key all 32 adversarial inputs degraded to the ticket fallback with zero ungrounded content. But "the model classifies off-topic correctly" is unmeasured. Run `scripts/support_chat_adversarial.py` once the key works. | **HIGH** |
 | 3 | **Nobody is notified of a new ticket.** They are stored and visible at `/admin/support-tickets`, but nothing emails or pushes. The widget promises a response "within 24 hours" — that promise currently depends on someone remembering to look. | **MEDIUM** |
 | 4 | Prompt-injection resistance is **untested against a real model** for the same reason as #2. The 7 injection cases are in the script, ready to run. | MEDIUM |
-| 5 | Cost is uncapped in aggregate — 30/user/day is per user, so N users cost N × 30. There is no global daily ceiling. | LOW |
+| 5 | Cost is uncapped in aggregate — 20/user/day is per user, so N users cost N × 20. There is no global daily ceiling. In `mock` mode the aggregate cost is zero. | LOW |
 | 6 | The FAQ has no entry for pricing, refunds, or integrations, so those questions correctly produce tickets. Add entries if they become common. | LOW |
+| 7 | **Mock mode's matcher is keyword-based and misses `"who is it for"`** — an FAQ question that is entirely stopwords. It produces an unnecessary ticket rather than a wrong answer, which is the safe direction, but it is a real recall gap that disappears the moment `AI_MODE` is `live`. | LOW |

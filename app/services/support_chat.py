@@ -1,7 +1,24 @@
-"""The AI support answerer (Feature 3).
+"""The AI support answerer (Feature 3, + AI_MODE from Task 4).
 
 Takes a user question, returns an answer that is either grounded in
 app/services/support_kb.py or is an explicit refusal. Never anything else.
+
+THREE MODES, ONE CONTRACT
+-------------------------
+`answer_question` dispatches on AI_MODE (see `resolve_mode`) and every mode
+returns the same SupportAnswer shape, so nothing downstream -- the endpoint,
+the stored rows, the daily cap, the ticket flow -- knows or cares which ran:
+
+  live            calls Anthropic, with the three guards described below.
+  mock            no model call at all. Returns a curated FAQ answer VERBATIM
+                  when one matches, and offers a ticket when none does.
+  console         mock, plus an INFO log of the match and its score.
+
+Mock exists because an absent or invalid key used to mean every user who
+opened the widget saw an error. A product that has not launched yet is exactly
+the situation where the key is missing, so the pre-launch state was the broken
+one. `reason` on every stored message records which path produced it, so the
+history is never ambiguous about whether a model was involved.
 
 THREE GUARDS, NOT ONE
 ---------------------
@@ -48,7 +65,12 @@ from app.services import support_kb
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["SupportAnswer", "answer_question", "SYSTEM_PROMPT_HEADER"]
+__all__ = ["SupportAnswer", "answer_question", "SYSTEM_PROMPT_HEADER",
+           "resolve_mode", "MODES"]
+
+
+# AI_MODE (Task 4). See app/config.py for what each one means.
+MODES = ("console", "mock", "live")
 
 
 SYSTEM_PROMPT_HEADER = """\
@@ -166,8 +188,103 @@ def _clean_faq_ids(raw) -> tuple[str, ...]:
     )
 
 
+def resolve_mode() -> str:
+    """Which answerer runs: "console", "mock" or "live".
+
+    AUTO IS THE DEFAULT AND THAT IS THE POINT. An unset AI_MODE resolves by
+    looking for a key, so the same build runs mock before the key arrives and
+    live after it, with nothing to remember to change. An explicitly set mode
+    always wins, including "mock" with a valid key present.
+
+    An unrecognised value falls back to auto rather than raising. This is
+    called on every message: raising here would turn one typo in one
+    environment variable into a 500 on a support widget, which is the worst
+    possible place to be strict.
+    """
+    configured = (settings.ai_mode or "").strip().lower()
+    if configured in MODES:
+        return configured
+    if configured:
+        logger.warning("AI_MODE=%r is not one of %s -- falling back to auto",
+                       configured, MODES)
+    return "live" if (settings.anthropic_api_key or "").strip() else "mock"
+
+
+def _mock_answer(question: str, echo: bool = False) -> SupportAnswer:
+    """Answer from the curated FAQ alone. NO model call is made, ever.
+
+    This is not a degraded live mode -- it is a different and in one respect
+    stronger guarantee. Live mode lets the model rephrase FAQ content, which
+    is where an invented fact can still enter. Mock mode returns the human
+    written answer BYTE FOR BYTE, so hallucination is not reduced here, it is
+    structurally impossible.
+
+    What it gives up is comprehension: it matches keywords, so it cannot
+    combine two entries, cannot follow "what about the second one?", and
+    cannot recognise a question phrased in words the FAQ does not use. When it
+    cannot match, it offers a ticket rather than guessing.
+    """
+    ranked = support_kb.scored(question)
+    top_score, entry = ranked[0]
+    threshold = settings.support_chat_mock_min_score
+    matched = top_score >= threshold
+
+    if echo:
+        # console mode: the whole reason it exists as a separate value.
+        logger.info(
+            "[AI_MODE=console] question=%r -> %s (score %d, threshold %d, %s)",
+            question, entry.id, top_score, threshold,
+            "ANSWERED" if matched else "NO MATCH, offering ticket",
+        )
+
+    if not matched:
+        return SupportAnswer(
+            text=support_kb.MOCK_NO_MATCH_MESSAGE,
+            # on_topic stays True: mock mode does not classify topics, it only
+            # knows whether the FAQ covers the question. Claiming a topic
+            # verdict it never made would put a false reason on the stored row.
+            on_topic=True,
+            confidence=0.0,
+            faq_ids=(),
+            suggest_ticket=True,
+            reason="mock_no_match",
+        )
+
+    return SupportAnswer(
+        text=entry.answer,
+        on_topic=True,
+        # 1.0 is honest here and means something different from live mode's
+        # self-reported number: the text is a human-written answer returned
+        # verbatim, so there is nothing for the system to be unsure about.
+        # `reason` is what distinguishes the two, and it is stored per message.
+        confidence=1.0,
+        faq_ids=(entry.id,),
+        suggest_ticket=False,
+        reason="mock_faq_match",
+    )
+
+
 def answer_question(question: str, history: list[dict] | None = None) -> SupportAnswer:
     """Answer one support question. NEVER raises.
+
+    Dispatches on AI_MODE. Everything around this call -- persistence, the
+    daily cap, ticket creation -- is identical in every mode, because the mode
+    only decides where the answer TEXT comes from. That is what makes mock a
+    usable pre-launch state rather than a stub: the conversation a user has
+    today is a real stored conversation.
+    """
+    text = (question or "").strip()
+    if not text:
+        return _ticket("empty_question")
+
+    mode = resolve_mode()
+    if mode in ("mock", "console"):
+        return _mock_answer(text, echo=(mode == "console"))
+    return _live_answer(text, history)
+
+
+def _live_answer(question: str, history: list[dict] | None = None) -> SupportAnswer:
+    """The full Anthropic path, with all three refusal guards. NEVER raises.
 
     `history` is prior turns as [{"role": "user"|"assistant", "content": str}]
     so follow-ups ("what about the second one?") make sense. It is included in
@@ -205,8 +322,30 @@ def answer_question(question: str, history: list[dict] | None = None) -> Support
             max_tokens=settings.support_chat_max_tokens,
         )
     except Exception as exc:
-        # Includes a missing API key, a revoked key, rate limits, timeouts and
-        # truncation. The user gets a route forward either way.
+        # A PERMANENT failure is a configuration problem, not an outage: a
+        # revoked or invalid key, an exhausted credit balance, a model name
+        # that does not exist. Retrying cannot fix it and neither can waiting,
+        # so every question for the rest of that deployment would land here.
+        #
+        # THIS IS THE CASE TASK 4 ACTUALLY EXISTS FOR. Auto-resolution picks
+        # live whenever a key is PRESENT, and it cannot know the key is dead
+        # without spending a call to find out -- so the real .env, which holds
+        # an invalid key, resolves to live and lands here on every message.
+        # Falling through to a ticket would leave the widget as useless as it
+        # was before mock mode was built, which is the outcome that mode was
+        # added to prevent.
+        #
+        # A TRANSIENT failure still becomes a ticket. An overloaded API or a
+        # timeout is genuinely temporary, and quietly serving keyword-matched
+        # answers during a five-minute blip would hide a real incident behind
+        # a slightly worse product.
+        if anthropic_client.is_permanent_error(exc):
+            logger.error(
+                "support chat: PERMANENT model failure (%s: %s) -- falling "
+                "back to the curated FAQ. Fix ANTHROPIC_API_KEY.",
+                type(exc).__name__, exc)
+            return _mock_answer(question)
+
         logger.warning("support chat model call failed: %s: %s",
                        type(exc).__name__, exc)
         return _ticket("model_error")

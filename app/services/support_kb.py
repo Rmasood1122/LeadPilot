@@ -22,10 +22,12 @@ treat them as permanent: change text freely, change ids never.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
-__all__ = ["FaqEntry", "FAQ", "by_id", "search", "as_prompt_context",
-           "REFUSAL_MESSAGE", "TICKET_SUGGESTION"]
+__all__ = ["FaqEntry", "FAQ", "by_id", "search", "scored", "best_match",
+           "as_prompt_context", "REFUSAL_MESSAGE", "TICKET_SUGGESTION",
+           "MOCK_NO_MATCH_MESSAGE", "MIN_MOCK_MATCH_SCORE"]
 
 
 @dataclass(frozen=True)
@@ -175,6 +177,16 @@ TICKET_SUGGESTION = (
     "guess. Submit a ticket and the team will respond within 24 hours."
 )
 
+# Mock mode's version of the same thing. Worded differently on purpose: the
+# sentence above is the model declining to trust itself, which is not what
+# happened here. Here there is no model at all and the FAQ simply does not
+# cover the question, so claiming a confidence judgement would be a lie about
+# how the answer was produced.
+MOCK_NO_MATCH_MESSAGE = (
+    "I don't have an answer for that in my help topics yet. Submit a ticket "
+    "and the team will respond within 24 hours."
+)
+
 
 # ---------------------------------------------------------------------------
 # Lookups
@@ -228,6 +240,102 @@ def search(query: str) -> list[FaqEntry]:
 
     scored.sort()
     return [entry for _score, _index, entry in scored]
+
+
+# ---------------------------------------------------------------------------
+# Mock-mode matching (Task 4)
+# ---------------------------------------------------------------------------
+# `search` above ranks the WHOLE knowledge base and never returns nothing,
+# because the model is shown every entry regardless of ranking. Mock mode has
+# no model, so it needs the opposite thing: a yes/no verdict on whether any
+# entry is actually relevant, and a ticket when none is.
+#
+# That verdict needs a stricter score than `search` produces. `search` counts
+# any word of three or more characters, so "the" -- which appears in most
+# answers -- scores. Fine when the score only reorders a list the model sees in
+# full; not fine when the score decides whether a user gets an answer at all:
+# "what is the weather" would match on "the" and be answered from the FAQ.
+
+STOPWORDS: frozenset[str] = frozenset({
+    "the", "and", "for", "are", "was", "were", "this", "that", "with", "from",
+    "has", "have", "had", "its", "but", "not", "you", "your", "yours", "can",
+    "could", "would", "should", "does", "did", "doing", "what", "when",
+    "where", "which", "who", "whom", "why", "how", "there", "their", "them",
+    "they", "then", "than", "into", "onto", "over", "under", "after",
+    "before", "between", "because", "while", "some", "any", "all", "also",
+    "just", "very", "much", "many", "more", "most", "such", "only", "own",
+    "same", "too", "get", "got", "let", "tell", "please", "thanks", "thank",
+    "need", "want", "know", "about", "make", "made", "use", "used", "using",
+    "give", "say", "see", "look", "take", "come",
+})
+
+# Chosen by measurement, not by feel. Against 20 on-topic questions and 15
+# off-topic ones (the battery in tests/test_support_chat.py::TestMockMatching):
+#
+#   threshold 2  ->  18/20 answered,  2/15 off-topic WRONGLY answered
+#   threshold 3  ->  18/20 answered,  0/15 off-topic wrongly answered
+#   threshold 4  ->  18/20 answered,  0/15 off-topic wrongly answered
+#   threshold 5  ->  16/20 answered,  0/15 off-topic wrongly answered
+#
+# 4 is the highest threshold that costs no recall, and it lands on a
+# meaningful boundary: exactly one keyword hit. Below it, a single incidental
+# word shared with an answer would be enough to answer.
+#
+# The two on-topic questions it does NOT answer are "pricing plans" -- correct,
+# the FAQ has no pricing entry, so a ticket is the right outcome -- and "who is
+# it for", which is genuinely in the FAQ but consists entirely of stopwords
+# once "who" and "for" are removed. Admitting "who" would score
+# "who won the world cup" against the who-is-it-for entry, so the miss is
+# deliberate: it costs one unnecessary ticket, and the alternative costs a
+# confidently wrong answer. That is the same trade the confidence floor makes.
+MIN_MOCK_MATCH_SCORE = 4
+
+
+def _tokens(query: str) -> list[str]:
+    """Meaningful words only: lowercase, punctuation stripped, stopwords gone."""
+    words = re.findall(r"[a-z0-9']+", (query or "").lower())
+    return [w for w in words if len(w) >= 3 and w not in STOPWORDS]
+
+
+def _score(entry: FaqEntry, query: str, tokens: list[str]) -> int:
+    needle = (query or "").strip().lower()
+    score = 0
+    if needle and needle in entry.question.lower():
+        score += 10
+    question = entry.question.lower()
+    answer = entry.answer.lower()
+    for word in tokens:
+        if word in question:
+            score += 3
+        if word in answer:
+            score += 2
+        # Bidirectional, for the same plural/stem reason as `search`.
+        if any(word in kw or kw in word for kw in entry.keywords):
+            score += 4
+    return score
+
+
+def scored(query: str) -> list[tuple[int, FaqEntry]]:
+    """Every entry with its match score, best first. Case-insensitive."""
+    tokens = _tokens(query)
+    ranked = [
+        (-_score(entry, query, tokens), index, entry)
+        for index, entry in enumerate(FAQ)
+    ]
+    ranked.sort()
+    return [(-neg, entry) for neg, _index, entry in ranked]
+
+
+def best_match(query: str) -> FaqEntry | None:
+    """The one entry that answers `query`, or None when nothing does.
+
+    None is the whole point of this function: it is what makes mock mode offer
+    a ticket instead of answering from an entry that merely shares a word.
+    """
+    if not (query or "").strip():
+        return None
+    top_score, entry = scored(query)[0]
+    return entry if top_score >= MIN_MOCK_MATCH_SCORE else None
 
 
 def as_prompt_context(query: str | None = None) -> str:

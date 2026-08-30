@@ -424,6 +424,42 @@ def check_test_email(ctx: dict) -> CheckResult:
 # ---------------------------------------------------------------------------
 
 
+def check_ai_mode(ctx: dict) -> CheckResult:
+    """AI_MODE must resolve to live before anything below is meaningful.
+
+    THE TRAP THIS EXISTS TO CLOSE. Task 4 added a mock mode that answers from
+    the curated FAQ without calling Anthropic. With AI_MODE pinned to "mock"
+    or "console", the adversarial check below would run against the FAQ
+    matcher, score well because a keyword matcher never says anything
+    ungrounded, and report that the assistant refuses correctly -- while the
+    model it is supposed to be measuring was never invoked.
+
+    A green activation that measured the wrong thing is worse than a red one.
+    """
+    from app.config import settings
+    from app.services import support_chat
+
+    mode = support_chat.resolve_mode()
+    configured = (settings.ai_mode or "").strip()
+
+    if mode == "live":
+        if configured:
+            return CheckResult(True, "AI_MODE is live")
+        return CheckResult(
+            True, "AI_MODE is unset; a valid key resolves it to live")
+
+    return CheckResult(
+        False,
+        f"AI_MODE resolves to {mode!r}, so the chat would NOT use Anthropic.",
+        fix=("\n".join([
+            f"AI_MODE is pinned to {configured!r} in .env.",
+            "    Set AI_MODE=live, or remove the line entirely so that a",
+            "    valid key resolves it to live, then re-run this script.",
+            "    Leaving it would make the adversarial check below grade",
+            "    the FAQ matcher instead of the model.",
+        ])))
+
+
 def check_adversarial(ctx: dict) -> CheckResult:
     """The only measurement of whether the assistant actually refuses.
 
@@ -510,6 +546,7 @@ CHECKS: list[tuple[str, Callable[[dict], CheckResult], bool]] = [
     ("Neon database connection", check_database, True),
     ("Database migrations", check_migrations, True),
     ("Test email delivery", check_test_email, True),
+    ("AI mode resolves to live", check_ai_mode, False),
     ("Adversarial AI behaviour", check_adversarial, True),
     ("Full test suite", check_test_suite, False),
 ]

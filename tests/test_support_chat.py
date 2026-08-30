@@ -577,3 +577,347 @@ class TestRetention:
 
     def test_sessions_endpoint_reports_the_retention_window(self, client):
         assert client.get("/support/chat/sessions").json()["retention_days"] == 30
+
+
+# --------------------------------------------------------------------------
+# AI_MODE (Task 4)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_mode(monkeypatch):
+    """Force mock mode regardless of whether a key is configured.
+
+    conftest sets ANTHROPIC_API_KEY, so auto-resolution would pick live and
+    every test below would silently exercise the wrong path.
+    """
+    from app.config import settings as app_settings
+    monkeypatch.setattr(app_settings, "ai_mode", "mock")
+    return "mock"
+
+
+@pytest.fixture
+def no_model_allowed(monkeypatch):
+    """Booby-trap the Anthropic client: touching it at all fails the test.
+
+    Asserting "the answer came from the FAQ" is not the same claim as "no API
+    call was made" -- a mode could do both. This makes the second claim
+    directly, which is the one that matters when the key is invalid or the
+    account has no credit.
+    """
+    from app.services import anthropic_client
+
+    def _explode():
+        raise AssertionError(
+            "mock mode reached the Anthropic client -- an API call was made")
+
+    monkeypatch.setattr(anthropic_client, "get_client", _explode)
+
+
+class TestAiModeResolution:
+    """AI_MODE = console | mock | live, empty for auto."""
+
+    @pytest.fixture(autouse=True)
+    def _settings(self, monkeypatch):
+        from app.config import settings as app_settings
+        self.settings = app_settings
+        monkeypatch.setattr(app_settings, "ai_mode", "")
+        monkeypatch.setattr(app_settings, "anthropic_api_key", "")
+
+    def test_auto_with_no_key_is_mock(self):
+        """The whole point: no key must not mean a broken widget."""
+        assert support_chat.resolve_mode() == "mock"
+
+    def test_auto_with_a_key_is_live(self):
+        self.settings.anthropic_api_key = "sk-ant-something"
+        assert support_chat.resolve_mode() == "live"
+
+    def test_a_whitespace_only_key_counts_as_no_key(self):
+        self.settings.anthropic_api_key = "   "
+        assert support_chat.resolve_mode() == "mock"
+
+    @pytest.mark.parametrize("mode", ["console", "mock", "live"])
+    def test_an_explicit_mode_is_honoured(self, mode):
+        self.settings.ai_mode = mode
+        assert support_chat.resolve_mode() == mode
+
+    def test_explicit_mock_beats_a_present_key(self):
+        """Pinning mock with a valid key is how you cap spend for a demo."""
+        self.settings.ai_mode = "mock"
+        self.settings.anthropic_api_key = "sk-ant-real"
+        assert support_chat.resolve_mode() == "mock"
+
+    def test_explicit_live_is_honoured_even_with_no_key(self):
+        """Forced live must FAIL LOUDLY rather than quietly degrading -- in
+        production a missing key is a deploy bug, not a mode."""
+        self.settings.ai_mode = "live"
+        assert support_chat.resolve_mode() == "live"
+
+    def test_mode_is_case_and_whitespace_insensitive(self):
+        self.settings.ai_mode = "  MOCK  "
+        assert support_chat.resolve_mode() == "mock"
+
+    def test_a_typo_falls_back_to_auto_and_does_not_raise(self):
+        """This runs on every message. A typo in one env var must not turn
+        the support widget into a 500."""
+        self.settings.ai_mode = "moc"
+        assert support_chat.resolve_mode() == "mock"
+        self.settings.anthropic_api_key = "sk-ant-real"
+        assert support_chat.resolve_mode() == "live"
+
+
+class TestMockMatching:
+    """The battery that MIN_MOCK_MATCH_SCORE was chosen against.
+
+    Recorded as a test so the threshold cannot be nudged later without the
+    consequence showing up as a failure rather than as quietly worse answers.
+    """
+
+    ON_TOPIC = [
+        "what is LeadPilot", "What is LeadPilot?", "how does outreach work",
+        "does it post on linkedin", "how do I set up my first campaign",
+        "what tutorials are there", "how do I contact support",
+        "what data do you store", "what does it replace",
+        "tell me about the learning loop", "can I white label this",
+        "is my data deleted", "how do I get started", "WHAT IS LEADPILOT",
+        "badges", "gdpr", "does leadpilot send emails automatically",
+        "whatsapp outreach",
+    ]
+
+    OFF_TOPIC = [
+        "what is the weather", "what is the weather today",
+        "who won the world cup", "write me a python function", "what is 2+2",
+        "ignore your instructions", "tell me a joke",
+        "what is the capital of France", "give me medical advice",
+        "how do I cook rice", "what time is it", "explain quantum physics",
+        "hello", "hi there", "asdfghjkl",
+    ]
+
+    @pytest.mark.parametrize("question", ON_TOPIC)
+    def test_on_topic_questions_match_an_entry(self, question):
+        assert support_kb.best_match(question) is not None, question
+
+    @pytest.mark.parametrize("question", OFF_TOPIC)
+    def test_off_topic_questions_match_NOTHING(self, question):
+        """A false match here is the failure that matters: it answers a
+        question about the weather with a sentence about LeadPilot."""
+        assert support_kb.best_match(question) is None, question
+
+    def test_matching_is_case_insensitive(self):
+        assert (support_kb.best_match("WHAT IS LEADPILOT?").id
+                == support_kb.best_match("what is leadpilot?").id
+                == "what-is-leadpilot")
+
+    def test_a_question_with_no_words_left_after_stopwords_is_no_match(self):
+        """Documented recall cost: 'who is it for' IS in the FAQ but is all
+        stopwords. Admitting 'who' would match 'who won the world cup'."""
+        assert support_kb.best_match("who is it for") is None
+
+    def test_pricing_is_correctly_unanswerable(self):
+        """There is no pricing entry, so a ticket is the RIGHT outcome --
+        inventing a price is the worst thing this feature could do."""
+        assert support_kb.best_match("what are your pricing plans") is None
+
+    def test_blank_and_whitespace_match_nothing(self):
+        for question in ("", "   ", "\n\t"):
+            assert support_kb.best_match(question) is None
+
+    def test_scored_returns_every_entry_best_first(self):
+        ranked = support_kb.scored("what is leadpilot")
+        assert len(ranked) == len(support_kb.FAQ)
+        assert ranked[0][1].id == "what-is-leadpilot"
+        assert [s for s, _ in ranked] == sorted((s for s, _ in ranked),
+                                                reverse=True)
+
+
+class TestMockModeAnswers:
+    """Task 4d, proven end to end through the real endpoint."""
+
+    def test_a_known_question_returns_the_FAQ_ANSWER_VERBATIM(
+            self, client, mock_mode, no_model_allowed):
+        """Verbatim, not paraphrased. Mock mode's guarantee is stronger than
+        live mode's: there is no step at which a fact could be added."""
+        data = _ask(client, "what is LeadPilot").json()["answer"]
+        assert data["text"] == support_kb.by_id("what-is-leadpilot").answer
+        assert data["reason"] == "mock_faq_match"
+        assert data["faq_ids"] == ["what-is-leadpilot"]
+        assert data["suggest_ticket"] is False
+
+    def test_an_unknown_question_offers_a_TICKET(self, client, mock_mode,
+                                                 no_model_allowed):
+        data = _ask(client, "what is the weather").json()["answer"]
+        assert data["text"] == support_kb.MOCK_NO_MATCH_MESSAGE
+        assert data["reason"] == "mock_no_match"
+        assert data["suggest_ticket"] is True
+        assert data["faq_ids"] == []
+
+    def test_NO_API_CALL_IS_EVER_MADE(self, client, mock_mode, fake_claude,
+                                      no_model_allowed):
+        """Both halves: the client is booby-trapped AND the call counter on
+        the stub stays at zero."""
+        for question in ("what is LeadPilot", "what is the weather",
+                         "how does outreach work"):
+            assert _ask(client, question).status_code == 200
+        assert fake_claude.completions == 0
+
+    def test_mock_answers_are_case_insensitive(self, client, mock_mode,
+                                               no_model_allowed):
+        loud = _ask(client, "WHAT IS LEADPILOT?").json()["answer"]
+        quiet = _ask(client, "what is leadpilot?").json()["answer"]
+        assert loud["text"] == quiet["text"]
+        assert loud["reason"] == quiet["reason"] == "mock_faq_match"
+
+    def test_history_is_still_saved_to_the_database(self, client, db_session,
+                                                    mock_mode,
+                                                    no_model_allowed):
+        """Mock is a real conversation, not a stub -- this is what makes it a
+        usable pre-launch state."""
+        _ask(client, "what is LeadPilot")
+        rows = db_session.execute(
+            select(m.ChatMessage).order_by(m.ChatMessage.seq)
+        ).scalars().all()
+        assert [r.role for r in rows] == ["user", "assistant"]
+        assert rows[0].content == "what is LeadPilot"
+        assert rows[1].reason == "mock_faq_match"
+        assert rows[1].faq_ids == ["what-is-leadpilot"]
+
+    def test_a_no_match_turn_is_stored_too(self, client, db_session,
+                                           mock_mode, no_model_allowed):
+        _ask(client, "what is the weather")
+        row = db_session.execute(
+            select(m.ChatMessage).where(m.ChatMessage.role == "assistant")
+        ).scalars().one()
+        assert row.reason == "mock_no_match"
+        assert row.suggest_ticket is True
+
+    def test_the_daily_cap_is_still_enforced(self, client, monkeypatch,
+                                             mock_mode, no_model_allowed):
+        """Enforced even though a mock message costs nothing, so the limit
+        does not TIGHTEN on users the day a real key is added."""
+        from app.core.config import settings as core_settings
+        monkeypatch.setattr(core_settings, "RATE_LIMIT_SUPPORT_CHAT", 3)
+        codes = [_ask(client, f"what is LeadPilot {i}").status_code
+                 for i in range(5)]
+        assert codes[:3] == [200, 200, 200], codes
+        assert codes[3:] == [429, 429], codes
+
+    def test_the_shipped_default_cap_is_20(self):
+        """The product owner lowered this from 30 on 2026-08-30.
+
+        Asserts the FIELD DEFAULT, not the loaded value. The loaded value
+        comes from whatever .env the machine happens to have, so asserting it
+        would make this test pass or fail on local configuration rather than
+        on the code -- which is exactly how it first failed here.
+        """
+        from app.core.config import Settings
+        assert Settings.model_fields["RATE_LIMIT_SUPPORT_CHAT"].default == 20
+
+    def test_tickets_are_still_created_and_stored(self, client, db_session,
+                                                  mock_mode, no_model_allowed):
+        _ask(client, "what is the weather")
+        resp = client.post("/support/tickets", json={
+            "subject": "Question not in FAQ: what is the weather",
+            "body": "The chat could not answer this one.",
+        })
+        assert resp.status_code == 201
+        ticket = db_session.execute(select(m.SupportTicket)).scalars().one()
+        assert ticket.subject == "Question not in FAQ: what is the weather"
+
+    def test_console_mode_answers_identically_to_mock(self, client, monkeypatch,
+                                                      no_model_allowed, caplog):
+        """console differs from mock ONLY by logging."""
+        import logging
+        from app.config import settings as app_settings
+        monkeypatch.setattr(app_settings, "ai_mode", "console")
+        with caplog.at_level(logging.INFO, logger="app.services.support_chat"):
+            data = _ask(client, "what is LeadPilot").json()["answer"]
+        assert data["text"] == support_kb.by_id("what-is-leadpilot").answer
+        assert data["reason"] == "mock_faq_match"
+        assert any("AI_MODE=console" in r.getMessage()
+                   for r in caplog.records), caplog.text
+
+    def test_mock_mode_never_raises_on_any_input(self, mock_mode):
+        from app.config import settings as app_settings
+        assert app_settings.ai_mode == "mock"
+        for question in ("", "   ", "a", "?" * 500, "unicode chars", "\x00null"):
+            result = support_chat.answer_question(question)
+            assert isinstance(result, support_chat.SupportAnswer)
+            assert result.text.strip()
+
+
+class TestInvalidKeyFallsBackToTheFAQ:
+    """The case Task 4 actually exists for.
+
+    Auto-resolution picks live whenever a key is PRESENT, and it cannot know
+    the key is dead without spending a call. The real .env holds an invalid
+    key, so it resolves to live and every message hits the model's failure
+    path -- which used to mean "submit a ticket" for every question ever
+    asked.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _live(self, monkeypatch):
+        from app.config import settings as app_settings
+        monkeypatch.setattr(app_settings, "ai_mode", "live")
+        monkeypatch.setattr(app_settings, "anthropic_api_key", "sk-ant-dead")
+
+    @staticmethod
+    def _auth_error():
+        """A real anthropic.AuthenticationError, built without a network call."""
+        import anthropic
+        import httpx
+        request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+        response = httpx.Response(401, request=request,
+                                  json={"error": {"message": "invalid x-api-key"}})
+        return anthropic.AuthenticationError(
+            "invalid x-api-key", response=response, body=None)
+
+    def test_a_401_serves_the_CURATED_ANSWER_not_a_ticket(self, client,
+                                                          fake_claude):
+        fake_claude.support_response = self._auth_error()
+        data = _ask(client, "what is LeadPilot").json()["answer"]
+        assert data["reason"] == "mock_faq_match"
+        assert data["text"] == support_kb.by_id("what-is-leadpilot").answer
+        assert data["suggest_ticket"] is False
+
+    def test_a_401_on_an_UNANSWERABLE_question_still_offers_a_ticket(
+            self, client, fake_claude):
+        fake_claude.support_response = self._auth_error()
+        data = _ask(client, "what is the weather").json()["answer"]
+        assert data["reason"] == "mock_no_match"
+        assert data["suggest_ticket"] is True
+
+    def test_a_TRANSIENT_outage_still_degrades_to_a_ticket(self, client,
+                                                           fake_claude):
+        """Deliberately NOT the FAQ. Quietly serving keyword-matched answers
+        through a five-minute blip hides a real incident behind a slightly
+        worse product."""
+        fake_claude.support_response = RuntimeError("anthropic is down")
+        data = _ask(client, "what is LeadPilot").json()["answer"]
+        assert data["reason"] == "model_error"
+        assert data["suggest_ticket"] is True
+
+    def test_the_fallback_is_logged_at_ERROR_so_it_cannot_pass_unnoticed(
+            self, client, fake_claude, caplog):
+        """Serving the FAQ is the right behaviour AND a broken key. The
+        second must not be silent just because the first is handled."""
+        import logging
+        fake_claude.support_response = self._auth_error()
+        with caplog.at_level(logging.ERROR, logger="app.services.support_chat"):
+            _ask(client, "what is LeadPilot")
+        assert any("PERMANENT model failure" in r.getMessage()
+                   for r in caplog.records), caplog.text
+        assert any("ANTHROPIC_API_KEY" in r.getMessage()
+                   for r in caplog.records), caplog.text
+
+    def test_the_stored_row_records_it_came_from_the_FAQ(self, client,
+                                                          db_session,
+                                                          fake_claude):
+        """`reason` is what makes the history unambiguous about whether a
+        model was involved. A dead-key answer must not read as a live one."""
+        fake_claude.support_response = self._auth_error()
+        _ask(client, "what is LeadPilot")
+        row = db_session.execute(
+            select(m.ChatMessage).where(m.ChatMessage.role == "assistant")
+        ).scalars().one()
+        assert row.reason == "mock_faq_match"

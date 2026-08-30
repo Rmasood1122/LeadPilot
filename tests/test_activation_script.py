@@ -273,3 +273,58 @@ class TestConstants:
         assert act.EXIT_OK == 0
         assert act.EXIT_CHECK_FAILED == 1
         assert act.EXIT_ABORTED == 2
+
+
+# --------------------------------------------------------------------------
+# AI_MODE guard (Task 4)
+# --------------------------------------------------------------------------
+
+
+class TestAiModeCheck:
+    """Guards the trap where activation grades the FAQ matcher, not the model."""
+
+    @pytest.fixture(autouse=True)
+    def _settings(self, monkeypatch):
+        from app.config import settings as app_settings
+        self.settings = app_settings
+        monkeypatch.setattr(app_settings, "ai_mode", "")
+        monkeypatch.setattr(app_settings, "anthropic_api_key", "")
+
+    def test_unset_mode_with_a_key_passes(self):
+        self.settings.anthropic_api_key = "sk-ant-real"
+        result = act.check_ai_mode({})
+        assert result.ok
+        assert "resolves it to live" in result.detail
+
+    def test_explicit_live_passes(self):
+        self.settings.ai_mode = "live"
+        assert act.check_ai_mode({}).ok
+
+    @pytest.mark.parametrize("mode", ["mock", "console"])
+    def test_a_pinned_non_live_mode_FAILS_even_with_a_valid_key(self, mode):
+        """The whole point. A valid key does not save you here: the pinned
+        mode means Anthropic is never called, so the adversarial check would
+        score the keyword matcher and report the model as safe."""
+        self.settings.ai_mode = mode
+        self.settings.anthropic_api_key = "sk-ant-real"
+        result = act.check_ai_mode({})
+        assert not result.ok
+        assert mode in result.detail
+        assert "AI_MODE=live" in result.fix
+
+    def test_no_key_and_no_mode_fails_rather_than_silently_mocking(self):
+        result = act.check_ai_mode({})
+        assert not result.ok
+        assert "'mock'" in result.detail
+
+    def test_it_runs_before_the_adversarial_check(self):
+        """Ordering is the guard. After it, the wrong thing is already
+        measured and reported green."""
+        names = [name for name, _fn, _net in act.CHECKS]
+        assert names.index("AI mode resolves to live") < \
+            names.index("Adversarial AI behaviour")
+
+    def test_it_needs_no_network(self):
+        """So --dry-run still exercises it for real."""
+        needs_network = dict((name, net) for name, _fn, net in act.CHECKS)
+        assert needs_network["AI mode resolves to live"] is False

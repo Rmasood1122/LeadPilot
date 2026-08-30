@@ -174,6 +174,18 @@ class Settings(BaseSettings):
     email_verification_ttl_hours: int = 24
 
     # --- AI support chat (Feature 3) ---------------------------------------
+    # AI_MODE — console | mock | live. EMPTY MEANS AUTO, and auto is the
+    # default deliberately: with an absent or invalid ANTHROPIC_API_KEY the
+    # chat used to show an error to every user who opened it, which is a
+    # broken widget on a product that has not launched yet. Auto resolves to
+    # "live" when a key is present and "mock" when it is not, so the widget
+    # answers from the curated FAQ instead of failing, and starts using the
+    # model the moment a real key lands -- with no code change.
+    #
+    # Set it explicitly to pin a mode: "mock" keeps the model off even with a
+    # key present (useful for demos and for capping spend), "live" forces the
+    # model and fails loudly if the key is bad rather than quietly degrading.
+    ai_mode: str = ""
     # Output ceiling for one support reply. Small on purpose: the system prompt
     # caps the answer at 120 words, and a low ceiling is the second line of
     # defence against a runaway generation billed to your key.
@@ -186,6 +198,10 @@ class Settings(BaseSettings):
     # is offered a ticket. A wrong answer delivered confidently is the failure
     # this feature must not produce; an unnecessary ticket is an annoyance.
     support_chat_min_confidence: float = 0.5
+    # Mock mode only. The lowest keyword score that counts as "the FAQ answers
+    # this"; below it the user is offered a ticket instead. See
+    # support_kb.MIN_MOCK_MATCH_SCORE for how 4 was measured.
+    support_chat_mock_min_score: int = 4
     # Chat history is deleted after this many days by the nightly purge task.
     support_chat_retention_days: int = 30
     # Kill switch, matching REQUIRE_EMAIL_VERIFICATION. Turns the chat off

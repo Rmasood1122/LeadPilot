@@ -10,7 +10,7 @@ Adds to the M8-C3 base:
   RATE_LIMIT_WA_TEMPLATES        — POST /whatsapp/templates per hour per user (default 20)
   RATE_LIMIT_GET                 — GET endpoints per minute per user (default 300)
   RATE_LIMIT_AUTH                — POST /auth/* per 15-min window (default 10)
-  RATE_LIMIT_SUPPORT_CHAT        — POST /support/chat per DAY per user (default 30)
+  RATE_LIMIT_SUPPORT_CHAT        — POST /support/chat per DAY per user (default 20)
 """
 from __future__ import annotations
 
@@ -211,11 +211,21 @@ class Settings(BaseSettings):
     RATE_LIMIT_AUTH: int = 10
     # Feature 3: AI support chat messages per user per DAY. Every message
     # spends the account's Anthropic key, so this is a cost ceiling as much as
-    # an abuse control. 30 rather than 20: a user troubleshooting a real
-    # problem sends 15-20 messages in one sitting, and being cut off mid-thread
-    # pushes them into a support ticket -- the exact outcome the chat exists to
-    # avoid. Window is 86400s, set at the call site.
-    RATE_LIMIT_SUPPORT_CHAT: int = 30
+    # an abuse control. Window is 86400s, set at the call site.
+    #
+    # 20, lowered from 30 on 2026-08-30 at the product owner's instruction.
+    # The case for 30 was that a user troubleshooting a real problem sends
+    # 15-20 messages in one sitting, and cutting them off mid-thread pushes
+    # them into a support ticket -- the outcome the chat exists to avoid. At 20
+    # that user is now cut off right at the edge of a normal session, so expect
+    # some tickets that a higher cap would have absorbed. The ceiling was
+    # chosen over that risk deliberately; raise this value if ticket volume
+    # from exhausted sessions shows up.
+    #
+    # The cap is enforced identically in mock mode, where a message costs
+    # nothing. That is on purpose: a user must not build a habit against a
+    # limit that tightens the day a real key is added.
+    RATE_LIMIT_SUPPORT_CHAT: int = 20
     """Max login/signup attempts per 15-minute window. Default: 10.
 
     Wired 2026-08-20 (it had been inert since M8-C5: defined, documented, and

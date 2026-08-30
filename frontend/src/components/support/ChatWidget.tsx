@@ -20,6 +20,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ticketSubjectFor } from "@/lib/support/ticketSubject";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle, LifeBuoy, MessageSquare, Send, Ticket, X,
@@ -153,6 +154,36 @@ export function ChatWidget() {
     [draft, ask],
   );
 
+  /**
+   * Open the ticket form from an assistant message, pre-filling the subject
+   * with the question that message failed to answer (Task 4).
+   *
+   * The question is the nearest USER message above `index`, not
+   * `messages[index - 1]`: an assistant turn is normally preceded by the user
+   * turn, but scanning backwards keeps this correct if a system or retry
+   * message is ever inserted between them.
+   *
+   * An already-typed subject is never overwritten -- the user editing the
+   * field and then clicking a second escalate button must not lose their
+   * wording.
+   */
+  const escalate = useCallback(
+    (index: number) => {
+      setMode("ticket");
+      setTicketSent(false);
+      setTicketSubject((current) => {
+        if (current.trim()) return current;
+        for (let i = index - 1; i >= 0; i -= 1) {
+          if (messages[i]?.role === "user") {
+            return ticketSubjectFor(messages[i].content);
+          }
+        }
+        return current;
+      });
+    },
+    [messages],
+  );
+
   const startNew = useCallback(async () => {
     const session = await startChatSession();
     setSessionId(session.id);
@@ -246,7 +277,7 @@ export function ChatWidget() {
                 ))}
               </div>
             )}
-            {messages.map((message) => (
+            {messages.map((message, index) => (
               <div
                 key={message.id}
                 data-testid={`support-msg-${message.role}`}
@@ -262,7 +293,7 @@ export function ChatWidget() {
                   <button
                     type="button"
                     data-testid="support-escalate"
-                    onClick={() => setMode("ticket")}
+                    onClick={() => escalate(index)}
                     className="mt-2 block w-full rounded bg-card px-2 py-1.5 text-xs font-medium underline"
                   >
                     Submit a ticket
