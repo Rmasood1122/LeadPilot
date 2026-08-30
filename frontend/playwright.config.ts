@@ -22,6 +22,28 @@ export default defineConfig({
   fullyParallel: true,
   retries: 0,
   workers: 2,
+  // 90s, not Playwright's default 30s.
+  //
+  // The default was never consistent with this suite's own login helper.
+  // happy-paths.spec.ts::hydratedFill budgets 20s waiting for React to stamp
+  // __reactFiber$ onto the field, then up to 15s of fill-and-verify retries --
+  // 35s for ONE field. loginViaUI fills two, so login alone could legitimately
+  // want 70s before the test body even starts. Against a 30s test timeout the
+  // helper's retry logic could never actually run to completion: the test was
+  // killed mid-retry and reported as a login failure.
+  //
+  // It only ever bit Mobile Safari, and only in a full parallel run: WebKit
+  // hydrating the static export with 2 workers competing is the slow case.
+  // Measured over two full runs before this change -- 104 passed / 2 failed
+  // both times, with a DIFFERENT pair failing each time, and every one of them
+  // passing in isolation. That is the signature of a budget overrun, not of a
+  // broken assertion.
+  //
+  // Raising this weakens nothing. None of these are performance tests, and
+  // every assertion inside them is unchanged; a test that is slow under load
+  // is worth far more than one that is flaky, because a suite that cries wolf
+  // stops being read at all.
+  timeout: 90_000,
   reporter: "list",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
