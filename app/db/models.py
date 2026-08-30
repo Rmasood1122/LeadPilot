@@ -421,6 +421,48 @@ class SupportTicket(TimestampMixin, Base):
     )
 
 
+class TutorialCatalogue(TimestampMixin, Base):
+    """One tutorial video (Task 3, migration 0018).
+
+    MOVED HERE FROM CODE. Feature 2 kept the catalogue in
+    app/services/tutorials.py so that swapping a placeholder id was a reviewed
+    one-line diff. That decision was reversed deliberately: adding a video now
+    happens in the admin UI, with no deploy. app/services/tutorials.py keeps
+    the same nine entries as SEED_CATALOGUE -- migration 0018 inserts them and
+    nothing reads them at runtime.
+
+    `slug` is still the permanent identifier. tutorial_progress rows point at
+    it by string, so RENAMING A SLUG STILL ORPHANS every user's progress for
+    that video -- moving the catalogue into a table did not change that, and
+    deliberately did NOT add a foreign key: an FK added retroactively fails on
+    any progress row whose tutorial was deleted, and progress outliving a
+    deleted tutorial is the behaviour we want (undelete restores it).
+
+    is_published defaults FALSE. A tutorial with no youtube_id would otherwise
+    appear to users as a permanent "coming soon" card, which is worse than not
+    appearing at all -- the Learn tab looks broken rather than short.
+    """
+
+    __tablename__ = "tutorial_catalogue"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    slug: Mapped[str] = mapped_column(String(100), unique=True, index=True,
+                                      nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    level: Mapped[str] = mapped_column(String(20), index=True, nullable=False)
+    # NULL until a real video exists. Not an empty string and not a fake id:
+    # a fake id renders YouTube's own "Video unavailable" error, which looks
+    # exactly like a bug in this app.
+    youtube_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0,
+                                            server_default="0", nullable=False)
+    is_published: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", index=True, nullable=False
+    )
+
+
 class TutorialProgress(TimestampMixin, Base):
     """One user's progress through one tutorial video (Feature 2).
 

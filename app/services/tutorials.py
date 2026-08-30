@@ -1,40 +1,37 @@
-"""The tutorial catalogue — the single source of truth for "Learn LeadPilot".
+"""Tutorial catalogue access + badge definitions.
 
-WHY THIS IS CODE AND NOT A DATABASE TABLE
------------------------------------------
-The videos are editorial content that changes when someone records a new one,
-not user data. Keeping the catalogue here means:
+WHERE THE CATALOGUE LIVES
+-------------------------
+In the DATABASE, table `tutorial_catalogue` (migration 0018). It used to live
+in this file as a constant; that was reversed on purpose so a video can be
+added through the admin UI with no deploy.
 
-  * replacing a placeholder with a real YouTube id is a one-line edit in a
-    reviewed, version-controlled file -- not hand-written SQL against the
-    production database, and not an admin CMS nobody asked for;
-  * the catalogue is identical in every environment, so a bug reproduces
-    locally instead of depending on which rows a database happens to hold;
-  * there is one migration for this feature instead of two tables.
+What remains here:
 
-The cost, stated plainly: adding a video needs a deploy, not a form. If
-admin-editable tutorials are ever wanted, this module becomes the seed data
-for a `tutorials` table and the API contract below does not change -- the
-endpoints already speak in slugs, not row ids, exactly so that swap stays
-cheap.
+  SEED_CATALOGUE   the original nine entries. Migration 0018 inserts them and
+                   NOTHING READS THEM AT RUNTIME. They stay so a fresh database
+                   seeds identically and the editorial text is reviewable in
+                   git rather than only in production rows.
 
-PROGRESS is the opposite kind of data -- per user, high write volume -- and
-lives in the `tutorial_progress` table (models.py, migration 0016).
+  LEVELS / BADGES  structural, not editorial. Levels are a closed set the UI
+                   lays out around, and badges are derived rules, not content
+                   -- neither is something an admin should be able to invent
+                   from a form.
 
-REPLACING THE PLACEHOLDERS
---------------------------
-Set `youtube_id` on each entry to the 11-character id from the video's URL:
+  query helpers    list_tutorials / get_tutorial / slugs_for_level, all taking
+                   a Session.
 
-    https://www.youtube.com/watch?v=AbCdEfGhIjK
-                                   ^^^^^^^^^^^ this part
+PUBLISHED VS NOT
+Every user-facing query filters is_published. Admin queries do not. That
+single distinction is why the helpers take an explicit `include_unpublished`
+flag rather than inferring it: a default that silently leaked drafts to users
+would be invisible until someone noticed an unfinished tutorial in the Learn
+tab.
 
-Leave it None until the video exists. `None` is deliberately not an empty
-string or a fake id: the API reports `is_placeholder: true` and the UI shows a
-"coming soon" panel instead of an <iframe> pointing at nothing. A fake id
-would render a broken YouTube player and look like a bug.
-
-Set `duration_seconds` too when you know it -- it drives the progress bar's
-denominator before the player has reported a duration.
+SLUGS ARE STILL PERMANENT
+tutorial_progress rows reference the catalogue by slug with no foreign key
+(see migration 0018 for why). Renaming a slug orphans progress, so the admin
+API refuses to change one.
 """
 
 from __future__ import annotations
@@ -42,15 +39,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 __all__ = [
-    "Tutorial",
+    "SeedTutorial",
     "LEVELS",
     "LEVEL_LABELS",
-    "CATALOGUE",
+    "SEED_CATALOGUE",
     "BADGES",
-    "by_slug",
-    "search",
-    "slugs_for_level",
+    "Badge",
     "badge_definitions",
+    "list_tutorials",
+    "get_tutorial",
+    "slugs_for_level",
+    "tutorial_out",
+    "is_valid_level",
 ]
 
 # Ordered easiest-first. The API and the UI both rely on this order, so it is
@@ -65,11 +65,12 @@ LEVEL_LABELS = {
 
 
 @dataclass(frozen=True)
-class Tutorial:
-    """One video in the catalogue.
+class SeedTutorial:
+    """One row of the INITIAL catalogue, used only by migration 0018.
 
-    Frozen: the catalogue is read-only at runtime. A mutable dataclass would
-    let one request's handler mutate the object every other request shares.
+    This is not the runtime type any more -- runtime reads
+    db.models.TutorialCatalogue. It is kept as a plain frozen dataclass so the
+    seed data is readable and diffable without a database.
     """
 
     slug: str
@@ -81,21 +82,6 @@ class Tutorial:
     youtube_id: str | None = None
     duration_seconds: int | None = None
 
-    @property
-    def is_placeholder(self) -> bool:
-        return not self.youtube_id
-
-    def as_dict(self) -> dict:
-        return {
-            "slug": self.slug,
-            "title": self.title,
-            "description": self.description,
-            "level": self.level,
-            "order": self.order,
-            "youtube_id": self.youtube_id,
-            "duration_seconds": self.duration_seconds,
-            "is_placeholder": self.is_placeholder,
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -105,9 +91,9 @@ class Tutorial:
 # foreign key tutorial_progress rows point at, so RENAMING A SLUG ORPHANS every
 # user's progress for that video. Change titles freely; change slugs never.
 
-CATALOGUE: tuple[Tutorial, ...] = (
+SEED_CATALOGUE: tuple[SeedTutorial, ...] = (
     # -- Beginner -----------------------------------------------------------
-    Tutorial(
+    SeedTutorial(
         slug="getting-started-with-leadpilot",
         title="Getting Started with LeadPilot",
         description=(
@@ -117,7 +103,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         level="beginner",
         order=1,
     ),
-    Tutorial(
+    SeedTutorial(
         slug="setting-up-your-first-campaign",
         title="Setting Up Your First Campaign",
         description=(
@@ -127,7 +113,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         level="beginner",
         order=2,
     ),
-    Tutorial(
+    SeedTutorial(
         slug="understanding-your-icp",
         title="Understanding Your ICP",
         description=(
@@ -138,7 +124,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         order=3,
     ),
     # -- Intermediate -------------------------------------------------------
-    Tutorial(
+    SeedTutorial(
         slug="advanced-lead-sourcing-with-apollo",
         title="Advanced Lead Sourcing with Apollo",
         description=(
@@ -148,7 +134,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         level="intermediate",
         order=1,
     ),
-    Tutorial(
+    SeedTutorial(
         slug="writing-high-converting-dms",
         title="Writing High-Converting DMs",
         description=(
@@ -158,7 +144,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         level="intermediate",
         order=2,
     ),
-    Tutorial(
+    SeedTutorial(
         slug="using-the-leadpilot-dashboard",
         title="Using the LeadPilot Dashboard",
         description=(
@@ -169,7 +155,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         order=3,
     ),
     # -- Advanced -----------------------------------------------------------
-    Tutorial(
+    SeedTutorial(
         slug="multi-channel-outreach-strategy",
         title="Multi-Channel Outreach Strategy",
         description=(
@@ -179,7 +165,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         level="advanced",
         order=1,
     ),
-    Tutorial(
+    SeedTutorial(
         slug="reading-your-analytics",
         title="Reading Your Analytics",
         description=(
@@ -189,7 +175,7 @@ CATALOGUE: tuple[Tutorial, ...] = (
         level="advanced",
         order=2,
     ),
-    Tutorial(
+    SeedTutorial(
         slug="scaling-your-pipeline",
         title="Scaling Your Pipeline",
         description=(
@@ -233,55 +219,103 @@ BADGES: tuple[Badge, ...] = (
 
 
 # ---------------------------------------------------------------------------
-# Lookups
+# Queries
 # ---------------------------------------------------------------------------
 
-_BY_SLUG: dict[str, Tutorial] = {t.slug: t for t in CATALOGUE}
-
-# Fail at import time rather than at request time. A duplicate slug would make
-# one tutorial permanently unreachable and silently merge two videos' progress.
-assert len(_BY_SLUG) == len(CATALOGUE), "duplicate tutorial slug in CATALOGUE"
-assert all(t.level in LEVELS for t in CATALOGUE), "unknown level in CATALOGUE"
+_BY_SEED_SLUG = {entry.slug: entry for entry in SEED_CATALOGUE}
+assert len(_BY_SEED_SLUG) == len(SEED_CATALOGUE), "duplicate slug in SEED_CATALOGUE"
+assert all(e.level in LEVELS for e in SEED_CATALOGUE), "unknown level in SEED_CATALOGUE"
 
 
-def by_slug(slug: str) -> Tutorial | None:
-    return _BY_SLUG.get(slug)
+def is_valid_level(level: str | None) -> bool:
+    return bool(level) and level.strip().lower() in LEVELS
 
 
-def slugs_for_level(level: str) -> list[str]:
-    return [t.slug for t in CATALOGUE if t.level == level]
+def _order_by():
+    """Level order, then sort_order, then title.
 
-
-def _sort_key(t: Tutorial) -> tuple[int, int]:
-    return (LEVELS.index(t.level), t.order)
-
-
-def search(query: str | None = None, level: str | None = None) -> list[Tutorial]:
-    """Filter the catalogue by free text and/or level, in catalogue order.
-
-    Matching is case-insensitive substring over title AND description. Nine
-    items do not need an index or a ranking function, and a substring match is
-    what a user typing "apollo" or "icp" into a search box expects. Searching
-    the description as well as the title is deliberate: "deliverability"
-    appears only in a description, and a user who types it should still find
-    "Scaling Your Pipeline".
+    Level is a string column, so ORDER BY level would give
+    advanced/beginner/intermediate -- alphabetical, and wrong. The CASE keeps
+    the pedagogical order the UI depends on without a second round trip.
     """
-    results = list(CATALOGUE)
+    from sqlalchemy import case
 
+    from app.db.models import TutorialCatalogue as T
+
+    level_rank = case(
+        {name: index for index, name in enumerate(LEVELS)},
+        value=T.level,
+        else_=len(LEVELS),
+    )
+    return (level_rank, T.sort_order, T.title)
+
+
+def list_tutorials(db, query: str | None = None, level: str | None = None,
+                   include_unpublished: bool = False) -> list:
+    """Catalogue rows, filtered and ordered.
+
+    `include_unpublished` is explicit and defaults to False. A default that
+    leaked drafts would be invisible until an admin noticed an unfinished
+    tutorial sitting in a user's Learn tab.
+
+    Search is a case-insensitive LIKE over title AND description, done in SQL
+    rather than in Python: the same filter has to behave identically for the
+    admin list and the user list, and two implementations of one filter
+    diverge. Searching descriptions matters -- "deliverability" appears in no
+    title.
+    """
+    from sqlalchemy import func, or_, select
+
+    from app.db.models import TutorialCatalogue as T
+
+    stmt = select(T)
+    if not include_unpublished:
+        stmt = stmt.where(T.is_published.is_(True))
     if level:
-        wanted = level.strip().lower()
-        results = [t for t in results if t.level == wanted]
-
-    if query:
-        needle = query.strip().lower()
-        if needle:
-            results = [
-                t for t in results
-                if needle in t.title.lower() or needle in t.description.lower()
-            ]
-
-    return sorted(results, key=_sort_key)
+        stmt = stmt.where(T.level == level.strip().lower())
+    needle = (query or "").strip().lower()
+    if needle:
+        pattern = f"%{needle}%"
+        stmt = stmt.where(or_(func.lower(T.title).like(pattern),
+                              func.lower(T.description).like(pattern)))
+    return list(db.execute(stmt.order_by(*_order_by())).scalars().all())
 
 
-def badge_definitions() -> tuple[Badge, ...]:
+def get_tutorial(db, slug: str, include_unpublished: bool = False):
+    """One row by slug, or None."""
+    from sqlalchemy import select
+
+    from app.db.models import TutorialCatalogue as T
+
+    stmt = select(T).where(T.slug == slug)
+    if not include_unpublished:
+        stmt = stmt.where(T.is_published.is_(True))
+    return db.execute(stmt).scalars().first()
+
+
+def slugs_for_level(db, level: str, include_unpublished: bool = False) -> list[str]:
+    return [t.slug for t in list_tutorials(db, level=level,
+                                           include_unpublished=include_unpublished)]
+
+
+def tutorial_out(row) -> dict:
+    """Serialise a catalogue row for the API.
+
+    is_placeholder is DERIVED, never stored: it is simply "no youtube_id yet",
+    and a second column could disagree with the first.
+    """
+    return {
+        "slug": row.slug,
+        "title": row.title,
+        "description": row.description,
+        "level": row.level,
+        "order": row.sort_order,
+        "youtube_id": row.youtube_id,
+        "duration_seconds": row.duration_seconds,
+        "is_placeholder": not row.youtube_id,
+        "is_published": row.is_published,
+    }
+
+
+def badge_definitions() -> tuple["Badge", ...]:
     return BADGES

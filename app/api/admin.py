@@ -15,12 +15,13 @@ from typing import Any, Optional
 from datetime import datetime, timezone as datetime_timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.db.models import User
+from app.services import tutorials as catalogue
 from app.core.database import get_db
 from app.core.logging import get_logger
 from app.services.admin_service import AdminService
@@ -363,6 +364,215 @@ async def list_webhook_deliveries(
 # Celery stats
 # ---------------------------------------------------------------------------
 
+class TutorialIn(BaseModel):
+    """Create payload. `slug` is required and permanent."""
+
+    slug: str = Field(min_length=3, max_length=100,
+                      pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    title: str = Field(min_length=3, max_length=200)
+    description: str = Field(min_length=10)
+    level: str
+    youtube_id: Optional[str] = Field(default=None, max_length=32)
+    duration_seconds: Optional[int] = Field(default=None, ge=1, le=86_400)
+    sort_order: int = 0
+    is_published: bool = False
+
+
+class TutorialPatch(BaseModel):
+    """Update payload. Every field optional; `slug` is NOT among them.
+
+    Renaming a slug orphans every tutorial_progress row that points at it, and
+    there is no foreign key to stop it (see migration 0018). Making the field
+    absent from this model means the API cannot do it at all, rather than
+    relying on a validator somebody later relaxes.
+    """
+
+    title: Optional[str] = Field(default=None, min_length=3, max_length=200)
+    description: Optional[str] = Field(default=None, min_length=10)
+    level: Optional[str] = None
+    # Explicit sentinel handling: `youtube_id: null` means "clear it", which is
+    # different from omitting the field. See _apply_patch.
+    youtube_id: Optional[str] = Field(default=None, max_length=32)
+    duration_seconds: Optional[int] = Field(default=None, ge=1, le=86_400)
+    sort_order: Optional[int] = None
+    is_published: Optional[bool] = None
+
+
+def _tutorial_admin_out(row) -> dict:
+    from app.services import tutorials as catalogue
+
+    return {**catalogue.tutorial_out(row), "id": str(row.id)}
+
+
+def _get_catalogue_row(db: Session, slug: str):
+    from app.db.models import TutorialCatalogue
+
+    row = db.query(TutorialCatalogue).filter(
+        TutorialCatalogue.slug == slug).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tutorial not found")
+    return row
+
+
+@router.get("/tutorials")
+def admin_list_tutorials(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Every tutorial, published or not, in display order."""
+    from app.services import tutorials as catalogue
+
+    rows = catalogue.list_tutorials(db, include_unpublished=True)
+    return {
+        "tutorials": [_tutorial_admin_out(r) for r in rows],
+        "levels": [{"level": lv, "label": catalogue.LEVEL_LABELS[lv]}
+                   for lv in catalogue.LEVELS],
+        "published_count": sum(1 for r in rows if r.is_published),
+        "total_count": len(rows),
+    }
+
+
+@router.post("/tutorials", status_code=201)
+def admin_create_tutorial(
+    payload: TutorialIn,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    from app.db.models import TutorialCatalogue
+    from app.services import tutorials as catalogue
+
+    if not catalogue.is_valid_level(payload.level):
+        raise HTTPException(status_code=422,
+                            detail=f"level must be one of {catalogue.LEVELS}")
+    if db.query(TutorialCatalogue).filter(
+            TutorialCatalogue.slug == payload.slug).first():
+        raise HTTPException(status_code=409, detail="slug already exists")
+
+    row = TutorialCatalogue(
+        slug=payload.slug,
+        title=payload.title,
+        description=payload.description,
+        level=payload.level.strip().lower(),
+        youtube_id=payload.youtube_id or None,
+        duration_seconds=payload.duration_seconds,
+        sort_order=payload.sort_order,
+        is_published=payload.is_published,
+    )
+    db.add(row)
+    db.commit()
+    logger.info("admin created tutorial %s", row.slug)
+    return _tutorial_admin_out(row)
+
+
+@router.put("/tutorials/{slug}")
+def admin_update_tutorial(
+    slug: str,
+    payload: TutorialPatch,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Update a tutorial. The slug itself cannot be changed -- see TutorialPatch.
+
+    Uses exclude_unset so omitting a field leaves it alone while sending
+    `null` clears it. Without that distinction there is no way to remove a
+    wrong youtube_id: every PUT would either overwrite untouched fields with
+    None, or make null meaningless.
+    """
+    from app.services import tutorials as catalogue
+
+    row = _get_catalogue_row(db, slug)
+    provided = payload.model_dump(exclude_unset=True)
+
+    if "level" in provided and not catalogue.is_valid_level(provided["level"]):
+        raise HTTPException(status_code=422,
+                            detail=f"level must be one of {catalogue.LEVELS}")
+
+    for field_name, value in provided.items():
+        if field_name == "level" and value:
+            value = value.strip().lower()
+        if field_name == "youtube_id" and value == "":
+            value = None
+        setattr(row, field_name, value)
+
+    db.commit()
+    logger.info("admin updated tutorial %s: %s", slug, sorted(provided))
+    return _tutorial_admin_out(row)
+
+
+@router.delete("/tutorials/{slug}")
+def admin_delete_tutorial(
+    slug: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Delete a tutorial.
+
+    User PROGRESS IS DELIBERATELY NOT DELETED. Progress rows reference the
+    catalogue by slug with no foreign key, so they survive -- and re-creating
+    a tutorial with the same slug restores every user's history. Cascading
+    would make an accidental delete unrecoverable and silent.
+
+    The orphaned rows are invisible to users (every user-facing query joins
+    against the catalogue) and are counted in the response so the decision is
+    not hidden from whoever pressed the button.
+    """
+    from app.db.models import TutorialProgress
+
+    row = _get_catalogue_row(db, slug)
+    orphaned = db.query(func.count(TutorialProgress.id)).filter(
+        TutorialProgress.tutorial_slug == slug).scalar() or 0
+    db.delete(row)
+    db.commit()
+    logger.info("admin deleted tutorial %s (%d progress rows kept)",
+                slug, orphaned)
+    return {
+        "deleted": slug,
+        "progress_rows_kept": int(orphaned),
+        "note": ("User progress was kept. Re-creating a tutorial with this "
+                 "slug restores it."),
+    }
+
+
+@router.post("/tutorials/{slug}/publish")
+def admin_publish_tutorial(
+    slug: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Make a tutorial visible to users.
+
+    REFUSES without a youtube_id. Publishing one would put a permanent
+    "coming soon" card in the Learn tab, which reads as a broken feature
+    rather than an incomplete one -- and it is the whole reason the seeded
+    rows start unpublished.
+    """
+    row = _get_catalogue_row(db, slug)
+    if not row.youtube_id:
+        raise HTTPException(
+            status_code=409,
+            detail=("Cannot publish without a youtube_id — it would show users "
+                    "a permanent 'coming soon' card. Add the video id first."))
+    row.is_published = True
+    db.commit()
+    logger.info("admin published tutorial %s", slug)
+    return _tutorial_admin_out(row)
+
+
+@router.post("/tutorials/{slug}/unpublish")
+def admin_unpublish_tutorial(
+    slug: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict:
+    """Hide a tutorial from users. Progress is untouched and returns on
+    republish."""
+    row = _get_catalogue_row(db, slug)
+    row.is_published = False
+    db.commit()
+    logger.info("admin unpublished tutorial %s", slug)
+    return _tutorial_admin_out(row)
+
+
 @router.get("/tutorials/completions")
 def tutorial_completions(
     db: Session = Depends(get_db),
@@ -383,7 +593,6 @@ def tutorial_completions(
     an account".
     """
     from app.db.models import TutorialProgress
-    from app.services import tutorials as catalogue
 
     completed_rows = dict(
         db.query(TutorialProgress.tutorial_slug, func.count(TutorialProgress.id))
@@ -400,14 +609,18 @@ def tutorial_completions(
         db.query(func.count(func.distinct(TutorialProgress.user_id))).scalar() or 0
     )
 
+    # include_unpublished: an admin needs the counts for a tutorial they just
+    # unpublished, otherwise the numbers vanish exactly when someone is asking
+    # why engagement dropped.
     per_tutorial = []
-    for tutorial in catalogue.CATALOGUE:
+    for tutorial in catalogue.list_tutorials(db, include_unpublished=True):
         started = int(started_rows.get(tutorial.slug, 0))
         completed = int(completed_rows.get(tutorial.slug, 0))
         per_tutorial.append({
             "slug": tutorial.slug,
             "title": tutorial.title,
             "level": tutorial.level,
+            "is_published": tutorial.is_published,
             "started_count": started,
             "completed_count": completed,
             # Not "started minus completed" as a separate concept: a completed

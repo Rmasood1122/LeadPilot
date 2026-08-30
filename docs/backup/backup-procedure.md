@@ -200,6 +200,7 @@ alembic downgrade <previous_revision_id>
 | `0015_email_verification` | Verified on PostgreSQL 16 and SQLite: drops `users.email_verified`, `users.email_verified_at`, `email_verification_tokens`; all user rows intact. | **Yes.** Discards *which* users had verified — the old schema has nowhere to keep it. Re-upgrading backfills everyone to verified again: safe (nobody locked out) but not the same data. |
 | `0016_tutorial_progress` | Verified on PostgreSQL 16: drops `tutorial_progress`; `users` and every other table intact. | **Yes.** Discards all tutorial watch progress and therefore every earned badge (badges are derived from progress, so there is nothing else to lose). |
 | `0017_ai_support_chat` | Verified on PostgreSQL 16: drops `chat_sessions`, `chat_messages`, `support_tickets`; `tutorial_progress` and `users` intact. | **Yes, and worse than the others.** Discards all chat history **and every support ticket, including open ones a user is waiting on**. Take a dump first. |
+| `0018_tutorial_catalogue` | Verified on PostgreSQL 16 (2026-08-30): full `0001 -> 0018` chain, then `downgrade 0017`, then forward again. Drops `tutorial_catalogue`; `tutorial_progress` and `users` intact, and the re-upgrade re-seeds all 9 rows. | **Yes.** The seed comes back, but every edit made through the admin UI does not: `youtube_id`s, retitled tutorials, publish state and any tutorial created after the migration live nowhere except this table. Progress rows survive (keyed by slug, no FK) and re-associate on re-upgrade. Take a dump first. |
 
 ---
 

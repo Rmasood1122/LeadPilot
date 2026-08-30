@@ -268,6 +268,50 @@ def auth_headers(user) -> dict[str, str]:
 
 
 # --------------------------------------------------------------------------
+# Feature 2 / Task 3 — the tutorial catalogue now lives in the DATABASE
+# --------------------------------------------------------------------------
+
+
+def seed_catalogue(db_session, *, published=True, with_video=False):
+    """Insert the nine seed tutorials into tutorial_catalogue.
+
+    Migration 0018 does this in a real database; the unit-test harness builds
+    its schema with Base.metadata.create_all, which creates tables but runs no
+    data migration. Without this the catalogue is empty and every tutorial test
+    asserts against nothing -- which would PASS a lot of them vacuously.
+
+    published defaults True so tests about progress, badges and search do not
+    each have to set it up. The publish workflow itself has its own tests that
+    pass published=False.
+    """
+    from app.db.models import TutorialCatalogue
+    from app.services.tutorials import SEED_CATALOGUE
+
+    rows = []
+    for entry in SEED_CATALOGUE:
+        row = TutorialCatalogue(
+            slug=entry.slug,
+            title=entry.title,
+            description=entry.description,
+            level=entry.level,
+            youtube_id=("vid" + entry.slug[:8]) if with_video else None,
+            duration_seconds=entry.duration_seconds,
+            sort_order=entry.order,
+            is_published=published,
+        )
+        db_session.add(row)
+        rows.append(row)
+    db_session.commit()
+    return rows
+
+
+@pytest.fixture()
+def catalogue(db_session):
+    """The nine seed tutorials, published, with no video ids (as seeded)."""
+    return seed_catalogue(db_session)
+
+
+# --------------------------------------------------------------------------
 # Feature 1 — email verification helpers
 # --------------------------------------------------------------------------
 

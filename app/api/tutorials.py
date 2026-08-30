@@ -13,9 +13,11 @@ user's rows, not even for an admin. Admins get aggregate completion counts
 from GET /admin/tutorials/completions, which returns numbers only and never
 names a video a specific person watched.
 
-The catalogue itself is app/services/tutorials.py, not a table. Slugs from the
-URL are always resolved against it before any database work, so an unknown
-slug is a clean 404 instead of an orphan progress row.
+The catalogue lives in the `tutorial_catalogue` table (migration 0018) and is
+managed from /admin/tutorials. EVERY query on this router filters
+is_published, so a draft tutorial is invisible here -- an unpublished slug is
+a 404 exactly like a slug that does not exist, which is what stops an admin
+accidentally previewing work-in-progress to users through a shared URL.
 """
 
 from __future__ import annotations
@@ -91,8 +93,14 @@ def _iso(value: datetime | None) -> str | None:
     return aware.isoformat()
 
 
-def _require_tutorial(slug: str) -> catalogue.Tutorial:
-    tutorial = catalogue.by_slug(slug)
+def _require_tutorial(db: Session, slug: str):
+    """Resolve a slug to a PUBLISHED tutorial, or 404.
+
+    Unpublished is indistinguishable from non-existent on purpose: an admin
+    who shares a draft URL must not be able to expose it, and the status code
+    must not become an oracle for "does this draft exist?".
+    """
+    tutorial = catalogue.get_tutorial(db, slug)
     if tutorial is None:
         raise HTTPException(status_code=404, detail="unknown tutorial")
     return tutorial
@@ -138,41 +146,53 @@ def _progress_out(row: TutorialProgress | None) -> dict:
     }
 
 
-def _tutorial_out(tutorial: catalogue.Tutorial,
-                  row: TutorialProgress | None) -> dict:
-    return {**tutorial.as_dict(), "progress": _progress_out(row)}
+def _tutorial_out(tutorial, row: TutorialProgress | None) -> dict:
+    return {**catalogue.tutorial_out(tutorial), "progress": _progress_out(row)}
 
 
 def _completed_slugs(progress: dict[str, TutorialProgress]) -> set[str]:
     return {slug for slug, row in progress.items() if row.completed}
 
 
-def _summary(progress: dict[str, TutorialProgress]) -> dict:
-    """Counts over the WHOLE catalogue, never over a filtered result set.
+def _summary(db: Session, progress: dict[str, TutorialProgress]) -> dict:
+    """Counts over every PUBLISHED tutorial, never over a filtered result set.
 
-    The summary answers "how far through the course am I", so it must not move
-    when the user types in the search box. The filtered list and the summary
-    are computed from different inputs on purpose.
+    Two separate rules, both load-bearing:
+
+    * It ignores ?q= and ?level=. The summary answers "how far through the
+      course am I", so it must not move while the user types in the search box.
+
+    * It counts only PUBLISHED tutorials. Progress rows can outlive
+      unpublishing, and counting a hidden tutorial in the denominator would
+      show "3 / 9" on a page displaying six -- arithmetic the user cannot
+      check. Completions of a now-hidden tutorial are excluded from the
+      numerator for the same reason, and are NOT deleted: republish and they
+      come back.
     """
     done = _completed_slugs(progress)
-    total = len(catalogue.CATALOGUE)
+    published = catalogue.list_tutorials(db)
+    published_slugs = {t.slug for t in published}
+    total = len(published)
+
     by_level = {}
     for level in catalogue.LEVELS:
-        slugs = catalogue.slugs_for_level(level)
+        slugs = [t.slug for t in published if t.level == level]
         by_level[level] = {
             "label": catalogue.LEVEL_LABELS[level],
             "total": len(slugs),
             "completed": sum(1 for s in slugs if s in done),
         }
+
+    visible_done = done & published_slugs
     return {
         "total": total,
-        "completed": len(done & set(t.slug for t in catalogue.CATALOGUE)),
-        "percent": round(100.0 * len(done) / total, 1) if total else 0.0,
+        "completed": len(visible_done),
+        "percent": round(100.0 * len(visible_done) / total, 1) if total else 0.0,
         "by_level": by_level,
     }
 
 
-def _badges(progress: dict[str, TutorialProgress]) -> list[dict]:
+def _badges(db: Session, progress: dict[str, TutorialProgress]) -> list[dict]:
     """Derive badge state from progress. Nothing about badges is stored.
 
     A stored badge row can disagree with the progress meant to justify it, and
@@ -183,12 +203,15 @@ def _badges(progress: dict[str, TutorialProgress]) -> list[dict]:
     is the moment the badge became true.
     """
     done = _completed_slugs(progress)
+    published = catalogue.list_tutorials(db)
     out = []
     for badge in catalogue.badge_definitions():
-        required = (
-            catalogue.slugs_for_level(badge.level) if badge.level
-            else [t.slug for t in catalogue.CATALOGUE]
-        )
+        # Requirements are the PUBLISHED tutorials only. `bool(required)` below
+        # is what stops an empty catalogue from making every badge vacuously
+        # earned -- all() over an empty list is True, so with nothing published
+        # a brand-new user would be handed "LeadPilot Certified".
+        required = [t.slug for t in published
+                    if badge.level is None or t.level == badge.level]
         earned = bool(required) and all(s in done for s in required)
         earned_at = None
         if earned:
@@ -287,15 +310,15 @@ def list_tutorials(
     typo in a URL someone shared.
     """
     progress = _progress_map(db, user)
-    found = catalogue.search(query=q, level=level)
+    found = catalogue.list_tutorials(db, query=q, level=level)
     return {
         "tutorials": [_tutorial_out(t, progress.get(t.slug)) for t in found],
         "levels": [
             {"level": lv, "label": catalogue.LEVEL_LABELS[lv]}
             for lv in catalogue.LEVELS
         ],
-        "summary": _summary(progress),
-        "badges": _badges(progress),
+        "summary": _summary(db, progress),
+        "badges": _badges(db, progress),
         "query": {"q": q, "level": level},
     }
 
@@ -303,7 +326,7 @@ def list_tutorials(
 @router.get("/{slug}")
 def get_tutorial(slug: str, db: Session = Depends(get_db),
                  user: User = Depends(get_current_user)) -> dict:
-    tutorial = _require_tutorial(slug)
+    tutorial = _require_tutorial(db, slug)
     row = db.execute(
         select(TutorialProgress).where(
             TutorialProgress.user_id == user.id,
@@ -328,7 +351,7 @@ def update_progress(slug: str, body: ProgressIn,
     Crossing COMPLETION_THRESHOLD_PERCENT marks the video complete. Completion
     is never revoked here -- only DELETE .../progress does that.
     """
-    _require_tutorial(slug)
+    tutorial = _require_tutorial(db, slug)
     row = _get_or_create(db, user, slug)
     now = _now()
 
@@ -348,7 +371,7 @@ def update_progress(slug: str, body: ProgressIn,
         _mark_complete(row, now)
 
     db.commit()
-    return _tutorial_out(_require_tutorial(slug), row)
+    return _tutorial_out(tutorial, row)
 
 
 @router.post("/{slug}/complete")
@@ -360,12 +383,12 @@ def complete_tutorial(slug: str, db: Session = Depends(get_db),
     placeholder cannot be watched at all, and a user who already knows the
     material should be able to clear it and reach the badge.
     """
-    _require_tutorial(slug)
+    tutorial = _require_tutorial(db, slug)
     row = _get_or_create(db, user, slug)
     _mark_complete(row, _now())
     row.last_watched_at = _now()
     db.commit()
-    return _tutorial_out(_require_tutorial(slug), row)
+    return _tutorial_out(tutorial, row)
 
 
 @router.delete("/{slug}/progress")
@@ -380,7 +403,7 @@ def reset_progress(slug: str, db: Session = Depends(get_db),
     to update its cache without a second round trip, so this returns 200 with
     the tutorial.
     """
-    tutorial = _require_tutorial(slug)
+    tutorial = _require_tutorial(db, slug)
     row = db.execute(
         select(TutorialProgress).where(
             TutorialProgress.user_id == user.id,

@@ -58,6 +58,33 @@ export const adminApi = {
     apiClient.get<import("./types").AdminTutorialCompletions>(
       "/admin/tutorials/completions"),
 
+  // Task 3: the catalogue is editable. `listTutorials` returns DRAFTS too --
+  // that is the difference between this and the user-facing /tutorials.
+  listTutorials: async () =>
+    apiClient.get<import("./types").AdminTutorialList>("/admin/tutorials"),
+
+  createTutorial: async (body: Record<string, unknown>) =>
+    apiClient.post<import("./types").AdminTutorial>("/admin/tutorials", body),
+
+  updateTutorial: async (
+    slug: string,
+    patch: import("./types").AdminTutorialPatch,
+  ) =>
+    apiClient.put<import("./types").AdminTutorial>(
+      `/admin/tutorials/${encodeURIComponent(slug)}`, patch),
+
+  deleteTutorial: async (slug: string) =>
+    apiClient.delete<{ deleted: string; progress_rows_kept: number }>(
+      `/admin/tutorials/${encodeURIComponent(slug)}`),
+
+  publishTutorial: async (slug: string) =>
+    apiClient.post<import("./types").AdminTutorial>(
+      `/admin/tutorials/${encodeURIComponent(slug)}/publish`),
+
+  unpublishTutorial: async (slug: string) =>
+    apiClient.post<import("./types").AdminTutorial>(
+      `/admin/tutorials/${encodeURIComponent(slug)}/unpublish`),
+
   listSupportTickets: async (status?: string) =>
     apiClient.get<{ open_count: number;
                     tickets: import("./types").AdminSupportTicket[] }>(

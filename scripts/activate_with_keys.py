@@ -47,7 +47,7 @@ EXIT_OK = 0
 EXIT_CHECK_FAILED = 1
 EXIT_ABORTED = 2
 
-TARGET_REVISION = "0017_ai_support_chat"
+TARGET_REVISION = "0018_tutorial_catalogue"
 SENDING_DOMAIN = "calendarharvest.com"
 ADVERSARIAL_MIN_PASS = 28
 ADVERSARIAL_TOTAL = 32
@@ -317,8 +317,8 @@ def check_migrations(ctx: dict) -> CheckResult:
         return CheckResult(
             False, "migration declined; NOTHING WAS CHANGED.",
             fix=("Take a backup first if that was the concern:\n"
-                 "    pg_dump \"$DATABASE_URL\" -Fc -f backup_pre_0017.dump\n"
-                 "    pg_restore --list backup_pre_0017.dump | head\n"
+                 "    pg_dump \"$DATABASE_URL\" -Fc -f backup_pre_0018.dump\n"
+                 "    pg_restore --list backup_pre_0018.dump | head\n"
                  "Then re-run this script and answer yes."))
 
     proc = subprocess.run([sys.executable, "-m", "app.db.migrate"],
@@ -355,6 +355,8 @@ def check_migrations(ctx: dict) -> CheckResult:
                  "chat_sessions" in tables, "table missing"),
                 ("support_tickets table exists (Feature 3)",
                  "support_tickets" in tables, "table missing"),
+                ("tutorial_catalogue table exists (Task 3)",
+                 "tutorial_catalogue" in tables, "table missing"),
             ]
             failed = [(label, why) for label, ok, why in assertions if not ok]
             for label, ok, _why in assertions:

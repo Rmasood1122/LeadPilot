@@ -58,6 +58,39 @@ export interface Tutorial {
   progress: TutorialProgress;
 }
 
+/** A catalogue row as the ADMIN sees it — includes unpublished drafts. */
+export interface AdminTutorial {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  level: TutorialLevel;
+  order: number;
+  youtube_id: string | null;
+  duration_seconds: number | null;
+  is_placeholder: boolean;
+  is_published: boolean;
+}
+
+export interface AdminTutorialList {
+  tutorials: AdminTutorial[];
+  levels: { level: TutorialLevel; label: string }[];
+  published_count: number;
+  total_count: number;
+}
+
+/** PUT payload. `slug` is absent on purpose — renaming one orphans every
+ *  progress row that points at it, so the API cannot do it at all. */
+export interface AdminTutorialPatch {
+  title?: string;
+  description?: string;
+  level?: TutorialLevel;
+  youtube_id?: string | null;
+  duration_seconds?: number | null;
+  sort_order?: number;
+  is_published?: boolean;
+}
+
 export interface TutorialLevelSummary {
   label: string;
   total: number;
@@ -171,6 +204,7 @@ export interface AdminTutorialCompletion {
   slug: string;
   title: string;
   level: string;
+  is_published: boolean;
   started_count: number;
   completed_count: number;
   in_progress_count: number;
