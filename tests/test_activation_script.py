@@ -328,3 +328,62 @@ class TestAiModeCheck:
         """So --dry-run still exercises it for real."""
         needs_network = dict((name, net) for name, _fn, net in act.CHECKS)
         assert needs_network["AI mode resolves to live"] is False
+
+
+class TestRunsAsAStandaloneScript:
+    """pytest imports this module with the repo root already on sys.path, so
+    it cannot see the one failure mode that matters: `python
+    scripts/activate_with_keys.py`, where sys.path[0] is scripts/ and the repo
+    root is absent.
+
+    check_ai_mode does `from app.config import settings`, and every check
+    before it reaches the app through subprocess instead -- which inherits the
+    working directory and so never noticed. The whole suite passed while the
+    script itself died at CHECK 7 with ModuleNotFoundError: No module named
+    'app'. These tests reproduce the real invocation.
+    """
+
+    @staticmethod
+    def _repo_root():
+        import pathlib
+        return pathlib.Path(__file__).resolve().parent.parent
+
+    def test_the_script_imports_with_only_its_own_directory_on_the_path(self):
+        import subprocess
+        import sys
+
+        root = self._repo_root()
+        code = (
+            "import sys;"
+            "sys.path = [p for p in sys.path if p not in ('', '.')];"
+            "sys.path.insert(0, 'scripts');"
+            "import activate_with_keys as act;"
+            "r = act.check_ai_mode({});"
+            "print('CHECK_RAN', r.ok)"
+        )
+        proc = subprocess.run([sys.executable, "-c", code], cwd=root,
+                              capture_output=True, text=True, timeout=120)
+        assert "ModuleNotFoundError" not in proc.stderr, proc.stderr
+        assert "CHECK_RAN" in proc.stdout, (proc.stdout, proc.stderr)
+
+    def test_the_bootstrap_line_is_present_and_explained(self):
+        """A bare sys.path.insert invites deletion as clutter. The comment is
+        what stops that, so assert it is still there."""
+        root = self._repo_root()
+        source = (root / "scripts" / "activate_with_keys.py").read_text(
+            encoding="utf-8")
+        assert "sys.path.insert(0, str(Path(__file__).resolve().parent.parent))" \
+            in source
+        assert "sys.path[0] is scripts/" in source
+
+    def test_help_exits_cleanly(self):
+        """The cheapest possible check that module-level import works."""
+        import subprocess
+        import sys
+
+        proc = subprocess.run([sys.executable, "scripts/activate_with_keys.py",
+                               "--help"],
+                              cwd=self._repo_root(), capture_output=True,
+                              text=True, timeout=120)
+        assert proc.returncode == 0, proc.stderr
+        assert "--dry-run" in proc.stdout

@@ -40,7 +40,15 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable
+
+# Run as `python scripts/activate_with_keys.py` and sys.path[0] is scripts/,
+# not the repo root -- so `from app.config import settings` inside
+# check_ai_mode raises ModuleNotFoundError. Every other check reaches the app
+# through subprocess, which inherits the working directory and therefore never
+# hit this. Same line as scripts/phase_c_pipeline.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Exit codes, so CI can tell "not configured yet" from "actively broken".
 EXIT_OK = 0
