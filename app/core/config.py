@@ -11,6 +11,7 @@ Adds to the M8-C3 base:
   RATE_LIMIT_GET                 — GET endpoints per minute per user (default 300)
   RATE_LIMIT_AUTH                — POST /auth/* per 15-min window (default 10)
   RATE_LIMIT_SUPPORT_CHAT        — POST /support/chat per DAY per user (default 20)
+  RATE_LIMIT_CRM_WRITE           — CRM writes per hour per user (default 600)
 """
 from __future__ import annotations
 
@@ -204,6 +205,33 @@ class Settings(BaseSettings):
 
     RATE_LIMIT_WA_TEMPLATES: int = 20
     """Max POST /whatsapp/templates/generate calls per user per hour. Default: 20."""
+
+    RATE_LIMIT_CRM_WRITE: int = 600
+    """Max CRM write calls per user per hour (M9). Default: 600.
+
+    Deliberately the LOOSEST limit in this class, because it is the only one
+    whose governed operation costs nothing external. Every other RATE_LIMIT_*
+    here is a spend ceiling -- strategies burn ~150 Claude calls, leads_source
+    spends Apollo and Hunter credits, support_chat spends the Anthropic key.
+    A CRM write is one row in PostgreSQL.
+
+    600/hour is 10 per minute sustained. The traffic shape this governs is
+    inline cell editing in the data grid: a user working a list of leads
+    types a value, tabs to the next cell, types again. A burst of twenty
+    edits in a minute is somebody doing their job, not abuse, and a limit
+    tight enough to catch abuse here would mostly catch that user instead --
+    with a 429 in the middle of a row they were halfway through editing.
+
+    What it does still bound: a runaway client loop, and a script pointed at
+    the bulk endpoint. Note that ONE bulk call may touch up to 500 leads and
+    costs ONE slot -- the limit counts requests, not rows, so the honest
+    high-volume path (select many, act once) is the cheap one and the abusive
+    path (500 individual PATCHes) is the expensive one. That is the right way
+    round.
+
+    Raise it if a legitimate user reports a 429 while editing; it is a single
+    env var, and nothing about it protects a paid resource.
+    """
 
     RATE_LIMIT_GET: int = 300
     """Max GET endpoint calls per user per minute. Default: 300."""

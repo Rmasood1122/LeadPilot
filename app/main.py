@@ -37,6 +37,7 @@ from app.api.products import router as products_router
 from app.api.strategies import router as strategies_router
 from app.api.tutorials import router as tutorials_router   # Feature 2
 from app.api.support import router as support_router       # Feature 3
+from app.api.crm import router as crm_router           # M9 native CRM
 
 # M7
 from app.api.devices import router as devices_router
@@ -49,6 +50,15 @@ from app.api.onboarding import router as onboarding_router
 from app.api.webhook_targets import router as webhook_targets_router
 from app.api.strategies_advanced import router as strategies_advanced_router
 from app.api.strategies_advanced import plans_router
+
+# M9: registers the SQLAlchemy session listeners that publish CRM events
+# to Redis. Imported for its SIDE EFFECT -- install() is a no-op marker so
+# this line does not read as an unused import to a future cleanup. Removing
+# it disables the real-time feed with no test failing, because every
+# consumer falls back to polling.
+from app.services.crm_events import install as _install_crm_events
+
+_install_crm_events()
 
 from app.core.errors import global_exception_handler
 from app.core.logging import RequestIDMiddleware
@@ -166,6 +176,7 @@ app.include_router(playbook_router)              # /playbook/* (M8)
 app.include_router(onboarding_router)            # /onboarding/* (M8-C5)
 app.include_router(tutorials_router)             # /tutorials/* (Feature 2)
 app.include_router(support_router)               # /support/* (Feature 3)
+app.include_router(crm_router)                   # /crm/* (M9)
 
 
 # ---------------------------------------------------------------------------

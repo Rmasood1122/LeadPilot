@@ -244,6 +244,28 @@ class Settings(BaseSettings):
     # SSE yet.
     verification_fixer_max_tokens: int = 18_432
 
+    # --- CRM real-time stream (M9) --------------------------------------
+    # How long ONE Server-Sent Events connection is held before the server
+    # asks the client to reconnect. Not a timeout in the failure sense: the
+    # stream is working fine at the moment it fires. It exists because an SSE
+    # connection is a worker slot held open for as long as the tab is open,
+    # and a dashboard left up over a weekend would otherwise hold one for
+    # days -- through a deploy, through a Redis failover, through every
+    # transient the process lives past.
+    #
+    # An hour, because the browser's own EventSource reconnect makes the cost
+    # of cycling a connection close to nothing (it retries automatically, and
+    # the client re-mints a stream ticket first), while the benefit is that
+    # no connection outlives a normal working session.
+    #
+    # 0 (or any non-positive value) is a KILL SWITCH, matching
+    # support_chat_enabled: GET /crm/stream answers 503 and every client falls
+    # back to its React Query poll. The lever to pull if the stream ever
+    # misbehaves in production; no deploy required. It refuses the connection
+    # rather than accepting one and immediately asking for a reconnect, which
+    # would put every open tab into a tight connect/disconnect loop.
+    crm_stream_max_seconds: int = 3600
+
     @property
     def broker_url(self) -> str:
         return self.celery_broker_url or self.redis_url

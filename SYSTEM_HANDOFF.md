@@ -1,6 +1,6 @@
 # ClientHunter Enterprise — System Handoff
 
-*Last updated: M8 Chunks 4+5 (final milestone). All 8 milestones complete.*
+*Last updated: M9 (native CRM + real-time). All 9 milestones complete.*
 
 ---
 
@@ -72,6 +72,46 @@ An end-to-end, self-learning B2B client acquisition platform. You describe a pro
 - PyPI release workflow (4-job: build → TestPyPI → smoke test → PyPI)
 - Performance benchmark script (dry-run + JSON output)
 
+### M9 - Native CRM + real-time push
+Migration `0019_m9_crm`. Eight new tables, no existing table altered.
+
+**Data model:** `crm_notes`, `crm_activities` (UI-facing audit trail, kept
+separate from `outcomes` so the learning loop's denominators are untouched),
+`crm_tags` + `crm_lead_tags`, `crm_saved_views`, `crm_custom_fields` +
+`crm_custom_field_values` (EAV, so custom columns sort and filter server-side
+identically on SQLite and PostgreSQL), and `crm_lead_meta` (owner,
+`stage_entered_at` - the stage-history measurement nothing before M9 recorded).
+
+**Real-time (SSE):** `GET /crm/stream` streams `lead.updated`,
+`lead.status_changed`, `note.created` and `outcome.created`, scoped to one
+Redis channel per user. Events are published by SQLAlchemy session listeners
+(`app/services/crm_events.py`) rather than by a call at each write site, so the
+~10 places that already write `Lead.status` or `Outcome` - including the Celery
+workers and the inbound webhooks - are covered without being edited, and a
+future write site is covered automatically. `EventSource` cannot send an
+Authorization header, so the stream authenticates with a single-use 60-second
+ticket from `POST /crm/stream/ticket` instead of a JWT in the URL.
+UNGATED BY PLAN: a subscription costs one Redis connection, and the polling
+fallback would give a free-tier user the same data anyway.
+
+**View 1 - executive dashboard** (`/crm/dashboard/*`, 4 pages): pipeline funnel
+with cumulative stage conversion, lead velocity + source mix + verification
+quality + stuck-lead detection, per-sequence/per-channel/per-variant outreach
+performance against the 3% bounce auto-pause threshold, and a keyset-paginated
+account activity feed. Every figure is a real SQL aggregation.
+
+**View 2 - data grid** (`/crm/table`): built from scratch - no spreadsheet
+library, and zero new frontend dependencies. Virtualized rows (smooth at
+5,000+), resizable and reorderable columns, inline editing with optimistic
+update and rollback, multi-column sort, per-column filters, multi-select with
+bulk actions, full keyboard navigation, and saved views persisted SERVER-side
+so they follow the user across devices. CSV leaves as a one-way download
+(formula-injection neutralised); there is no import.
+
+**Tests:** `tests/test_crm_{api,dashboard,stream,migration}.py` (+151 backend),
+`src/tests/crm-{grid-state,sse-client}.test.ts` (+59 frontend),
+`e2e/crm.spec.ts` (+8 per browser project).
+
 ---
 
 ## What is NOT built (honest list)
@@ -80,11 +120,10 @@ These are out of scope and would be next-phase work:
 
 - **LinkedIn outreach channel.** LinkedIn's official API doesn't allow automated outreach at this level. A compliant implementation would require a LinkedIn partnership or manual workflow.
 - **Stripe billing / payment.** Plan upgrade is currently handled via email (`upgrade@clienthunter.io`). There is no payment processing built in.
-- **Real-time push for web.** The web frontend polls via React Query. WebSocket push for "strategy complete" / "meeting booked" events is not built.
 - **Self-hosted email deliverability.** The system uses Gmail OAuth per user. A dedicated SMTP warm-up infrastructure (Mailgun/Postmark with domain authentication) is not built but is the right production path for high volume.
 - **iOS/App Store app.** The Capacitor wrapper targets Android (Google Play). A separate Xcode build + provisioning profile is needed for iOS.
 - **Multi-tenant team accounts.** All objects are user-scoped (user_id). Team-level sharing, role-based access within an org, and white-labeling are not built.
-- **HubSpot / Salesforce CRM sync.** The outbound webhook system (M8-C5) lets you push events to any CRM via webhook, but there are no native CRM integration adapters.
+- **HubSpot / Salesforce CRM sync.** M9 built LeadPilot's OWN CRM (dashboard + data grid, `/crm`); this entry is about syncing to a THIRD-PARTY one. The outbound webhook system (M8-C5) lets you push events to any CRM via webhook, but there are no native HubSpot/Salesforce adapters.
 
 ---
 
@@ -183,7 +222,17 @@ Learning loop tuning:
 - `PLAYBOOK_AGGREGATION_UTC_HOUR` (default 2) — when nightly job runs (UTC)
 
 Rate limits (per user per hour):
-- `RATE_LIMIT_STRATEGIES` (default 10)
+- `RATE_LIMIT_STRATEGIES` (default 2)
 - `RATE_LIMIT_LEADS_SOURCE` (default 5)
 - `RATE_LIMIT_GET` (default 300)
 - `RATE_LIMIT_AUTH` (default 10, per 15-min window)
+- `RATE_LIMIT_CRM_WRITE` (default 600) — M9. The loosest limit here on purpose:
+  it is the only one whose operation costs nothing external, and it governs
+  inline grid editing, where a tighter cap mostly catches a real user
+  mid-keystroke.
+
+Native CRM (M9):
+- `CRM_STREAM_MAX_SECONDS` (default 3600) — how long one SSE connection is held
+  before the client is asked to reconnect. **Set to 0 to turn real-time off
+  entirely**: `GET /crm/stream` then answers 503 and every client falls back to
+  its 60-second poll. The kill switch to pull if the stream misbehaves.

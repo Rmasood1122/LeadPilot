@@ -19,7 +19,7 @@ Design rules applied here:
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -191,6 +191,47 @@ class OptInSource(str, enum.Enum):
     INBOUND_MESSAGE = "inbound_message"  # the prospect messaged US first
     MANUAL_IMPORT = "manual_import"    # CSV import — evidence REQUIRED
     API = "api"                        # recorded via the opt-in API
+
+
+# --------------------------------------------------------------------------
+# M9 — native CRM layer
+# --------------------------------------------------------------------------
+
+
+class CrmActivityKind(str, enum.Enum):
+    """What a `crm_activities` row records.
+
+    Deliberately NOT the same vocabulary as OutcomeEvent. `outcomes` is the
+    learning loop's immutable event log (M8 aggregates it nightly and the A/B
+    sweep reads it); this is a UI-facing audit trail of what a HUMAN or the
+    pipeline did to a lead. Some events exist in both — a reply produces an
+    OutcomeEvent.REPLIED for the learning loop AND a REPLY_RECEIVED row for
+    the activity feed — because collapsing them would mean either polluting
+    the learning loop with note-added noise or losing the feed's notes.
+    """
+    LEAD_CREATED = "lead_created"
+    STATUS_CHANGED = "status_changed"
+    NOTE_ADDED = "note_added"
+    NOTE_DELETED = "note_deleted"
+    TAG_ADDED = "tag_added"
+    TAG_REMOVED = "tag_removed"
+    FIELD_CHANGED = "field_changed"      # custom field or crm_lead_meta edit
+    OWNER_CHANGED = "owner_changed"
+    REPLY_RECEIVED = "reply_received"
+    MEETING_BOOKED = "meeting_booked"
+
+
+class CrmViewType(str, enum.Enum):
+    DASHBOARD = "dashboard"
+    GRID = "grid"
+
+
+class CrmFieldType(str, enum.Enum):
+    TEXT = "text"
+    NUMBER = "number"
+    DATE = "date"
+    BOOL = "bool"
+    SELECT = "select"
 
 
 def _enum(e: type[enum.Enum]) -> Enum:
@@ -1271,3 +1312,310 @@ class WebhookDelivery(Base):
     delivered_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+# --------------------------------------------------------------------------
+# M9 — native CRM layer (migration 0019_m9_crm)
+# --------------------------------------------------------------------------
+#
+# Design note that governs this whole block: NOT ONE existing table is
+# modified. `leads`, `strategies` and `outcomes` are read by M1–M8 code
+# paths (the sourcing chain, the sequence engine, the nightly learning
+# loop) and by the published SDK; adding a column to `leads` for the CRM's
+# owner field or its custom-field bag would put M9's UI concerns inside the
+# row every one of those reads. So CRM-only per-lead state lives in
+# `crm_lead_meta`, and user-defined fields live in a definition + value pair
+# — both joined on lead_id, both droppable without touching the lead.
+
+
+class CrmNote(TimestampMixin, Base):
+    """A free-text note a user wrote on a lead.
+
+    Editable (updated_at moves) but `created_at` is never rewritten — the
+    activity feed orders by when the note was WRITTEN, and letting an edit
+    jump a three-week-old note to the top of the timeline would make the
+    feed lie about the sequence of events.
+    """
+
+    __tablename__ = "crm_notes"
+    __table_args__ = (
+        Index("ix_crm_notes_lead_created", "lead_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    # The note's author. SET NULL rather than CASCADE: deleting a user must
+    # not silently erase the notes that are still attached to a live lead.
+    author_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    body: Mapped[str] = mapped_column(Text)
+
+    lead: Mapped["Lead"] = relationship()
+
+
+class CrmActivity(Base):
+    """Append-only, UI-facing audit trail per lead. No updated_at.
+
+    This is NOT `outcomes`. `outcomes` is the M8 learning loop's immutable
+    event log: the nightly aggregation, the A/B sweep and the playbook
+    scorer all read it, filtered by strategy_id/variant/channel, and it is
+    deliberately narrow. Writing "note added" or "tag removed" rows into it
+    would put UI noise inside every one of those aggregates and change the
+    denominators the learning loop computes its rates from.
+
+    `actor_user_id` is NULL for machine-generated activity (the sourcing
+    chain, a webhook), which is how the feed distinguishes "you moved this"
+    from "the pipeline moved this".
+    """
+
+    __tablename__ = "crm_activities"
+    __table_args__ = (
+        Index("ix_crm_activities_lead_ts", "lead_id", "ts"),
+        # The account-wide feed (dashboard page 4) orders by ts across every
+        # lead the user owns; without this it is a full scan + filesort once
+        # the table has real volume.
+        Index("ix_crm_activities_strategy_ts", "strategy_id", "ts"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    # Denormalized from lead.strategy_id for the same reason
+    # outcomes.strategy_id is denormalized: the account-wide feed filters by
+    # strategy and would otherwise need a join on every page.
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[CrmActivityKind] = mapped_column(_enum(CrmActivityKind), index=True)
+    # Human-readable before/after for status and field changes. Stored as
+    # text, not as foreign keys: an activity row must stay readable after
+    # whatever it references has been renamed or deleted.
+    from_value: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    to_value: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    meta_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # BOTH defaults, and the Python one is load-bearing.
+    #
+    # For this table ordering IS the feature -- it is a timeline, read newest
+    # first -- and `func.now()` alone cannot order it. On SQLite
+    # CURRENT_TIMESTAMP has one-second resolution, so every event in the same
+    # second ties; on PostgreSQL now() is transaction-scoped, so every row
+    # written by one request ties by construction. Ties fall through to the
+    # `id DESC` tiebreaker, which on a random UUID4 is stable but meaningless
+    # -- the feed would show two events in the correct order only by luck, and
+    # the keyset cursor would skip or repeat across a tied group.
+    #
+    # A Python-side default is evaluated once per row at insert, in
+    # microseconds, and is not transaction-scoped, so it actually orders. The
+    # server_default stays as the backstop for a row written by anything that
+    # is not this ORM (a migration backfill, a psql session), same reasoning
+    # as users.email_verified.
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    lead: Mapped["Lead"] = relationship()
+
+
+class CrmTag(TimestampMixin, Base):
+    """A user-defined label. Scoped per user, not per strategy, so one tag
+    ("warm intro", "budget confirmed") is reusable across every campaign.
+
+    `color_token` names a THEME TOKEN (primary / accent / success / warning /
+    destructive / muted), never a hex value. The theme engine recolors the
+    whole app from CSS variables; a tag storing #16a34a would be the one
+    thing on screen that ignores the user's chosen preset.
+    """
+
+    __tablename__ = "crm_tags"
+    __table_args__ = (
+        UniqueConstraint("user_id", "name", name="crm_tag_user_name"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(60))
+    color_token: Mapped[str] = mapped_column(
+        String(20), default="muted", server_default="muted", nullable=False
+    )
+
+
+class CrmLeadTag(Base):
+    """lead to tag association. The unique constraint makes double-tagging
+    impossible at the schema level, so the bulk-tag endpoint can be naively
+    idempotent instead of reading before every write."""
+
+    __tablename__ = "crm_lead_tags"
+    __table_args__ = (
+        UniqueConstraint("lead_id", "tag_id", name="crm_lead_tag_unique"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    tag_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("crm_tags.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CrmSavedView(TimestampMixin, Base):
+    """A named filters+sort+columns combination, persisted SERVER-side.
+
+    localStorage was the cheaper option and the wrong one: a saved view is
+    the user's own work (they built the filter set), and putting it in
+    browser storage means it is invisible on their phone, gone when they
+    clear site data, and unrecoverable when they switch machines.
+
+    `is_default` is kept unique per (user, view_type) by the service layer
+    rather than by a partial unique index — SQLite and PostgreSQL both
+    support partial indexes, but their syntax diverges enough that the
+    constraint would need two dialect branches in the migration to express a
+    rule that is one UPDATE at the call site.
+    """
+
+    __tablename__ = "crm_saved_views"
+    __table_args__ = (
+        UniqueConstraint("user_id", "view_type", "name",
+                         name="crm_view_user_type_name"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    view_type: Mapped[CrmViewType] = mapped_column(
+        _enum(CrmViewType), default=CrmViewType.GRID, index=True
+    )
+    filters_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    sort_json: Mapped[list] = mapped_column(JSON, default=list)
+    # [{key, width, visible, order}] — column WIDTHS live here too, so a
+    # view restores the exact layout, not just the data selection.
+    columns_json: Mapped[list] = mapped_column(JSON, default=list)
+    is_default: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+
+
+class CrmCustomField(TimestampMixin, Base):
+    """Definition of a user-defined column on the grid.
+
+    `key` is the stable machine name a saved view's columns_json references;
+    `label` is what the header shows. They are separate so that renaming a
+    field does not orphan every saved view that displays it.
+    """
+
+    __tablename__ = "crm_custom_fields"
+    __table_args__ = (
+        UniqueConstraint("user_id", "key", name="crm_field_user_key"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    key: Mapped[str] = mapped_column(String(60))
+    label: Mapped[str] = mapped_column(String(100))
+    field_type: Mapped[CrmFieldType] = mapped_column(
+        _enum(CrmFieldType), default=CrmFieldType.TEXT
+    )
+    # SELECT only: the allowed choices. Validated on write, so a value that
+    # is not in this list can never be stored.
+    options_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    sort_order: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+
+
+class CrmCustomFieldValue(TimestampMixin, Base):
+    """One field's value for one lead (EAV).
+
+    WHY EAV RATHER THAN A JSON BAG ON `leads`:
+      1. A JSON column on `leads` is a schema change to a table that M1–M8
+         and the published SDK all read. This table is additive, and it can
+         be dropped without touching a lead row.
+      2. The grid sorts and filters on custom fields SERVER-side, across
+         5,000+ rows. JSON extraction is spelled differently in SQLite
+         (json_extract) and PostgreSQL (->>), with different NULL and
+         collation behaviour, so the test suite would exercise a different
+         query than production runs. A plain indexed column does not have
+         that problem.
+
+    THE COST, stated plainly: reading N leads with their custom values is
+    two queries, not one. The grid endpoint issues exactly one extra
+    `WHERE lead_id IN (...)` for the page's <=200 ids and assembles the rows
+    in Python — bounded, not N+1.
+
+    `value_text` is the canonical sortable/filterable form and is ALWAYS
+    populated (numbers zero-padded, dates ISO-8601, bools "true"/"false") so
+    that lexical ordering matches semantic ordering. `value_json` carries the
+    typed original so a round-trip never loses precision.
+    """
+
+    __tablename__ = "crm_custom_field_values"
+    __table_args__ = (
+        UniqueConstraint("field_id", "lead_id", name="crm_field_value_unique"),
+        Index("ix_crm_field_values_field_text", "field_id", "value_text"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    field_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("crm_custom_fields.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    value_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    value_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class CrmLeadMeta(TimestampMixin, Base):
+    """CRM-only per-lead state — the columns that would otherwise have been
+    added to `leads`.
+
+    `stage_entered_at` earns this table on its own. Lead velocity ("how long
+    has this one been sitting in contacted?") needs the moment the CURRENT
+    status was entered, and nothing in M1–M8 records it: `leads.updated_at`
+    moves on any write at all, including a WhatsApp opt-in timestamp that
+    says nothing about the stage. Leads that last changed status before M9
+    shipped have no meta row; the dashboard falls back to `leads.updated_at`
+    for those and labels the figure estimated, rather than quietly averaging
+    two different measurements together.
+    """
+
+    __tablename__ = "crm_lead_meta"
+    __table_args__ = (
+        UniqueConstraint("lead_id", name="crm_lead_meta_lead"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    priority: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    next_action_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    stage_entered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    lead: Mapped["Lead"] = relationship()

@@ -352,3 +352,258 @@ export interface SequenceOut {
   booking_url: string | null;
   steps: SequenceStepOut[];
 }
+
+// --------------------------------------------------------------------------
+// Native CRM (M9)
+// --------------------------------------------------------------------------
+
+export interface CrmFunnelStage {
+  stage: LeadStatus;
+  /** Leads sitting AT this stage right now. */
+  current: number;
+  /** Leads at this stage OR any later one — what a funnel bar shows. */
+  reached: number;
+  /** reached / the previous stage's reached. null for the first stage. */
+  conversion_from_previous: number | null;
+}
+
+export interface CrmPipelineDashboard {
+  strategy_id: string | null;
+  total_leads: number;
+  /** Excludes dropped and meeting_booked — those are finished, not active. */
+  active_leads: number;
+  by_status: Record<LeadStatus, number>;
+  funnel: CrmFunnelStage[];
+  meetings_booked_week: number;
+  meetings_booked_month: number;
+  bookings_trend: { bucket: string; count: number }[];
+  top_strategy: {
+    strategy_id: string;
+    product_name: string;
+    meetings_booked: number;
+  } | null;
+}
+
+export interface CrmVelocityRow {
+  stage: LeadStatus;
+  leads: number;
+  /** Leads with a real stage_entered_at measurement. */
+  measured: number;
+  /** Leads whose figure is derived from updated_at instead. */
+  estimated: number;
+  avg_days_in_stage: number;
+  /** True only when every lead in the stage has a real measurement. */
+  fully_measured: boolean;
+}
+
+export interface CrmLeadsDashboard {
+  strategy_id: string | null;
+  velocity: CrmVelocityRow[];
+  sources: { source: string; count: number }[];
+  verification: {
+    verified: number;
+    flagged: number;
+    dropped: number;
+    total: number;
+    /** null (not 0) when nothing was verified — "no data", not "all failed". */
+    verified_ratio: number | null;
+  };
+  stuck_after_days: number;
+  stuck_leads: {
+    lead_id: string;
+    status: LeadStatus;
+    days_in_stage: number;
+    measured: boolean;
+  }[];
+  stuck_count: number;
+}
+
+export interface CrmSequencePerformance {
+  sequence_id: string;
+  strategy_id: string;
+  name: string;
+  channel: string;
+  status: string;
+  sent: number;
+  replied: number;
+  booked: number;
+  reply_rate: number | null;
+  booking_rate: number | null;
+}
+
+export interface CrmChannelPerformance {
+  channel: string;
+  sent: number;
+  replied: number;
+  booked: number;
+  bounced: number;
+  reply_rate: number | null;
+  booking_rate: number | null;
+  bounce_rate: number | null;
+}
+
+export interface CrmVariantPerformance {
+  variant: string;
+  sent: number;
+  replied: number;
+  booked: number;
+  reply_rate: number | null;
+  booking_rate: number | null;
+}
+
+export interface CrmCampaignsDashboard {
+  strategy_id: string | null;
+  sequences: CrmSequencePerformance[];
+  channels: CrmChannelPerformance[];
+  variants: CrmVariantPerformance[];
+  bounce: {
+    sent: number;
+    bounced: number;
+    rate: number;
+    pause_threshold: number;
+    over_threshold: boolean;
+  };
+  paused_campaigns: {
+    strategy_id: string;
+    campaign_state: string;
+    reason: string | null;
+    product_name: string;
+  }[];
+}
+
+export type CrmActivityKind =
+  | "lead_created"
+  | "status_changed"
+  | "note_added"
+  | "note_deleted"
+  | "tag_added"
+  | "tag_removed"
+  | "field_changed"
+  | "owner_changed"
+  | "reply_received"
+  | "meeting_booked";
+
+export interface CrmActivityItem {
+  id: string;
+  lead_id: string;
+  strategy_id: string | null;
+  kind: CrmActivityKind;
+  from_value: string | null;
+  to_value: string | null;
+  meta: Record<string, unknown> | null;
+  ts: string | null;
+  /** null means the pipeline did it, not a person. */
+  actor_user_id: string | null;
+  lead: { full_name: string | null; company: string | null; email: string | null };
+}
+
+export interface CrmActivityPage {
+  items: CrmActivityItem[];
+  has_more: boolean;
+  /** Opaque cursor — pass back as `before`. Carries (ts, id), not just a
+   *  timestamp, because activity timestamps tie on both dialects. */
+  next_before: string | null;
+}
+
+export interface CrmTag {
+  id: string;
+  name: string;
+  /** A THEME TOKEN name (primary/accent/success/warning/destructive/muted),
+   *  never a hex — the app recolors from CSS variables. */
+  color_token: string;
+}
+
+export interface CrmNote {
+  id: string;
+  lead_id: string;
+  body: string;
+  author_user_id: string | null;
+  created_at: string | null;
+  updated_at?: string | null;
+}
+
+export interface CrmGridRow {
+  id: string;
+  strategy_id: string;
+  full_name: string | null;
+  title: string | null;
+  company: string | null;
+  email: string | null;
+  phone: string | null;
+  status: LeadStatus;
+  source: string;
+  created_at: string | null;
+  updated_at: string | null;
+  tags: CrmTag[];
+  custom: Record<string, unknown>;
+  note_count: number;
+  owner_user_id: string | null;
+  priority: string | null;
+  next_action_at: string | null;
+}
+
+export interface CrmGridPage {
+  items: CrmGridRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
+export type CrmFilterOp =
+  | "eq"
+  | "contains"
+  | "in"
+  | "not_in"
+  | "gte"
+  | "lte"
+  | "is_empty"
+  | "is_not_empty";
+
+export interface CrmFilter {
+  op: CrmFilterOp;
+  value: unknown;
+}
+
+export interface CrmSort {
+  key: string;
+  dir: "asc" | "desc";
+}
+
+export interface CrmColumnState {
+  key: string;
+  width: number;
+  visible: boolean;
+}
+
+export interface CrmSavedView {
+  id: string;
+  name: string;
+  view_type: "grid" | "dashboard";
+  filters_json: Record<string, CrmFilter>;
+  sort_json: CrmSort[];
+  columns_json: CrmColumnState[];
+  is_default: boolean;
+  created_at: string | null;
+}
+
+export type CrmFieldType = "text" | "number" | "date" | "bool" | "select";
+
+export interface CrmCustomField {
+  id: string;
+  key: string;
+  label: string;
+  field_type: CrmFieldType;
+  options_json: string[] | null;
+  sort_order: number;
+}
+
+/** Event names the SSE stream emits. */
+export type CrmStreamEventName =
+  | "ready"
+  | "reconnect"
+  | "lead.updated"
+  | "lead.status_changed"
+  | "note.created"
+  | "outcome.created"
+  | "activity.created";
