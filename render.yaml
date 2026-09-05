@@ -99,7 +99,14 @@ services:
         sync: false
       - key: PUBLIC_BASE_URL       # this service's own https URL
         sync: false
+      # The Vercel origin. NOT cosmetic: GET /auth/verify redirects the browser
+      # to "$FRONTEND_URL/login?verified=true", and app/config.py defaults it to
+      # http://localhost:3000 -- so leaving it unset does not fail the boot
+      # guard, it just mails every user a link that lands on their own machine.
+      # It was previously declared here with a key and NO value source at all,
+      # which is not a valid envVar entry.
       - key: FRONTEND_URL
+        sync: false
       # --- Email delivery, signup verification (Feature 1) ---------------
       # NOT `console`/`memory` in production: both accept the send and deliver
       # nothing, so signup keeps returning 201 while no user ever gets a link.
@@ -130,7 +137,6 @@ services:
         value: "30"
       - key: SUPPORT_CHAT_MIN_CONFIDENCE
         value: "0.5"
-        sync: false
       - key: SENDER_IDENTITY       # CAN-SPAM postal address
         sync: false
       - key: ADMIN_EMAIL
@@ -193,7 +199,14 @@ services:
         sync: false
       - key: PUBLIC_BASE_URL
         sync: false
+      # The Vercel origin. NOT cosmetic: GET /auth/verify redirects the browser
+      # to "$FRONTEND_URL/login?verified=true", and app/config.py defaults it to
+      # http://localhost:3000 -- so leaving it unset does not fail the boot
+      # guard, it just mails every user a link that lands on their own machine.
+      # It was previously declared here with a key and NO value source at all,
+      # which is not a valid envVar entry.
       - key: FRONTEND_URL
+        sync: false
       # --- Email delivery, signup verification (Feature 1) ---------------
       # NOT `console`/`memory` in production: both accept the send and deliver
       # nothing, so signup keeps returning 201 while no user ever gets a link.
@@ -224,7 +237,6 @@ services:
         value: "30"
       - key: SUPPORT_CHAT_MIN_CONFIDENCE
         value: "0.5"
-        sync: false
       - key: SENDER_IDENTITY
         sync: false
       - key: ADMIN_EMAIL
