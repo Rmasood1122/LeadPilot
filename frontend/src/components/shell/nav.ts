@@ -1,11 +1,13 @@
 import {
   BarChart3,
+  CalendarDays,
   GraduationCap,
   KanbanSquare,
   LayoutGrid,
   Megaphone,
   Route,
   Settings,
+  Video,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +26,13 @@ export const NAV: NavItem[] = [
   // stays first: it is the screen people open every morning.
   { href: "/crm", label: "CRM", icon: LayoutGrid },
   { href: "/campaigns", label: "Campaigns", icon: Megaphone },
+  // Engagement Hub. Placed immediately after Campaigns and in this order
+  // because that is the order the work happens in: a campaign produces a
+  // booking, a booking produces a meeting. Both sit ABOVE Strategies, which is
+  // a screen you visit while setting up and rarely afterwards, whereas these
+  // two are opened on the days you have calls.
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/meetings", label: "Meetings", icon: Video },
   { href: "/strategies", label: "Strategies", icon: Route },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   // Feature 2. Sits before Settings, not after: Settings is the conventional

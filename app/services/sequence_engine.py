@@ -484,3 +484,102 @@ def check_bounce_rate(session: Session, strategy: Strategy) -> bool:
                            "notification", strategy.id)
         return True
     return False
+
+
+# --------------------------------------------------------------------------
+# Engagement Hub (Feature 4) — a pending meeting pauses outreach
+# --------------------------------------------------------------------------
+#
+# WHY PAUSE AND NOT STOP
+# The M3 rule is that a booked meeting is a hard stop (see the module
+# docstring, and app/api/webhooks.py where the Calendly path applies it). That
+# is right for Calendly, where LeadPilot finds out a meeting exists and nothing
+# ever tells it the meeting fell through: a link the invitee cancels produces a
+# separate `invitee.canceled` delivery that may or may not arrive, so treating
+# the booking as terminal is the safe reading.
+#
+# A booking made on LeadPilot's OWN calendar is different. We own the row. We
+# know the moment it is cancelled, because the cancellation is a request to
+# this API. So the honest state is PAUSED -- "do not send while a meeting is
+# pending" -- and a cancelled meeting puts the lead back into the sequence
+# where it left off, instead of stranding a warm lead in a state the engine
+# defines as irreversible.
+#
+# stop_enrollment stays exactly as it is and keeps its irreversibility. This is
+# an additional state, not a weakening of that one.
+
+MEETING_PAUSE_REASON = "meeting_pending"
+
+# How long after a meeting ends before the sequence is allowed to resume on
+# its own. A day, because the useful outcome of a call is recorded by a human
+# within a day of it happening (won, lost, replied), and any of those already
+# stops the enrollment through the existing rules. This timer only matters for
+# the call nobody wrote up -- and there, resuming outreach a full day later is
+# better than never touching the lead again.
+MEETING_PAUSE_GRACE = timedelta(days=1)
+
+
+def pause_for_meeting(session: Session, lead: Lead,
+                      until: datetime | None = None,
+                      now: datetime | None = None) -> int:
+    """Pause every ACTIVE enrollment for `lead` while a meeting is pending.
+
+    Returns how many were paused. Never touches STOPPED enrollments -- a lead
+    who unsubscribed and later booked through a colleague's link must not have
+    their outreach quietly resurrected by this.
+
+    `until` defaults to one day after `now`; callers that know the meeting's
+    end time pass end + MEETING_PAUSE_GRACE, so the resume sweep
+    (resume_due_enrollments, already run on every dispatch tick) picks the
+    lead back up on its own if nothing else happened.
+    """
+    now = now or _now()
+    until = until or (now + MEETING_PAUSE_GRACE)
+    paused = 0
+    for enrollment in _enrollments_for_lead(session, lead.id):
+        if enrollment.status is not EnrollmentStatus.ACTIVE:
+            continue
+        pause_enrollment(session, enrollment, until=until)
+        enrollment.stop_reason = MEETING_PAUSE_REASON
+        paused += 1
+    session.commit()
+    if paused:
+        logger.info("paused %d enrollment(s) for lead %s until %s "
+                    "(meeting pending)", paused, lead.id, until.isoformat())
+    return paused
+
+
+def resume_after_meeting_cancelled(session: Session, lead: Lead,
+                                   now: datetime | None = None) -> int:
+    """Undo pause_for_meeting when the meeting is cancelled.
+
+    Only resumes enrollments THIS feature paused -- the stop_reason check is
+    what keeps a cancelled meeting from also un-pausing an out-of-office pause
+    that has nothing to do with it, which would send into an inbox the engine
+    has been told is unattended.
+    """
+    now = now or _now()
+    resumed = 0
+    for enrollment in _enrollments_for_lead(session, lead.id):
+        if enrollment.status is not EnrollmentStatus.PAUSED:
+            continue
+        if enrollment.stop_reason != MEETING_PAUSE_REASON:
+            continue
+        enrollment.status = EnrollmentStatus.ACTIVE
+        enrollment.paused_until = None
+        enrollment.stop_reason = None
+        # The pause pushed every scheduled message out to `paused_until`.
+        # Pulling them back to the next send window is what makes "resume"
+        # mean resume rather than "resume, tomorrow".
+        pending = session.execute(
+            select(Message).where(
+                Message.sequence_id == enrollment.sequence_id,
+                Message.lead_id == enrollment.lead_id,
+                Message.status == MessageStatus.SCHEDULED,
+            )
+        ).scalars().all()
+        for msg in pending:
+            msg.scheduled_at = next_window_slot(now, lead_timezone(lead))
+        resumed += 1
+    session.commit()
+    return resumed

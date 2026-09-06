@@ -19,7 +19,7 @@ Design rules applied here:
 
 import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 
 from sqlalchemy import (
     Boolean,
@@ -33,9 +33,12 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    Time,
     UniqueConstraint,
     Uuid,
     func,
+    text,
+    true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -219,6 +222,11 @@ class CrmActivityKind(str, enum.Enum):
     OWNER_CHANGED = "owner_changed"
     REPLY_RECEIVED = "reply_received"
     MEETING_BOOKED = "meeting_booked"
+    # Engagement Hub. Both are VARCHAR-backed additions to an existing enum,
+    # which is a data-free change (see the module docstring) -- no migration
+    # touches this column.
+    MEETING_COMPLETED = "meeting_completed"
+    TASK_CREATED = "task_created"
 
 
 class CrmViewType(str, enum.Enum):
@@ -232,6 +240,52 @@ class CrmFieldType(str, enum.Enum):
     DATE = "date"
     BOOL = "bool"
     SELECT = "select"
+
+
+# --------------------------------------------------------------------------
+# Engagement Hub — calendar, bookings, meetings
+# --------------------------------------------------------------------------
+
+
+class BookingStatus(str, enum.Enum):
+    """Lifecycle of one slot booked on a public booking page.
+
+    CANCELLED is a soft delete: DELETE /calendar/bookings/{id} sets this and
+    clears `slot_key`, which both frees the slot for someone else and keeps
+    the row for the lead's timeline. A cancelled meeting that vanished from
+    history would take its CRM activity with it.
+    """
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    NO_SHOW = "no_show"
+
+
+class MeetingPlatform(str, enum.Enum):
+    """Where the call actually happens.
+
+    CUSTOM is not a fallback for "we could not integrate" -- it is the
+    platform-agnostic path the product promises: paste any join URL (Whereby,
+    a phone bridge, the client's own Webex) and LeadPilot still runs the
+    notes, transcript and summary around it.
+    """
+    GOOGLE_MEET = "google_meet"
+    ZOOM = "zoom"
+    TEAMS = "teams"
+    CUSTOM = "custom"
+
+
+class MeetingStatus(str, enum.Enum):
+    SCHEDULED = "scheduled"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class MeetingParticipantRole(str, enum.Enum):
+    HOST = "host"
+    CLIENT = "client"
+    OBSERVER = "observer"
 
 
 def _enum(e: type[enum.Enum]) -> Enum:
@@ -864,6 +918,22 @@ class SequenceStep(TimestampMixin, Base):
     # — 'lead.<field>' fills deterministically; anything else is a brief
     # Claude fills from lead enrichment + strategy messaging.
     variable_mapping_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # --- Engagement Hub: automated follow-up (migration 0020) -------------
+    # `delay_days` schedules the NEXT step after this one SENDS. These two
+    # govern something different: what happens when the lead does not reply
+    # to this step at all. The sweep in app/workers/outreach_tasks.py
+    # (check_followup_due) reads them per step.
+    #
+    # Both carry a server_default as well as a Python default because
+    # migration 0020 adds them to a table that already has rows: without one
+    # the ALTER cannot make the column NOT NULL, and a NULL delay would make
+    # the sweep's arithmetic silently skip every pre-existing step.
+    followup_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    followup_delay_hours: Mapped[int] = mapped_column(
+        Integer, default=72, server_default=text("72"), nullable=False
+    )
 
     sequence: Mapped["Sequence"] = relationship(back_populates="steps")
 
@@ -1619,3 +1689,276 @@ class CrmLeadMeta(TimestampMixin, Base):
     )
 
     lead: Mapped["Lead"] = relationship()
+
+
+# --------------------------------------------------------------------------
+# Engagement Hub — self-built calendar (migration 0021)
+# --------------------------------------------------------------------------
+#
+# WHY THIS IS NOT CALENDLY
+# app/integrations/calendly.py stays exactly where it is: an account that
+# already runs on Calendly keeps its links, its webhook and its bookings. The
+# tables below are the OWNED path — availability the user edits in-app, a
+# public booking page on our own domain, and bookings that land in the same
+# database as the lead they belong to. That last part is the point: a Calendly
+# booking arrives as a webhook that has to be matched back to a lead by a
+# tagged UTM parameter (see calendly.py's tenant-tagging note for how fragile
+# that is), whereas a booking made here already knows which page it came from
+# and therefore which user owns it.
+#
+# TABLE NAMES: the brief spells these singular (calendar_booking_page). Every
+# other table in this schema is plural, and a schema that is plural except in
+# one corner is a trap for anyone writing a raw query, so they are pluralised
+# here. The MODEL names are what application code touches, and those match the
+# brief exactly.
+
+
+class CalendarAvailability(TimestampMixin, Base):
+    """One recurring weekly window a user is bookable in.
+
+    Multiple rows per weekday are intended and normal — "9-12 and 14-17" is
+    two rows, not one row with a hole in it, because a single row with a break
+    would need a nested structure that no query can filter on.
+
+    `timezone` lives on the ROW, not on the user: the times are wall-clock
+    times in it ("I take calls at 9am Karachi time"), and storing them in UTC
+    would move the user's morning by an hour twice a year. Slot generation in
+    app/services/calendar_service.py converts to UTC per day, so DST is
+    resolved at the day being offered rather than when the rule was written.
+    """
+
+    __tablename__ = "calendar_availability"
+    __table_args__ = (
+        CheckConstraint("day_of_week >= 0 AND day_of_week <= 6",
+                        name="calendar_availability_dow"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # 0 = Monday .. 6 = Sunday — Python's datetime.weekday(), so the slot
+    # generator never has to translate between two week conventions.
+    day_of_week: Mapped[int] = mapped_column(Integer)
+    start_time: Mapped[time] = mapped_column(Time)
+    end_time: Mapped[time] = mapped_column(Time)
+    timezone: Mapped[str] = mapped_column(
+        String(64), default="UTC", server_default="UTC", nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+
+
+class CalendarBookingPage(TimestampMixin, Base):
+    """A shareable page (/book/<slug>) that turns availability into a
+    bookable offer.
+
+    A user can have several: "30-min intro" and "60-min technical deep dive"
+    are different durations, different questions and different links over the
+    same underlying availability.
+    """
+
+    __tablename__ = "calendar_booking_pages"
+    __table_args__ = (
+        # Global, not per-user: the slug IS the public URL. Two users cannot
+        # both own /book/intro-call.
+        UniqueConstraint("slug", name="calendar_booking_page_slug"),
+        CheckConstraint("duration_minutes IN (15, 30, 45, 60)",
+                        name="calendar_booking_page_duration"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    slug: Mapped[str] = mapped_column(String(80), index=True)
+    title: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration_minutes: Mapped[int] = mapped_column(
+        Integer, default=30, server_default=text("30"), nullable=False
+    )
+    # Padding AFTER each booking, so back-to-back calls are impossible.
+    buffer_minutes: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    # NULL = unlimited. A sentinel like 0 would read as "nobody may book",
+    # which is the opposite of what an unset field should mean.
+    max_bookings_per_day: Mapped[int | None] = mapped_column(
+        Integer, nullable=True
+    )
+    # [{"key": "budget", "label": "What is your budget?", "type": "text",
+    #   "required": true}] — answers land in calendar_bookings.answers.
+    custom_questions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+
+
+class CalendarBooking(TimestampMixin, Base):
+    """One booked slot.
+
+    `slot_key` IS THE DOUBLE-BOOKING GUARD, and it is why this table has a
+    column the brief does not list. Two people can load the same booking page
+    and submit the same 10:00 slot in the same second; a check-then-insert in
+    the handler loses that race, and a partial unique index (WHERE status <>
+    'cancelled') is PostgreSQL-only, so the test suite would exercise a
+    different constraint than production.
+
+    Instead: slot_key holds the slot's UTC start while the booking is live and
+    is set to NULL when it is cancelled. NULLs do not collide in a UNIQUE
+    constraint on either PostgreSQL or SQLite, so the constraint blocks a
+    second live booking of the same slot and still lets a cancelled slot be
+    re-booked. One insert, no read, no race.
+    """
+
+    __tablename__ = "calendar_bookings"
+    __table_args__ = (
+        UniqueConstraint("booking_page_id", "slot_key",
+                         name="calendar_booking_live_slot"),
+        Index("ix_calendar_bookings_page_start", "booking_page_id", "start_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    booking_page_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("calendar_booking_pages.id", ondelete="CASCADE"), index=True
+    )
+    invitee_name: Mapped[str] = mapped_column(String(200))
+    invitee_email: Mapped[str] = mapped_column(String(320), index=True)
+    invitee_phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # The invitee's own IANA zone, captured at booking time. Confirmation
+    # emails render the time in it; without it a person in Auckland gets a
+    # confirmation for a time they have to convert by hand.
+    invitee_timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    meeting_link: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[BookingStatus] = mapped_column(
+        _enum(BookingStatus), default=BookingStatus.CONFIRMED, index=True
+    )
+    # SET NULL, not CASCADE: deleting a lead must not erase the fact that a
+    # meeting happened — the invitee's own record of it is this row.
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    answers: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # See the class docstring: the UTC slot start while live, NULL once
+    # cancelled. Never read by application logic — the constraint is the point.
+    slot_key: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    booking_page: Mapped["CalendarBookingPage"] = relationship()
+    lead: Mapped["Lead | None"] = relationship()
+
+
+# --------------------------------------------------------------------------
+# Engagement Hub — meetings (migration 0022)
+# --------------------------------------------------------------------------
+
+
+class Meeting(TimestampMixin, Base):
+    """A call: where it happens, what was said, and what to do next.
+
+    `booking_id` IS NULLABLE because meetings are also created by hand — the
+    prospect proposed a time over email, or the call was booked before this
+    feature existed. A NOT NULL booking would make the manual path impossible
+    and force fake bookings to be written to satisfy the schema.
+
+    `lead_id` is carried here as well as on the booking. It is not redundant:
+    a manually created meeting has no booking to inherit it from, and Feature
+    4's "Meetings" tab on a lead needs one indexed column to query rather than
+    a LEFT JOIN through bookings that only resolves half the rows.
+
+    THE TWO TIME PAIRS ARE DIFFERENT FACTS. start_at/end_at are what was
+    scheduled; actual_start_at/actual_end_at are when Start/End Meeting were
+    pressed. The AI summary prompt uses the actual duration, because "we
+    booked 60 minutes and it ran 12" is a signal about the call, and folding
+    it into the scheduled figure would erase it.
+    """
+
+    __tablename__ = "meetings"
+    __table_args__ = (
+        Index("ix_meetings_host_start", "host_user_id", "start_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    booking_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("calendar_bookings.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    host_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    platform: Mapped[MeetingPlatform] = mapped_column(
+        _enum(MeetingPlatform), default=MeetingPlatform.CUSTOM
+    )
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    meeting_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    # The provider's own id for the event (Google Calendar eventId, Zoom
+    # meeting id). Kept so a later cancel or reschedule can address the right
+    # object instead of parsing it back out of the join URL.
+    external_event_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    actual_start_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    actual_end_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    status: Mapped[MeetingStatus] = mapped_column(
+        _enum(MeetingStatus), default=MeetingStatus.SCHEDULED, index=True
+    )
+    # What the user typed during the call. Never overwritten by the AI —
+    # ai_notes is a separate column precisely so a generated summary can never
+    # destroy a human's own record of what was said.
+    raw_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    recording_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # [{"text": "...", "owner": "us"|"client", "due": "2026-09-14",
+    #   "done": false}] — `done` is written back by the checkbox list in the UI.
+    action_items: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # The remaining three fields of meeting_ai.generate_meeting_summary()'s
+    # contract. Separate columns rather than a blob inside ai_notes because
+    # the UI renders them as distinct affordances (a bullet list, a next-steps
+    # list, a sentiment chip), and re-parsing them out of prose on every
+    # render is how a summary panel starts lying.
+    key_points: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    next_steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
+    booking: Mapped["CalendarBooking | None"] = relationship()
+    lead: Mapped["Lead | None"] = relationship()
+    participants: Mapped[list["MeetingParticipant"]] = relationship(
+        back_populates="meeting", cascade="all, delete-orphan"
+    )
+
+
+class MeetingParticipant(Base):
+    """Who was on the call. No updated_at — join/leave times are facts, and a
+    row is written once per person per meeting."""
+
+    __tablename__ = "meeting_participants"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    meeting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("meetings.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    role: Mapped[MeetingParticipantRole] = mapped_column(
+        _enum(MeetingParticipantRole), default=MeetingParticipantRole.CLIENT
+    )
+    joined_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    left_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    meeting: Mapped["Meeting"] = relationship(back_populates="participants")

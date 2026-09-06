@@ -40,6 +40,17 @@ logger = logging.getLogger(__name__)
 GMAIL_SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.readonly",
+    # Engagement Hub: app/integrations/google_meet.py creates a Calendar event
+    # (which is the only way to mint a Google Meet link) on this same grant,
+    # rather than putting the user through a second Google consent flow for
+    # the same account.
+    #
+    # An account connected BEFORE this line existed does not gain the scope
+    # retroactively -- Google answers 403, and google_meet.py turns that one
+    # status into GoogleCalendarNotAuthorized with a message telling the user
+    # to reconnect. Adding it here is what makes every new connection work
+    # without that step.
+    "https://www.googleapis.com/auth/calendar.events",
 ]
 
 GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"

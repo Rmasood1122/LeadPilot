@@ -359,6 +359,9 @@ describe("CSV export", () => {
       owner_user_id: null,
       priority: null,
       next_action_at: null,
+    // Engagement Hub, Feature 1: server-computed, so the fixture just
+    // carries the neutral value. rowsToCsv renders whatever is here.
+    followup_status: "none" as const,
     };
     const columns = visibleColumns(state0());
     const csv = rowsToCsv([row], columns);

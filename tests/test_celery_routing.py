@@ -23,6 +23,7 @@ import yaml
 
 # Importing the task modules is what registers them on the app.
 import app.workers.beat_heartbeat  # noqa: F401
+import app.workers.calendar_tasks  # noqa: F401  (Engagement Hub)
 import app.workers.lead_tasks  # noqa: F401
 import app.workers.learning_tasks  # noqa: F401
 import app.workers.outreach_tasks  # noqa: F401

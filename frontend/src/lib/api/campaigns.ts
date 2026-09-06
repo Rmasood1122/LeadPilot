@@ -53,3 +53,27 @@ export function generateTemplates(
     body: { strategy_id: strategyId },
   });
 }
+
+/** Engagement Hub, Feature 1 — per-step automatic follow-up.
+ *
+ *  Both fields are optional so the toggle and the delay input are independent
+ *  controls: flipping the switch must not also re-send (and possibly clobber)
+ *  a delay the user is halfway through typing.
+ *
+ *  POST, not PATCH — the path the backend exposes. It is idempotent either
+ *  way; it writes exactly the fields it is sent. */
+export function updateFollowupSettings(
+  sequenceId: string,
+  stepNo: number,
+  settings: { enabled?: boolean; delay_hours?: number },
+): Promise<{
+  sequence_id: string;
+  step_no: number;
+  followup_enabled: boolean;
+  followup_delay_hours: number;
+}> {
+  return api(`/sequences/${sequenceId}/steps/${stepNo}/followup-settings`, {
+    method: "POST",
+    body: settings,
+  });
+}

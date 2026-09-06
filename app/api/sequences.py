@@ -66,6 +66,16 @@ class StepIn(BaseModel):
     variable_mapping: dict[str, str] | None = Field(
         default=None, description="Per-variable fill sources: 'lead.<field>' "
         "or a free-text brief Claude fills from enrichment + messaging")
+    # --- Engagement Hub, Feature 1 ---------------------------------------
+    # NOT the same timer as delay_days. delay_days waits after this step
+    # SENDS before the next one is scheduled; these two govern what happens
+    # when the lead never replies to this step at all. See migration 0020.
+    followup_enabled: bool = Field(
+        default=True, description="Automatically follow up when this step "
+        "gets no reply")
+    followup_delay_hours: int = Field(
+        default=72, ge=1, le=2160, description="Hours of silence after this "
+        "step before the automatic follow-up fires (max 90 days)")
 
 
 class SequenceCreate(BaseModel):
@@ -181,7 +191,9 @@ def create_sequence(
                             channel=s.channel,
                             whatsapp_kind=s.whatsapp_kind,
                             whatsapp_template_id=s.whatsapp_template_id,
-                            variable_mapping_json=s.variable_mapping))
+                            variable_mapping_json=s.variable_mapping,
+                            followup_enabled=s.followup_enabled,
+                            followup_delay_hours=s.followup_delay_hours))
     db.commit()
     db.refresh(sequence)
     return sequence
@@ -228,4 +240,62 @@ def get_sequence(
     return {
         "sequence": SequenceOut.model_validate(sequence).model_dump(),
         "enrollments": {status.value: counts.get(status, 0) for status in EnrollmentStatus},
+    }
+
+# --------------------------------------------------------------------------
+# Engagement Hub, Feature 1 — per-step follow-up settings
+# --------------------------------------------------------------------------
+
+
+class FollowupSettingsIn(BaseModel):
+    """Both fields optional, so the toggle and the delay input are
+    independent controls rather than one form that must send both."""
+
+    enabled: bool | None = None
+    delay_hours: int | None = Field(
+        default=None, ge=1, le=2160,
+        description="Hours of silence before the automatic follow-up fires. "
+                    "Capped at 90 days: past that the sweep is holding an "
+                    "enrollment open for a quarter, which is a state somebody "
+                    "should be looking at rather than a setting.")
+
+
+@router.post("/sequences/{sequence_id}/steps/{step_no}/followup-settings")
+def update_followup_settings(
+    sequence_id: uuid.UUID,
+    step_no: int,
+    body: FollowupSettingsIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Turn the automatic follow-up on or off for one step, and set its delay.
+
+    POST rather than PATCH because that is the path the brief specifies, and
+    the operation is idempotent either way -- it writes exactly the fields it
+    was sent.
+
+    Changing the delay takes effect on the NEXT sweep, including for
+    enrollments that are already waiting: the sweep compares `now - sent_at`
+    against the CURRENT value every time it runs rather than storing a due
+    date, so shortening the delay releases messages that were already overdue
+    under the new setting instead of only applying to sends from here on.
+    """
+    _owned_sequence(db, sequence_id, current_user)
+    step = db.execute(
+        select(SequenceStep).where(SequenceStep.sequence_id == sequence_id,
+                                   SequenceStep.step_no == step_no)
+    ).scalars().first()
+    if step is None:
+        raise HTTPException(status_code=404, detail="sequence step not found")
+
+    if body.enabled is not None:
+        step.followup_enabled = body.enabled
+    if body.delay_hours is not None:
+        step.followup_delay_hours = body.delay_hours
+    db.commit()
+    return {
+        "sequence_id": str(sequence_id),
+        "step_no": step.step_no,
+        "followup_enabled": step.followup_enabled,
+        "followup_delay_hours": step.followup_delay_hours,
     }

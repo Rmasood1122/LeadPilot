@@ -27,6 +27,11 @@ celery_app = Celery(
         "app.workers.webhook_tasks",    # C5 reliable outbound webhooks
         "app.workers.beat_heartbeat",   # C3 beat liveness key
         "app.workers.support_tasks",    # Feature 3 chat retention purge
+        # Engagement Hub: post-booking work, meeting summaries, stale-meeting
+        # sweep. The follow-up tasks live in outreach_tasks (already included
+        # above) because they send outreach messages and belong on the same
+        # queue as every other send.
+        "app.workers.calendar_tasks",
     ],
 )
 
@@ -59,6 +64,13 @@ celery_app.conf.task_routes = {
     "app.workers.beat_heartbeat.*": {"queue": "default"},
     "app.workers.webhook_tasks.*": {"queue": "default"},
     "app.workers.support_tasks.*": {"queue": "default"},
+    # Engagement Hub. "default" rather than "outreach": these tasks send
+    # transactional email and write CRM rows, they do not dispatch outreach,
+    # and the outreach worker's concurrency is sized for send throughput
+    # against a daily cap. Note the follow-up tasks are NOT here -- they match
+    # leadpilot.outreach.* above, which is correct: they send real outbound
+    # messages under the same caps and windows as any other send.
+    "app.workers.calendar_tasks.*": {"queue": "default"},
     "leadpilot.ping": {"queue": "default"},
 }
 
@@ -125,6 +137,22 @@ celery_app.conf.beat_schedule = {
     "support-chat-retention-purge": {
         "task": "app.workers.support_tasks.purge_old_chats",
         "schedule": crontab(hour=3, minute=20),
+    },
+    # Engagement Hub, Feature 1: the automated follow-up sweep. Every 30
+    # minutes by default (FOLLOWUP_SWEEP_INTERVAL_SECONDS). It only ENQUEUES;
+    # each send goes through the same compliance path as any other message.
+    "check-followup-due": {
+        "task": "leadpilot.outreach.check_followup_due",
+        "schedule": float(settings.followup_sweep_interval_seconds),
+    },
+    # Engagement Hub, Feature 3: close meetings nobody pressed End on. Hourly
+    # rather than on a schedule tied to meeting times, because the thing being
+    # cleaned up is precisely the case where nobody was watching. A meeting
+    # left in_progress keeps blocking calendar slots and keeps its lead's
+    # enrollment paused, so this is not cosmetic.
+    "close-stale-meetings": {
+        "task": "app.workers.calendar_tasks.close_stale_meetings",
+        "schedule": 3600.0,
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

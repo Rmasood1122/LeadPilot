@@ -55,7 +55,10 @@ EXIT_OK = 0
 EXIT_CHECK_FAILED = 1
 EXIT_ABORTED = 2
 
-TARGET_REVISION = "0019_m9_crm"
+# The alembic head. tests/test_activation_script.py asserts this IS the
+# head, so adding a migration without moving this line fails there rather
+# than in production against a database missing the new tables.
+TARGET_REVISION = "0022_meetings"
 SENDING_DOMAIN = "calendarharvest.com"
 ADVERSARIAL_MIN_PASS = 28
 ADVERSARIAL_TOTAL = 32

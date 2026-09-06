@@ -53,6 +53,7 @@ from app.db.models import (
     OutcomeEvent,
     Product,
     Sequence as SequenceModel,
+    SequenceStep,
     Strategy,
     User,
 )
@@ -985,6 +986,8 @@ def grid_page(db: Session, current_user: User, *,
             select(CrmLeadMeta).where(CrmLeadMeta.lead_id.in_(lead_ids))
         ).scalars().all()
     } if lead_ids else {}
+    # Engagement Hub: four batched queries for the whole page, never per row.
+    followups = followup_status_for_leads(db, lead_ids)
 
     items = []
     for lead in rows:
@@ -1009,6 +1012,7 @@ def grid_page(db: Session, current_user: User, *,
             "priority": meta.priority if meta else None,
             "next_action_at": (meta.next_action_at.isoformat()
                                if meta and meta.next_action_at else None),
+            "followup_status": followups.get(lead.id, FOLLOWUP_NONE),
         })
 
     return {"items": items, "total": total, "limit": limit, "offset": offset,
@@ -1024,3 +1028,115 @@ def get_or_create_meta(db: Session, lead: Lead) -> CrmLeadMeta:
         db.add(meta)
         db.flush()
     return meta
+
+
+# ---------------------------------------------------------------------------
+# Engagement Hub, Feature 1 — the grid's follow-up column
+# ---------------------------------------------------------------------------
+#
+# WHY THIS IS COMPUTED SERVER-SIDE AND BATCHED
+# The obvious shape is a per-row derivation in the grid component from data it
+# already has. It cannot be: the answer depends on the lead's messages, its
+# outcomes and the followup_delay_hours of the step that last sent -- none of
+# which the grid row carries, and all of which would be N round trips to fetch.
+#
+# So it is four queries for a whole page, resolved here, and the row ships a
+# single string the cell renders as a badge.
+
+FOLLOWUP_REPLIED = "replied"
+FOLLOWUP_DUE = "due"
+FOLLOWUP_SCHEDULED = "scheduled"
+FOLLOWUP_WAITING = "waiting"
+FOLLOWUP_NONE = "none"
+
+
+def _utc(value):
+    """SQLite hands back naive datetimes for timestamptz columns; PostgreSQL
+    does not. Everything in those columns is UTC, so this restates rather than
+    converts -- without it the comparison below raises on SQLite only."""
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def followup_status_for_leads(db: Session, lead_ids: Sequence[uuid.UUID],
+                              now: datetime | None = None) -> dict:
+    """lead_id -> one of the FOLLOWUP_* constants.
+
+    The precedence is the order a user would read it in, and it matters:
+
+      replied    a reply exists. Nothing else about this lead's follow-up
+                 state is interesting any more, so it wins outright.
+      scheduled  a message is queued. The sequence engine has it in hand.
+      due        the last send is older than its step's followup_delay_hours
+                 and nothing is queued -- this lead has fallen through.
+      waiting    contacted, inside the window, nothing queued.
+      none       never contacted on any sequence.
+
+    `due` is the one that earns the column. It is exactly the population
+    app/workers/outreach_tasks.py::check_followup_due picks up, computed the
+    same way, so the badge and the automation cannot disagree about who is
+    overdue.
+    """
+    if not lead_ids:
+        return {}
+    now = now or datetime.now(timezone.utc)
+    ids = list(lead_ids)
+
+    replied = set(db.execute(
+        select(Outcome.lead_id).where(Outcome.lead_id.in_(ids),
+                                      Outcome.event == OutcomeEvent.REPLIED)
+    ).scalars().all())
+
+    pending = set(db.execute(
+        select(Message.lead_id).where(
+            Message.lead_id.in_(ids),
+            Message.status.in_([MessageStatus.SCHEDULED, MessageStatus.SENDING]),
+        )
+    ).scalars().all())
+
+    # The most recent successful send per lead. Ordered ascending so the last
+    # write into the dict wins, which avoids a correlated subquery that would
+    # be spelled differently on SQLite and PostgreSQL.
+    last_sent: dict = {}
+    for lead_id, sequence_id, step_no, sent_at in db.execute(
+        select(Message.lead_id, Message.sequence_id, Message.step_no,
+               Message.sent_at)
+        .where(Message.lead_id.in_(ids), Message.status == MessageStatus.SENT)
+        .order_by(Message.sent_at)
+    ).all():
+        last_sent[lead_id] = (sequence_id, step_no, sent_at)
+
+    steps = {
+        (sequence_id, step_no): (enabled, hours)
+        for sequence_id, step_no, enabled, hours in db.execute(
+            select(SequenceStep.sequence_id, SequenceStep.step_no,
+                   SequenceStep.followup_enabled,
+                   SequenceStep.followup_delay_hours)
+            .where(SequenceStep.sequence_id.in_(
+                {seq for seq, _, _ in last_sent.values()} or {None}
+            ))
+        ).all()
+    } if last_sent else {}
+
+    out: dict = {}
+    for lead_id in ids:
+        if lead_id in replied:
+            out[lead_id] = FOLLOWUP_REPLIED
+            continue
+        if lead_id in pending:
+            out[lead_id] = FOLLOWUP_SCHEDULED
+            continue
+        entry = last_sent.get(lead_id)
+        if entry is None:
+            out[lead_id] = FOLLOWUP_NONE
+            continue
+        sequence_id, step_no, sent_at = entry
+        enabled, hours = steps.get((sequence_id, step_no), (True, 72))
+        sent_at = _utc(sent_at)
+        if not enabled or sent_at is None:
+            out[lead_id] = FOLLOWUP_WAITING
+            continue
+        overdue = (now - sent_at) >= timedelta(hours=hours or 72)
+        out[lead_id] = FOLLOWUP_DUE if overdue else FOLLOWUP_WAITING
+    return out

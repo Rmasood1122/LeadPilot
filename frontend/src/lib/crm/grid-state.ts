@@ -50,6 +50,12 @@ export const GRID_COLUMNS: GridColumnDef[] = [
   { key: "priority", label: "Priority", sortable: false, filterable: false, editable: true, defaultWidth: 120 },
   { key: "owner_user_id", label: "Owner", sortable: false, filterable: false, editable: true, defaultWidth: 140 },
   { key: "note_count", label: "Notes", sortable: false, filterable: false, editable: false, defaultWidth: 90, numeric: true },
+  // Engagement Hub, Feature 1. NOT sortable or filterable: it is computed per
+  // page in crm_service.followup_status_for_leads, not a column the server can
+  // ORDER BY, and offering a sort the backend cannot honour would silently do
+  // nothing. Never editable -- it is derived state, and the way to change it
+  // is to send the follow-up, not to retype the badge.
+  { key: "followup_status", label: "Follow-up", sortable: false, filterable: false, editable: false, defaultWidth: 130 },
   { key: "source", label: "Source", sortable: true, filterable: true, editable: false, defaultWidth: 120 },
   { key: "created_at", label: "Created", sortable: true, filterable: false, editable: false, defaultWidth: 140 },
 ];

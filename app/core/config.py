@@ -206,6 +206,38 @@ class Settings(BaseSettings):
     RATE_LIMIT_WA_TEMPLATES: int = 20
     """Max POST /whatsapp/templates/generate calls per user per hour. Default: 20."""
 
+    RATE_LIMIT_PUBLIC_BOOKING: int = 30
+    """Max public booking-page writes per IP per hour (Engagement Hub).
+
+    Scoped to the IP, not a user, because there is no user: POST
+    /calendar/booking-pages/{slug}/book is the one write in this API that an
+    unauthenticated stranger can make. Without a limit, a booking page is a
+    free way to fill a founder's calendar with junk and their inbox with
+    confirmation emails sent from OUR domain -- a deliverability problem as
+    much as a nuisance.
+
+    30/hour is loose for a human (who books once) and tight for a script. The
+    slots endpoint is NOT limited by this: it is a read, it is what the page
+    calls on every date click, and limiting it would break the booking flow
+    for a person who is simply browsing dates.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
+    RATE_LIMIT_CALENDAR_WRITE: int = 300
+    """Max authenticated calendar/meeting writes per user per hour.
+
+    Sized like RATE_LIMIT_CRM_WRITE and for the same reason -- these are rows
+    in PostgreSQL, not external spend -- but half of it, because the traffic
+    is a person editing availability and typing meeting notes rather than
+    working through a grid of five thousand leads. The meeting-notes autosave
+    fires at most once every 10 seconds per open meeting, which is 360/hour
+    for somebody in back-to-back calls all day; the two ceilings that matter
+    are set above that.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
     RATE_LIMIT_CRM_WRITE: int = 600
     """Max CRM write calls per user per hour (M9). Default: 600.
 

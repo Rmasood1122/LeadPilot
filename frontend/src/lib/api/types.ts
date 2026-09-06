@@ -341,6 +341,13 @@ export interface SequenceStepOut {
   channel?: "email" | "whatsapp" | null;
   whatsapp_kind?: "template" | "text" | null;
   whatsapp_template_id?: string | null;
+  /** Engagement Hub, Feature 1. NOT the same timer as delay_days:
+   *  delay_days waits after this step SENDS before the next one is
+   *  scheduled, while these govern what happens when the lead never replies
+   *  to this step at all. Optional so a response from a backend that predates
+   *  migration 0020 still parses. */
+  followup_enabled?: boolean;
+  followup_delay_hours?: number;
 }
 
 export interface SequenceOut {
@@ -540,7 +547,23 @@ export interface CrmGridRow {
   owner_user_id: string | null;
   priority: string | null;
   next_action_at: string | null;
+  /** Engagement Hub, Feature 1. Computed server-side (crm_service
+   *  ::followup_status_for_leads) from the lead's messages, outcomes and the
+   *  followup_delay_hours of the step that last sent — none of which the row
+   *  itself carries, which is why it is not derived in the grid. */
+  followup_status: FollowupStatus;
 }
+
+/** "due" is the one that matters: contacted, past its step's follow-up
+ *  window, and nothing queued. It is exactly the population the
+ *  check_followup_due sweep picks up, computed the same way, so the badge and
+ *  the automation cannot disagree about who is overdue. */
+export type FollowupStatus =
+  | "replied"
+  | "scheduled"
+  | "due"
+  | "waiting"
+  | "none";
 
 export interface CrmGridPage {
   items: CrmGridRow[];

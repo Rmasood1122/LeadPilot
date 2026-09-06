@@ -143,10 +143,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
           user hitting /support/chat would just collect 403s. */}
       <ChatWidget />
 
-      {/* Bottom tabs (mobile) */}
+      {/* Bottom tabs (mobile).
+
+          HORIZONTALLY SCROLLABLE since the Engagement Hub added Calendar and
+          Meetings. With `flex-1` and nine items a 360px phone gives each tab
+          40px, which is below the 44px minimum touch target on every platform
+          guideline and puts two labels on top of each other. Each tab now has
+          a 4.5rem basis and does not shrink, so on a narrow phone the bar
+          scrolls and every tab stays tappable, while on a wider one they grow
+          to fill the width exactly as before.
+
+          Scrolling was chosen over dropping items into an overflow menu:
+          every entry here is a top-level destination, and hiding two of them
+          behind a "more" button on the platform where the product is most
+          often opened is a worse answer than a bar you can swipe. */}
       <nav
         aria-label="Main navigation"
-        className="no-print fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-card md:hidden"
+        className="no-print fixed inset-x-0 bottom-0 z-10 flex overflow-x-auto border-t border-border bg-card md:hidden"
       >
         {NAV.map(({ href, label, icon: Icon }) => (
           <Link
@@ -154,7 +167,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             href={href}
             aria-current={pathname.startsWith(href) ? "page" : undefined}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]",
+              "flex flex-1 shrink-0 basis-[4.5rem] flex-col items-center gap-0.5 py-2 text-[10px]",
               pathname.startsWith(href)
                 ? "text-[rgb(var(--primary))]"
                 : "text-muted-foreground",

@@ -42,6 +42,7 @@ from app.db.models import (
 )
 from app.integrations.outreach_base import OutboundMessage, OutreachChannel
 from app.services import sequence_engine as engine
+from app.services import message_personalization as personalization
 from app.services.message_personalization import (
     preview_whatsapp_body,
     render_message,
@@ -128,7 +129,17 @@ def dispatch_due_messages_impl(session: Session, now: datetime | None = None,
 
 def send_message_impl(session: Session, message_id: uuid.UUID,
                       channel: OutreachChannel | None = None,
-                      now: datetime | None = None) -> str:
+                      now: datetime | None = None,
+                      outcome_source: str | None = None) -> str:
+    """Send one message, re-checking every compliance gate at send time.
+
+    `outcome_source` tags the OutcomeEvent.SENT row this writes with WHY the
+    send happened. It is None for the ordinary scheduled path (whose outcome
+    meta stays byte-identical to what M3 wrote, so the learning loop's
+    existing aggregates are untouched) and "auto_followup" when Feature 1's
+    sweep drove it -- which is what makes an automatic send distinguishable
+    from a sequenced one in the audit trail and in the learning loop.
+    """
     now = now or _now()
     message = session.get(Message, message_id)
     if message is None:
@@ -297,10 +308,13 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     message.sent_at = now
     message.provider_message_id = result.provider_message_id
     message.thread_ref = result.thread_ref
+    sent_meta = {"step_no": message.step_no, "variant": message.variant}
+    if outcome_source:
+        sent_meta["source"] = outcome_source
     session.add(Outcome(lead_id=lead.id, message_id=message.id,
                         event=OutcomeEvent.SENT,
                         channel=message.channel.value,
-                        meta_json={"step_no": message.step_no, "variant": message.variant}))
+                        meta_json=sent_meta))
     if lead.status in (LeadStatus.VERIFIED, LeadStatus.FLAGGED):
         lead.status = LeadStatus.CONTACTED
     session.commit()
@@ -658,5 +672,313 @@ def poll_replies() -> int:
             except Exception:
                 logger.exception("reply polling failed for account %s", account.id)
         return total
+    finally:
+        session.close()
+
+
+# --------------------------------------------------------------------------
+# Engagement Hub, Feature 1 — automated follow-up
+# --------------------------------------------------------------------------
+#
+# WHAT THIS DOES THAT THE SEQUENCE ENGINE DOES NOT
+# schedule_next_step already queues step N+1 the moment step N sends, on the
+# step's `delay_days` timer. That covers the happy path completely, and this
+# sweep must not fire for it -- two systems scheduling the same follow-up is
+# how a prospect receives the same message twice.
+#
+# So the sweep's central guard is: SKIP ANY ENROLLMENT THAT ALREADY HAS A
+# PENDING MESSAGE. What is left is the population the engine currently drops
+# on the floor:
+#
+#   * a send that failed permanently (status FAILED) -- the enrollment stays
+#     ACTIVE with nothing queued behind it, forever;
+#   * a WhatsApp step that fell to NEEDS_TEMPLATE because the 24h window
+#     closed or a template lost approval -- documented, expected, and
+#     currently terminal for that lead;
+#   * a step deleted or renumbered after its message was scheduled.
+#
+# In each case a real prospect was contacted, said nothing, and the system
+# quietly stopped. That is what this fixes.
+#
+# ENROLLMENT STATUS: ACTIVE ONLY.
+# COMPLETED enrollments (every step sent, no reply) are deliberately out of
+# scope. Sweeping them would auto-DM every lead who ever finished a sequence,
+# on every sweep, with no upper bound on how many follow-ups one lead
+# receives -- a mass-send this system has no user-facing control for. If that
+# behaviour is wanted it needs its own cap, its own opt-in and its own row in
+# the compliance story.
+#
+# IDEMPOTENCY IS TWO LAYERS, NOT ONE.
+# The Redis lock (followup:{enrollment_id}:{step_no}, 2h TTL) stops two
+# workers acting on the same overdue enrollment. The message row's own
+# SCHEDULED -> SENDING claim in send_message_impl stops a double transmit if
+# the lock ever fails open (Redis down). The lock is an optimisation for the
+# common case; the claim is the guarantee.
+
+FOLLOWUP_LOCK_PREFIX = "followup:"
+
+# How far into the future an auto follow-up message is dated when it is
+# created. It is NOT a delay: send_followup_impl transmits it immediately in
+# the same task, and send_message_impl does not look at scheduled_at.
+#
+# It exists so the 60-second beat dispatcher cannot claim the row in the
+# window between INSERT and send. If it did, the message would still send
+# exactly once (the SENDING claim guarantees that) but it would be sent by the
+# generic path, and the OutcomeEvent would be written without
+# source="auto_followup" -- so the audit trail would lose the one fact that
+# says this send was automatic.
+_FOLLOWUP_DISPATCH_GUARD = timedelta(minutes=5)
+
+
+def _followup_lock_key(enrollment_id, step_no: int) -> str:
+    return f"{FOLLOWUP_LOCK_PREFIX}{enrollment_id}:{step_no}"
+
+
+def _acquire_followup_lock(enrollment_id, step_no: int) -> bool:
+    """SET NX EX. True when this caller owns the follow-up.
+
+    FAILS OPEN. If Redis is unreachable this returns True and the send goes
+    ahead protected only by the message row's SENDING claim. The alternative
+    -- failing closed -- means a Redis outage silently stops every follow-up
+    in the product with nothing surfacing that it has, which is a worse
+    failure than the one it would be preventing.
+    """
+    try:
+        from app.core.redis_client import get_sync_redis  # noqa: PLC0415
+
+        return bool(get_sync_redis().set(
+            _followup_lock_key(enrollment_id, step_no), "1",
+            nx=True, ex=settings.followup_lock_ttl_seconds,
+        ))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("follow-up lock unavailable (%s) — relying on the "
+                       "message SENDING claim for enrollment %s step %s",
+                       exc, enrollment_id, step_no)
+        return True
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    """SQLite returns naive datetimes for timestamptz columns; PostgreSQL does
+    not. Every value in those columns is UTC, so this restates that rather
+    than converting -- without it the arithmetic below raises on SQLite only,
+    i.e. in the test suite and nowhere else."""
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+def _last_sent_message(session: Session, enrollment: SequenceEnrollment) -> Message | None:
+    return session.execute(
+        select(Message)
+        .where(Message.sequence_id == enrollment.sequence_id,
+               Message.lead_id == enrollment.lead_id,
+               Message.status == MessageStatus.SENT)
+        .order_by(Message.step_no.desc(), Message.sent_at.desc())
+    ).scalars().first()
+
+
+def _has_pending_message(session: Session, enrollment: SequenceEnrollment) -> bool:
+    return session.execute(
+        select(Message.id).where(
+            Message.sequence_id == enrollment.sequence_id,
+            Message.lead_id == enrollment.lead_id,
+            Message.status.in_([MessageStatus.SCHEDULED, MessageStatus.SENDING]),
+        ).limit(1)
+    ).scalars().first() is not None
+
+
+def _replied_since(session: Session, lead_id, since: datetime | None) -> bool:
+    """Has this lead replied since the last message went out?
+
+    Scoped by time rather than "has ever replied", because a lead can reply to
+    one campaign and be legitimately enrolled in another later. `outcomes` has
+    no enrollment_id to filter on -- it is keyed on lead and message -- so the
+    send time of the message we are following up is the boundary that makes
+    the question answerable.
+    """
+    query = select(Outcome.id).where(Outcome.lead_id == lead_id,
+                                     Outcome.event == OutcomeEvent.REPLIED)
+    if since is not None:
+        query = query.where(Outcome.ts >= since)
+    return session.execute(query.limit(1)).scalars().first() is not None
+
+
+def _step_for(session: Session, sequence_id, step_no: int):
+    from app.db.models import SequenceStep  # noqa: PLC0415
+
+    return session.execute(
+        select(SequenceStep).where(SequenceStep.sequence_id == sequence_id,
+                                   SequenceStep.step_no == step_no)
+    ).scalars().first()
+
+
+def check_followup_due_impl(session: Session, now: datetime | None = None,
+                            enqueue=None) -> list[tuple[str, int]]:
+    """Find enrollments whose last message has gone unanswered past its step's
+    follow-up window. Returns the (enrollment_id, step_no) pairs enqueued.
+
+    `step_no` is the step the follow-up WILL send: last_sent + 1. It is part
+    of the lock key, so a lead can receive step 3's follow-up after step 2's
+    without the second being mistaken for a retry of the first.
+    """
+    now = now or _now()
+    enqueue = enqueue or (lambda eid, step: send_followup_task.delay(eid, step))
+
+    enrollments = session.execute(
+        select(SequenceEnrollment).where(
+            SequenceEnrollment.status == EnrollmentStatus.ACTIVE
+        )
+    ).scalars().all()
+
+    due: list[tuple[str, int]] = []
+    for enrollment in enrollments:
+        # The guard that keeps this out of the sequence engine's way. See the
+        # section comment above.
+        if _has_pending_message(session, enrollment):
+            continue
+
+        last = _last_sent_message(session, enrollment)
+        if last is None or last.sent_at is None:
+            continue
+
+        step = _step_for(session, enrollment.sequence_id, last.step_no)
+        if step is not None and not step.followup_enabled:
+            continue
+        delay_hours = step.followup_delay_hours if step is not None else 72
+
+        sent_at = _aware(last.sent_at)
+        if now - sent_at < timedelta(hours=delay_hours):
+            continue
+        if _replied_since(session, enrollment.lead_id, sent_at):
+            continue
+
+        # A campaign the user paused sends nothing, automatic or not. Checked
+        # here as well as in send_message_impl so a paused campaign does not
+        # burn a lock and a task per sweep.
+        lead = session.get(Lead, enrollment.lead_id)
+        strategy = session.get(Strategy, lead.strategy_id) if lead else None
+        if strategy is None or strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
+            continue
+
+        next_step_no = last.step_no + 1
+        enqueue(str(enrollment.id), next_step_no)
+        due.append((str(enrollment.id), next_step_no))
+
+    return due
+
+
+def send_followup_impl(session: Session, enrollment_id: uuid.UUID, step_no: int,
+                       now: datetime | None = None) -> str:
+    """Send one automatic follow-up. Idempotent; safe to call twice.
+
+    Two shapes, decided by whether the sequence has a step `step_no`:
+      * IT DOES  -- schedule that step's message and send it now. This is the
+        stalled-sequence recovery: the step exists, its message failed or was
+        never created, and this puts the lead back on the rails.
+      * IT DOES NOT -- generate a follow-up brief from the lead's own history
+        (message_personalization.build_followup_brief) and send it as step
+        `step_no` on the same channel as the last message. The message row
+        carries the generated brief as its `template`, so the ordinary render
+        path personalizes it at send time exactly like a human-written step.
+    """
+    now = now or _now()
+    enrollment = session.get(SequenceEnrollment, enrollment_id)
+    if enrollment is None:
+        return "missing"
+    if enrollment.status is not EnrollmentStatus.ACTIVE:
+        return f"skipped_{enrollment.status.value}"
+    if _has_pending_message(session, enrollment):
+        # The engine scheduled something between the sweep and now.
+        return "skipped_already_pending"
+
+    if not _acquire_followup_lock(enrollment_id, step_no):
+        return "locked"
+
+    last = _last_sent_message(session, enrollment)
+    if last is None or last.sent_at is None:
+        return "no_prior_send"
+    if _replied_since(session, enrollment.lead_id, _aware(last.sent_at)):
+        return "skipped_replied"
+
+    lead = session.get(Lead, enrollment.lead_id)
+    sequence = session.get(Sequence, enrollment.sequence_id)
+    strategy = session.get(Strategy, lead.strategy_id)
+    if strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
+        return "campaign_paused"
+
+    step = _step_for(session, enrollment.sequence_id, step_no)
+    if step is not None:
+        channel = step.effective_channel(sequence)
+        template = step.template
+        variant = step.variant
+        whatsapp_kind = step.whatsapp_kind
+        whatsapp_template_id = step.whatsapp_template_id
+        mode = "sequence_step"
+    else:
+        # The auto-DM fallback. Same channel as the last message: a lead who
+        # has only ever been emailed should not suddenly receive a WhatsApp
+        # message from an automation, and the opt-in state that would make
+        # that legal is a decision a human makes, not a fallback.
+        channel = last.channel
+        if channel is ChannelType.WHATSAPP:
+            # A cold WhatsApp message requires an approved template, and there
+            # is no step to name one. Generating free-form copy here would
+            # either be blocked by the adapter's compliance guard or, worse,
+            # sent inside a window the lead did not open. Email-only fallback.
+            logger.info("no auto follow-up for enrollment %s: last channel was "
+                        "WhatsApp and a generated follow-up has no approved "
+                        "template", enrollment_id)
+            return "skipped_whatsapp_needs_template"
+        template = personalization.build_followup_brief(
+            session, strategy, lead, channel=channel.value
+        )
+        variant = last.variant
+        whatsapp_kind = None
+        whatsapp_template_id = None
+        mode = "auto_dm"
+
+    message = Message(
+        sequence_id=enrollment.sequence_id,
+        lead_id=lead.id,
+        channel=channel,
+        step_no=step_no,
+        template=template,
+        variant=variant,
+        whatsapp_kind=whatsapp_kind,
+        whatsapp_template_id=whatsapp_template_id,
+        status=MessageStatus.SCHEDULED,
+        # See _FOLLOWUP_DISPATCH_GUARD: keeps the beat dispatcher off this row
+        # for the moment it takes to send it here. Not a delay.
+        scheduled_at=now + _FOLLOWUP_DISPATCH_GUARD,
+    )
+    session.add(message)
+    session.commit()
+
+    result = send_message_impl(session, message.id, now=now,
+                               outcome_source="auto_followup")
+    logger.info("auto follow-up (%s) for enrollment %s step %s: %s",
+                mode, enrollment_id, step_no, result)
+    return result
+
+
+@celery_app.task(name="leadpilot.outreach.check_followup_due")
+def check_followup_due() -> int:
+    session = SessionLocal()
+    try:
+        return len(check_followup_due_impl(session))
+    finally:
+        session.close()
+
+
+@celery_app.task(name="leadpilot.outreach.send_followup", bind=True, max_retries=3)
+def send_followup_task(self, enrollment_id: str, step_no: int) -> str:
+    session = SessionLocal()
+    try:
+        return send_followup_impl(session, uuid.UUID(enrollment_id), int(step_no))
+    except Exception as exc:
+        session.rollback()
+        logger.exception("auto follow-up failed for enrollment %s step %s — "
+                         "retrying", enrollment_id, step_no)
+        raise self.retry(exc=exc, countdown=300)
     finally:
         session.close()

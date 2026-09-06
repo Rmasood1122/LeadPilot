@@ -115,6 +115,13 @@ class FakeClaude:
         # test can simulate the API being down without patching anything else.
         self.support_response: object | None = None
         self.support_prompts: list[str] = []
+        # Engagement Hub. Same contract as support_response: a dict is
+        # returned verbatim, an Exception instance is raised, so a test can
+        # simulate the model being unavailable without patching anything else.
+        self.meeting_summary_response: object | None = None
+        self.meeting_prompts: list[str] = []
+        self.followup_brief_response: object | None = None
+        self.followup_prompts: list[str] = []
         self.default_reply_class = "interested"
         self.pattern_result = {
             "industry": "fire protection",
@@ -151,6 +158,33 @@ class FakeClaude:
             return {"on_topic": True, "confidence": 0.9,
                     "answer": "LeadPilot runs a 72-step research pipeline.",
                     "faq_ids": ["what-is-leadpilot"]}
+        if "meeting analyst" in system:  # Engagement Hub, Feature 3
+            self.meeting_prompts.append(prompt)
+            if isinstance(self.meeting_summary_response, Exception):
+                raise self.meeting_summary_response
+            if self.meeting_summary_response is not None:
+                return self.meeting_summary_response
+            return {
+                "summary": "They walked through their onboarding backlog.",
+                "key_points": ["Two-week onboarding backlog",
+                               "Budget approved for Q4"],
+                "action_items": [
+                    {"text": "Send the pricing sheet", "owner": "us",
+                     "due": None},
+                    {"text": "Introduce us to their ops lead",
+                     "owner": "client", "due": None},
+                ],
+                "next_steps": ["Follow up Thursday"],
+                "sentiment": "positive",
+            }
+        if "follow-up brief writer" in system:  # Engagement Hub, Feature 1
+            self.followup_prompts.append(prompt)
+            if isinstance(self.followup_brief_response, Exception):
+                raise self.followup_brief_response
+            if self.followup_brief_response is not None:
+                return self.followup_brief_response
+            return {"brief": "Re-open on their onboarding backlog and ask "
+                             "which team owns it today."}
         if "sales analyst" in system:  # pattern recognition
             return dict(self.pattern_result)
         if "personalization engine" in system:  # M3 message rendering
@@ -204,6 +238,7 @@ def fake_claude(monkeypatch):
         "app.services.pattern_recognition.get_client",
         "app.services.icp_extraction.get_client",
         "app.services.message_personalization.get_client",
+        "app.services.meeting_ai.get_client",
         "app.services.reply_classification.get_client",
         "app.services.whatsapp_templates.get_client",
         # Feature 3 reaches get_client through the MODULE at call time

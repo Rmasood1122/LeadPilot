@@ -216,6 +216,56 @@ class Settings(BaseSettings):
     # instead of needing a code change and a redeploy.
     require_email_verification: bool = True
 
+    # --- Engagement Hub: calendar (Feature 2) -----------------------------
+    # How far ahead a public booking page offers slots. 30 days is the brief's
+    # figure. It is also the width of the window every slot query scans, so it
+    # is the one knob that trades "book me in three months" against the cost
+    # of an unauthenticated request.
+    calendar_slot_days_ahead: int = 30
+    # A slot closer than this is not offered. Without it the page happily
+    # sells the host a call starting in ninety seconds, in a meeting they are
+    # already in, having never seen the notification.
+    calendar_min_notice_minutes: int = 60
+
+    # --- Engagement Hub: meeting platforms (Feature 3) --------------------
+    # Google Calendar / Meet event creation. Deliberately SEPARATE fields from
+    # google_client_id above: that pair is the Gmail send credential, scoped
+    # to gmail.send, and a calendar event needs calendar.events. In practice
+    # both usually come from the same Google Cloud project, so an empty value
+    # here falls back to the Gmail pair (see google_meet_client_id below)
+    # rather than failing on a deployment that only ever configured one.
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    zoom_oauth_client_id: str = ""
+    zoom_oauth_client_secret: str = ""
+    # Zoom server-to-server OAuth needs the account id alongside the client
+    # pair; without it the token request is rejected with an opaque 400.
+    zoom_account_id: str = ""
+    # Shared secret on POST /meetings/{id}/transcript. That endpoint is how a
+    # browser extension or a Recall.ai webhook streams transcript chunks in,
+    # and neither can hold a user JWT, so it authenticates by HMAC over the
+    # body instead. EMPTY MEANS THE ENDPOINT IS CLOSED -- it answers 503
+    # rather than accepting unauthenticated writes to a meeting transcript.
+    meeting_recording_webhook_secret: str = ""
+    # Output ceiling for one meeting summary. Larger than the support chat's
+    # 1024 because this call returns five structured fields over a full
+    # transcript, and a truncated summary is a summary with the action items
+    # missing -- see anthropic_client.TruncatedResponseError.
+    meeting_ai_max_tokens: int = 4096
+
+    # --- Engagement Hub: automated follow-up (Feature 1) ------------------
+    # How often check_followup_due sweeps for enrollments whose last message
+    # has gone unanswered past its step's followup_delay_hours. 30 minutes is
+    # the brief's figure: the delays it enforces are measured in days, so a
+    # finer sweep buys nothing and a coarser one makes a 24h setting land
+    # anywhere in a wide band.
+    followup_sweep_interval_seconds: int = 1800
+    # TTL on the Redis idempotency lock a follow-up send takes. Two hours: far
+    # longer than any send can take, far shorter than the shortest useful
+    # follow-up delay, so a crashed worker's lock cannot survive to block the
+    # next legitimate attempt.
+    followup_lock_ttl_seconds: int = 7200
+
     # --- Pipeline engine -------------------------------------------------
     pipeline_step_timeout_seconds: int = 300
     # Verification loop: max fix→re-run attempts per pass before the

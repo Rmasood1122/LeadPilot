@@ -199,3 +199,140 @@ def preview_whatsapp_body(template_body: str, values: dict[str, str]) -> str:
     for n, v in values.items():
         out = out.replace("{{%s}}" % n, v)
     return out
+
+
+# --------------------------------------------------------------------------
+# Engagement Hub, Feature 1 — the auto follow-up brief
+# --------------------------------------------------------------------------
+#
+# WHY THIS RETURNS A BRIEF AND NOT A FINISHED MESSAGE
+# Every message in this system is a two-stage thing: a sequence step holds a
+# BRIEF ("open on their hiring post, ask one question about onboarding"), and
+# render_message above turns the brief plus the lead's data plus the strategy's
+# messaging playbook into the copy that actually sends. That split is what lets
+# the send path re-render at send time, after the compliance gates, with the
+# playbook as it stands today.
+#
+# An auto follow-up that produced finished copy here would sit outside all of
+# that: it would be written hours before it sends, against whatever the
+# playbook said then, and it would bypass the personalization scoring and the
+# compliant-email assembly that only run on the render path. So this generates
+# the missing BRIEF -- the thing a human would have written as step N+1 -- and
+# the ordinary send path does the rest.
+#
+# It costs one extra model call per auto follow-up. That is the price of the
+# follow-up being indistinguishable from a step somebody wrote.
+
+_FOLLOWUP_SYSTEM = (
+    "You are LeadPilot's follow-up brief writer. A prospect was contacted and "
+    "has not replied. You write the BRIEF for the next touch -- instructions "
+    "to the message writer, not the message itself. Respond with ONLY a JSON "
+    'object: {"brief": "..."} -- no prose, no markdown fences.\n'
+    "RULES. The brief is 1-3 sentences. It must name the angle to take and "
+    "the single question to ask. It must be grounded ONLY in the history and "
+    "product brief given -- never invent a trigger event, a mutual "
+    "connection, a statistic or a deadline. Do not suggest guilt, urgency, "
+    "'just bumping this to the top of your inbox', 'circling back', or any "
+    "reference to the prospect not having replied. Assume they never saw the "
+    "first message."
+)
+
+_FOLLOWUP_PROMPT = """WHAT WAS SENT BEFORE (most recent last):
+{history}
+
+WHAT THIS PROSPECT HAS DONE (outcome log):
+{outcomes}
+
+WHAT WE SELL:
+{product}
+
+MESSAGING PLAYBOOK (strategy research, phase 6):
+{playbook}
+
+LEAD:
+- Name: {full_name}
+- Title: {title}
+- Company: {company}
+
+CHANNEL FOR THIS FOLLOW-UP: {channel}
+
+Write the brief for the next touch now."""
+
+# Used when the model call fails. A generic brief still produces a message the
+# render path will personalize from real lead data, which is a far better
+# outcome than a follow-up that silently never sends because Anthropic was
+# briefly down.
+FALLBACK_FOLLOWUP_BRIEF = (
+    "Short, friendly follow-up on the previous message. Restate the single "
+    "most relevant benefit for this company in one line and ask one specific, "
+    "easy-to-answer question. No pressure, no reference to them not replying."
+)
+
+
+def build_followup_brief(
+    session: Session,
+    strategy: Strategy,
+    lead: Lead,
+    *,
+    channel: str = "email",
+    max_history: int = 3,
+) -> str:
+    """The brief for an automatic follow-up, from this lead's actual history.
+
+    Never raises. A follow-up whose brief could not be generated falls back to
+    FALLBACK_FOLLOWUP_BRIEF rather than failing the send: the render path will
+    still personalize it against the lead's real data and the playbook, so the
+    degraded case is a less specific message, not a wrong one and not a
+    missing one.
+    """
+    from app.db.models import Message, Outcome, Product  # noqa: PLC0415
+
+    sent = session.execute(
+        select(Message)
+        .where(Message.lead_id == lead.id, Message.body.isnot(None))
+        .order_by(Message.step_no)
+    ).scalars().all()[-max_history:]
+    history = "\n\n".join(
+        f"[step {m.step_no}, {m.channel.value if m.channel else '?'}] "
+        f"{(m.subject or '').strip()}\n{(m.body or '').strip()[:600]}"
+        for m in sent
+    ) or "(nothing on file — treat this as a first touch)"
+
+    events = session.execute(
+        select(Outcome)
+        .where(Outcome.lead_id == lead.id)
+        .order_by(Outcome.ts)
+    ).scalars().all()[-12:]
+    outcomes = ", ".join(
+        f"{o.event.value if o.event else '?'}"
+        f"({o.channel}{', ' + o.ts.date().isoformat() if o.ts else ''})"
+        for o in events
+    ) or "(no recorded activity)"
+
+    product = session.get(Product, strategy.product_id)
+    product_brief = (
+        f"{product.name} — {product.description or ''}".strip(" —")
+        if product is not None else "(no product on file)"
+    )
+
+    try:
+        data = get_client().complete_json(
+            system=_FOLLOWUP_SYSTEM,
+            prompt=_FOLLOWUP_PROMPT.format(
+                history=history[:6000],
+                outcomes=outcomes,
+                product=product_brief[:1000],
+                playbook=_playbook(session, strategy)[:4000],
+                full_name=lead.full_name or "there",
+                title=lead.title or "unknown",
+                company=lead.company or "their company",
+                channel=channel,
+            ),
+        )
+        brief = str((data or {}).get("brief") or "").strip()
+    except Exception as exc:  # noqa: BLE001 — see the docstring
+        logger.warning("follow-up brief generation failed for lead %s: %s: %s",
+                       lead.id, type(exc).__name__, exc)
+        brief = ""
+
+    return brief[:2000] or FALLBACK_FOLLOWUP_BRIEF

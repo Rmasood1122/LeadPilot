@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "comment": [
+    "Engagement Hub, Feature 2. This file exists for ONE reason: to make the",
+    "public booking link /book/<slug> work on a static export.",
+    "",
+    "next.config.js sets output: 'export' (it is what Capacitor bundles into",
+    "the APK), so Next can only emit routes it can enumerate at build time. A",
+    "[slug] segment needs generateStaticParams, and booking slugs are created",
+    "by users after the build, so the route is a single static page that reads",
+    "the slug from the URL instead (src/app/book/page.tsx).",
+    "",
+    "This rewrite is what lets that page answer /book/intro-call/ rather than",
+    "only /book/?slug=intro-call. Both forms work; this one is the link people",
+    "actually paste into an email. Without this file the query form still",
+    "works, so a deployment on another host degrades rather than breaking.",
+    "",
+    "Deliberately narrow: only /book/* is rewritten. A catch-all would swallow",
+    "genuine 404s across the whole app."
+  ],
+  "rewrites": [
+    { "source": "/book/:slug", "destination": "/book/" },
+    { "source": "/book/:slug/", "destination": "/book/" }
+  ]
+}

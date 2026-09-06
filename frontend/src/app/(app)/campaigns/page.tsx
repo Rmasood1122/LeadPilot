@@ -5,8 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listStrategies } from "@/lib/api/strategies";
 import { useCampaign, useSequences, useTemplates } from "@/lib/api/hooks";
 import { pauseCampaign, resumeCampaign, generateTemplates,
-         submitTemplate, syncTemplate, createTemplate, updateTemplate } from "@/lib/api/campaigns";
-import type { StrategyOut, TemplateOut } from "@/lib/api/types";
+         submitTemplate, syncTemplate, createTemplate, updateTemplate,
+         updateFollowupSettings } from "@/lib/api/campaigns";
+import type { SequenceOut, SequenceStepOut, StrategyOut, TemplateOut } from "@/lib/api/types";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -259,15 +260,107 @@ function TemplatesPanel({ strategyId }: { strategyId: string }) {
 }
 
 // --------------------------------------------------------------------------
-// Sequence viewer
+// Sequence viewer + per-step follow-up settings (Engagement Hub, Feature 1)
 // --------------------------------------------------------------------------
+
+/** The toggle and delay for ONE step's automatic follow-up.
+ *
+ *  WHY THE COPY LABOURS THE DIFFERENCE FROM delay_days: they are two timers on
+ *  the same row, and confusing them produces exactly the wrong behaviour.
+ *  `delay_days` is "wait this long after this step sends, then send the next
+ *  one", and it runs whatever the lead does. This is "the lead never replied
+ *  to this step - now what", and it is the only one of the two that can fire
+ *  on a sequence that has otherwise stalled.
+ *
+ *  Saved on toggle and on blur rather than behind a Save button: two controls
+ *  with their own Save is more chrome than the setting deserves, and the
+ *  failure case is visible - a toast, and the values revert. */
+function FollowupSettings({
+  sequenceId,
+  step,
+}: {
+  sequenceId: string;
+  step: SequenceStepOut;
+}) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [enabled, setEnabled] = useState(step.followup_enabled ?? true);
+  const [hours, setHours] = useState(String(step.followup_delay_hours ?? 72));
+
+  const save = useMutation({
+    mutationFn: (settings: { enabled?: boolean; delay_hours?: number }) =>
+      updateFollowupSettings(sequenceId, step.step_no, settings),
+    onSuccess: (result) => {
+      // Trust the server's echo rather than the local state: it applies the
+      // 1..2160 clamp, so a value the input allowed and the API rejected does
+      // not stay on screen looking saved.
+      setEnabled(result.followup_enabled);
+      setHours(String(result.followup_delay_hours));
+      qc.invalidateQueries({ queryKey: ["sequences"] });
+    },
+    onError: (e) => {
+      setEnabled(step.followup_enabled ?? true);
+      setHours(String(step.followup_delay_hours ?? 72));
+      toast((e as Error).message, "error");
+    },
+  });
+
+  const commitHours = () => {
+    const parsed = Number(hours);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      setHours(String(step.followup_delay_hours ?? 72));
+      return;
+    }
+    if (parsed === (step.followup_delay_hours ?? 72)) return;
+    save.mutate({ delay_hours: Math.round(parsed) });
+  };
+
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-3 rounded border border-border/60 bg-muted/30 px-2 py-1.5">
+      <label className="flex items-center gap-1.5 text-xs">
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={save.isPending}
+          onChange={(e) => {
+            setEnabled(e.target.checked);
+            save.mutate({ enabled: e.target.checked });
+          }}
+          aria-label={"Automatic follow-up for step " + step.step_no}
+          className="h-3.5 w-3.5 accent-[rgb(var(--primary))]"
+        />
+        Auto follow-up
+      </label>
+
+      <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        after
+        <input
+          type="number"
+          min={1}
+          max={2160}
+          value={hours}
+          disabled={!enabled || save.isPending}
+          onChange={(e) => setHours(e.target.value)}
+          onBlur={commitHours}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+          aria-label={"Follow-up delay in hours for step " + step.step_no}
+          className="h-7 w-16 rounded border border-border bg-card px-2 text-xs tabular-nums disabled:opacity-50"
+        />
+        hours of silence
+      </label>
+    </div>
+  );
+}
+
 function SequencesPanel({ strategyId }: { strategyId: string }) {
   const { data, isLoading, error } = useSequences(strategyId);
   return (
     <AsyncState isLoading={isLoading} error={error}
                 empty={!data?.length} emptyLabel="No sequences configured.">
       <div className="space-y-2">
-        {data?.map(seq => (
+        {data?.map((seq: SequenceOut) => (
           <Card key={seq.id}>
             <CardHeader className="flex-row items-center justify-between">
               <CardTitle className="text-sm">{seq.name}</CardTitle>
@@ -277,21 +370,29 @@ function SequencesPanel({ strategyId }: { strategyId: string }) {
               </div>
             </CardHeader>
             <CardContent>
-              <ol className="space-y-1 text-xs text-muted-foreground">
-                {seq.steps.map(s => (
+              <ol className="space-y-2 text-xs text-muted-foreground">
+                {seq.steps.map((s) => (
                   <li key={s.step_no} className="flex items-start gap-2">
                     <span className="w-5 shrink-0 font-medium text-foreground">
                       {s.step_no}.
                     </span>
-                    <span>
-                      {s.channel ?? seq.channel}
-                      {s.whatsapp_kind ? ` (${s.whatsapp_kind})` : ""}
-                      {s.delay_days > 0 ? ` — +${s.delay_days}d` : " — day 0"}
-                      {s.variant !== "A" ? ` [${s.variant}]` : ""}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span>
+                        {s.channel ?? seq.channel}
+                        {s.whatsapp_kind ? " (" + s.whatsapp_kind + ")" : ""}
+                        {s.delay_days > 0 ? " — +" + s.delay_days + "d" : " — day 0"}
+                        {s.variant !== "A" ? " [" + s.variant + "]" : ""}
+                      </span>
+                      <FollowupSettings sequenceId={seq.id} step={s} />
+                    </div>
                   </li>
                 ))}
               </ol>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                The step delay above schedules the NEXT step once this one
+                sends. Auto follow-up is separate: it fires when this step gets
+                no reply and nothing else is queued for that lead.
+              </p>
             </CardContent>
           </Card>
         ))}

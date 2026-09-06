@@ -24,7 +24,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, StickyNote } from "lucide-react";
 
-import type { CrmGridRow, CrmTag, LeadStatus } from "@/lib/api/types";
+import type {
+  CrmGridRow,
+  CrmTag,
+  FollowupStatus,
+  LeadStatus,
+} from "@/lib/api/types";
 import {
   type CellCursor,
   type GridAction,
@@ -507,6 +512,10 @@ function GridCell({
     return <TagCell tags={row.tags} />;
   }
 
+  if (columnKey === "followup_status") {
+    return <FollowupCell status={row.followup_status} />;
+  }
+
   if (columnKey === "note_count") {
     return (
       <button
@@ -570,6 +579,37 @@ function GridCell({
     >
       {text}
     </span>
+  );
+}
+
+/** Engagement Hub, Feature 1 — the follow-up badge.
+ *
+ *  Five states, three of which the user acts on. "waiting" and "none" render
+ *  as a dash rather than a badge: a grid where every row is wearing a chip is
+ *  a grid where the chips have stopped meaning anything, and neither of those
+ *  states is something to do. The value is computed server-side (see
+ *  crm_service.followup_status_for_leads) — the row does not carry the
+ *  messages, outcomes and step delays the answer depends on. */
+function FollowupCell({ status }: { status: FollowupStatus }) {
+  const presentation: Partial<
+    Record<FollowupStatus, { label: string; tone: "success" | "warning" | "accent" }>
+  > = {
+    replied: { label: "Replied", tone: "success" },
+    due: { label: "Follow-up due", tone: "warning" },
+    scheduled: { label: "Scheduled", tone: "accent" },
+  };
+  const shown = presentation[status];
+  if (!shown) {
+    return (
+      <span className="text-muted-foreground" title={`Follow-up: ${status}`}>
+        —
+      </span>
+    );
+  }
+  return (
+    <Badge tone={shown.tone} className="truncate">
+      {shown.label}
+    </Badge>
   );
 }
 

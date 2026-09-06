@@ -186,20 +186,59 @@ class TestRevisionChain:
         assert migration.revision == "0019_m9_crm"
         assert migration.down_revision == "0018_tutorial_catalogue"
 
-    def test_no_existing_migration_was_edited_to_point_at_0019(self):
-        """0019 is a leaf. If something else claims it as a parent, the chain
-        has been rewritten -- and rewriting an applied migration is the one
-        thing this repo's migration rules forbid outright."""
+    def test_the_revision_chain_stays_linear(self):
+        """No revision may be claimed as a parent twice, and there must be
+        exactly one head.
+
+        This started life as "0019 is a leaf, nothing may point at it", which
+        was true right up until 0020_followup_delay was written on top of it --
+        as every migration after a head is. Pinning the identity of the current
+        head made the test fail on the one action it should permit (extending
+        the chain) while still passing on the action it exists to forbid
+        (rewriting it), so it now asserts the property directly.
+
+        Two files claiming the same down_revision is a fork: `alembic upgrade
+        head` becomes ambiguous and the deploy fails. Two heads is the same
+        failure seen from the other end.
+        """
+        from collections import Counter
+
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        versions = os.path.join(root, "alembic", "versions")
-        for name in os.listdir(versions):
-            if not name.endswith(".py") or name.startswith("0019"):
-                continue
-            with open(os.path.join(versions, name), encoding="utf-8") as handle:
-                source = handle.read()
-            assert "0019_m9_crm" not in source, (
-                f"{name} references 0019_m9_crm; the head should be a leaf"
-            )
+        # Alembic's own loader, not a regex over the files: revision ids are
+        # declared in several spellings across this directory (bare assignment,
+        # annotated assignment, single quotes), and a regex that misses one
+        # would silently shrink the comparison to the files it happened to
+        # parse -- which is exactly the failure mode this test exists to catch.
+        script = ScriptDirectory.from_config(
+            Config(os.path.join(root, "alembic.ini"))
+        )
+
+        parents: list[str] = []
+        for revision in script.walk_revisions():
+            for down in (revision.down_revision or ()) if isinstance(
+                revision.down_revision, tuple
+            ) else ([revision.down_revision] if revision.down_revision else []):
+                parents.append(down)
+
+        forked = [rev for rev, count in Counter(parents).items() if count > 1]
+        assert not forked, (
+            f"these revisions are claimed as a parent by more than one "
+            f"migration, which forks the chain: {sorted(forked)}"
+        )
+        heads = script.get_heads()
+        assert len(heads) == 1, (
+            f"the chain has {len(heads)} heads ({sorted(heads)}); "
+            f"`alembic upgrade head` is ambiguous with more than one"
+        )
+
+    def test_0019_is_still_in_the_chain(self):
+        """The half of the old test that is still meaningful: 0019 has been
+        applied to real databases, so its position must not be rewritten."""
+        migration = _load_migration()
+        assert migration.down_revision == "0018_tutorial_catalogue"
 
 
 class TestCrmActivityStaysSeparateFromOutcomes:
