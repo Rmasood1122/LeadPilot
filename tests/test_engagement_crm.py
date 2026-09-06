@@ -69,6 +69,22 @@ def enrolled(db_session, verified_strategy, lead):
 
 
 @pytest.fixture()
+def availability_utc(db_session, test_user):
+    """The host's zone comes from their availability rows (_host_timezone).
+    Without one the fallback is UTC anyway, but stating it makes the
+    timezone assertion below test the lookup rather than the fallback."""
+    from datetime import time as _time
+
+    row = m.CalendarAvailability(
+        user_id=test_user.id, day_of_week=0, start_time=_time(9, 0),
+        end_time=_time(17, 0), timezone="UTC", is_active=True,
+    )
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+@pytest.fixture()
 def booking(db_session, test_user, lead):
     page = m.CalendarBookingPage(user_id=test_user.id, slug="intro",
                                  title="Intro call", duration_minutes=30)
@@ -233,6 +249,25 @@ class TestBookingCancelled:
         recipients = {msg["to"] for msg in mailbox}
         assert booking.invitee_email in recipients
         assert test_user.email in recipients
+
+    def test_each_party_is_told_the_time_in_THEIR_zone(
+        self, db_session, booking, mailbox, test_user, availability_utc
+    ):
+        """Caught running the stack locally: the cancellation path computed a
+        single `when` in the invitee's zone and sent it to both, so a host
+        whose calendar said 09:30 UTC was told their "10:30 (Europe/London)"
+        meeting was cancelled. The confirmation path never had this bug."""
+        booking.invitee_timezone = "Asia/Karachi"
+        db_session.commit()
+
+        calendar_tasks.on_booking_cancelled_impl(db_session, booking.id)
+        to_invitee = next(m_ for m_ in mailbox
+                          if m_["to"] == booking.invitee_email)
+        to_host = next(m_ for m_ in mailbox if m_["to"] == test_user.email)
+
+        assert "Asia/Karachi" in to_invitee["text"]
+        assert "(UTC)" in to_host["text"]
+        assert "Asia/Karachi" not in to_host["text"]
 
 
 # --------------------------------------------------------------------------

@@ -262,19 +262,28 @@ def on_booking_cancelled_impl(session: Session, booking_id: uuid.UUID,
         session.commit()
         engine.resume_after_meeting_cancelled(session, lead, now=now)
 
-    when = _format_when(booking.start_at,
-                        booking.invitee_timezone or (_host_timezone(session, page)
-                                                     if page else "UTC"))
+    # ONE TIME PER READER, not one time for both. The confirmation path
+    # (_confirmation_emails) already renders the invitee's zone for the
+    # invitee and the host's for the host; this used to compute a single
+    # `when` in the INVITEE's zone and send it to both, so a host whose
+    # calendar said 09:30 UTC was told their 10:30 Europe/London meeting was
+    # cancelled. The zone label made it unambiguous rather than wrong, but it
+    # still made the host convert their own calendar by hand -- on the one
+    # email whose whole job is "the slot you were holding is free again".
+    host_tz = _host_timezone(session, page) if page else "UTC"
+    when_invitee = _format_when(booking.start_at,
+                                booking.invitee_timezone or host_tz)
+    when_host = _format_when(booking.start_at, host_tz)
     title = page.title if page else "your meeting"
     _send(booking.invitee_email, f"Cancelled: {title}", [
         f"Hi {booking.invitee_name},",
-        f"Your {title} on {when} has been cancelled.",
+        f"Your {title} on {when_invitee} has been cancelled.",
         (reason or "").strip(),
         "You are welcome to book another time.",
     ])
     _send(getattr(host, "email", None), f"Cancelled: {booking.invitee_name} — {title}", [
         f"The booking with {booking.invitee_name} ({booking.invitee_email}) "
-        f"on {when} was cancelled.",
+        f"on {when_host} was cancelled.",
         (reason or "").strip(),
     ])
     return "ok"
