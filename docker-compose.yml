@@ -1,5 +1,16 @@
 version: "3.9"
 
+# One build definition for every service that runs the backend image.
+# PYTHON_IMAGE pins the Debian 12 (bookworm) Python base for local builds: the
+# default python:3.11-slim is Debian trixie, and a Docker Desktop with a corrupt
+# cached trixie layer fails every build with "exec format error". Production
+# (Render, docker-compose.prod.yml) does not pass it and keeps the Dockerfile
+# default.
+x-backend-build: &backend-build
+  context: .
+  args:
+    PYTHON_IMAGE: python:3.11-slim-bookworm
+
 services:
   db:
     image: postgres:16-alpine
@@ -27,7 +38,7 @@ services:
       - "6380:6379"
 
   backend:
-    build: .
+    build: *backend-build
     restart: unless-stopped
     depends_on:
       db: { condition: service_healthy }
@@ -36,6 +47,10 @@ services:
       DATABASE_URL: postgresql://leadpilot:leadpilot@db:5432/leadpilot
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me-min-32-chars}
+      # app/core/crypto.py reads this from the environment, and the image
+      # deliberately excludes .env -- without it every stored integration
+      # token fails to encrypt. Taken from the project .env by compose.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       CORS_ORIGINS: http://localhost:3000,http://frontend:3000
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       APOLLO_API_KEY: ${APOLLO_API_KEY:-}
@@ -54,7 +69,7 @@ services:
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
 
   worker:
-    build: .
+    build: *backend-build
     restart: unless-stopped
     depends_on:
       db: { condition: service_healthy }
@@ -64,6 +79,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       SECRET_KEY: ${SECRET_KEY:-dev-secret-change-me-min-32-chars}
+      # Tasks decrypt stored tokens (Gmail, tool integrations) -- see backend.
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
     volumes:
       - media:/app/media
     # -Q must list every queue in celery_app.conf.task_routes. Without it this
@@ -83,7 +100,7 @@ services:
       - "3000:3000"
 
   beat:
-    build: .
+    build: *backend-build
     restart: unless-stopped
     depends_on:
       db: { condition: service_healthy }

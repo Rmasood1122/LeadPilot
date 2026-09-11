@@ -5,7 +5,14 @@
 # — so the production compose file could not build at all. `docker compose
 # config` does not catch this: it validates and renders, it never resolves
 # build targets.
-FROM python:3.11-slim AS production
+#
+# PYTHON_IMAGE defaults to the base Render and docker-compose.prod.yml have
+# always used. The dev docker-compose.yml overrides it with the Debian 12
+# (bookworm) variant: on a Docker Desktop whose cached Debian trixie layer is
+# corrupt, every trixie-based image -- python:3.11-slim included -- dies on its
+# first RUN with "exec format error", and re-pulling does not help.
+ARG PYTHON_IMAGE=python:3.11-slim
+FROM ${PYTHON_IMAGE} AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
