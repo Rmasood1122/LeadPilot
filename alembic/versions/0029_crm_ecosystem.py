@@ -105,8 +105,21 @@ def upgrade() -> None:
                                                server_default="api", nullable=False))
     op.add_column("webhook_targets", sa.Column("disabled_reason", sa.String(length=200),
                                                nullable=True))
-    op.add_column("webhook_deliveries", sa.Column("last_attempt_at",
-                                                  sa.DateTime(timezone=True), nullable=True))
+    # 0011 already creates webhook_deliveries.last_attempt_at (as a naive
+    # DateTime), so on any database built by the migration chain an
+    # unconditional ADD COLUMN fails with DuplicateColumn. Add it only where it
+    # is missing; where 0011 made it, bring it to the timestamptz the model
+    # declares (stored values are UTC).
+    bind = op.get_bind()
+    existing = {c["name"]: c for c in sa.inspect(bind).get_columns("webhook_deliveries")}
+    if "last_attempt_at" not in existing:
+        op.add_column("webhook_deliveries", sa.Column("last_attempt_at",
+                                                      sa.DateTime(timezone=True), nullable=True))
+    elif bind.dialect.name == "postgresql" and not getattr(
+            existing["last_attempt_at"]["type"], "timezone", False):
+        op.alter_column("webhook_deliveries", "last_attempt_at",
+                        type_=sa.DateTime(timezone=True), existing_nullable=True,
+                        postgresql_using="last_attempt_at AT TIME ZONE 'UTC'")
 
 
 def downgrade() -> None:
