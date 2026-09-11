@@ -1,127 +1,144 @@
-"""
-Outbound webhook targets API (M8-C5).
+"""Outbound webhooks API (Feature Group 4; replaces the M8-C5 raw-SQL version).
 
-NOTE (integration): the inbound WhatsApp and Calendly webhook routes that were
-bundled in the original M8-C5 file are NOT registered from here — the canonical
-inbound handlers are the M3/M4 routers (app/api/webhooks.py and
-app/api/webhooks_whatsapp.py), which carry signature verification AND
-ProcessedWebhook idempotency. Registering both would create duplicate routes.
+    POST   /webhooks/outbound/register      subscribe a URL to events -> 201,
+                                            returns the signing secret ONCE
+    GET    /webhooks/outbound               the account's subscriptions
+    DELETE /webhooks/outbound/{id}          unsubscribe -> 204 (Zapier calls
+                                            this when a Zap is turned off)
+    POST   /webhooks/outbound/{id}/test     queue a sample delivery
+    GET    /webhooks/outbound/deliveries    recent deliveries and their status
+    GET    /webhooks/outbound/events        events + sample payloads (Zapier's
+                                            "perform list" / sample data)
 
-New C5 endpoints:
-  POST   /webhooks/targets        — register a new outbound webhook target
-  GET    /webhooks/targets        — list user's registered targets
-  DELETE /webhooks/targets/{id}   — remove a target
+The M8-C5 routes stay, on the same implementation, for existing callers:
+    POST /webhooks/targets · GET /webhooks/targets · DELETE /webhooks/targets/{id}
+
+Authentication is the normal bearer token, or a personal API key (Settings ›
+API keys) -- Zapier and Make cannot refresh a 15-minute access token.
 """
+
 from __future__ import annotations
 
-import hashlib
-import hmac
-import json
-from typing import Optional
+import uuid
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Header
-from pydantic import BaseModel, HttpUrl
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.database import get_db
-from app.core.logging import get_logger
-from app.services.webhook_delivery import EVENT_TYPES
+from app.core.rate_limiting import enforce_rate_limit
+from app.db.base import get_db
+from app.db.models import User, WebhookTarget
+from app.services import webhook_delivery as wd
 
-logger = get_logger("api.webhooks")
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
+class RegisterIn(BaseModel):
+    url: str = Field(max_length=1000)
+    events: list[str] = Field(min_length=1, max_length=20)
+    description: Optional[str] = Field(default=None, max_length=500)
+    secret: Optional[str] = Field(default=None, min_length=16, max_length=200)
+    source: Literal["api", "zapier", "make"] = "api"
+
+
+def _owned(db: Session, target_id: uuid.UUID, user: User) -> WebhookTarget:
+    target = db.get(WebhookTarget, target_id)
+    if target is None or target.user_id != user.id:
+        raise HTTPException(status_code=404, detail="webhook not found")
+    return target
+
+
+def _register(db: Session, user: User, url: str, events, *, secret=None, description=None,
+              source="api") -> tuple[WebhookTarget, str]:
+    enforce_rate_limit(str(user.id), "webhook_register", "RATE_LIMIT_AI_ACTION")
+    try:
+        return wd.create_target(db, user.id, url, events, secret=secret,
+                                description=description, source=source)
+    except wd.TargetRejected as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/outbound/register", status_code=201)
+def register(body: RegisterIn, db: Session = Depends(get_db),
+             current_user: User = Depends(get_current_user)) -> dict:
+    target, secret = _register(db, current_user, body.url, body.events, secret=body.secret,
+                               description=body.description, source=body.source)
+    return {**wd.target_out(target), "secret": secret}
+
+
+@router.get("/outbound")
+def list_targets(db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)) -> list[dict]:
+    rows = db.execute(select(WebhookTarget).where(WebhookTarget.user_id == current_user.id)
+                      .order_by(WebhookTarget.created_at.desc())).scalars().all()
+    return [wd.target_out(t) for t in rows]
+
+
+@router.get("/outbound/events")
+def list_events(current_user: User = Depends(get_current_user)) -> list[dict]:
+    return [{"event": name, "description": text, "sample": wd.SAMPLES.get(name, {}),
+             "zapier": name in wd.ZAPIER_EVENTS}
+            for name, text in wd.EVENT_DESCRIPTIONS.items()]
+
+
+@router.get("/outbound/deliveries")
+def list_deliveries(limit: int = Query(default=50, ge=1, le=200),
+                    db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user)) -> list[dict]:
+    return wd.list_deliveries(db, current_user.id, limit)
+
+
+@router.post("/outbound/{target_id}/test", status_code=202)
+def test_target(target_id: uuid.UUID, db: Session = Depends(get_db),
+                current_user: User = Depends(get_current_user)) -> dict:
+    enforce_rate_limit(str(current_user.id), "webhook_test", "RATE_LIMIT_AI_ACTION")
+    target = _owned(db, target_id, current_user)
+    if not target.active:
+        raise HTTPException(status_code=409, detail="this webhook is disabled")
+    delivery = wd.send_test(db, target)
+    return {"delivery_id": str(delivery.id), "event": delivery.event_type}
+
+
+@router.delete("/outbound/{target_id}", status_code=204)
+def delete_target(target_id: uuid.UUID, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)) -> Response:
+    db.delete(_owned(db, target_id, current_user))
+    db.commit()
+    return Response(status_code=204)
+
+
 # ---------------------------------------------------------------------------
-# Outbound webhook targets (C5)
+# M8-C5 compatibility
 # ---------------------------------------------------------------------------
+
 
 class WebhookTargetCreate(BaseModel):
-    url: str
-    secret: str
-    event_types: list[str]
-    description: Optional[str] = None
-
-
-class WebhookTargetResponse(BaseModel):
-    id: str
-    url: str
-    event_types: list[str]
-    active: bool
-    description: Optional[str]
-    created_at: str
+    url: str = Field(max_length=1000)
+    secret: str = Field(min_length=16, max_length=200)
+    event_types: list[str] = Field(min_length=1, max_length=20)
+    description: Optional[str] = Field(default=None, max_length=500)
 
 
 @router.post("/targets", status_code=201)
-async def create_webhook_target(
-    body: WebhookTargetCreate,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> dict:
-    """Register a new outbound webhook destination."""
-    # Validate event_types
-    invalid = [e for e in body.event_types if e not in EVENT_TYPES]
-    if invalid:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid event_types: {invalid}. Valid: {sorted(EVENT_TYPES)}",
-        )
-
-    from app.core.crypto import encrypt
-    from sqlalchemy import text
-    import uuid, datetime
-
-    target_id = str(uuid.uuid4())
-    encrypted_secret = encrypt(body.secret)
-
-    db.execute(text("""
-        INSERT INTO webhook_targets
-            (id, user_id, url, secret_encrypted, event_types, active, description, created_at, updated_at)
-        VALUES
-            (:id, :uid, :url, :secret, :events, true, :desc, :now, :now)
-    """), {
-        "id": target_id,
-        "uid": str(current_user.id),
-        "url": str(body.url),
-        "secret": encrypted_secret,
-        "events": body.event_types,
-        "desc": body.description,
-        "now": datetime.datetime.utcnow(),
-    })
-    db.commit()
-    logger.info("webhooks.target_created", target_id=target_id, user_id=str(current_user.id))
-    return {"id": target_id, "status": "created"}
+def create_webhook_target(body: WebhookTargetCreate, db: Session = Depends(get_db),
+                          current_user: User = Depends(get_current_user)) -> dict:
+    target, _ = _register(db, current_user, body.url, body.event_types, secret=body.secret,
+                          description=body.description)
+    return {"id": str(target.id), "status": "created"}
 
 
 @router.get("/targets")
-async def list_webhook_targets(
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> list[dict]:
-    """List the current user's registered webhook targets."""
-    from sqlalchemy import text
-    rows = db.execute(text("""
-        SELECT id, url, event_types, active, description, created_at
-        FROM webhook_targets
-        WHERE user_id = :uid
-        ORDER BY created_at DESC
-    """), {"uid": str(current_user.id)}).mappings().all()
-    return [dict(r) for r in rows]
+def list_webhook_targets(db: Session = Depends(get_db),
+                         current_user: User = Depends(get_current_user)) -> list[dict]:
+    return [{**t, "event_types": t["events"]} for t in list_targets(db, current_user)]
 
 
 @router.delete("/targets/{target_id}")
-async def delete_webhook_target(
-    target_id: str,
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-) -> dict:
-    """Delete a webhook target. Only the owner can delete."""
-    from sqlalchemy import text
-    count = db.execute(text("""
-        DELETE FROM webhook_targets
-        WHERE id = :id AND user_id = :uid
-    """), {"id": target_id, "uid": str(current_user.id)}).rowcount
+def delete_webhook_target(target_id: uuid.UUID, db: Session = Depends(get_db),
+                          current_user: User = Depends(get_current_user)) -> dict:
+    db.delete(_owned(db, target_id, current_user))
     db.commit()
-    if count == 0:
-        raise HTTPException(status_code=404, detail="Webhook target not found")
-    return {"status": "deleted", "id": target_id}
+    return {"status": "deleted", "id": str(target_id)}

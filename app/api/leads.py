@@ -112,6 +112,7 @@ def list_leads(
     status: LeadStatus | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    sort: str = Query(default="score", pattern="^(score|created)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeadListOut:
@@ -122,8 +123,14 @@ def list_leads(
         where.append(Lead.status == status)
 
     total = db.execute(select(func.count(Lead.id)).where(*where)).scalar_one()
+    # Feature Group 1: highest ai_booking_likelihood first by default.
+    # Unscored leads (NULL) sort LAST, not as zero, and fall back to the old
+    # creation order among themselves -- so a strategy with no scores yet
+    # lists exactly as it always did.
+    order = ([Lead.ai_booking_likelihood.desc().nulls_last(), Lead.created_at]
+             if sort == "score" else [Lead.created_at])
     items = db.execute(
-        select(Lead).where(*where).order_by(Lead.created_at).limit(limit).offset(offset)
+        select(Lead).where(*where).order_by(*order).limit(limit).offset(offset)
     ).scalars().all()
     return LeadListOut(
         total=total, limit=limit, offset=offset,
@@ -196,6 +203,16 @@ def gdpr_delete_lead(
                 db.add(SuppressionEntry(phone=phone.strip(), reason="gdpr_delete"))
 
     _suppress(lead.email, lead.phone)
+    # Feature Group 5: the LinkedIn profile is personal data AND a contact
+    # route -- suppress it like the email and phone, then erase it.
+    if lead.linkedin_url:
+        from app.db.models import LinkedInSuppression  # noqa: PLC0415
+        from app.services.linkedin_outreach import normalize_profile  # noqa: PLC0415
+        from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
+
+        profile = normalize_profile(lead.linkedin_url)
+        if profile and not is_suppressed(db, linkedin=lead.linkedin_url):
+            db.add(LinkedInSuppression(profile=profile, reason="gdpr_delete"))
 
     # Erase personal data; keep the non-personal tombstone.
     lead.full_name = None
@@ -204,5 +221,18 @@ def gdpr_delete_lead(
     lead.phone = None
     lead.company = None
     lead.enrichment_json = {"gdpr_deleted": True}
+    # Feature Groups 1/2/5: everything else that describes the person.
+    lead.linkedin_url = None
+    lead.linkedin_provider_id = None
+    lead.linkedin_posts_json = None
+    lead.company_news_json = None
+    lead.loom_video_json = None
+    lead.ai_score_reason = None
+    lead.ai_score_factors = None
     lead.status = LeadStatus.DROPPED
     db.commit()
+    # Feature Group 4: forget which CRM record this person was synced to.
+    # (What the CRM itself holds is the CRM owner's to erase.)
+    from app.services import crm_sync  # noqa: PLC0415
+
+    crm_sync.forget_local(db, "lead", lead.id)

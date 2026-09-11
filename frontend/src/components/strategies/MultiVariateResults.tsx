@@ -17,7 +17,7 @@ export function MultiVariateResults({
     queryFn: () =>
       apiClient
         .get(`/strategies/${strategyId}/mv-results?metric=${metric}`)
-        .then((r: any) => r.data),
+        ,
   });
 
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading test results…</div>;

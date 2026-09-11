@@ -32,6 +32,21 @@ celery_app = Celery(
         # above) because they send outreach messages and belong on the same
         # queue as every other send.
         "app.workers.calendar_tasks",
+        # Feature expansion: the notification hub's queue, and the meeting
+        # prep brief + pre-meeting reminders that feed it.
+        "app.workers.notification_tasks",
+        "app.workers.meeting_prep_tasks",
+        # Feature Group 3: send-time windows + weekly reply sentiment.
+        "app.workers.analytics_tasks",
+        # Feature Group 4: HubSpot / Salesforce two-way sync.
+        "app.workers.crm_tasks",
+        # Feature Group 9: daily sending-domain health + blacklist sweep.
+        "app.workers.deliverability_tasks",
+        # Feature Group 1: idle-campaign mutation sweep, lead rescoring,
+        # market-signal refresh.
+        "app.workers.intelligence_tasks",
+        # Feature Group 6: AI call transcript analysis.
+        "app.workers.call_tasks",
     ],
 )
 
@@ -72,6 +87,29 @@ celery_app.conf.task_routes = {
     # messages under the same caps and windows as any other send.
     "app.workers.calendar_tasks.*": {"queue": "default"},
     "leadpilot.ping": {"queue": "default"},
+    # Feature expansion: the `notifications` queue. Push/Slack/webhook fan-out
+    # and the meeting prep brief are user-facing and time-sensitive -- a
+    # one-hour reminder that queues behind a 144-step pipeline or the nightly
+    # learning loop arrives after the call has started. Its own queue gets its
+    # own worker (docker-compose.prod.yml: celery-worker-notifications).
+    "app.workers.notification_tasks.*": {"queue": "notifications"},
+    "app.workers.meeting_prep_tasks.*": {"queue": "notifications"},
+    # Feature Group 1. The mutation sweep is the learning loop reacting to
+    # outcomes, so it runs with it; rescoring and signal refresh are batched
+    # model/API work shaped like sourcing, so they run with it. The exact name
+    # is matched before the glob.
+    "app.workers.intelligence_tasks.check_idle_campaigns": {"queue": "learning"},
+    "app.workers.intelligence_tasks.*": {"queue": "pipeline"},
+    # Feature Group 6: the phone channel's reply routing -- same queue as
+    # every other reply path.
+    "app.workers.call_tasks.*": {"queue": "outreach"},
+    # Feature Group 3: the learning loop reacting to opens and replies.
+    "app.workers.analytics_tasks.*": {"queue": "learning"},
+    # Feature Group 4: CRM sync is one user's integration I/O at a time --
+    # neither outreach volume nor the learning loop -- like webhook delivery.
+    "app.workers.crm_tasks.*": {"queue": "default"},
+    # Feature Group 9: outbound DNS / API lookups, one user at a time.
+    "app.workers.deliverability_tasks.*": {"queue": "default"},
 }
 
 celery_app.conf.update(
@@ -153,6 +191,43 @@ celery_app.conf.beat_schedule = {
     "close-stale-meetings": {
         "task": "app.workers.calendar_tasks.close_stale_meetings",
         "schedule": 3600.0,
+    },
+    # Feature Group 7: 24h and 1h pre-meeting reminders. Every five minutes;
+    # each reminder is claimed with a conditional UPDATE, so overlapping
+    # sweeps cannot double-send (see meeting_prep_tasks).
+    "send-meeting-reminders": {
+        "task": "app.workers.meeting_prep_tasks.send_meeting_reminders",
+        "schedule": float(settings.meeting_reminder_sweep_seconds),
+    },
+    # Feature Group 1: mutate campaigns idle for N days with zero replies.
+    # Daily, after the learning-loop aggregation (:05) and promotion (:35) so
+    # it reasons from that night's numbers.
+    "check-idle-campaigns": {
+        "task": "app.workers.intelligence_tasks.check_idle_campaigns",
+        "schedule": crontab(hour=_aggregation_hour(), minute=50),
+    },
+    # Feature Group 3: recompute every campaign's smart-send windows after
+    # the aggregation, and roll up last week's reply sentiment (Mondays) --
+    # the objection-spike alert runs off that roll-up.
+    "refresh-send-windows": {
+        "task": "app.workers.analytics_tasks.refresh_send_windows",
+        "schedule": crontab(hour=_aggregation_hour(), minute=15),
+    },
+    "aggregate-reply-sentiment": {
+        "task": "app.workers.analytics_tasks.aggregate_reply_sentiment",
+        "schedule": crontab(day_of_week=1, hour=_aggregation_hour(), minute=25),
+    },
+    # Feature Group 4: push what changed to each connected CRM and pull its
+    # linked records back. Catches every status change no event announces.
+    "crm-sync": {
+        "task": "app.workers.crm_tasks.sync_all",
+        "schedule": 900.0,
+    },
+    # Feature Group 9: daily blacklist + health check of every sending
+    # domain. A new listing pauses the user's campaigns immediately.
+    "deliverability-checks": {
+        "task": "app.workers.deliverability_tasks.run_daily_checks",
+        "schedule": crontab(hour=6, minute=10),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

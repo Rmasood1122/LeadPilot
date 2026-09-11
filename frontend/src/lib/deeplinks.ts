@@ -40,10 +40,12 @@ export type DeepLinkRoute =
   | { path: '/strategies/[id]'; params: { id: string } }
   | { path: '/strategies'; params: Record<string, never> }
   | { path: '/campaigns/[id]'; params: { id: string } }
-  | { path: '/campaigns'; params: Record<string, never> }
+  | { path: '/campaigns'; params: { strategy?: string; tab?: string } }
   | { path: '/leads/[id]'; params: { id: string } }
+  | { path: '/leads/detail'; params: { id: string; tab?: string } }
   | { path: '/leads'; params: Record<string, never> }
-  | { path: '/settings'; params: Record<string, never> }
+  | { path: '/settings'; params: { tab?: string } }
+  | { path: '/team'; params: Record<string, never> }
   | { path: '/analytics'; params: Record<string, never> }
   | null; // unrecognised link - do nothing
 
@@ -53,6 +55,7 @@ export type DeepLinkRoute =
  */
 export function parseDeepLink(url: string): DeepLinkRoute {
   let pathname: string;
+  let search: URLSearchParams;
 
   try {
     // Normalise both schemes to a URL object by rewriting the custom scheme.
@@ -67,8 +70,20 @@ export function parseDeepLink(url: string): DeepLinkRoute {
 
     const parsed = new URL(normalised);
     pathname = parsed.pathname.replace(/\/$/, '') || '/';
+    search = parsed.searchParams;
   } catch {
     return null;
+  }
+
+  // Feature expansion: the lead detail page. Every notification the event
+  // bus sends about a lead (meeting prep ready, reminders, deal won) links
+  // here, with an optional tab. Matched BEFORE the /leads/[id] regex below,
+  // which would otherwise read "detail" as a lead id.
+  if (pathname === '/leads/detail') {
+    const id = search.get('id');
+    if (!id) return null;
+    const tab = search.get('tab');
+    return { path: '/leads/detail', params: tab ? { id, tab } : { id } };
   }
 
   // -- Route matching -------------------------------------------------
@@ -91,7 +106,14 @@ export function parseDeepLink(url: string): DeepLinkRoute {
   }
 
   if (pathname === '/campaigns') {
-    return { path: '/campaigns', params: {} };
+    // Feature Group 3: campaign alerts (objection spike) link to a campaign
+    // and tab via query params -- the static export has no /campaigns/<id>.
+    const params: { strategy?: string; tab?: string } = {};
+    const strategy = search.get('strategy');
+    const tab = search.get('tab');
+    if (strategy) params.strategy = strategy;
+    if (tab) params.tab = tab;
+    return { path: '/campaigns', params };
   }
 
   const leadMatch = pathname.match(/^\/leads\/([^/]+)$/);
@@ -104,7 +126,13 @@ export function parseDeepLink(url: string): DeepLinkRoute {
   }
 
   if (pathname === '/analytics') return { path: '/analytics', params: {} };
-  if (pathname === '/settings') return { path: '/settings', params: {} };
+  // Feature Groups 8/9: deliverability alerts open Settings on their tab;
+  // approval notices and invitations lead to the team page.
+  if (pathname === '/settings') {
+    const tab = search.get('tab');
+    return { path: '/settings', params: tab ? { tab } : {} };
+  }
+  if (pathname === '/team') return { path: '/team', params: {} };
 
   return null;
 }
@@ -114,8 +142,30 @@ export function parseDeepLink(url: string): DeepLinkRoute {
  */
 export function routeToPath(route: NonNullable<DeepLinkRoute>): string {
   if (route.path === '/strategies/[id]') return `/strategies/detail?id=${route.params.id}`;
-  if (route.path === '/campaigns/[id]') return `/campaigns/${route.params.id}`;
-  if (route.path === '/leads/[id]') return `/leads/${route.params.id}`;
+  // `/campaigns/<id>` is a dynamic segment the static export cannot serve
+  // (the same 404 the lead links had); the campaigns page reads ?strategy=.
+  if (route.path === '/campaigns/[id]') {
+    return `/campaigns?strategy=${encodeURIComponent(route.params.id)}`;
+  }
+  if (route.path === '/campaigns') {
+    const q = new URLSearchParams();
+    if (route.params.strategy) q.set('strategy', route.params.strategy);
+    if (route.params.tab) q.set('tab', route.params.tab);
+    const qs = q.toString();
+    return qs ? `/campaigns?${qs}` : '/campaigns';
+  }
+  // `/leads/[id]` used to map to `/leads/<id>` -- a dynamic segment the
+  // static export (output: 'export', required by Capacitor) cannot serve, so
+  // every "new reply" push opened a 404. Both forms now land on the
+  // query-param detail page, like /strategies/detail and /meetings/detail.
+  if (route.path === '/settings') {
+    return route.params.tab ? `/settings?tab=${encodeURIComponent(route.params.tab)}` : '/settings';
+  }
+  if (route.path === '/leads/[id]') return `/leads/detail?id=${route.params.id}`;
+  if (route.path === '/leads/detail') {
+    const tab = route.params.tab ? `&tab=${encodeURIComponent(route.params.tab)}` : '';
+    return `/leads/detail?id=${encodeURIComponent(route.params.id)}${tab}`;
+  }
   return route.path;
 }
 
@@ -153,11 +203,15 @@ export const deepLinks = {
   }),
   campaign: (id: string | number) => ({
     custom: buildCustomSchemeLink(`/campaigns/${id}`),
-    web: buildAppLink(`/campaigns/${id}`),
+    web: buildAppLink(`/campaigns?strategy=${id}`),
   }),
   lead: (id: string | number) => ({
     custom: buildCustomSchemeLink(`/leads/${id}`),
-    web: buildAppLink(`/leads/${id}`),
+    web: buildAppLink(`/leads/detail?id=${id}`),
+  }),
+  leadTab: (id: string | number, tab: string) => ({
+    custom: buildCustomSchemeLink(`/leads/detail?id=${id}&tab=${tab}`),
+    web: buildAppLink(`/leads/detail?id=${id}&tab=${tab}`),
   }),
   dashboard: () => ({
     custom: buildCustomSchemeLink('/'),

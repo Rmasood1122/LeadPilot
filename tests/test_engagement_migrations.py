@@ -145,9 +145,14 @@ class TestMigrationsMatchModels:
 
     def test_models_declare_every_table(self):
         """The other direction: a table in a migration but not in the models."""
+        # meeting_prep_briefs / meeting_outcomes also start with "meeting" but
+        # are created by 0023 (Feature Group 7), which has its own
+        # models-vs-migration test in tests/test_meeting_prep_migration.py.
+        later = {"meeting_prep_briefs", "meeting_outcomes"}
         declared = {
             t for t in Base.metadata.tables
-            if t.startswith("calendar_") or t.startswith("meeting")
+            if (t.startswith("calendar_") or t.startswith("meeting"))
+            and t not in later
         }
         assert declared == set(ENGAGEMENT_TABLES)
 

@@ -136,6 +136,10 @@ class LeadOut(BaseModel):
     email: str | None
     phone: str | None
     created_at: datetime
+    # Feature Group 1. Defaults so a response built from an older row (or a
+    # client of the published SDK) is unaffected.
+    ai_booking_likelihood: int | None = None
+    ai_score_reason: str | None = None
 
 
 class LeadDetailOut(LeadOut):
@@ -143,6 +147,14 @@ class LeadDetailOut(LeadOut):
     batch_id: uuid.UUID | None
     external_id: str | None
     enrichment_json: dict | None
+    ai_score_factors: dict | None = None
+    ai_scored_at: datetime | None = None
+    linkedin_url: str | None = None      # Feature Group 2/5
+    # Feature Group 6
+    phone_consent_at: datetime | None = None
+    phone_consent_source: str | None = None
+    last_call_at: datetime | None = None
+    last_call_outcome: str | None = None
 
 
 class LeadListOut(BaseModel):

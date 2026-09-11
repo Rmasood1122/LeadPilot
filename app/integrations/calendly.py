@@ -83,14 +83,32 @@ def verify_webhook_signature(raw_body: bytes, signature_header: str | None,
 
 
 def extract_event_id(payload: dict, raw_body: bytes) -> str:
-    """Stable id for webhook dedupe: Calendly retries deliveries."""
+    """Stable id for webhook dedupe: Calendly retries deliveries.
+
+    PREFIXED WITH THE EVENT TYPE. The key used to be the invitee URI alone,
+    and Calendly sends the SAME invitee URI on `invitee.created` and on the
+    later `invitee.canceled` for that booking -- so every real cancellation
+    hit the (provider, event_id) unique constraint, was acknowledged as a
+    duplicate, and never reached the handler: the lead stayed meeting_booked
+    and (since Feature Group 7) its reminders kept firing for a call that was
+    not happening. The existing tests missed it by giving the cancellation a
+    different invitee URI than the booking. A retry of the same delivery still
+    maps to the same key, which is all dedupe needs.
+
+    Deploy note: a booking delivered before this change and REDELIVERED after
+    it would be processed once more. Calendly retries within hours, the
+    booked-path writes are idempotent for the brief (unique per scheduled
+    event), and the cost is at most one duplicate BOOKED outcome row.
+    """
+    event_type = str(payload.get("event") or "").strip()
     for candidate in (
         payload.get("event_id"),
         (payload.get("payload") or {}).get("uri"),
         payload.get("created_at"),
     ):
         if candidate:
-            return str(candidate)[:200]
+            key = f"{event_type}:{candidate}" if event_type else str(candidate)
+            return key[:200]
     return hashlib.sha256(raw_body).hexdigest()
 
 

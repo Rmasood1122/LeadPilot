@@ -336,6 +336,15 @@ def _activity(session, lead_id, kind, *, actor_user_id=None, from_value=None,
     return activity
 
 
+def record_activity(session, lead_id, kind, *, actor_user_id=None,
+                    from_value=None, to_value=None, meta=None):
+    """Public entry point for feature-expansion writers (meeting prep, meeting
+    outcomes, deals, calls). Same contract as the helpers below: one
+    CrmActivity row, strategy_id resolved from the lead, and NO commit."""
+    return _activity(session, lead_id, kind, actor_user_id=actor_user_id,
+                     from_value=from_value, to_value=to_value, meta=meta)
+
+
 def on_booking_created(session: Session, lead_id: uuid.UUID,
                        booking_id: uuid.UUID, *, when: datetime | None = None,
                        page_title: str | None = None):

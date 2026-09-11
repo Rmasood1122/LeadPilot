@@ -51,6 +51,11 @@ GMAIL_SCOPES = [
     # to reconnect. Adding it here is what makes every new connection work
     # without that step.
     "https://www.googleapis.com/auth/calendar.events",
+    # Feature Group 7: "Log Meeting Outcome" saves the follow-up email as a
+    # Gmail DRAFT for the user to review, which gmail.send cannot do. Same
+    # retroactivity caveat as calendar.events: an older grant answers 403, and
+    # create_draft() turns that into GmailScopeMissing ("reconnect Gmail").
+    "https://www.googleapis.com/auth/gmail.compose",
 ]
 
 GOOGLE_AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -259,6 +264,12 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
         for name, value in (message.headers or {}).items():
             mime[name] = value
         mime.set_content(message.body)
+        # Feature Group 3: the engine may supply an HTML twin (open pixel).
+        # Plain text stays the first part, so text-only clients and spam
+        # filters see exactly the message that was written.
+        html_part = (message.metadata or {}).get("html_body")
+        if html_part:
+            mime.add_alternative(html_part, subtype="html")
 
         raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
         payload: dict = {"raw": raw}
@@ -354,3 +365,78 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
             return True
         except Exception:
             return False
+
+
+# --------------------------------------------------------------------------
+# Drafts (Feature Group 7 — the post-meeting follow-up)
+# --------------------------------------------------------------------------
+#
+# Deliberately NOT routed through GmailChannel/BaseHttpAdapter. The channel is
+# the OUTREACH transport: its circuit breaker, caps and send windows govern
+# cold email, and a user saving one draft for a prospect they just met is not
+# outreach volume. Sharing the breaker would let a burst of draft failures
+# pause the user's campaigns, and vice versa.
+
+
+class GmailScopeMissing(GmailNotConnected):
+    """The grant predates gmail.compose — the user must reconnect Gmail."""
+
+
+def _gmail_http() -> httpx.Client:
+    """Factory tests monkeypatch."""
+    return httpx.Client(base_url=GMAIL_API_BASE, timeout=30.0)
+
+
+def _raw_message(from_addr: str | None, to: str, subject: str, body: str) -> str:
+    mime = EmailMessage()
+    mime["From"] = from_addr or "me"
+    mime["To"] = to
+    mime["Subject"] = subject
+    mime.set_content(body)
+    return base64.urlsafe_b64encode(mime.as_bytes()).decode()
+
+
+def _drafts_call(session: Session, account: GmailAccount, method: str, path: str,
+                 payload: dict, oauth: GmailOAuth | None = None) -> dict:
+    token = get_valid_access_token(session, account, oauth)
+    with _gmail_http() as http:
+        resp = http.request(method, path, json=payload,
+                            headers={"Authorization": f"Bearer {token}"})
+    if resp.status_code == 403:
+        raise GmailScopeMissing(
+            "Gmail refused to create a draft (403). This connection was made "
+            "before draft access was requested -- reconnect Gmail in Settings."
+        )
+    resp.raise_for_status()
+    return resp.json()
+
+
+def create_draft(session: Session, account: GmailAccount, *, to: str,
+                 subject: str, body: str, thread_ref: str | None = None,
+                 oauth: GmailOAuth | None = None) -> dict:
+    """users.drafts.create. Returns {"id": draftId, "message": {...}}.
+    # TODO: verify against current Gmail API docs (users.drafts.create)"""
+    message: dict = {"raw": _raw_message(account.email_address, to, subject, body)}
+    if thread_ref:
+        message["threadId"] = thread_ref
+    return _drafts_call(session, account, "POST", "/users/me/drafts",
+                        {"message": message}, oauth)
+
+
+def update_draft(session: Session, account: GmailAccount, draft_id: str, *,
+                 to: str, subject: str, body: str,
+                 thread_ref: str | None = None,
+                 oauth: GmailOAuth | None = None) -> dict:
+    """users.drafts.update (full replace)."""
+    message: dict = {"raw": _raw_message(account.email_address, to, subject, body)}
+    if thread_ref:
+        message["threadId"] = thread_ref
+    return _drafts_call(session, account, "PUT", f"/users/me/drafts/{draft_id}",
+                        {"id": draft_id, "message": message}, oauth)
+
+
+def send_draft(session: Session, account: GmailAccount, draft_id: str,
+               oauth: GmailOAuth | None = None) -> dict:
+    """users.drafts.send. Returns the sent Message resource."""
+    return _drafts_call(session, account, "POST", "/users/me/drafts/send",
+                        {"id": draft_id}, oauth)

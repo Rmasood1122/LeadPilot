@@ -187,6 +187,26 @@ services:
         limits:
           memory: 1g
 
+  # Feature expansion: push / Slack / webhook fan-out, meeting prep briefs and
+  # pre-meeting reminders. Its own worker so a one-hour reminder never waits
+  # behind a strategy pipeline or the nightly learning loop.
+  celery-worker-notifications:
+    <<: *api-env
+    build: *api-build
+    command: celery -A app.workers.celery_app worker -Q notifications -c 2 --loglevel=info
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 768m
+
   # ---------------------------------------------------------------------------
   # Celery Beat (scheduler)
   # ---------------------------------------------------------------------------

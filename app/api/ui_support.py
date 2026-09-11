@@ -54,7 +54,16 @@ _ALLOWED_TRANSITIONS: dict[LeadStatus, set[LeadStatus]] = {
     LeadStatus.DROPPED: set(),
     LeadStatus.CONTACTED: {LeadStatus.REPLIED},
     LeadStatus.REPLIED: {LeadStatus.MEETING_BOOKED},
-    LeadStatus.MEETING_BOOKED: set(),
+    # Feature Group 7. The post-meeting stages are normally written by "Log
+    # Meeting Outcome", which also drafts the follow-up and creates the deal;
+    # dragging a card only moves the status, so the kanban offers the moves
+    # that do not need either (an opportunity that went quiet, a reopened one).
+    LeadStatus.MEETING_BOOKED: {LeadStatus.OPPORTUNITY, LeadStatus.DISQUALIFIED},
+    LeadStatus.OPPORTUNITY: {LeadStatus.CLOSED_WON, LeadStatus.CLOSED_LOST,
+                             LeadStatus.DISQUALIFIED},
+    LeadStatus.CLOSED_WON: set(),
+    LeadStatus.CLOSED_LOST: {LeadStatus.OPPORTUNITY},
+    LeadStatus.DISQUALIFIED: set(),
 }
 
 
@@ -138,6 +147,13 @@ def patch_lead(
         )
     lead.status = body.status
     db.commit()
+    # Feature Group 4: mirror a manual move to the connected CRM now (the
+    # 15-minute sweep would catch it too, just later).
+    from app.services import crm_sync  # noqa: PLC0415
+    from app.workers import crm_tasks  # noqa: PLC0415
+
+    if crm_sync.has_connection(db, current_user.id):
+        crm_tasks.enqueue_push("lead", current_user.id, lead.id)
     return {"id": str(lead.id), "status": lead.status.value}
 
 

@@ -32,6 +32,10 @@ const STATUSES: LeadStatus[] = [
   "contacted",
   "replied",
   "meeting_booked",
+  "opportunity",
+  "closed_won",
+  "closed_lost",
+  "disqualified",
 ];
 
 export function GridToolbar({

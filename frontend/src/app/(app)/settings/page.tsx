@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@/lib/theme/ThemeProvider";
 import { saveTheme, uploadBackground } from "@/lib/api/themes";
@@ -17,9 +18,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast";
+import { VoiceSettings } from "@/components/settings/VoiceSettings";
+import { LinkedInAccountsCard } from "@/components/settings/LinkedInAccountsCard";
+import { SlackCard } from "@/components/settings/SlackCard";
+import { CrmCards } from "@/components/settings/CrmCards";
+import { ApiKeysCard, WebhooksCard } from "@/components/settings/WebhooksCard";
+import { oauthResultMessage } from "@/lib/api/ecosystem";
+import { ComplianceAuditCard, DeliverabilityCard } from "@/components/settings/DeliverabilityCard";
 import { cn } from "@/lib/utils";
 
-type SettingsTab = "appearance" | "integrations" | "suppression";
+type SettingsTab = "appearance" | "voice" | "integrations" | "deliverability" | "suppression";
 
 // ------------------------------------------------------------------ Theme --
 
@@ -362,6 +370,13 @@ function IntegrationsSettings() {
             </CardContent>
           </Card>
 
+          {/* LinkedIn (Feature Group 5) */}
+          <LinkedInAccountsCard />
+
+          {/* Feature Group 4: Slack, HubSpot, Salesforce */}
+          <SlackCard />
+          <CrmCards />
+
           {/* Calendly */}
           <Card>
             <CardContent className="p-gutter">
@@ -373,6 +388,10 @@ function IntegrationsSettings() {
               </p>
             </CardContent>
           </Card>
+
+          {/* Feature Group 4: Zapier / Make */}
+          <WebhooksCard />
+          <ApiKeysCard />
         </div>
       )}
     </AsyncState>
@@ -452,13 +471,29 @@ function SuppressionViewer() {
 
 // -------------------------------------------------------------------  Main
 
+const SETTINGS_TABS: SettingsTab[] = ["appearance", "voice", "integrations", "deliverability",
+                                      "suppression"];
+
 export default function SettingsPage() {
-  const [tab, setTab] = useState<SettingsTab>("appearance");
+  // Feature Group 4: the Slack / HubSpot / Salesforce OAuth callbacks land on
+  // /settings?tab=integrations&<provider>=connected|error.
+  const params = useSearchParams();
+  const toast = useToast();
+  const requested = params.get("tab") as SettingsTab | null;
+  const [tab, setTab] = useState<SettingsTab>(
+    requested && SETTINGS_TABS.includes(requested) ? requested : "appearance",
+  );
+  useEffect(() => {
+    const result = oauthResultMessage(params);
+    if (result) toast(result.text, result.ok ? "success" : "error");
+    // Once per landing -- the params do not change while the page is open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Settings</h1>
       <div className="flex gap-2 border-b border-border">
-        {(["appearance", "integrations", "suppression"] as SettingsTab[]).map(t => (
+        {SETTINGS_TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
                   className={`pb-2 text-sm font-medium capitalize transition-colors border-b-2 ${
                     tab === t
@@ -470,7 +505,16 @@ export default function SettingsPage() {
         ))}
       </div>
       {tab === "appearance" && <AppearanceSettings />}
+      {/* Feature Group 2: the voice every outreach message is written in. */}
+      {tab === "voice" && <VoiceSettings />}
       {tab === "integrations" && <IntegrationsSettings />}
+      {/* Feature Group 9: email health + the compliance audit log. */}
+      {tab === "deliverability" && (
+        <div className="space-y-3">
+          <DeliverabilityCard />
+          <ComplianceAuditCard />
+        </div>
+      )}
       {tab === "suppression" && <SuppressionViewer />}
     </div>
   );

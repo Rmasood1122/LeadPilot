@@ -259,7 +259,14 @@ class TestPublicSlots:
         slots = anon_client.get(
             "/calendar/booking-pages/intro-call/slots?days=7"
         ).json()
-        same_day = [s for s in slots if s["date"] == slots[0]["date"]]
+        # The first day with at least two slots, not simply the first day: run
+        # late on a weekday afternoon, the 60-minute minimum notice leaves
+        # TODAY with a single bookable slot and this test used to IndexError
+        # on a spacing that is perfectly correct.
+        by_date: dict = {}
+        for s in slots:
+            by_date.setdefault(s["date"], []).append(s)
+        same_day = next(day for day in by_date.values() if len(day) >= 2)
         first = datetime.fromisoformat(same_day[0]["start_at"])
         second = datetime.fromisoformat(same_day[1]["start_at"])
         assert second - first == timedelta(minutes=45)

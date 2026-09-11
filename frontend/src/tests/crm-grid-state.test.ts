@@ -411,8 +411,21 @@ describe("status editing", () => {
   });
 
   it("offers nothing but the current value from a terminal stage", () => {
-    expect(statusOptionsFor("meeting_booked")).toEqual(["meeting_booked"]);
+    // meeting_booked stopped being terminal in Feature Group 7 (the
+    // post-meeting stages follow it); closed_won and disqualified are the
+    // new ends of the road.
     expect(statusOptionsFor("dropped")).toEqual(["dropped"]);
+    expect(statusOptionsFor("closed_won")).toEqual(["closed_won"]);
+    expect(statusOptionsFor("disqualified")).toEqual(["disqualified"]);
+  });
+
+  it("offers the post-meeting moves from meeting_booked and opportunity", () => {
+    expect(statusOptionsFor("meeting_booked")).toEqual(
+      ["meeting_booked", "opportunity", "disqualified"],
+    );
+    expect(statusOptionsFor("opportunity")).toEqual(
+      ["opportunity", "closed_won", "closed_lost", "disqualified"],
+    );
   });
 });
 

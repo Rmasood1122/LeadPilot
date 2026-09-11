@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listLeads, updateLeadStatus, deleteLead, getOptin,
          ALLOWED_TRANSITIONS, canTransition } from "@/lib/api/leads";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog, Modal } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
+import { ScoreBadge } from "@/components/leads/ScoreBadge";
 import { cn } from "@/lib/utils";
 
 const COLUMNS: { status: LeadStatus; label: string }[] = [
@@ -24,6 +26,10 @@ const COLUMNS: { status: LeadStatus; label: string }[] = [
   { status: "contacted",     label: "Contacted"},
   { status: "replied",       label: "Replied"  },
   { status: "meeting_booked",label: "Booked"   },
+  // Feature Group 7. closed_lost / disqualified are exits, like dropped,
+  // and get no column.
+  { status: "opportunity",   label: "Opportunity" },
+  { status: "closed_won",    label: "Won"      },
 ];
 
 // Pick the first strategy from a tiny listing query so the kanban works
@@ -108,7 +114,15 @@ function LeadDrawer({ lead, onClose }: { lead: LeadOut; onClose: () => void }) {
               </pre>
             </details>
           )}
-          <div className="pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-2">
+            {/* Feature Group 7: the drawer is a glance; the detail page holds
+                the Meeting Prep brief and Log Meeting Outcome. */}
+            <Link
+              href={`/leads/detail?id=${lead.id}`}
+              className="inline-flex h-8 items-center rounded border border-border px-3 text-xs font-medium hover:bg-muted"
+            >
+              Open full lead
+            </Link>
             <Button variant="destructive" size="sm"
                     onClick={() => setConfirmDelete(true)}>
               Delete (GDPR erasure)
@@ -149,7 +163,12 @@ function LeadCard({
       onKeyDown={(e) => e.key === "Enter" && onClick()}
     >
       <CardContent className="p-3 text-sm">
-        <p className="truncate font-medium">{lead.full_name ?? lead.email}</p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="truncate font-medium">{lead.full_name ?? lead.email}</p>
+          {/* Feature Group 1: AI booking likelihood. Unscored leads show
+              nothing rather than a misleading zero. */}
+          <ScoreBadge score={lead.ai_booking_likelihood} reason={lead.ai_score_reason} compact />
+        </div>
         <p className="truncate text-xs text-muted-foreground">{lead.company}</p>
       </CardContent>
     </Card>

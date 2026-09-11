@@ -36,6 +36,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["webhooks"])
 
 
+def _calendly_event_ref(invitee: dict, fallback: str) -> str:
+    """The id that ties a booking's created and canceled deliveries together.
+
+    The SCHEDULED EVENT's URI, not the delivery's event_id: the created and
+    canceled deliveries are two different events about the same meeting, and
+    the brief they both address has to be found by the thing they share.
+    # TODO: verify against current Calendly docs (payload.scheduled_event.uri)
+    """
+    scheduled = invitee.get("scheduled_event") or {}
+    ref = scheduled.get("uri") or invitee.get("event") or invitee.get("uri") or fallback
+    return str(ref)[:200]
+
+
+def _parse_iso(value):
+    """Calendly's ISO-8601 start_time as an aware datetime, or None."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 @router.post("/webhooks/calendly")
 async def calendly_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
     raw = await request.body()
@@ -115,9 +141,37 @@ async def calendly_webhook(request: Request, db: Session = Depends(get_db)) -> d
                 owner, lead.id,
                 attendee_name=invitee.get("name") or lead.full_name,
             ))
+            # Feature Group 4: Slack + outbound webhooks. push=False -- the M7
+            # push above already went, and a second one would double-buzz.
+            from app.services import event_bus  # noqa: PLC0415
+            from app.workers import notification_tasks  # noqa: PLC0415
+
+            notification_tasks.enqueue_event(
+                owner, "meeting_booked", push=False, title="Meeting booked",
+                body=f"{invitee.get('name') or lead.full_name or 'A lead'} booked a meeting "
+                     f"via Calendly.",
+                deep_link=f"/leads/detail?id={lead.id}", data={"leadId": str(lead.id)},
+                webhook_payload={"lead": event_bus.lead_payload(lead), "source": "calendly",
+                                 "calendly_event": event_id},
+            )
         else:
             logger.warning("lead %s has no resolvable owner - no booking "
                            "notification", lead.id)
+
+        # Feature Group 7: queue the meeting prep brief. request_prep never
+        # raises and only ENQUEUES -- the model call happens on the
+        # notifications worker, so Calendly still gets its fast 200.
+        from app.services.meeting_prep import SOURCE_CALENDLY  # noqa: PLC0415
+        from app.workers.meeting_prep_tasks import request_prep  # noqa: PLC0415
+
+        scheduled = invitee.get("scheduled_event") or {}
+        request_prep(
+            db, lead, source=SOURCE_CALENDLY,
+            external_ref=_calendly_event_ref(invitee, event_id),
+            meeting_start_at=_parse_iso(scheduled.get("start_time")),
+            meeting_url=(scheduled.get("location") or {}).get("join_url"),
+            user_id=tenant_id,
+        )
         return {"ok": True, "matched": True, "action": "booked"}
 
     if event_type == "invitee.canceled":
@@ -125,6 +179,12 @@ async def calendly_webhook(request: Request, db: Session = Depends(get_db)) -> d
         db.add(Outcome(lead_id=lead.id, event=OutcomeEvent.REPLIED,
                        channel="calendly",
                        meta_json={"calendly_event": event_id, "canceled": True}))
+        # Stop the brief's reminders: nobody wants a "meeting in 1 hour" push
+        # for a call that was cancelled yesterday.
+        from app.services.meeting_prep import SOURCE_CALENDLY, cancel_briefs  # noqa: PLC0415
+
+        cancel_briefs(db, lead.id, source=SOURCE_CALENDLY,
+                      external_ref=_calendly_event_ref(invitee, event_id))
         db.commit()
         return {"ok": True, "matched": True, "action": "canceled"}
 

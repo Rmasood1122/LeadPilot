@@ -23,6 +23,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, StickyNote } from "lucide-react";
+import { ScoreBadge } from "@/components/leads/ScoreBadge";
 
 import type {
   CrmGridRow,
@@ -514,6 +515,10 @@ function GridCell({
 
   if (columnKey === "followup_status") {
     return <FollowupCell status={row.followup_status} />;
+  }
+
+  if (columnKey === "ai_booking_likelihood") {
+    return <ScoreBadge score={row.ai_booking_likelihood} reason={row.ai_score_reason} compact />;
   }
 
   if (columnKey === "note_count") {

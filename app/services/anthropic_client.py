@@ -163,6 +163,14 @@ class ClaudeClient:
         )
         stop_reason = getattr(resp, "stop_reason", None)
         out_tokens = getattr(resp.usage, "output_tokens", "?")
+        # Feature Group 3: attribute the spend to the active campaign scope
+        # (a no-op outside one). Before the truncation check -- a cut-off
+        # answer was still paid for.
+        from app.services import usage_meter  # noqa: PLC0415
+
+        usage_meter.note("anthropic", settings.anthropic_model,
+                         getattr(resp.usage, "input_tokens", 0) or 0,
+                         out_tokens if isinstance(out_tokens, int) else 0)
         logger.info(
             "anthropic call ok model=%s in_tokens=%s out_tokens=%s stop_reason=%s",
             settings.anthropic_model,

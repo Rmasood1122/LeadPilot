@@ -89,8 +89,17 @@ def run_pipeline(self, strategy_id: str) -> str:
         strategy.error = None
         session.commit()
 
-        executed = engine.run_all_steps(session, strategy)
-        engine.assemble_documents(session, strategy)
+        # Feature Group 1: live competitor / market signals, fetched ONCE
+        # before Phase 1 (a resumed run reuses the stored snapshot so every
+        # step of one strategy reasons from the same data). Never raises.
+        from app.services import market_intel, usage_meter  # noqa: PLC0415
+
+        # Feature Group 3: the pipeline is most of a campaign's model spend.
+        with usage_meter.owner_scope(session, strategy, "pipeline"):
+            market_intel.ensure_signals(session, strategy)
+
+            executed = engine.run_all_steps(session, strategy)
+            engine.assemble_documents(session, strategy)
         logger.info("strategy %s: pipeline complete (%s steps this run)", strategy_id, executed)
 
         # Bind the strategy to its playbook bucket now that Phase 2/3 research
@@ -160,7 +169,10 @@ def run_verification(self, strategy_id: str) -> str:
         strategy = session.get(Strategy, _pk(strategy_id))
         if strategy is None:
             return f"strategy {strategy_id} not found"
-        final = run_verification_loop(session, strategy)
+        from app.services import usage_meter  # noqa: PLC0415
+
+        with usage_meter.owner_scope(session, strategy, "verification"):
+            final = run_verification_loop(session, strategy)
         return f"verification finished: {final.value}"
     except Exception as exc:
         session.rollback()

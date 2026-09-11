@@ -237,6 +237,10 @@ export interface StrategyOut {
   error: string | null;
 }
 
+/** src/tests/statusTone.test.ts imports the strategy shape as `Strategy`,
+ *  which was never exported -- the one pre-existing `tsc --noEmit` error. */
+export type Strategy = StrategyOut;
+
 export interface PhaseProgress {
   pipeline: "strategy" | "gtm";
   phase: number;
@@ -269,10 +273,18 @@ export type LeadStatus =
   | "dropped"
   | "contacted"
   | "replied"
-  | "meeting_booked";
+  | "meeting_booked"
+  // Feature Group 7 — written by "Log Meeting Outcome".
+  | "opportunity"
+  | "closed_won"
+  | "closed_lost"
+  | "disqualified";
 
 export interface LeadOut {
   id: string;
+  /** Present on GET /leads/{id} (LeadDetailOut); absent on list rows. */
+  strategy_id?: string;
+  created_at?: string;
   full_name: string | null;
   title: string | null;
   company: string | null;
@@ -281,6 +293,27 @@ export interface LeadOut {
   status: LeadStatus;
   enrichment_json: Record<string, unknown> | null;
   whatsapp_opted_in?: boolean;
+  /** Feature Group 1 — 0-100, null when never scored. */
+  ai_booking_likelihood?: number | null;
+  ai_score_reason?: string | null;
+  /** Detail view only. */
+  ai_score_factors?: LeadScoreFactors | null;
+  ai_scored_at?: string | null;
+  /** Feature Group 6 — prior consent to AI-voice calls; detail view only. */
+  phone_consent_at?: string | null;
+  phone_consent_source?: string | null;
+  last_call_outcome?: string | null;
+}
+
+export interface LeadScoreFactors {
+  seniority: number;
+  industry_match: number;
+  verification: number;
+  company_signals: number;
+  playbook: number;
+  playbook_booking_rate: number | null;
+  heuristic: number;
+  method: "model" | "heuristic";
 }
 
 export interface ChannelStats {
@@ -338,9 +371,11 @@ export interface SequenceStepOut {
   template: string;
   variant: string;
   delay_days: number;
-  channel?: "email" | "whatsapp" | null;
+  channel?: "email" | "whatsapp" | "linkedin" | "phone" | null;
   whatsapp_kind?: "template" | "text" | null;
   whatsapp_template_id?: string | null;
+  /** Feature Group 5 — LinkedIn steps only. */
+  linkedin_action?: "auto" | "connect" | "message" | "inmail" | null;
   /** Engagement Hub, Feature 1. NOT the same timer as delay_days:
    *  delay_days waits after this step SENDS before the next one is
    *  scheduled, while these govern what happens when the lead never replies
@@ -354,7 +389,7 @@ export interface SequenceOut {
   id: string;
   strategy_id: string;
   name: string;
-  channel: "email" | "whatsapp";
+  channel: "email" | "whatsapp" | "linkedin" | "phone";
   status: string;
   booking_url: string | null;
   steps: SequenceStepOut[];
@@ -552,6 +587,9 @@ export interface CrmGridRow {
    *  followup_delay_hours of the step that last sent — none of which the row
    *  itself carries, which is why it is not derived in the grid. */
   followup_status: FollowupStatus;
+  /** Feature Group 1 — sortable server-side; null = never scored. */
+  ai_booking_likelihood?: number | null;
+  ai_score_reason?: string | null;
 }
 
 /** "due" is the one that matters: contacted, past its step's follow-up

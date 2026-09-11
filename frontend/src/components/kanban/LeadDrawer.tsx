@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteLead, getOptin } from "@/lib/api/leads";
 import type { LeadOut } from "@/lib/api/types";
@@ -72,7 +73,13 @@ export function LeadDrawer({
             </dl>
           </section>
         )}
-        <div className="border-t border-border pt-3">
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <Link
+            href={`/leads/detail?id=${lead.id}`}
+            className="inline-flex h-8 items-center rounded border border-border px-3 text-xs font-medium hover:bg-muted"
+          >
+            Open full lead
+          </Link>
           <Button variant="destructive" size="sm" onClick={() => setConfirming(true)}>
             Delete lead (GDPR)
           </Button>

@@ -118,12 +118,43 @@ describe('routeToPath', () => {
     expect(routeToPath({ path: '/strategies/[id]', params: { id: '42' } })).toBe('/strategies/detail?id=42');
   });
 
-  it('converts campaign detail route', () => {
-    expect(routeToPath({ path: '/campaigns/[id]', params: { id: '7' } })).toBe('/campaigns/7');
+  it('converts campaign detail route to the query-param page the static export serves', () => {
+    // Was '/campaigns/7' -- a dynamic segment output:'export' cannot serve.
+    expect(routeToPath({ path: '/campaigns/[id]', params: { id: '7' } })).toBe('/campaigns?strategy=7');
   });
 
-  it('converts lead detail route', () => {
-    expect(routeToPath({ path: '/leads/[id]', params: { id: '99' } })).toBe('/leads/99');
+  it('keeps the campaign and tab of a campaign alert link', () => {
+    const route = parseDeepLink('https://host/campaigns?strategy=s1&tab=sentiment');
+    expect(route).toEqual({ path: '/campaigns', params: { strategy: 's1', tab: 'sentiment' } });
+    expect(routeToPath(route!)).toBe('/campaigns?strategy=s1&tab=sentiment');
+    expect(routeToPath({ path: '/campaigns', params: {} })).toBe('/campaigns');
+  });
+
+  it('keeps the settings tab of a deliverability alert and knows the team page', () => {
+    const route = parseDeepLink('clienthunter:///settings?tab=deliverability');
+    expect(route).toEqual({ path: '/settings', params: { tab: 'deliverability' } });
+    expect(routeToPath(route!)).toBe('/settings?tab=deliverability');
+    expect(parseDeepLink('clienthunter:///settings')).toEqual({ path: '/settings', params: {} });
+    expect(parseDeepLink('https://host/team')).toEqual({ path: '/team', params: {} });
+  });
+
+  it('converts lead detail route to the query-param page the static export serves', () => {
+    // Was '/leads/99' -- a dynamic segment output:'export' cannot serve, so
+    // every "new reply" push opened a 404.
+    expect(routeToPath({ path: '/leads/[id]', params: { id: '99' } })).toBe('/leads/detail?id=99');
+  });
+
+  it('parses the lead detail page with a tab (Feature Group 7 notifications)', () => {
+    const route = parseDeepLink('clienthunter:///leads/detail?id=abc-123&tab=prep');
+    expect(route).toEqual({ path: '/leads/detail', params: { id: 'abc-123', tab: 'prep' } });
+    expect(routeToPath(route!)).toBe('/leads/detail?id=abc-123&tab=prep');
+  });
+
+  it('does not read "detail" as a lead id, and needs an id', () => {
+    expect(parseDeepLink('clienthunter:///leads/detail')).toBeNull();
+    expect(parseDeepLink('clienthunter:///leads/detail?id=7')).toEqual({
+      path: '/leads/detail', params: { id: '7' },
+    });
   });
 
   it('converts root route', () => {

@@ -44,12 +44,15 @@ export function Badge({
 }
 
 export function statusTone(status: string): keyof typeof tones {
-  if (["approved", "verified", "active", "sent", "meeting_booked"].includes(status))
+  if (["approved", "verified", "active", "sent", "meeting_booked", "closed_won",
+       "ready"].includes(status))
     return "success";
-  if (["rejected", "failed", "dropped", "bounced"].includes(status))
+  if (["rejected", "failed", "dropped", "bounced", "closed_lost",
+       "disqualified"].includes(status))
     return "destructive";
+  if (["opportunity"].includes(status)) return "primary";
   if (["submitted", "needs_human_review", "flagged", "paused_bounce_rate",
-       "paused_manual", "needs_template"].includes(status))
+       "paused_manual", "needs_template", "pending_approval", "paused_blacklist"].includes(status))
     return "warning";
   if (["replied", "contacted", "executing"].includes(status)) return "accent";
   return "default";

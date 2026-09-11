@@ -16,7 +16,7 @@ export function PersonalizationHealth({ strategyId }: PersonalizationHealthProps
   const { data, isLoading } = useQuery({
     queryKey: ["personalization-stats", strategyId],
     queryFn: () =>
-      apiClient.get(`/strategies/${strategyId}/personalization-stats`).then((r: any) => r.data),
+      apiClient.get(`/strategies/${strategyId}/personalization-stats`),
   });
 
   if (isLoading) return null;

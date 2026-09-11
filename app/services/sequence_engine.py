@@ -189,11 +189,15 @@ def enroll_leads(
     if not steps:
         raise ValueError("sequence has no steps")
 
+    # Feature Group 5: a sequence that OPENS on LinkedIn needs a profile URL,
+    # not an email -- a lead Apollo found no email for is still reachable.
+    opens_on_linkedin = steps[0].effective_channel(sequence) is ChannelType.LINKEDIN
+    address = Lead.linkedin_url.isnot(None) if opens_on_linkedin else Lead.email.isnot(None)
     leads = session.execute(
         select(Lead).where(
             Lead.strategy_id == sequence.strategy_id,
             Lead.status.in_(lead_statuses),
-            Lead.email.isnot(None),
+            address,
         )
     ).scalars().all()
 
@@ -204,7 +208,8 @@ def enroll_leads(
         ).scalars()
     }
     for lead in leads:
-        if lead.id in existing or is_suppressed(session, lead.email, lead.phone):
+        if lead.id in existing or is_suppressed(session, lead.email, lead.phone,
+                                                linkedin=lead.linkedin_url):
             continue
         enrollment = SequenceEnrollment(sequence_id=sequence.id, lead_id=lead.id)
         session.add(enrollment)
@@ -278,6 +283,12 @@ def _schedule_step_message(
     time; the send task persists it before transmitting)."""
     when = next_window_slot(base_time + timedelta(days=step.delay_days if step.step_no > 1 else 0),
                             lead_timezone(lead))
+    # Feature Group 3: with smart send time on, hold the step for the
+    # campaign's next top engagement window (bounded; a no-op otherwise).
+    from app.services import send_windows  # noqa: PLC0415
+
+    when = send_windows.next_smart_slot(session, sequence.strategy, when,
+                                        lead_timezone(lead), spread_key=lead.id)
     msg = Message(
         sequence_id=sequence.id,
         lead_id=lead.id,
@@ -385,6 +396,13 @@ def build_compliant_email(lead: Lead, subject: str, body: str) -> tuple[str, str
         "List-Unsubscribe": f"<{url}>",
         "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     }
+    # Feature Group 9: GDPR / UK and CASL recipients get the notice their
+    # regime asks for (right to object / sender + unsubscribe route).
+    from app.services import compliance_audit  # noqa: PLC0415
+
+    notice = compliance_audit.region_notice(lead)
+    if notice:
+        body = f"{body}\n\n{notice}"
     return subject, body + compliance_footer(url), headers, token
 
 
@@ -417,6 +435,15 @@ def unsubscribe_lead(session: Session, lead: Lead, source: str,
     if lead.phone and not is_suppressed(session, phone=lead.phone):
         session.add(SuppressionEntry(phone=lead.phone.strip(),
                                      reason=f"unsubscribed_{source}"))
+    # Feature Group 5: an opt-out on any channel covers LinkedIn too.
+    if lead.linkedin_url and not is_suppressed(session, linkedin=lead.linkedin_url):
+        from app.db.models import LinkedInSuppression  # noqa: PLC0415
+        from app.services.linkedin_outreach import normalize_profile  # noqa: PLC0415
+
+        profile = normalize_profile(lead.linkedin_url)
+        if profile:
+            session.add(LinkedInSuppression(profile=profile,
+                                            reason=f"unsubscribed_{source}"))
     _outcome(session, lead, OutcomeEvent.UNSUBSCRIBED, message_id,
              {"source": source}, channel=channel)
     session.commit()
@@ -478,6 +505,19 @@ def check_bounce_rate(session: Session, strategy: Strategy) -> bool:
         if owner is not None:
             notifications.dispatch(
                 notifications.notify_campaign_paused(owner, strategy.id)
+            )
+            # Feature Group 4: Slack ("campaign auto-paused") + webhooks;
+            # push=False because the M7 push above already went.
+            from app.workers import notification_tasks  # noqa: PLC0415
+
+            notification_tasks.enqueue_event(
+                owner, "campaign_paused", push=False, title="Campaign auto-paused",
+                body=strategy.campaign_pause_reason or "Bounce rate over the limit.",
+                deep_link=f"/campaigns?strategy={strategy.id}",
+                data={"strategyId": str(strategy.id)},
+                webhook_payload={"strategy_id": str(strategy.id), "trigger": "bounce_rate",
+                                 "reason": strategy.campaign_pause_reason,
+                                 "bounce_rate": round(rate, 4)},
             )
         else:
             logger.warning("strategy %s has no resolvable owner - no pause "

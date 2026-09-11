@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { listStrategies } from "@/lib/api/strategies";
@@ -67,6 +68,11 @@ export default function AnalyticsPage() {
           <option value="week">Weekly</option>
           <option value="month">Monthly</option>
         </select>
+        {/* Feature Group 3 */}
+        <Link href="/analytics/revenue"
+              className="ml-auto text-sm font-medium text-[rgb(var(--primary))] hover:underline">
+          Revenue &amp; ROI →
+        </Link>
       </div>
 
       <AsyncState isLoading={isLoading} error={error}

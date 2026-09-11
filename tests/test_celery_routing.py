@@ -33,6 +33,17 @@ import app.workers.support_tasks  # noqa: F401  (Feature 3 retention purge)
 import app.workers.webhook_tasks  # noqa: F401
 from app.workers.celery_app import celery_app
 
+# Every module the worker loads, not only the ones listed above. The feature
+# expansion's task modules (notification, meeting prep, intelligence, calls,
+# analytics, CRM, deliverability) were missing from that list and only
+# registered when some OTHER test file happened to import them first -- so
+# these assertions depended on test order and failed when run alone.
+# Importing celery_app's own include list makes that impossible to repeat.
+import importlib  # noqa: E402
+
+for _module in celery_app.conf.include:
+    importlib.import_module(_module)
+
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _COMPOSE_FILES = ["docker-compose.yml", "docker-compose.prod.yml"]
 

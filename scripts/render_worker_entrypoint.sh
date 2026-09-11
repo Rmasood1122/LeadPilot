@@ -33,8 +33,8 @@
 #
 # QUEUES
 # -Q lists every queue app/workers/celery_app.py routes to:
-#   pipeline, outreach, learning, default
-# One worker consumes all four because the free tier gives us exactly one
+#   pipeline, outreach, learning, default, notifications
+# One worker consumes all five because the free tier gives us exactly one
 # service to work with. Omitting a queue here strands every task routed to it
 # with no error anywhere — that exact bug (nothing consumed the queue tasks
 # were published to) was a total production outage found in session update 9.
@@ -62,9 +62,9 @@ BEAT_SCHEDULE="${CELERY_BEAT_SCHEDULE:-/tmp/celerybeat-schedule}"
 export WORKER_PID_FILE="${WORKER_PID_FILE:-/tmp/celery-worker.pid}"
 export BEAT_PID_FILE="${BEAT_PID_FILE:-/tmp/celery-beat.pid}"
 
-echo "[entrypoint] starting Celery worker (queues: pipeline,outreach,learning,default)"
+echo "[entrypoint] starting Celery worker (queues: pipeline,outreach,learning,default,notifications)"
 celery -A app.workers.celery_app worker \
-  -Q pipeline,outreach,learning,default \
+  -Q pipeline,outreach,learning,default,notifications \
   --concurrency "${CONCURRENCY}" \
   --loglevel "${LOGLEVEL}" &
 WORKER_PID=$!

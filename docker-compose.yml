@@ -68,7 +68,7 @@ services:
       - media:/app/media
     # -Q must list every queue in celery_app.conf.task_routes. Without it this
     # worker consumes only the implicit "celery" queue and processes nothing.
-    command: celery -A app.workers.celery_app worker -Q pipeline,outreach,learning,default --loglevel=info
+    command: celery -A app.workers.celery_app worker -Q pipeline,outreach,learning,default,notifications --loglevel=info
 
   frontend:
     build:

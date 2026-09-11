@@ -204,6 +204,18 @@ def on_booking_created_impl(session: Session, booking_id: uuid.UUID,
             now=now,
         )
         _notify_owner(session, lead, booking)
+
+        # Feature Group 7: queue the meeting prep brief. Keyed on the booking
+        # id, so this task's retries update one brief rather than making more.
+        from app.services.meeting_prep import SOURCE_CALENDAR  # noqa: PLC0415
+        from app.workers.meeting_prep_tasks import request_prep  # noqa: PLC0415
+
+        request_prep(
+            session, lead, source=SOURCE_CALENDAR, external_ref=str(booking.id),
+            meeting_start_at=_aware(booking.start_at),
+            meeting_url=booking.meeting_link, booking_id=booking.id,
+            user_id=page.user_id,
+        )
     else:
         session.commit()
 
@@ -228,6 +240,18 @@ def _notify_owner(session: Session, lead: Lead, booking: CalendarBooking) -> Non
     notifications.dispatch(notifications.notify_meeting_booked(
         owner, lead.id, attendee_name=booking.invitee_name,
     ))
+    # Feature Group 4: Slack + outbound webhooks (push=False: sent above).
+    from app.services import event_bus  # noqa: PLC0415
+    from app.workers import notification_tasks  # noqa: PLC0415
+
+    notification_tasks.enqueue_event(
+        owner, "meeting_booked", push=False, title="Meeting booked",
+        body=f"{booking.invitee_name or lead.full_name or 'A lead'} booked a meeting "
+             f"on your LeadPilot calendar.",
+        deep_link=f"/leads/detail?id={lead.id}", data={"leadId": str(lead.id)},
+        webhook_payload={"lead": event_bus.lead_payload(lead), "source": "leadpilot_calendar",
+                         "booking_id": str(booking.id)},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -261,6 +285,11 @@ def on_booking_cancelled_impl(session: Session, booking_id: uuid.UUID,
             lead.status = LeadStatus.REPLIED
         session.commit()
         engine.resume_after_meeting_cancelled(session, lead, now=now)
+        # Feature Group 7: no reminders for a meeting that is not happening.
+        from app.services.meeting_prep import cancel_briefs  # noqa: PLC0415
+
+        cancel_briefs(session, lead.id, booking_id=booking.id, now=now)
+        session.commit()
 
     # ONE TIME PER READER, not one time for both. The confirmation path
     # (_confirmation_emails) already renders the invitee's zone for the

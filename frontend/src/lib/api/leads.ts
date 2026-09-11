@@ -44,7 +44,13 @@ export const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   dropped: [],
   contacted: ["replied"],
   replied: ["meeting_booked"],
-  meeting_booked: [],
+  // Feature Group 7 — mirrors app/api/ui_support.py. "Log Meeting Outcome"
+  // is the normal way into these; a drag only moves the status.
+  meeting_booked: ["opportunity", "disqualified"],
+  opportunity: ["closed_won", "closed_lost", "disqualified"],
+  closed_won: [],
+  closed_lost: ["opportunity"],
+  disqualified: [],
 };
 
 export function canTransition(from: LeadStatus, to: LeadStatus): boolean {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listStrategies } from "@/lib/api/strategies";
 import { useCampaign, useSequences, useTemplates } from "@/lib/api/hooks";
@@ -15,6 +16,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Modal } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
+import { StrategyCalls } from "@/components/calls/CallHistory";
+import { FunnelHeatmap } from "@/components/campaigns/FunnelHeatmap";
+import { SendTimePanel } from "@/components/campaigns/SendTimePanel";
+import { SentimentTrend } from "@/components/campaigns/SentimentTrend";
 import { pct } from "@/lib/utils";
 
 // --------------------------------------------------------------------------
@@ -380,6 +385,7 @@ function SequencesPanel({ strategyId }: { strategyId: string }) {
                       <span>
                         {s.channel ?? seq.channel}
                         {s.whatsapp_kind ? " (" + s.whatsapp_kind + ")" : ""}
+                        {s.linkedin_action ? " (" + s.linkedin_action + ")" : ""}
                         {s.delay_days > 0 ? " — +" + s.delay_days + "d" : " — day 0"}
                         {s.variant !== "A" ? " [" + s.variant + "]" : ""}
                       </span>
@@ -404,13 +410,20 @@ function SequencesPanel({ strategyId }: { strategyId: string }) {
 // --------------------------------------------------------------------------
 // Main page
 // --------------------------------------------------------------------------
-type Tab = "overview" | "sequences" | "templates";
+const TABS = ["overview", "sequences", "templates", "funnel", "sentiment", "calls"] as const;
+type Tab = (typeof TABS)[number];
 
 export default function CampaignsPage() {
   const toast = useToast();
   const qc = useQueryClient();
-  const [strategyId, setStrategyId] = useState<string>("");
-  const [tab, setTab] = useState<Tab>("overview");
+  // Feature Group 3: alerts deep-link here as /campaigns?strategy=<id>&tab=<tab>
+  // (the static export cannot serve /campaigns/<id>).
+  const params = useSearchParams();
+  const initialTab = params.get("tab");
+  const [strategyId, setStrategyId] = useState<string>(params.get("strategy") ?? "");
+  const [tab, setTab] = useState<Tab>(
+    TABS.includes(initialTab as Tab) ? (initialTab as Tab) : "overview",
+  );
   const { data: strats } = useStrategyList();
   const { data: campaign, isLoading: camLoading, error: camError } = useCampaign(strategyId);
 
@@ -448,7 +461,7 @@ export default function CampaignsPage() {
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-border">
-        {(["overview", "sequences", "templates"] as Tab[]).map(t => (
+        {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
                   className={`pb-2 text-sm font-medium capitalize transition-colors border-b-2 ${
                     tab === t ? "border-primary text-[rgb(var(--primary))]"
@@ -466,7 +479,9 @@ export default function CampaignsPage() {
             <div className="space-y-4">
               {/* Pause/resume banner */}
               {(campaign.campaign_state === "paused_bounce_rate" ||
-                campaign.campaign_state === "paused_manual") && (
+                campaign.campaign_state === "paused_manual" ||
+                // Feature Group 9: sending domain found on a blocklist.
+                campaign.campaign_state === "paused_blacklist") && (
                 <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded border border-warning bg-card p-4 text-sm">
                   <div>
                     <p className="font-medium">Campaign paused</p>
@@ -514,6 +529,9 @@ export default function CampaignsPage() {
               {campaign.campaign_state === "active" && (
                 <Button variant="outline" onClick={() => pause()}>Pause campaign</Button>
               )}
+
+              {/* Feature Group 3: per-campaign smart send time. */}
+              <SendTimePanel strategyId={effectiveStratId} />
             </div>
           )}
         </AsyncState>
@@ -524,6 +542,17 @@ export default function CampaignsPage() {
       )}
       {tab === "templates" && effectiveStratId && (
         <TemplatesPanel strategyId={effectiveStratId} />
+      )}
+      {/* Feature Group 6: AI call history for every lead in the campaign. */}
+      {tab === "calls" && effectiveStratId && (
+        <StrategyCalls strategyId={effectiveStratId} />
+      )}
+      {/* Feature Group 3: where the campaign converts, and how replies feel. */}
+      {tab === "funnel" && effectiveStratId && (
+        <FunnelHeatmap strategyId={effectiveStratId} />
+      )}
+      {tab === "sentiment" && effectiveStratId && (
+        <SentimentTrend strategyId={effectiveStratId} />
       )}
     </div>
   );

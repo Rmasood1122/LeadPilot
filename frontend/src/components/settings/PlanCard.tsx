@@ -34,7 +34,7 @@ export function PlanCard() {
 
   const { data: plansData } = useQuery({
     queryKey: ["plans"],
-    queryFn: () => apiClient.get("/plans").then((r: any) => r.data),
+    queryFn: () => apiClient.get("/plans"),
     staleTime: 10 * 60 * 1000,
   });
 

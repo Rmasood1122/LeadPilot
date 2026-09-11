@@ -19,8 +19,8 @@ export interface OnboardingState {
 
 export const onboardingApi = {
   getState: (): Promise<OnboardingState> =>
-    apiClient.get("/onboarding/state").then((r: any) => r.data),
+    apiClient.get("/onboarding/state"),
 
   completeStep: (step: string): Promise<{ status: string; step: string }> =>
-    apiClient.post("/onboarding/complete-step", { step }).then((r: any) => r.data),
+    apiClient.post("/onboarding/complete-step", { step }),
 };

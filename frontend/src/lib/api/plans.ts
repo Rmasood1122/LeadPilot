@@ -20,5 +20,5 @@ export interface PlansResponse {
 
 export const plansApi = {
   getAll: (): Promise<PlansResponse> =>
-    apiClient.get("/plans").then((r: any) => r.data),
+    apiClient.get("/plans"),
 };

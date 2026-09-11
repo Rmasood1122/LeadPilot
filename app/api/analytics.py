@@ -109,6 +109,16 @@ def pause_campaign(
     strategy.campaign_state = "paused_manual"
     strategy.campaign_pause_reason = "paused by user"
     db.commit()
+    # Feature Group 4: outbound webhooks only -- the user just did this, so
+    # neither a push nor a Slack message would tell them anything.
+    from app.workers import notification_tasks  # noqa: PLC0415
+
+    notification_tasks.enqueue_event(
+        current_user.id, "campaign_paused", push=False, slack=False, title="Campaign paused",
+        body="Paused by you.", deep_link=f"/campaigns?strategy={strategy.id}",
+        webhook_payload={"strategy_id": str(strategy.id), "trigger": "manual",
+                         "reason": strategy.campaign_pause_reason},
+    )
     return {"campaign_state": strategy.campaign_state,
             "campaign_pause_reason": strategy.campaign_pause_reason}
 

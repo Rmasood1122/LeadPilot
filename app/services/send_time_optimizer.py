@@ -46,6 +46,9 @@ class SendTimeRecommendation:
 
 
 def _cache_key(channel: str, icp_industry: Optional[str], icp_company_size: Optional[str]) -> str:
+    # Messages store channel "email"; the Analytics page asks for "gmail".
+    # Normalise so both name the same cache entry.
+    channel = "email" if channel == "gmail" else channel
     industry = (icp_industry or "any").lower().replace(" ", "_")
     size = (icp_company_size or "any").lower().replace(" ", "_")
     return f"send_time:{channel}:{industry}:{size}"
@@ -116,67 +119,66 @@ def update_send_time_scores(db_session) -> int:
     Slot = (channel, icp_industry, icp_company_size, day_of_week, hour_utc).
     Rates computed as: slot_replies / slot_sends.
     """
+    from collections import defaultdict
+
+    from sqlalchemy import select
+
+    from app.core.config import settings
     from app.core.redis_client import get_sync_redis
-    from sqlalchemy import text
+    from app.db.models import Message, Outcome, OutcomeEvent, Sequence, Strategy
 
-    sql = text("""
-        SELECT
-            m.channel,
-            s.icp_industry,
-            s.icp_company_size_bucket AS icp_company_size,
-            EXTRACT(DOW FROM o.ts)::int AS day_of_week,
-            EXTRACT(HOUR FROM o.ts)::int AS hour_utc,
-            COUNT(*) FILTER (WHERE o.event = 'sent') AS sends,
-            COUNT(*) FILTER (WHERE o.event = 'replied') AS replies
-        FROM outcomes o
-        JOIN messages m ON m.id = o.message_id
-        JOIN sequences seq ON seq.id = m.sequence_id
-        JOIN strategies s ON s.id = seq.strategy_id
-        WHERE o.event IN ('sent', 'replied')
-          AND m.channel IS NOT NULL
-        GROUP BY
-            m.channel,
-            s.icp_industry,
-            s.icp_company_size_bucket,
-            EXTRACT(DOW FROM o.ts),
-            EXTRACT(HOUR FROM o.ts)
-        HAVING COUNT(*) FILTER (WHERE o.event = 'sent') > 0
-    """)
-
+    # Feature Group 3 repair. The old raw SQL selected s.icp_industry and
+    # s.icp_company_size_bucket, columns strategies has never had, so this
+    # failed every night on PostgreSQL -- and its except branch then called
+    # rollback() on an undefined name `db`. The ICP bucket lives in
+    # pattern_inputs_json (icp_extraction.canonical_pattern_payload), and the
+    # query is now ORM so it also runs on SQLite. A reply is also now counted
+    # in the slot its MESSAGE was sent in (it used to land in the hour the
+    # reply arrived, which made "send at 9am" rates a mix of two clocks).
     try:
-        rows = db_session.execute(sql).mappings().all()
+        rows = db_session.execute(
+            select(Outcome.event, Outcome.ts, Message.sent_at, Message.channel,
+                   Strategy.pattern_inputs_json)
+            .join(Message, Message.id == Outcome.message_id)
+            .join(Sequence, Sequence.id == Message.sequence_id)
+            .join(Strategy, Strategy.id == Sequence.strategy_id)
+            .where(Outcome.event.in_([OutcomeEvent.SENT, OutcomeEvent.REPLIED]))
+        ).all()
     except Exception as e:
-        # REPAIR: rollback so a failed query cannot leave the shared
-        # session in an aborted transaction for later aggregation steps.
+        # Rollback so a failed query cannot leave the shared session in an
+        # aborted transaction for later aggregation steps.
         try:
-            db.rollback()
+            db_session.rollback()
         except Exception:
             pass
         logger.error("send_time.query_failed", error=str(e))
         return 0
 
-    # Group by (channel, industry, size)
-    from collections import defaultdict
+    counts: dict[tuple, list[int]] = defaultdict(lambda: [0, 0])
+    for event, ts, sent_at, channel, inputs in rows:
+        when = sent_at or ts
+        if when is None:
+            continue
+        icp = (inputs or {}).get("icp") if isinstance(inputs, dict) else None
+        icp = icp if isinstance(icp, dict) else {}
+        industry = (icp.get("industries") or ["any"])[0]
+        size = (icp.get("company_size_ranges") or ["any"])[0]
+        ch = getattr(channel, "value", channel) or "email"
+        # Sunday=0 .. Saturday=6: the convention the cached slots and
+        # pick_next_send_datetime() already use.
+        dow = (when.weekday() + 1) % 7
+        cell = counts[(ch, industry, size, dow, when.hour)]
+        cell[0 if event is OutcomeEvent.SENT else 1] += 1
+
+    min_sample = settings.PLAYBOOK_MIN_SAMPLE
     grouped: dict[tuple, list[dict]] = defaultdict(list)
-    for row in rows:
-        key_tuple = (
-            row["channel"] or "gmail",
-            row["icp_industry"] or "any",
-            row["icp_company_size"] or "any",
-        )
-        sends = row["sends"] or 0
-        replies = row["replies"] or 0
+    for (ch, industry, size, dow, hour), (sends, replies) in counts.items():
         if sends == 0:
             continue
-        reply_rate = replies / sends
-
-        from app.core.config import settings
-        min_sample = settings.PLAYBOOK_MIN_SAMPLE
-
-        grouped[key_tuple].append({
-            "day_of_week": row["day_of_week"],
-            "hour_utc": row["hour_utc"],
-            "expected_reply_rate": round(reply_rate, 4),
+        grouped[(ch, industry, size)].append({
+            "day_of_week": dow,
+            "hour_utc": hour,
+            "expected_reply_rate": round(replies / sends, 4),
             "sample_size": sends,
             "is_reliable": sends >= min_sample,
         })

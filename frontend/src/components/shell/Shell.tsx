@@ -11,6 +11,8 @@ import { isUnverifiedError, logout, me } from "@/lib/api/auth";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/ui/Logo";
 import { ChatWidget } from "@/components/support/ChatWidget";
+import { useBranding } from "@/lib/branding";
+import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
@@ -20,6 +22,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [ready, setReady] = useState(false);
+  // Feature Group 8: a white-labelled host shows its own name and logo.
+  const brand = useBranding();
+  const mark = brand.white_label && brand.logo_url
+    ? <img src={brand.logo_url} alt="" className="h-[22px] w-auto max-w-[88px] object-contain" />
+    : <LogoMark size={22} />;
 
   useEffect(() => {
     if (!hasSession()) {
@@ -84,8 +91,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </button>
           {/* Mark stays visible when collapsed (w-16) — the rail keeps its
               brand anchor; only the wordmark text is dropped. */}
-          <LogoMark size={22} />
-          {!collapsed && <span className="font-semibold">LeadPilot</span>}
+          {mark}
+          {!collapsed && <span className="font-semibold">{brand.brand_name}</span>}
         </div>
         <nav className="flex-1 space-y-1 px-2">
           {NAV.map(({ href, label, icon: Icon }) => (
@@ -124,12 +131,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {/* Top bar */}
         <header className="no-print sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-card px-4">
           <span className="flex items-center gap-2 font-semibold md:hidden">
-            <LogoMark size={22} />
-            LeadPilot
+            {mark}
+            {brand.brand_name}
           </span>
           <span className="hidden text-sm text-muted-foreground md:block">
             {NAV.find((n) => pathname.startsWith(n.href))?.label ?? ""}
           </span>
+          <WorkspaceSwitcher />
         </header>
         <main className="flex-1 p-gutter pb-20 md:pb-gutter">{children}</main>
       </div>

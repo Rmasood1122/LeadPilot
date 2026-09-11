@@ -177,10 +177,18 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     if enrollment.status is EnrollmentStatus.PAUSED:
         return "enrollment_paused"
     is_whatsapp = message.channel is ChannelType.WHATSAPP
-    target = lead.phone if is_whatsapp else lead.email
-    if not target or is_suppressed(session, lead.email, lead.phone):
+    # Feature Group 5: the LinkedIn channel addresses the lead's profile.
+    is_linkedin = message.channel is ChannelType.LINKEDIN
+    # Feature Group 6: the phone channel dials the lead's number.
+    is_phone = message.channel is ChannelType.PHONE
+    target = (lead.phone if (is_whatsapp or is_phone)
+              else lead.linkedin_url if is_linkedin else lead.email)
+    if not target or is_suppressed(session, lead.email, lead.phone,
+                                   linkedin=lead.linkedin_url):
         message.status = MessageStatus.CANCELLED
         message.error = "suppressed at send time" if target else "no address for channel"
+        _audit(session, strategy, lead, message,
+               "blocked_suppressed" if target else "blocked_no_address")
         session.commit()
         if enrollment.status is not EnrollmentStatus.STOPPED:
             engine.stop_enrollment(session, enrollment, reason="suppressed")
@@ -192,6 +200,7 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     # the whole sequence dying on a ComplianceError) --------------------------
     if is_whatsapp:
         if optin_svc.current_status(session, lead.id) is not OptInStatus.OPTED_IN:
+            _audit(session, strategy, lead, message, "skipped_no_consent")
             engine.skip_message(session, message, reason="skipped_no_optin", now=now)
             return "skipped_no_optin"
 
@@ -232,7 +241,24 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         return "deferred_window"
 
     # ---- daily cap + warm-up (per channel; deferred, never dropped) ---------
-    if is_whatsapp:
+    li_account = li_action = None
+    if is_linkedin:
+        # Profile lookup, connect/message/InMail decision, account rotation
+        # and the per-account daily ceiling -- see _prepare_linkedin.
+        account = None
+        prepared = _prepare_linkedin(session, strategy, lead, message, now, tz)
+        if isinstance(prepared, str):
+            return prepared
+        li_account, li_action = prepared
+    elif is_phone:
+        # Admin switch, consent, dialable number, provider, daily call cap --
+        # see _prepare_phone. The send window above already bounds calling
+        # hours to the lead's local business day.
+        account = None
+        stopped = _prepare_phone(session, strategy, lead, message, now, tz)
+        if stopped is not None:
+            return stopped
+    elif is_whatsapp:
         account = None
         if engine.whatsapp_allowance_left(session, now) <= 0:
             tomorrow = now.astimezone(timezone.utc).replace(
@@ -253,14 +279,26 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
 
     # ---- claim (scheduled -> sending), render, persist BEFORE transmit ----
     message.status = MessageStatus.SENDING
-    message.sender_ref = (
-        f"whatsapp:{settings.whatsapp_phone_number_id}" if is_whatsapp
-        else str(account.id)
-    )
+    if is_linkedin:
+        message.sender_ref = f"linkedin:{li_account.id}"
+        message.linkedin_account_id = li_account.id
+        message.linkedin_action = li_action
+    elif is_phone:
+        message.sender_ref = "phone:ai_voice"
+    else:
+        message.sender_ref = (
+            f"whatsapp:{settings.whatsapp_phone_number_id}" if is_whatsapp
+            else str(account.id)
+        )
     session.commit()
 
     try:
-        if is_whatsapp:
+        if is_linkedin:
+            outbound = _render_linkedin_outbound(session, strategy, lead, message,
+                                                 li_account, li_action)
+        elif is_phone:
+            outbound = _render_phone_outbound(session, strategy, lead, message)
+        elif is_whatsapp:
             outbound = _render_whatsapp_outbound(session, strategy, lead,
                                                  message, now)
         else:
@@ -269,10 +307,25 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         session.commit()  # rendered content persisted before the send
 
         if channel is None:
-            channel = (_get_whatsapp_channel(session) if is_whatsapp
-                       else _get_channel(session, account))
+            if is_linkedin:
+                channel = _get_linkedin_channel(session, strategy)
+            elif is_phone:
+                channel = _get_phone_channel(session, strategy)
+            else:
+                channel = (_get_whatsapp_channel(session) if is_whatsapp
+                           else _get_channel(session, account))
         result = channel.send(outbound)
     except Exception as exc:
+        if li_account is not None:
+            # A request LinkedIn never received is not usage.
+            from app.services import linkedin_limits  # noqa: PLC0415
+
+            linkedin_limits.release(li_account, li_action, now=now)
+        if is_phone:
+            # The call was never placed: mark it failed and give the daily
+            # call slot back.
+            _phone_send_failed(session, strategy, message,
+                               f"{type(exc).__name__}: {exc}", now)
         # Import from the canonical module, not from the adapter. whatsapp.py
         # used to declare its own ComplianceError and this caught THAT class;
         # now there is only one, which also means this branch would catch a
@@ -294,6 +347,12 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         raise
 
     if not result.ok:
+        if li_account is not None:
+            from app.services import linkedin_limits  # noqa: PLC0415
+
+            linkedin_limits.release(li_account, li_action, now=now)
+        if is_phone:
+            _phone_send_failed(session, strategy, message, result.error or "call failed", now)
         if result.permanent_failure:
             message.status = MessageStatus.FAILED
             message.error = result.error
@@ -308,6 +367,20 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     message.sent_at = now
     message.provider_message_id = result.provider_message_id
     message.thread_ref = result.thread_ref
+    if li_account is not None:
+        from app.services import linkedin_outreach  # noqa: PLC0415
+
+        linkedin_outreach.after_send(session, lead, li_account, li_action, result, now)
+    if is_phone:
+        # "Sent" = the call was placed. What happened on it arrives on the
+        # provider's webhook (app/api/calls.py).
+        from app.services import phone_calls  # noqa: PLC0415
+
+        call = phone_calls.call_for_message(session, message)
+        if call is not None:
+            call.provider_call_id = result.provider_message_id
+            call.provider = (result.raw or {}).get("provider") or call.provider
+            call.status = "ringing"
     sent_meta = {"step_no": message.step_no, "variant": message.variant}
     if outcome_source:
         sent_meta["source"] = outcome_source
@@ -317,10 +390,27 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                         meta_json=sent_meta))
     if lead.status in (LeadStatus.VERIFIED, LeadStatus.FLAGGED):
         lead.status = LeadStatus.CONTACTED
+    # Feature Group 9: the region, regime and checks behind this send, in the
+    # same commit as the send itself.
+    _audit(session, strategy, lead, message, "sent")
     session.commit()
 
     engine.schedule_next_step(session, message, now=now)
     return "sent"
+
+
+def _audit(session: Session, strategy: Strategy, lead: Lead, message: Message,
+           decision: str) -> None:
+    """Add a compliance_audit_log row (committed by the caller). Never raises:
+    an audit failure must not turn into a send that silently did not happen."""
+    try:
+        from app.services import compliance_audit, notifications  # noqa: PLC0415
+
+        compliance_audit.record(session, lead=lead, message=message,
+                                channel=message.channel.value, decision=decision,
+                                user_id=notifications.owner_of_strategy(session, strategy))
+    except Exception:
+        logger.exception("compliance audit for message %s failed", message.id)
 
 
 def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
@@ -333,15 +423,31 @@ def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
     from app.integrations.calendly import tag_booking_url  # noqa: PLC0415
     from app.services import notifications  # noqa: PLC0415
 
-    booking_url = tag_booking_url(
-        sequence.booking_url, notifications.owner_of_strategy(session, strategy)
-    )
+    from app.services import personalization_context  # noqa: PLC0415
+
+    owner_id = notifications.owner_of_strategy(session, strategy)
+    # Feature Group 2: refresh the lead's recent posts / company news if stale,
+    # right before writing. Never raises -- a failed fetch means an email
+    # without that hook, never a send that did not happen.
+    personalization_context.ensure_fresh(session, lead, owner_id=owner_id)
+    booking_url = tag_booking_url(sequence.booking_url, owner_id)
+    used: dict = {}
     subject, body = render_message(session, strategy, lead,
-                                   _step_of(session, message), booking_url)
+                                   _step_of(session, message), booking_url,
+                                   inputs_out=used)
     subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
     message.subject = subject
     message.body = body
     message.unsubscribe_token = token
+    message.personalization_json = used or None
+    # Feature Group 3: an HTML twin of the same text carrying the open pixel,
+    # unless tracking is off or the lead is in the EU/EEA/UK.
+    from app.services import open_tracking  # noqa: PLC0415
+
+    metadata = {}
+    if open_tracking.tracking_enabled(session, lead):
+        metadata["html_body"] = open_tracking.html_body(
+            body, open_tracking.pixel_url(message.id))
     return OutboundMessage(
         message_id=str(message.id),
         lead_id=str(lead.id),
@@ -350,6 +456,7 @@ def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
         body=body,
         headers=headers,
         thread_ref=_thread_ref_for_followup(session, message),
+        metadata=metadata,
     )
 
 
@@ -420,6 +527,184 @@ def _step_of(session: Session, message: Message):
                         template=message.template, variant=message.variant, delay_days=0)
 
 
+# --------------------------------------------------------------------------
+# Feature Group 5 — LinkedIn
+# --------------------------------------------------------------------------
+
+
+def _get_linkedin_channel(session: Session, strategy: Strategy) -> OutreachChannel:
+    """Tests monkeypatch THIS function (like _get_channel for Gmail)."""
+    from app.integrations.linkedin_channel import LinkedInChannel  # noqa: PLC0415
+    from app.services import linkedin_outreach, notifications  # noqa: PLC0415
+
+    owner = notifications.owner_of_strategy(session, strategy)
+    return LinkedInChannel(session=session,
+                           client=linkedin_outreach.client_for(session, owner))
+
+
+def _prepare_linkedin(session: Session, strategy: Strategy, lead: Lead,
+                      message: Message, now: datetime, tz: str):
+    """Everything a LinkedIn send decides before it may claim the message.
+
+    Returns (account, action) with the account's daily slot RESERVED, or a
+    status string when the send ends here:
+      failed_linkedin_not_configured   no Unipile credentials (permanent)
+      failed_no_linkedin_account       the owner has no active account
+      failed_linkedin_account_gone     the account that owns this lead's
+                                       conversation was disconnected
+      skipped_linkedin_not_connected   a message step, request still pending
+                                       (the sequence continues, like a
+                                       WhatsApp step for a lead without opt-in)
+      deferred_cap                     every eligible account is at its ceiling
+    """
+    from app.services import linkedin_limits, notifications  # noqa: PLC0415
+    from app.services import linkedin_outreach as li  # noqa: PLC0415
+
+    def _fail(code: str, reason: str) -> str:
+        message.status = MessageStatus.FAILED
+        message.error = reason
+        session.commit()
+        return code
+
+    owner = notifications.owner_of_strategy(session, strategy)
+    client = li.client_for(session, owner)
+    if client is None:
+        return _fail("failed_linkedin_not_configured",
+                     "LinkedIn is not configured (Admin > Integrations > Unipile)")
+    if not li.active_accounts(session, owner):
+        return _fail("failed_no_linkedin_account",
+                     "no active LinkedIn account connected (Settings > Integrations)")
+    pinned = li.relationship_account(session, lead)
+    if lead.linkedin_account_id and (pinned is None or not pinned.is_active):
+        return _fail("failed_linkedin_account_gone",
+                     "the LinkedIn account that owns this conversation is "
+                     "disconnected -- reconnect it to continue")
+
+    li.refresh_profile(session, client, lead, owner)   # raises -> task retry
+    action = li.resolve_action(_step_of(session, message).linkedin_action, lead)
+    if action == li.WAIT:
+        engine.skip_message(session, message, reason="skipped_linkedin_not_connected", now=now)
+        return "skipped_linkedin_not_connected"
+
+    account = linkedin_limits.pick_account(session, owner, action,
+                                           required_account_id=lead.linkedin_account_id,
+                                           now=now)
+    if account is None and action == "inmail" and lead.linkedin_connection_status is None:
+        # No InMail-capable account with credits: a connection request is the
+        # next best first touch.
+        action = "connect"
+        account = linkedin_limits.pick_account(session, owner, action,
+                                               required_account_id=lead.linkedin_account_id,
+                                               now=now)
+    if account is None:
+        tomorrow = now.astimezone(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+        session.commit()
+        return "deferred_cap"
+    return account, action
+
+
+def _render_linkedin_outbound(session: Session, strategy: Strategy, lead: Lead,
+                              message: Message, account, action: str) -> OutboundMessage:
+    from app.services import linkedin_outreach  # noqa: PLC0415
+
+    rendered = linkedin_outreach.render(session, strategy, lead,
+                                        _step_of(session, message), action)
+    message.body = rendered["text"]
+    message.subject = rendered.get("subject")
+    return OutboundMessage(
+        message_id=str(message.id),
+        lead_id=str(lead.id),
+        to_address=lead.linkedin_provider_id or lead.linkedin_url,
+        body=rendered["text"],
+        subject=rendered.get("subject"),
+        thread_ref=lead.linkedin_chat_id,
+        metadata={"action": action, "account_id": account.unipile_account_id,
+                  "provider_id": lead.linkedin_provider_id,
+                  "chat_id": lead.linkedin_chat_id},
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature Group 6 — AI phone calls
+# --------------------------------------------------------------------------
+
+
+def _get_phone_channel(session: Session, strategy: Strategy) -> OutreachChannel:
+    """Tests monkeypatch THIS function."""
+    from app.integrations import voice_providers  # noqa: PLC0415
+    from app.integrations.phone_channel import PhoneChannel  # noqa: PLC0415
+    from app.services import notifications  # noqa: PLC0415
+
+    vapi, eleven = voice_providers.get_clients(
+        session, notifications.owner_of_strategy(session, strategy))
+    return PhoneChannel(session=session, vapi=vapi, eleven=eleven)
+
+
+def _prepare_phone(session: Session, strategy: Strategy, lead: Lead, message: Message,
+                   now: datetime, tz: str) -> str | None:
+    """The phone channel's gates. None = proceed (a call slot is reserved);
+    a status string = the send ends here:
+      failed_calling_disabled         the admin has not enabled AI calling
+      failed_bad_number               the number cannot be dialled
+      skipped_no_call_consent         no recorded consent (sequence continues)
+      failed_calling_not_configured   no Vapi / ElevenLabs credentials
+      deferred_cap                    the owner's daily call limit is reached
+    See app/services/phone_calls.py for why consent is required.
+    """
+    from app.integrations import voice_providers  # noqa: PLC0415
+    from app.services import notifications, phone_calls, system_settings  # noqa: PLC0415
+
+    def _fail(code: str, reason: str) -> str:
+        message.status = MessageStatus.FAILED
+        message.error = reason
+        session.commit()
+        return code
+
+    if not system_settings.get(session, "phone_calling_enabled"):
+        return _fail("failed_calling_disabled", "AI calling is disabled (Admin > System Settings)")
+    if not phone_calls.e164(lead.phone):
+        return _fail("failed_bad_number", "the lead's phone number cannot be dialled")
+    if not phone_calls.consent_ok(session, lead):
+        engine.skip_message(session, message, reason="skipped_no_call_consent", now=now)
+        return "skipped_no_call_consent"
+    owner = notifications.owner_of_strategy(session, strategy)
+    vapi, eleven = voice_providers.get_clients(session, owner)
+    if vapi is None and not (eleven is not None and eleven.can_call):
+        return _fail("failed_calling_not_configured",
+                     "no AI voice provider configured (Admin > Integrations > Vapi / ElevenLabs)")
+    if not phone_calls.reserve_call_slot(session, owner, now=now):
+        tomorrow = now.astimezone(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+        session.commit()
+        return "deferred_cap"
+    return None
+
+
+def _render_phone_outbound(session: Session, strategy: Strategy, lead: Lead,
+                           message: Message) -> OutboundMessage:
+    from app.services import notifications, phone_calls  # noqa: PLC0415
+
+    owner = notifications.owner_of_strategy(session, strategy)
+    call, meta = phone_calls.prepare_call(session, strategy, lead,
+                                          _step_of(session, message).template,
+                                          owner_id=owner, message=message)
+    message.body = call.script_json["first_message"]
+    message.subject = None
+    return OutboundMessage(message_id=str(message.id), lead_id=str(lead.id),
+                           to_address=call.to_number, body=message.body, metadata=meta)
+
+
+def _phone_send_failed(session: Session, strategy: Strategy, message: Message,
+                       error: str, now: datetime) -> None:
+    from app.services import notifications, phone_calls  # noqa: PLC0415
+
+    phone_calls.mark_send_failed(session, phone_calls.call_for_message(session, message),
+                                 error, notifications.owner_of_strategy(session, strategy), now)
+
+
 def _thread_ref_for_followup(session: Session, message: Message) -> str | None:
     if message.step_no <= 1:
         return None
@@ -454,9 +739,10 @@ def poll_account_replies_impl(session: Session, account: GmailAccount,
     return handled
 
 
-def _notify_new_reply(session: Session, lead: Lead) -> None:
-    """Push "new reply" to the lead's owner. Shared by the email and WhatsApp
-    inbound routers so both resolve the recipient the same way."""
+def _notify_new_reply(session: Session, lead: Lead, classification: str | None = None,
+                      channel: str = "email") -> None:
+    """Push "new reply" to the lead's owner. Shared by the email, WhatsApp and
+    LinkedIn inbound routers so all resolve the recipient the same way."""
     from app.services import notifications  # noqa: PLC0415
 
     owner = notifications.owner_of_lead(session, lead)
@@ -467,6 +753,26 @@ def _notify_new_reply(session: Session, lead: Lead) -> None:
     notifications.dispatch(
         notifications.notify_new_reply(owner, lead.id, company=lead.company)
     )
+    # Feature Group 4: outbound webhooks for every reply; Slack only for an
+    # interested one (the spec's "interested reply received"). push=False on
+    # both -- the M7 push above already told the phone.
+    from app.services import event_bus  # noqa: PLC0415
+    from app.workers import notification_tasks  # noqa: PLC0415
+
+    who = lead.full_name or lead.email or "A lead"
+    payload = {"lead": event_bus.lead_payload(lead), "channel": channel,
+               "classification": classification}
+    link = f"/leads/detail?id={lead.id}"
+    notification_tasks.enqueue_event(
+        owner, "reply_received", push=False, slack=False, title="A lead replied",
+        body=f"{who} replied on {channel} ({classification or 'unclassified'}).",
+        deep_link=link, data={"leadId": str(lead.id)}, webhook_payload=payload)
+    if classification == "interested":
+        notification_tasks.enqueue_event(
+            owner, "reply_interested", push=False, title="Interested reply",
+            body=f"{who}{f' ({lead.company})' if lead.company else ''} replied with "
+                 f"interest on {channel}.",
+            deep_link=link, data={"leadId": str(lead.id)}, webhook_payload=payload)
 
 
 def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
@@ -510,7 +816,8 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
                                Lead.id.in_(owned_lead_ids))
         ).scalars().first()
 
-    classification = classify_reply(inbound.from_address, inbound.subject, inbound.body)
+    classification = classify_reply(inbound.from_address, inbound.subject, inbound.body,
+                                    session=session)
 
     session.add(InboundReply(
         lead_id=lead.id if lead else None,
@@ -528,6 +835,10 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
 
     if lead is None:
         return f"unmatched_{classification}"
+    # Feature Group 9: a machine's "reply" is stored (above) but is not a
+    # reply -- the sequence neither stops nor advances, nothing is counted.
+    if classification == "automated_response":
+        return classification
 
     enrollments = [
         e for e in session.execute(
@@ -568,7 +879,7 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
     session.commit()
     # A human replied - tell the lead's owner. dispatch() never raises, so a
     # push failure cannot undo the stop/outcome writes above.
-    _notify_new_reply(session, lead)
+    _notify_new_reply(session, lead, classification, "email")
 
     return classification
 
@@ -583,9 +894,11 @@ def route_whatsapp_inbound_impl(session: Session, lead: Lead,
     them via status webhooks, already mapped to the bounce path), but the
     'bounce' class is still handled for robustness.
     Never auto-replies to humans."""
-    classification = classify_reply(reply.from_address, None, reply.body)
+    classification = classify_reply(reply.from_address, None, reply.body, session=session)
     reply.classification = classification
     session.commit()
+    if classification == "automated_response":   # Feature Group 9
+        return classification
 
     enrollments = [
         e for e in session.execute(
@@ -629,8 +942,56 @@ def route_whatsapp_inbound_impl(session: Session, lead: Lead,
     session.commit()
     # A human replied - tell the lead's owner. dispatch() never raises, so a
     # push failure cannot undo the stop/outcome writes above.
-    _notify_new_reply(session, lead)
+    _notify_new_reply(session, lead, classification, "whatsapp")
 
+    return classification
+
+
+# --------------------------------------------------------------------------
+# Feature Group 5: LinkedIn inbound routing
+# (the section header below is kept for the Celery wrappers)
+# --------------------------------------------------------------------------
+
+
+def route_linkedin_inbound_impl(session: Session, lead: Lead,
+                                reply: InboundReply) -> str:
+    """Classify a LinkedIn reply with the SAME classifier and apply the SAME
+    unified stop rules as email and WhatsApp. An unsubscribe request
+    suppresses the email, the phone AND the LinkedIn profile. Never
+    auto-replies to humans."""
+    classification = classify_reply(reply.from_address, None, reply.body, session=session)
+    reply.classification = classification
+    session.commit()
+    if classification == "automated_response":   # Feature Group 9
+        return classification
+
+    enrollments = list(session.execute(
+        select(SequenceEnrollment).where(SequenceEnrollment.lead_id == lead.id)
+    ).scalars())
+
+    if classification == "unsubscribe_request":
+        engine.unsubscribe_lead(session, lead, source="linkedin_reply", channel="linkedin")
+        return classification
+
+    if classification == "out_of_office":
+        until = (reply.received_at or datetime.now(timezone.utc)) + timedelta(
+            days=settings.ooo_reschedule_days)
+        for e in enrollments:
+            if e.status is EnrollmentStatus.ACTIVE:
+                engine.pause_enrollment(session, e, until=until)
+        return classification
+
+    if classification == "bounce":
+        return classification   # not meaningful on LinkedIn; recorded above
+
+    for e in enrollments:
+        if e.status is not EnrollmentStatus.STOPPED:
+            engine.stop_enrollment(session, e, reason=f"replied_{classification}")
+    lead.status = LeadStatus.REPLIED
+    session.add(Outcome(lead_id=lead.id, event=OutcomeEvent.REPLIED, channel="linkedin",
+                        meta_json={"classification": classification}))
+    session.commit()
+    _notify_new_reply(session, lead, classification, "linkedin")
     return classification
 
 
@@ -652,7 +1013,15 @@ def dispatch_due_messages() -> int:
 def send_message(self, message_id: str) -> str:
     session = SessionLocal()
     try:
-        return send_message_impl(session, uuid.UUID(message_id))
+        # Feature Group 3: every model call made while rendering this send is
+        # attributed to its campaign (usage_meter).
+        from app.services import usage_meter  # noqa: PLC0415
+
+        message = session.get(Message, uuid.UUID(message_id))
+        sequence = session.get(Sequence, message.sequence_id) if message else None
+        strategy = session.get(Strategy, sequence.strategy_id) if sequence else None
+        with usage_meter.owner_scope(session, strategy, "outreach"):
+            return send_message_impl(session, uuid.UUID(message_id))
     except Exception as exc:
         session.rollback()
         logger.exception("send failed for message %s — retrying", message_id)

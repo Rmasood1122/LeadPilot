@@ -37,7 +37,7 @@ LEAD:
 - Company: {company}
 - Enrichment highlights: {enrichment}
 
-{booking_line}
+{context}{booking_line}
 Write the email for THIS lead now."""
 
 
@@ -50,7 +50,45 @@ def _playbook(session: Session, strategy: Strategy) -> str:
             ResearchStep.step_no % 9 == 0,  # phase-6 synthesis
         )
     ).scalars().all()
-    return "\n\n".join(r.output for r in rows) or "(no messaging research found — keep it short, factual and human)"
+    research = ("\n\n".join(r.output for r in rows)
+                or "(no messaging research found — keep it short, factual and human)")
+    mutation = _applied_mutation(session, strategy)
+    return f"{mutation}\n\n{research}" if mutation else research
+
+
+def _voice(session: Session, strategy: Strategy) -> str:
+    from app.services.style_profile import suffix_for_strategy  # noqa: PLC0415
+
+    return suffix_for_strategy(session, strategy)
+
+
+def _applied_mutation(session: Session, strategy: Strategy) -> str | None:
+    """Feature Group 1: the messaging of an APPLIED strategy mutation.
+
+    Outreach is personalised from the phase-6 research above, not from
+    strategy_document -- so applying a mutation by rewriting the document
+    alone would have changed nothing a lead ever receives. The applied
+    version's new angle and revised messaging are therefore put in front of
+    the research here, marked as taking precedence where they conflict. A
+    proposed (unapplied) mutation has no effect.
+    """
+    from app.db.models import StrategyVersion  # noqa: PLC0415
+
+    version = session.execute(
+        select(StrategyVersion)
+        .where(StrategyVersion.strategy_id == strategy.id,
+               StrategyVersion.status == "applied",
+               StrategyVersion.trigger != "original")
+        .order_by(StrategyVersion.version_no.desc())
+    ).scalars().first()
+    if version is None:
+        return None
+    changes = version.changes_json or {}
+    angle = (changes.get("messaging_angle") or {}).get("proposed") or ""
+    revised = changes.get("revised_messaging") or ""
+    return (f"[APPLIED STRATEGY MUTATION v{version.version_no} — takes precedence "
+            f"over the research below where they conflict]\n"
+            f"Messaging angle: {angle}\n{revised}").strip()
 
 
 def render_message(
@@ -59,8 +97,18 @@ def render_message(
     lead: Lead,
     step: SequenceStep,
     booking_url: str | None = None,
+    inputs_out: dict | None = None,
 ) -> tuple[str, str]:
-    """Returns (subject, body) — the caller persists them before sending."""
+    """Returns (subject, body) — the caller persists them before sending.
+
+    Feature Group 2: the prompt carries the lead's recent LinkedIn posts and
+    company news (personalization_context), the personal-video CTA on step 2
+    when one was recorded (loom_video), and the system prompt carries the
+    sender's voice profile (style_profile). `inputs_out`, when given, is
+    filled with what the message was written from, for messages.personalization_json.
+    """
+    from app.services import loom_video, personalization_context, style_profile  # noqa: PLC0415
+
     enrichment = lead.enrichment_json or {}
     highlights = {
         k: enrichment.get(k)
@@ -71,9 +119,19 @@ def render_message(
         f"Include this scheduling link naturally in the call to action: {booking_url}\n"
         if booking_url else ""
     )
+    context, used = personalization_context.prompt_block(lead)
+    cta = loom_video.cta_for_step(lead, step.step_no)
+    used["loom_cta"] = bool(cta)
+    if cta:
+        context = f"{context}\n\n{cta}".strip()
+    voice = style_profile.suffix_for_strategy(session, strategy)
+    used["style_profile"] = bool(voice)
+    if inputs_out is not None:
+        inputs_out.update(used)
     data = get_client().complete_json(
-        system=_SYSTEM,
+        system=_SYSTEM + voice,
         prompt=_PROMPT.format(
+            context=f"{context}\n\n" if context else "",
             step_no=step.step_no,
             variant=step.variant,
             template=step.template,
@@ -170,7 +228,8 @@ def render_whatsapp_variables(
     if briefs:
         enrichment = lead.enrichment_json or {}
         data = get_client().complete_json(
-            system=_WA_SYSTEM,
+            # Feature Group 2: the sender's voice, like every outreach copy call.
+            system=_WA_SYSTEM + _voice(session, strategy),
             prompt=_WA_PROMPT.format(
                 body=template_body,
                 briefs="\n".join(f"{{{{{n}}}}} -> {b}" for n, b in briefs.items()),

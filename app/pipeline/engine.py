@@ -133,6 +133,17 @@ def _context_block(session: Session, strategy: Strategy, spec: StepSpec) -> str:
             pass
         parts.append(PlaybookService.get_insights(session, user_id=user_id))
 
+    # Feature Group 1: live market signals (news + Apollo funding/hiring for
+    # the ICP), fetched once before Phase 1 by run_pipeline. Injected where
+    # they change the research: Phase 1 (value proposition, triggers worth
+    # naming) and Phase 3 (which segments are moving right now).
+    if spec.pipeline is PipelineKind.STRATEGY and spec.phase in (1, 3):
+        from app.services.market_intel import signals_block
+
+        block = signals_block(strategy)
+        if block:
+            parts.append(block)
+
     return "\n\n".join(parts) or "(this is the first step — no prior research yet)"
 
 
@@ -149,7 +160,18 @@ def run_step(session: Session, strategy: Strategy, spec: StepSpec) -> None:
         patterns_block=_patterns_block(session, strategy),
         context_block=_context_block(session, strategy, spec),
     )
-    output = get_client().complete(system=SYSTEM_PROMPT, prompt=prompt)
+    # Feature Group 1: on a phase-synthesis step, with consensus enabled and an
+    # OpenAI key configured, GPT-4o answers the same brief in parallel and
+    # disagreements become uncertain zones. Claude's answer is still the one
+    # persisted below -- see app/services/consensus.py.
+    from app.services import consensus  # noqa: PLC0415
+
+    claude = get_client()
+    if consensus.applies(session, strategy, spec):
+        output = consensus.run_step(session, strategy, spec, system=SYSTEM_PROMPT,
+                                    prompt=prompt, claude=claude)
+    else:
+        output = claude.complete(system=SYSTEM_PROMPT, prompt=prompt)
 
     session.add(
         ResearchStep(

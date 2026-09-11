@@ -63,18 +63,35 @@ def _get_verifier(batch: LeadBatch) -> EmailVerifier:
 # --------------------------------------------------------------------------
 
 
-def is_suppressed(session: Session, email: str | None = None, phone: str | None = None) -> bool:
-    if not email and not phone:
-        return False
-    conditions = []
-    if email:
-        conditions.append(SuppressionEntry.email == email.lower().strip())
-    if phone:
-        conditions.append(SuppressionEntry.phone == phone.strip())
-    row = session.execute(
-        select(SuppressionEntry.id).where(or_(*conditions)).limit(1)
-    ).scalar_one_or_none()
-    return row is not None
+def is_suppressed(session: Session, email: str | None = None, phone: str | None = None,
+                  linkedin: str | None = None) -> bool:
+    """True if ANY of the contact's identifiers is suppressed.
+
+    Feature Group 5 added `linkedin` (a profile URL or slug), checked against
+    linkedin_suppressions. Every send path passes all three, so a person who
+    opted out on one channel is never reached on another.
+    """
+    if email or phone:
+        conditions = []
+        if email:
+            conditions.append(SuppressionEntry.email == email.lower().strip())
+        if phone:
+            conditions.append(SuppressionEntry.phone == phone.strip())
+        row = session.execute(
+            select(SuppressionEntry.id).where(or_(*conditions)).limit(1)
+        ).scalar_one_or_none()
+        if row is not None:
+            return True
+    if linkedin:
+        from app.db.models import LinkedInSuppression  # noqa: PLC0415
+        from app.services.linkedin_outreach import normalize_profile  # noqa: PLC0415
+
+        profile = normalize_profile(linkedin)
+        if profile and session.execute(
+            select(LinkedInSuppression.id).where(LinkedInSuppression.profile == profile)
+        ).scalar_one_or_none() is not None:
+            return True
+    return False
 
 
 # --------------------------------------------------------------------------
@@ -101,6 +118,14 @@ def _lead_exists(session: Session, batch: LeadBatch, raw: RawLead) -> bool:
         .limit(1)
     ).scalar_one_or_none()
     return row is not None
+
+
+def _linkedin_url(payload: dict | None) -> str | None:
+    """Feature Group 2/5: the profile URL Apollo reports (top level on search
+    rows, person.linkedin_url on enrichment)."""
+    from app.services.personalization_context import linkedin_url_from  # noqa: PLC0415
+
+    return linkedin_url_from(payload)
 
 
 def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource | None = None) -> dict:
@@ -130,6 +155,7 @@ def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
             phone=raw.phone,
             enrichment_json={"raw": raw.raw, "company_domain": raw.company_domain},
             status=LeadStatus.SOURCED,
+            linkedin_url=_linkedin_url(raw.raw),
         ))
         try:
             session.commit()  # per-lead commit: crash-safe, resume-safe
@@ -179,6 +205,7 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
             lead.full_name = lead.full_name or enriched.full_name
             lead.title = lead.title or enriched.title
             lead.company = lead.company or enriched.company
+            lead.linkedin_url = lead.linkedin_url or _linkedin_url(enriched.enrichment)
             lead.enrichment_json = {
                 **stored,
                 "company_domain": enriched.company_domain or stored.get("company_domain"),
@@ -284,7 +311,53 @@ def finalize_lead_batch_impl(session: Session, batch_id: uuid.UUID) -> dict:
     batch.stage = BatchStage.FINALIZED
     session.commit()
     logger.info("batch %s finalized: %s", batch_id, batch.summary_json)
+
+    # Feature Group 1: score the leads that survived verification. After the
+    # FINALIZED commit on purpose -- sourcing has succeeded whatever happens
+    # next, and score_batch never raises (a model failure falls back to the
+    # heuristic score).
+    from app.db.models import Strategy as _Strategy  # noqa: PLC0415
+    from app.services import lead_scoring, usage_meter  # noqa: PLC0415
+
+    strategy = session.get(_Strategy, batch.strategy_id) if batch else None
+    with usage_meter.owner_scope(session, strategy, "lead_scoring"):
+        scored = lead_scoring.score_batch(session, batch_id)
+    if scored:
+        logger.info("batch %s: scored %d leads", batch_id, scored)
+    _emit_lead_sourced(session, batch)
     return batch.summary_json
+
+
+def _emit_lead_sourced(session: Session, batch: LeadBatch) -> None:
+    """Feature Group 4: `lead_sourced` to outbound webhooks (Zapier / Make),
+    carrying the batch's verified leads (first 200). Webhook-only -- a push
+    per sourcing batch would be noise. Never raises: sourcing has succeeded."""
+    from app.db.models import Strategy as _Strategy  # noqa: PLC0415
+    from app.services import event_bus, notifications  # noqa: PLC0415
+    from app.workers import notification_tasks  # noqa: PLC0415
+
+    try:
+        strategy = session.get(_Strategy, batch.strategy_id)
+        owner = notifications.owner_of_strategy(session, strategy) if strategy else None
+        if owner is None:
+            return
+        leads = session.execute(
+            select(Lead).where(Lead.batch_id == batch.id, Lead.status == LeadStatus.VERIFIED)
+            .limit(200)
+        ).scalars().all()
+        if not leads:
+            return
+        notification_tasks.enqueue_event(
+            owner, "lead_sourced", push=False, slack=False,
+            title=f"{len(leads)} leads sourced", body="A sourcing batch finished.",
+            deep_link="/pipeline",
+            data={"batchId": str(batch.id), "strategyId": str(batch.strategy_id)},
+            webhook_payload={"batch_id": str(batch.id), "strategy_id": str(batch.strategy_id),
+                             "counts": (batch.summary_json or {}).get("counts", {}),
+                             "leads": [event_bus.lead_payload(lead) for lead in leads]},
+        )
+    except Exception:
+        logger.exception("batch %s: lead_sourced event failed", batch.id)
 
 
 # --------------------------------------------------------------------------

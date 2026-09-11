@@ -142,6 +142,11 @@ class Settings(BaseSettings):
     # this module; it is read here so the redirect target is configuration,
     # not a constant compiled into the redirect handler.
     frontend_url: str = "http://localhost:3000"
+    # Feature Group 8 (white label): a workspace is reachable at
+    # <slug>.<white_label_base_domain>, and a custom domain verifies by a TXT
+    # record or by CNAME-ing to white_label_cname_target. Empty = off.
+    white_label_base_domain: str = ""
+    white_label_cname_target: str = ""
 
     # Which transport actually delivers mail. Deliberately explicit rather than
     # "use resend if a key is present": a production process with a typo'd key
@@ -265,6 +270,17 @@ class Settings(BaseSettings):
     # follow-up delay, so a crashed worker's lock cannot survive to block the
     # next legitimate attempt.
     followup_lock_ttl_seconds: int = 7200
+
+    # --- Feature Group 7: meeting preparation -----------------------------
+    # Output ceiling for one prep brief: eleven structured sections over the
+    # full lead context. A truncated brief is a brief with the opening script
+    # missing -- see anthropic_client.TruncatedResponseError.
+    meeting_prep_max_tokens: int = 4096
+    # The post-meeting follow-up is one short email.
+    meeting_followup_max_tokens: int = 1500
+    # How often the reminder sweep looks for meetings 24h / 1h out. Five
+    # minutes keeps the one-hour reminder within five minutes of the hour.
+    meeting_reminder_sweep_seconds: int = 300
 
     # --- Pipeline engine -------------------------------------------------
     pipeline_step_timeout_seconds: int = 300

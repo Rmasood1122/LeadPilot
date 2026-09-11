@@ -24,7 +24,7 @@ export function SubjectLineCard({ channel = "gmail" }: SubjectLineCardProps) {
     queryFn: () =>
       apiClient
         .get(`/playbook/subject-patterns?channel=${channel}&top_n=5`)
-        .then((r: any) => r.data),
+        ,
   });
 
   return (

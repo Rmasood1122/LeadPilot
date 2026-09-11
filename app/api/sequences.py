@@ -1,8 +1,10 @@
 """Sequence endpoints — create, enroll, inspect (M3)."""
 
 import uuid
+from datetime import datetime, timezone
+from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -76,6 +78,11 @@ class StepIn(BaseModel):
     followup_delay_hours: int = Field(
         default=72, ge=1, le=2160, description="Hours of silence after this "
         "step before the automatic follow-up fires (max 90 days)")
+    # --- Feature Group 5 --------------------------------------------------
+    linkedin_action: Literal["auto", "connect", "message", "inmail"] | None = Field(
+        default=None, description="LinkedIn steps only: 'auto' (default) = "
+        "message if connected, InMail for a Premium lead, else a connection "
+        "request")
 
 
 class SequenceCreate(BaseModel):
@@ -116,11 +123,16 @@ def create_sequence(
     current_user: User = Depends(get_current_user),
 ) -> Sequence:
     strategy = _owned_strategy(db, strategy_id, current_user)
-    if body.channel is ChannelType.LINKEDIN or any(
-        s.channel is ChannelType.LINKEDIN for s in body.steps
-    ):
-        raise HTTPException(status_code=422,
-                            detail="the linkedin channel is not available yet")
+    # Feature Group 5: LinkedIn steps are available. linkedin_action belongs
+    # on LinkedIn steps only, and defaults to `auto` there.
+    for s in body.steps:
+        if (s.channel or body.channel) is ChannelType.LINKEDIN:
+            s.linkedin_action = s.linkedin_action or "auto"
+        elif s.linkedin_action is not None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"step {s.step_no}: linkedin_action is only valid on "
+                       "LinkedIn steps")
     step_nos = [s.step_no for s in body.steps]
     if sorted(step_nos) != list(range(1, len(step_nos) + 1)):
         raise HTTPException(status_code=422,
@@ -193,22 +205,14 @@ def create_sequence(
                             whatsapp_template_id=s.whatsapp_template_id,
                             variable_mapping_json=s.variable_mapping,
                             followup_enabled=s.followup_enabled,
-                            followup_delay_hours=s.followup_delay_hours))
+                            followup_delay_hours=s.followup_delay_hours,
+                            linkedin_action=s.linkedin_action))
     db.commit()
     db.refresh(sequence)
     return sequence
 
 
-@router.post("/sequences/{sequence_id}/enroll", status_code=202)
-def enroll(
-    sequence_id: uuid.UUID,
-    body: EnrollRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> dict:
-    """Enroll matching leads and schedule their first message. Requires a
-    VERIFIED strategy with an active campaign — same gate as sourcing."""
-    sequence = _owned_sequence(db, sequence_id, current_user)
+def _launch_checks(db: Session, sequence: Sequence) -> None:
     strategy = db.get(Strategy, sequence.strategy_id)
     if strategy.status is not StrategyStatus.VERIFIED:
         raise HTTPException(status_code=409,
@@ -218,11 +222,193 @@ def enroll(
                             detail=f"campaign is {strategy.campaign_state}: "
                                    f"{strategy.campaign_pause_reason}")
 
-    enrolled = engine.enroll_leads(db, sequence, lead_statuses=body.lead_statuses)
-    if enrolled and sequence.status is SequenceStatus.DRAFT:
+
+def _launch(db: Session, sequence: Sequence, lead_statuses) -> int:
+    enrolled = engine.enroll_leads(db, sequence, lead_statuses=lead_statuses)
+    if enrolled and sequence.status in (SequenceStatus.DRAFT, SequenceStatus.PENDING_APPROVAL):
         sequence.status = SequenceStatus.ACTIVE
         db.commit()
-    return {"enrolled": enrolled}
+    return enrolled
+
+
+@router.post("/sequences/{sequence_id}/enroll", status_code=202)
+def enroll(
+    sequence_id: uuid.UUID,
+    body: EnrollRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Enroll matching leads and schedule their first message. Requires a
+    VERIFIED strategy with an active campaign — same gate as sourcing.
+
+    Feature Group 8: an SDR's first launch of a sequence, in a workspace that
+    requires approval, is held as `pending_approval` instead -- nothing is
+    enrolled or scheduled until a manager approves it."""
+    sequence = _owned_sequence(db, sequence_id, current_user)
+    _launch_checks(db, sequence)
+    if _needs_approval(db, request, sequence):
+        return _request_approval(db, request, sequence, body)
+    result = {"enrolled": _launch(db, sequence, body.lead_statuses)}
+    # Feature Group 9: launching into a sick sending domain is allowed, but
+    # never silently.
+    from app.services import deliverability  # noqa: PLC0415
+
+    warning = deliverability.launch_warning(db, current_user.id)
+    if warning:
+        result["warning"] = warning
+    return result
+
+
+# --------------------------------------------------------------------------
+# Feature Group 8: manager approval
+# --------------------------------------------------------------------------
+
+
+def _role(request: Request) -> str:
+    return getattr(request.state, "workspace_role", "owner")
+
+
+def _actor(request: Request, fallback: User) -> User:
+    return getattr(request.state, "actor", None) or fallback
+
+
+def _needs_approval(db: Session, request: Request, sequence: Sequence) -> bool:
+    from app.db.models import Workspace  # noqa: PLC0415
+
+    if _role(request) != "sdr" or sequence.approved_at is not None:
+        return False
+    ws_id = getattr(request.state, "workspace_id", None)
+    ws = db.get(Workspace, ws_id) if ws_id else None
+    return ws is None or bool(ws.approval_required)
+
+
+def _request_approval(db: Session, request: Request, sequence: Sequence,
+                      body: EnrollRequest) -> dict:
+    from app.db.models import Workspace  # noqa: PLC0415
+    from app.services import workspaces  # noqa: PLC0415
+    from app.workers import notification_tasks  # noqa: PLC0415
+
+    actor = _actor(request, None)
+    sequence.status = SequenceStatus.PENDING_APPROVAL
+    sequence.approval_requested_by_user_id = actor.id if actor else None
+    sequence.approval_requested_at = datetime.now(timezone.utc)
+    sequence.approval_note = None
+    sequence.approval_payload_json = {"lead_statuses": [s.value for s in body.lead_statuses]}
+    db.commit()
+    ws = db.get(Workspace, getattr(request.state, "workspace_id", None))
+    for user_id in (workspaces.approvers(db, ws) if ws else []):
+        if actor is None or user_id != actor.id:
+            notification_tasks.enqueue_event(
+                user_id, "approval_requested", title="Campaign awaiting approval",
+                body=f"{actor.email if actor else 'An SDR'} wants to launch “{sequence.name}”.",
+                deep_link=f"/campaigns?strategy={sequence.strategy_id}&tab=sequences",
+                data={"sequenceId": str(sequence.id), "strategyId": str(sequence.strategy_id)},
+            )
+    return {"enrolled": 0, "status": SequenceStatus.PENDING_APPROVAL.value}
+
+
+def _require_approver(request: Request) -> None:
+    if _role(request) not in ("owner", "manager"):
+        raise HTTPException(status_code=403, detail="Approving a launch needs a manager.")
+
+
+def _notify_decision(sequence: Sequence, approved: bool, actor: User) -> None:
+    from app.workers import notification_tasks  # noqa: PLC0415
+
+    if sequence.approval_requested_by_user_id is None:
+        return
+    verdict = "approved" if approved else "declined"
+    note = f" Note: {sequence.approval_note}" if sequence.approval_note else ""
+    notification_tasks.enqueue_event(
+        sequence.approval_requested_by_user_id, "approval_decided",
+        title=f"Campaign {verdict}",
+        body=f"{actor.email} {verdict} “{sequence.name}”.{note}",
+        deep_link=f"/campaigns?strategy={sequence.strategy_id}&tab=sequences",
+        data={"sequenceId": str(sequence.id), "approved": str(approved).lower()},
+    )
+
+
+@router.post("/sequences/{sequence_id}/approve")
+def approve_sequence(
+    sequence_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    _require_approver(request)
+    sequence = _owned_sequence(db, sequence_id, current_user)
+    if sequence.status is not SequenceStatus.PENDING_APPROVAL:
+        raise HTTPException(status_code=409, detail="this sequence is not awaiting approval")
+    _launch_checks(db, sequence)
+    actor = _actor(request, current_user)
+    payload = EnrollRequest(**(sequence.approval_payload_json or {}))
+    sequence.approved_by_user_id = actor.id
+    sequence.approved_at = datetime.now(timezone.utc)
+    db.commit()
+    enrolled = _launch(db, sequence, payload.lead_statuses)
+    if sequence.status is SequenceStatus.PENDING_APPROVAL:
+        # Approved, but no lead matched yet: it can be launched again later
+        # without another approval.
+        sequence.status = SequenceStatus.DRAFT
+        db.commit()
+    _notify_decision(sequence, True, actor)
+    return {"status": sequence.status.value, "enrolled": enrolled}
+
+
+class RejectRequest(BaseModel):
+    note: str = Field(default="", max_length=1000)
+
+
+@router.post("/sequences/{sequence_id}/reject")
+def reject_sequence(
+    sequence_id: uuid.UUID,
+    body: RejectRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    _require_approver(request)
+    sequence = _owned_sequence(db, sequence_id, current_user)
+    if sequence.status is not SequenceStatus.PENDING_APPROVAL:
+        raise HTTPException(status_code=409, detail="this sequence is not awaiting approval")
+    sequence.status = SequenceStatus.DRAFT
+    sequence.approval_note = body.note.strip() or None
+    db.commit()
+    _notify_decision(sequence, False, _actor(request, current_user))
+    return {"status": sequence.status.value}
+
+
+@router.get("/approvals")
+def list_approvals(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict]:
+    """Launch requests in this workspace: pending ones, and declined ones
+    (so the SDR can read the note)."""
+    from app.db.models import Product  # noqa: PLC0415
+
+    rows = db.execute(
+        select(Sequence, Product.name)
+        .join(Strategy, Strategy.id == Sequence.strategy_id)
+        .join(Product, Product.id == Strategy.product_id)
+        .where(Product.user_id == current_user.id,
+               Sequence.approval_requested_at.isnot(None),
+               Sequence.approved_at.is_(None))
+        .order_by(Sequence.approval_requested_at.desc())
+    ).all()
+    emails = {u.id: u.email for u in db.execute(select(User).where(User.id.in_(
+        [s.approval_requested_by_user_id for s, _ in rows
+         if s.approval_requested_by_user_id]))).scalars()}
+    return [{
+        "sequence_id": str(s.id), "sequence_name": s.name, "strategy_id": str(s.strategy_id),
+        "campaign": name, "status": s.status.value,
+        "state": "pending" if s.status is SequenceStatus.PENDING_APPROVAL else "declined",
+        "requested_by": emails.get(s.approval_requested_by_user_id),
+        "requested_at": s.approval_requested_at.isoformat() if s.approval_requested_at else None,
+        "note": s.approval_note,
+        "lead_statuses": (s.approval_payload_json or {}).get("lead_statuses", []),
+    } for s, name in rows]
 
 
 @router.get("/sequences/{sequence_id}", response_model=None)

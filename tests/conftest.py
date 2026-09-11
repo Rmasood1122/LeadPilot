@@ -122,6 +122,31 @@ class FakeClaude:
         self.meeting_prompts: list[str] = []
         self.followup_brief_response: object | None = None
         self.followup_prompts: list[str] = []
+        # Feature Group 7. Same contract: dict returned, Exception raised.
+        self.meeting_prep_response: object | None = None
+        self.meeting_prep_prompts: list[str] = []
+        self.followup_email_response: object | None = None
+        self.followup_email_prompts: list[str] = []
+        # Feature Group 1. Same contract: dict returned, Exception raised.
+        self.consensus_response: object | None = None
+        self.consensus_prompts: list[str] = []
+        self.lead_score_response: object | None = None
+        self.lead_score_prompts: list[str] = []
+        # Default lead-score behaviour: baseline + this, so the clamp is
+        # exercised by every scoring test that does not override it.
+        self.lead_score_offset = 30
+        # Feature Group 9: the automated-reply detector (reply_fraud). Same
+        # contract: dict returned, Exception raised; default "human".
+        self.automated_reply_response: object | None = None
+        self.automated_reply_prompts: list[str] = []
+        self.mutation_response: object | None = None
+        self.mutation_prompts: list[str] = []
+        # Feature Group 2.
+        self.style_response: object | None = None
+        self.video_script_response: object | None = None
+        # Every (system, prompt) the personalization engine received, so a
+        # test can assert on the voice suffix and the post/news/video blocks.
+        self.personalization_calls: list[tuple[str, str]] = []
         self.default_reply_class = "interested"
         self.pattern_result = {
             "industry": "fire protection",
@@ -185,9 +210,129 @@ class FakeClaude:
                 return self.followup_brief_response
             return {"brief": "Re-open on their onboarding backlog and ask "
                              "which team owns it today."}
+        if "meeting prep strategist" in system:  # Feature Group 7
+            self.meeting_prep_prompts.append(prompt)
+            if isinstance(self.meeting_prep_response, Exception):
+                raise self.meeting_prep_response
+            if self.meeting_prep_response is not None:
+                return self.meeting_prep_response
+            return {
+                "company_overview": "A 30-person fire protection contractor.",
+                "recent_activity": "Posted about inspection backlogs.",
+                "why_they_booked": 'They replied to step 2: "we are drowning '
+                                   'in inspections".',
+                "pain_points": ["Inspection backlog (inferred from their reply)"],
+                "likely_objections": [{"objection": "We use a spreadsheet",
+                                       "response": "Ask what a missed "
+                                                   "inspection costs."}],
+                "talking_points": ["Lead with the backlog they named"],
+                "discovery_questions": ["Who owns inspection scheduling today?"],
+                "competitive_landscape": "Nothing in our records.",
+                "next_steps": ["Offer a two-week pilot"],
+                "deal_structure": "Monthly retainer per the strategy.",
+                "opening_60_seconds": "Thanks for booking, Sara. You mentioned "
+                                      "your team is drowning in inspections.",
+            }
+        if "post-meeting follow-up writer" in system:  # Feature Group 7
+            self.followup_email_prompts.append(prompt)
+            if isinstance(self.followup_email_response, Exception):
+                raise self.followup_email_response
+            if self.followup_email_response is not None:
+                return self.followup_email_response
+            return {"subject": "Great speaking today",
+                    "body": "Hi Sara,\n\nThanks for the time today."}
+        if "consensus judge" in system:  # Feature Group 1
+            self.consensus_prompts.append(prompt)
+            if isinstance(self.consensus_response, Exception):
+                raise self.consensus_response
+            if self.consensus_response is not None:
+                return self.consensus_response
+            return {"disagreements": [
+                {"topic": "Primary channel", "a_position": "Email first",
+                 "b_position": "LinkedIn first", "severity": "high"},
+                {"topic": "Tone", "a_position": "Formal",
+                 "b_position": "Casual", "severity": "low"},
+            ], "agreement_summary": "Agree on the ICP."}
+        if "lead scoring analyst" in system:  # Feature Group 1
+            self.lead_score_prompts.append(prompt)
+            if isinstance(self.lead_score_response, Exception):
+                raise self.lead_score_response
+            if self.lead_score_response is not None:
+                return self.lead_score_response
+            pairs = re.findall(r'"lead_id": "([^"]+)".*?"baseline": (\d+)', prompt)
+            return {"scores": [
+                {"lead_id": lid, "score": int(base) + self.lead_score_offset,
+                 "reason": "Owner at an ICP-fit company."}
+                for lid, base in pairs
+            ]}
+        if "strategy mutation strategist" in system:  # Feature Group 1
+            self.mutation_prompts.append(prompt)
+            if isinstance(self.mutation_response, Exception):
+                raise self.mutation_response
+            if self.mutation_response is not None:
+                return self.mutation_response
+            return {
+                "diagnosis": "Opens without replies: the offer is not landing.",
+                "messaging_angle": {"current": "Save time on audits",
+                                    "proposed": "Pass your next fire inspection first time",
+                                    "rationale": "Loss aversion beats efficiency."},
+                "channel": {"recommended": "linkedin",
+                            "rationale": "Owners read LinkedIn more than email."},
+                "icp_refinement": {"changes": ["Target companies with 11-50 staff"],
+                                   "rationale": "Smaller firms feel the pain."},
+                "revised_messaging": "Hook: failed inspections cost contracts.",
+            }
         if "sales analyst" in system:  # pattern recognition
             return dict(self.pattern_result)
+        if "writing style analyst" in system:  # Feature Group 2
+            if isinstance(self.style_response, Exception):
+                raise self.style_response
+            if self.style_response is not None:
+                return self.style_response
+            return {"tone": "warm and direct", "formality": 2,
+                    "vocabulary_level": "conversational", "sentence_length": "short",
+                    "avg_words_per_sentence": 11, "humor": "light",
+                    "greeting_style": "Hey <first name>", "signoff_style": "Cheers",
+                    "signature_habits": ["asks one question at the end"],
+                    "do": ["use contractions"], "dont": ["use jargon"],
+                    "summary": "Short, friendly and to the point."}
+        if "video script writer" in system:  # Feature Group 2
+            if isinstance(self.video_script_response, Exception):
+                raise self.video_script_response
+            if self.video_script_response is not None:
+                return self.video_script_response
+            return {"title": "A quick idea for your team",
+                    "script": "Hi Sara, I saw your post about inspections...",
+                    "on_screen": "Their website"}
+        if "cold call script writer" in system:  # Feature Group 6
+            if isinstance(getattr(self, "call_script_response", None), Exception):
+                raise self.call_script_response
+            if getattr(self, "call_script_response", None) is not None:
+                return self.call_script_response
+            return {"first_message": "Hi Sara, this is an AI assistant calling on behalf "
+                                     "of Rehan. You posted about inspections — is now a bad time?",
+                    "objective": "Book a 15-minute call",
+                    "talking_points": ["Inspection backlog"],
+                    "objection_handling": [{"objection": "No time", "response": "Two minutes?"}],
+                    "questions": ["Who owns scheduling?"],
+                    "close": "Would Thursday work?",
+                    "voicemail": "Hi Sara, AI assistant for Rehan here — call back on 555."}
+        if "call transcript analyst" in system:  # Feature Group 6
+            if isinstance(getattr(self, "call_analysis_response", None), Exception):
+                raise self.call_analysis_response
+            if getattr(self, "call_analysis_response", None) is not None:
+                return self.call_analysis_response
+            return {"outcome": "interested", "summary": "Agreed to a Thursday call.",
+                    "objections": ["We already have a vendor"],
+                    "interest_signals": ["'send me a calendar invite'"],
+                    "next_step": "Send invite", "stop_request": False, "sentiment": "positive"}
+        if "LinkedIn message writer" in system:  # Feature Group 5
+            kind = "INMAIL" if "LINKEDIN INMAIL" in prompt else (
+                "NOTE" if "CONNECTION NOTE" in prompt else "MESSAGE")
+            return {"text": f"Hi — {kind.lower()} about your inspection backlog.",
+                    "subject": "Quick question"}
         if "personalization engine" in system:  # M3 message rendering
+            self.personalization_calls.append((system, prompt))
             return {"subject": f"Subject v{self.completions}",
                     "body": f"Hello, this is rendered body v{self.completions}."}
         if "template drafter" in system:  # M4 template generation
@@ -203,6 +348,13 @@ class FakeClaude:
             import re as _re
             numbers = _re.findall(r"\{\{(\d+)\}\} ->", prompt)
             return {n: f"value{n}" for n in numbers}
+        if "automated-reply detector" in system:  # Feature Group 9
+            self.automated_reply_prompts.append(prompt)
+            if isinstance(self.automated_reply_response, Exception):
+                raise self.automated_reply_response
+            if self.automated_reply_response is not None:
+                return self.automated_reply_response
+            return {"automated": False, "reason": "reads like a person"}
         if "reply classifier" in system:  # M3 inbound classification
             body_part = prompt.split("BODY:", 1)[-1]
             for needle, cls in self.reply_verdicts.items():
@@ -260,6 +412,92 @@ def fake_claude(monkeypatch):
 @pytest.fixture()
 def enqueued():
     return []
+
+
+@pytest.fixture(autouse=True)
+def queued_jobs(monkeypatch):
+    """Feature expansion: record jobs instead of publishing them.
+
+    CELERY_ALWAYS_EAGER is declared in app/core/config.py but never applied to
+    the Celery app, so a real `.apply_async()` here would try to reach a Redis
+    broker. The two enqueue helpers are the only publish points the feature
+    expansion adds; autouse so no test (including the pre-existing Calendly
+    and calendar ones, which now request a prep brief) can reach a broker.
+    """
+    jobs = {"prep": [], "events": []}
+
+    def _prep(brief_id):
+        jobs["prep"].append(str(brief_id))
+        return True
+
+    def _event(user_id, event, **kwargs):
+        jobs["events"].append((str(user_id), event, kwargs))
+        return True
+
+    monkeypatch.setattr("app.workers.meeting_prep_tasks.enqueue_generation", _prep)
+    monkeypatch.setattr("app.workers.notification_tasks.enqueue_event", _event)
+
+    jobs["intel"] = []
+
+    def _intel(task, *args):
+        jobs["intel"].append((task.name, args))
+        return True
+
+    monkeypatch.setattr("app.workers.intelligence_tasks.enqueue", _intel)
+
+    jobs["calls"] = []
+
+    def _analysis(call_id):
+        jobs["calls"].append(str(call_id))
+        return True
+
+    monkeypatch.setattr("app.workers.call_tasks.enqueue_analysis", _analysis)
+
+    jobs["analytics"] = []
+
+    def _windows(strategy_id):
+        jobs["analytics"].append(str(strategy_id))
+        return True
+
+    monkeypatch.setattr("app.workers.analytics_tasks.enqueue_send_windows", _windows)
+
+    jobs["crm"] = []
+    jobs["webhooks"] = []
+
+    def _record(bucket, *item):
+        jobs[bucket].append(tuple(str(i) if not isinstance(i, bool) else i for i in item))
+        return True
+
+    monkeypatch.setattr("app.workers.crm_tasks.enqueue_push",
+                        lambda kind, user_id, local_id: _record("crm", "push", kind, user_id,
+                                                                local_id))
+    monkeypatch.setattr("app.workers.crm_tasks.enqueue_sync",
+                        lambda connection_id, full=False: _record("crm", "sync", connection_id,
+                                                                  full))
+    monkeypatch.setattr("app.workers.crm_tasks.enqueue_import",
+                        lambda user_id, remote_id: _record("crm", "import", user_id, remote_id))
+    monkeypatch.setattr("app.workers.webhook_tasks.enqueue_delivery",
+                        lambda delivery_id, countdown=0: _record("webhooks", delivery_id,
+                                                                 countdown))
+    return jobs
+
+
+@pytest.fixture(autouse=True)
+def no_real_anthropic(monkeypatch):
+    """Refuse real Anthropic calls from code paths reached WITHOUT fake_claude.
+
+    The feature expansion added model calls to paths that pre-existing tests
+    exercise without requesting fake_claude -- lead scoring at the end of
+    every sourcing batch is the obvious one. Unguarded, those tests would hit
+    the real API with the placeholder key (and sit through its retry
+    backoff). Every such caller degrades on an exception by design (heuristic
+    score, FAILED brief), so refusing is safe. `fake_claude` patches the same
+    attribute afterwards and wins whenever a test asks for it.
+    """
+    def _refuse():
+        raise RuntimeError("test attempted a real Anthropic call -- use fake_claude")
+
+    monkeypatch.setattr("app.services.anthropic_client.get_client", _refuse)
 
 
 # --------------------------------------------------------------------------

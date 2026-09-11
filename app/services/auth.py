@@ -152,12 +152,56 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     not a deploy.
     """
     header = request.headers.get("Authorization") or ""
+    if not header.startswith("Bearer ") and request.headers.get("X-API-Key"):
+        header = f"Bearer {request.headers['X-API-Key']}"
     if not header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="missing bearer token")
-    user_id = decode_token(header.removeprefix("Bearer ").strip(), "access")
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=401, detail="user not found")
+    token = header.removeprefix("Bearer ").strip()
+
+    # Feature Group 4: a personal API key (Zapier, Make, scripts) instead of
+    # a short-lived access token. It passes through the SAME verification
+    # gate below; deps.require_admin refuses it (request.state.auth_via).
+    from app.services import api_keys  # noqa: PLC0415
+
+    if token.startswith(api_keys.PREFIX):
+        user = api_keys.authenticate(db, token)
+        if user is None:
+            raise HTTPException(status_code=401, detail="invalid or revoked API key")
+        request.state.auth_via = "api_key"
+    else:
+        user_id = decode_token(token, "access")
+        user = db.get(User, user_id)
+        if user is None:
+            raise HTTPException(status_code=401, detail="user not found")
     if settings.require_email_verification and not user.email_verified:
         raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED)
-    return user
+    return _workspace_principal(request, db, user)
+
+
+def _workspace_principal(request: Request, db: Session, actor: User) -> User:
+    """Feature Group 8: WHOSE data this request acts on.
+
+    With an X-Workspace-Id header naming a workspace the actor is a member of,
+    the request acts on that workspace owner's records -- every route that
+    scopes by user_id keeps working unchanged -- and the member's role is
+    enforced here (app/services/rbac.py). `request.state.actor` is always the
+    person who signed in; admin checks and audit use it, never the owner.
+    Personal routes (/auth, /me, /devices, ...) ignore the header.
+    """
+    from app.services import rbac, workspaces  # noqa: PLC0415
+
+    request.state.actor = actor
+    request.state.workspace_role = "owner"
+    header = request.headers.get(workspaces.HEADER)
+    if not header or rbac.is_personal(request.url.path):
+        return actor
+    ctx = workspaces.resolve(db, actor, header)
+    request.state.workspace_id = ctx.workspace.id
+    request.state.workspace_role = ctx.role
+    if ctx.workspace.owner_user_id == actor.id:
+        return actor
+    rbac.enforce(ctx.role, request.method, request.url.path)
+    owner = db.get(User, ctx.workspace.owner_user_id)
+    if owner is None or getattr(owner, "is_suspended", False):
+        raise HTTPException(status_code=403, detail="this workspace is unavailable")
+    return owner

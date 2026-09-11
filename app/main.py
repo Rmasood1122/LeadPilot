@@ -40,6 +40,21 @@ from app.api.support import router as support_router       # Feature 3
 from app.api.crm import router as crm_router           # M9 native CRM
 from app.api.calendar import router as calendar_router   # Engagement Hub F2
 from app.api.meetings import router as meetings_router   # Engagement Hub F3
+# Feature expansion
+from app.api.meeting_prep import router as meeting_prep_router   # FG7
+from app.api.deals import router as deals_router                 # FG3/FG7
+from app.api.admin_integrations import router as admin_integrations_router
+from app.api.ai_intelligence import router as ai_intelligence_router   # FG1
+from app.api.personalization import router as personalization_router   # FG2
+from app.api.linkedin import router as linkedin_router                 # FG5
+from app.api.calls import router as calls_router                       # FG6
+from app.api.revenue_analytics import router as revenue_analytics_router  # FG3
+from app.api.tracking import router as tracking_router                 # FG3
+from app.api.api_keys import router as api_keys_router                 # FG4
+from app.api.crm_integrations import router as crm_integrations_router # FG4
+from app.api.slack_integration import router as slack_router           # FG4
+from app.api.workspaces import router as workspaces_router             # FG8
+from app.api.trust import router as trust_router                       # FG9
 
 # M7
 from app.api.devices import router as devices_router
@@ -184,6 +199,28 @@ app.include_router(crm_router)                   # /crm/* (M9)
 # slot list and its book action, both documented in app/api/calendar.py.
 app.include_router(calendar_router)              # /calendar/* (Feature 2)
 app.include_router(meetings_router)              # /meetings/* (Feature 3)
+# Feature expansion. None of these paths collide with an earlier router (the
+# ui_support.py shadowing lesson): /leads/{id}/meeting-prep and
+# /leads/{id}/meeting-outcome(s) are new sub-paths, /deals and /meeting-prep
+# are new prefixes, and /admin/integrations + /admin/system-settings are not
+# declared by app/api/admin.py.
+app.include_router(meeting_prep_router)          # FG7 briefs + outcomes
+app.include_router(deals_router)                 # /deals
+app.include_router(admin_integrations_router)    # /admin/integrations, /admin/system-settings
+app.include_router(ai_intelligence_router)       # FG1: /strategies/{id}/intelligence, versions, rescore
+# FG2. /public/video is the one unauthenticated route it adds (token + IP limit).
+app.include_router(personalization_router)       # /me/style-profile, /leads/{id}/personalization, /public/video
+# FG5. Its /integrations/linkedin/* paths do not collide with ui_support's
+# /integrations/status or /integrations/{provider}/test (different segments).
+app.include_router(linkedin_router)              # /integrations/linkedin/*, /webhooks/unipile
+app.include_router(calls_router)                 # FG6: /calls, /leads/{id}/call, /webhooks/vapi|elevenlabs
+app.include_router(revenue_analytics_router)     # FG3: /analytics/revenue, /costs, funnel, send-time, sentiment
+app.include_router(tracking_router)              # FG3: /t/o/{token}.gif (public open pixel)
+app.include_router(api_keys_router)              # FG4: /me/api-keys (Zapier / Make auth)
+app.include_router(slack_router)                 # FG4: /integrations/slack/*
+app.include_router(crm_integrations_router)      # FG4: HubSpot / Salesforce + their webhooks
+app.include_router(workspaces_router)            # FG8: /workspaces/*, public /branding
+app.include_router(trust_router)                 # FG9: /deliverability, /compliance/audit
 
 
 # ---------------------------------------------------------------------------

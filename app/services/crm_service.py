@@ -69,12 +69,19 @@ FUNNEL_STAGES: list[LeadStatus] = [
     LeadStatus.CONTACTED,
     LeadStatus.REPLIED,
     LeadStatus.MEETING_BOOKED,
+    # Feature Group 7: the post-meeting stages. OPPORTUNITY and CLOSED_WON
+    # continue the funnel; CLOSED_LOST and DISQUALIFIED are exits, like
+    # `dropped`, and are deliberately not stages.
+    LeadStatus.OPPORTUNITY,
+    LeadStatus.CLOSED_WON,
 ]
 
 # Terminal stages: a lead sitting here is finished, not stuck. Excluded from
 # stuck-lead detection, which would otherwise report every booked meeting and
 # every dropped address as a problem forever.
-TERMINAL_STAGES = {LeadStatus.DROPPED, LeadStatus.MEETING_BOOKED}
+TERMINAL_STAGES = {LeadStatus.DROPPED, LeadStatus.MEETING_BOOKED,
+                   LeadStatus.CLOSED_WON, LeadStatus.CLOSED_LOST,
+                   LeadStatus.DISQUALIFIED}
 
 
 # ---------------------------------------------------------------------------
@@ -866,6 +873,8 @@ GRID_COLUMNS: dict[str, Any] = {
     "created_at": Lead.created_at,
     "updated_at": Lead.updated_at,
     "strategy_id": Lead.strategy_id,
+    # Feature Group 1: sortable so the grid can rank by booking likelihood.
+    "ai_booking_likelihood": Lead.ai_booking_likelihood,
 }
 
 _TEXT_COLUMNS = {"full_name", "title", "company", "email", "phone", "source"}
@@ -1013,6 +1022,8 @@ def grid_page(db: Session, current_user: User, *,
             "next_action_at": (meta.next_action_at.isoformat()
                                if meta and meta.next_action_at else None),
             "followup_status": followups.get(lead.id, FOLLOWUP_NONE),
+            "ai_booking_likelihood": lead.ai_booking_likelihood,
+            "ai_score_reason": lead.ai_score_reason,
         })
 
     return {"items": items, "total": total, "limit": limit, "offset": offset,

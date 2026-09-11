@@ -7,6 +7,7 @@ import {
   Megaphone,
   Route,
   Settings,
+  Users,
   Video,
   type LucideIcon,
 } from "lucide-react";
@@ -40,5 +41,7 @@ export const NAV: NavItem[] = [
   // sure nobody finds them. On mobile this is the 6th of 7 bottom tabs --
   // CRM made it seven, which is tight at 360px but still tappable.
   { href: "/learn", label: "Learn", icon: GraduationCap },
+  // Feature Group 8: members, approvals, white label.
+  { href: "/team", label: "Team", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

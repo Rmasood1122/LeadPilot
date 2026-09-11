@@ -22,6 +22,7 @@ import {
   getRefreshToken,
   setSession,
 } from "../auth-session";
+import { WORKSPACE_HEADER, getActiveWorkspace, setActiveWorkspace } from "../workspace";
 
 export class ApiError extends Error {
   status: number;
@@ -137,6 +138,10 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     if (opts.auth !== false) {
       const token = getAccessTokenSync();
       if (token) headers["Authorization"] = `Bearer ${token}`;
+      // Feature Group 8: act in the selected workspace (the server checks
+      // membership and role on every request).
+      const workspace = getActiveWorkspace();
+      if (workspace) headers[WORKSPACE_HEADER] = workspace;
     }
     return fetch(`${BASE}${path}`, {
       method: opts.method ?? (opts.body || opts.formData ? "POST" : "GET"),
@@ -149,7 +154,13 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   if (resp.status === 401 && opts.auth !== false && (await tryRefresh())) {
     resp = await doFetch();
   }
-  if (!resp.ok) throw await normalizeError(resp);
+  if (!resp.ok) {
+    const error = await normalizeError(resp);
+    // Removed from the selected workspace: fall back to the personal one
+    // rather than failing every request from here on.
+    if (resp.status === 404 && error.detail === "workspace not found") setActiveWorkspace(null);
+    throw error;
+  }
   if (resp.status === 204) return undefined as T;
   return (await resp.json()) as T;
 }
@@ -160,13 +171,27 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 // were written against an `apiClient` object.  The M5 equivalent is the
 // module-level `api<T>()` function — provide a thin adapter here so all
 // call sites compile without changes.
+//
+// FIXED (feature expansion): post/put/patch used to pass
+// `body: JSON.stringify(body)`, and api() stringifies `body` AGAIN -- so every
+// write went out as a JSON *string* ("\"{...}\"") and FastAPI answered 422.
+// Every apiClient write in the app was broken. And seven modules read
+// `.then((r) => r.data)` off a result that is already the parsed body, so
+// every apiClient read rendered `undefined` (the admin users / suppression /
+// task-error pages, the plan card, onboarding, the send-time card). The body
+// is now passed through untouched, and those `.data` reads were removed at
+// the call sites.
+// `T = any` keeps the typing those call sites always had: they were written
+// against `.then((r: any) => ...)`, so their data was `any` all along.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Loose = any;
 export const apiClient = {
-  get:    <T>(path: string, opts?: RequestOptions) => api<T>(path, { method: "GET",    ...opts }),
-  post:   <T>(path: string, body?: unknown, opts?: RequestOptions) =>
-    api<T>(path, { method: "POST",   body: JSON.stringify(body), ...opts }),
-  put:    <T>(path: string, body?: unknown, opts?: RequestOptions) =>
-    api<T>(path, { method: "PUT",    body: JSON.stringify(body), ...opts }),
-  patch:  <T>(path: string, body?: unknown, opts?: RequestOptions) =>
-    api<T>(path, { method: "PATCH",  body: JSON.stringify(body), ...opts }),
-  delete: <T>(path: string, opts?: RequestOptions) => api<T>(path, { method: "DELETE", ...opts }),
+  get:    <T = Loose>(path: string, opts?: RequestOptions) => api<T>(path, { method: "GET",    ...opts }),
+  post:   <T = Loose>(path: string, body?: unknown, opts?: RequestOptions) =>
+    api<T>(path, { method: "POST",   body, ...opts }),
+  put:    <T = Loose>(path: string, body?: unknown, opts?: RequestOptions) =>
+    api<T>(path, { method: "PUT",    body, ...opts }),
+  patch:  <T = Loose>(path: string, body?: unknown, opts?: RequestOptions) =>
+    api<T>(path, { method: "PATCH",  body, ...opts }),
+  delete: <T = Loose>(path: string, opts?: RequestOptions) => api<T>(path, { method: "DELETE", ...opts }),
 };

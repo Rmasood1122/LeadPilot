@@ -22,8 +22,10 @@ import uuid
 from datetime import datetime, time, timezone
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     Float,
@@ -36,6 +38,7 @@ from sqlalchemy import (
     Time,
     UniqueConstraint,
     Uuid,
+    false,
     func,
     text,
     true,
@@ -93,6 +96,14 @@ class LeadStatus(str, enum.Enum):
     CONTACTED = "contacted"
     REPLIED = "replied"
     MEETING_BOOKED = "meeting_booked"
+    # Feature Group 7: what happens AFTER the meeting, written by "Log Meeting
+    # Outcome" (app/services/meeting_followup.py) and by the HubSpot/Salesforce
+    # deal-stage webhooks. VARCHAR-backed, so a data-free addition -- no
+    # migration touches this column.
+    OPPORTUNITY = "opportunity"    # met; interested or needs a follow-up
+    CLOSED_WON = "closed_won"
+    CLOSED_LOST = "closed_lost"
+    DISQUALIFIED = "disqualified"  # met; not a fit
 
 
 class BatchStage(str, enum.Enum):
@@ -109,6 +120,9 @@ class ChannelType(str, enum.Enum):
     EMAIL = "email"
     WHATSAPP = "whatsapp"
     LINKEDIN = "linkedin"
+    # Feature Group 6: AI voice calls (Vapi / ElevenLabs). VARCHAR-backed, so
+    # a data-free addition.
+    PHONE = "phone"
 
 
 class SequenceStatus(str, enum.Enum):
@@ -116,6 +130,9 @@ class SequenceStatus(str, enum.Enum):
     ACTIVE = "active"
     PAUSED = "paused"
     COMPLETED = "completed"
+    # Feature Group 8: an SDR asked to launch it; nothing sends until a
+    # manager approves. VARCHAR(32)-backed, so no column change.
+    PENDING_APPROVAL = "pending_approval"
 
 
 class MessageStatus(str, enum.Enum):
@@ -227,6 +244,11 @@ class CrmActivityKind(str, enum.Enum):
     # touches this column.
     MEETING_COMPLETED = "meeting_completed"
     TASK_CREATED = "task_created"
+    # Feature expansion. Same data-free VARCHAR addition.
+    MEETING_PREP_READY = "meeting_prep_ready"
+    MEETING_OUTCOME_LOGGED = "meeting_outcome_logged"
+    FOLLOWUP_EMAIL_SENT = "followup_email_sent"
+    DEAL_CREATED = "deal_created"
 
 
 class CrmViewType(str, enum.Enum):
@@ -362,6 +384,14 @@ class User(TimestampMixin, Base):
         Boolean, default=False, server_default="0", nullable=False
     )
     email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Feature Group 2 (migration 0025): voice-matched messaging. The samples
+    # are kept so the user can edit and re-run them; only the extracted
+    # PROFILE ever reaches an outreach prompt (see style_profile.py).
+    style_profile_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    style_samples_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    style_profile_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -743,6 +773,34 @@ class Strategy(TimestampMixin, Base):
     personalization_correlation: Mapped[float | None] = mapped_column(
         Float, nullable=True
     )
+    # --- Feature Group 1 (migration 0024) --------------------------------
+    # Live market signals (news + Apollo company data for the ICP) fetched
+    # once, BEFORE Phase 1, and injected into the Phase 1 and 3 prompts. The
+    # exact payload the prompts saw is kept so a strategy stays explainable
+    # after the news has moved on. See app/services/market_intel.py.
+    market_signals_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    market_signals_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # NULL = consensus never ran; "complete" / "partial" (the second model
+    # failed on some sections). See app/services/consensus.py.
+    consensus_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # The idle-campaign mutation sweep's once-per-window guard.
+    last_mutation_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # --- Feature Group 3 (migration 0028): smart send time ----------------
+    # The user's toggle, and the top engagement windows it schedules into:
+    # {"windows": [{dow, hour, score, share, opens, replies}], "opens": n,
+    #  "replies": n}. Computed by app/services/send_windows.py once the
+    # campaign has `send_time_min_opens` opens; NULL until then.
+    smart_send_time: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    send_windows_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    send_windows_computed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     product: Mapped["Product"] = relationship(back_populates="strategies")
     research_steps: Mapped[list["ResearchStep"]] = relationship(
@@ -851,6 +909,81 @@ class Lead(TimestampMixin, Base):
     whatsapp_last_inbound_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Feature Group 1: predictive lead scoring (migration 0024) -------
+    # 0-100. NULL = never scored (leads sourced before the feature, or
+    # scoring disabled), which sorts LAST rather than reading as zero.
+    # Indexed because the leads list sorts by it by default.
+    ai_booking_likelihood: Mapped[int | None] = mapped_column(
+        Integer, nullable=True, index=True
+    )
+    ai_score_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # The factor values the score was built from (seniority, industry match,
+    # verification, company signals, playbook history, heuristic baseline) --
+    # so a score can always be explained, and re-derived without the model.
+    ai_score_factors: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ai_scored_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # --- Feature Group 2: hyper-personalization (migration 0025) ----------
+    # Captured from Apollo at sourcing (person.linkedin_url); editable by hand.
+    # Also the address Feature Group 5's LinkedIn channel sends to.
+    linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # The lead's three most recent posts [{text, posted_at, url}] and when they
+    # were fetched (cached 7 days). [] means "fetched, and they post nothing";
+    # NULL means "never fetched" -- two different facts.
+    linkedin_posts_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    linkedin_posts_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Last-30-day articles naming the company [{headline, summary, url,
+    # source, published_at}] (cached 3 days).
+    company_news_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    company_news_fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # {status: suggested|recorded|skipped, title, script, on_screen,
+    #  share_url, embed_id, suggested_at, recorded_at} -- see loom_video.py.
+    loom_video_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # --- Feature Group 5: LinkedIn channel state (migration 0026) ---------
+    # Unipile's id for the person; indexed because every inbound LinkedIn
+    # event is matched back to a lead by it.
+    linkedin_provider_id: Mapped[str | None] = mapped_column(
+        String(120), nullable=True, index=True
+    )
+    # The LEAD's Premium flag (Open Profile) -- decides InMail vs connection
+    # request for step 1. NULL = not looked up yet.
+    linkedin_is_premium: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    # NULL (no request) | pending | connected
+    linkedin_connection_status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True
+    )
+    linkedin_invited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    linkedin_connected_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # The ONE connected account that owns this relationship; every later
+    # touch goes from it (see app/services/linkedin_limits.py).
+    linkedin_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("linkedin_accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    linkedin_chat_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # --- Feature Group 6: AI phone calls (migration 0027) -----------------
+    # PRIOR EXPRESS CONSENT to be called by an AI voice. Since the FCC's
+    # February 2024 ruling, AI-generated voices are "artificial voice" under
+    # the US TCPA, so an AI cold call (or voicemail drop) to a US number needs
+    # it; the phone channel refuses to call without it unless an admin has
+    # turned the requirement off (see phone_calls.consent_ok).
+    phone_consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    phone_consent_source: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Denormalized from the latest `calls` row so lists can show it cheaply.
+    last_call_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_call_outcome: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     strategy: Mapped["Strategy"] = relationship(back_populates="leads")
     batch: Mapped["LeadBatch | None"] = relationship(back_populates="leads")
@@ -873,6 +1006,21 @@ class Sequence(TimestampMixin, Base):
         _enum(SequenceStatus), default=SequenceStatus.DRAFT
     )
     booking_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # --- Feature Group 8 (migration 0030): the manager approval workflow --
+    # `approval_payload_json` is the launch request the SDR made (which lead
+    # statuses to enroll), replayed verbatim when a manager approves.
+    approval_requested_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    approval_requested_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    approved_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approval_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approval_payload_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     strategy: Mapped["Strategy"] = relationship(back_populates="sequences")
     steps: Mapped[list["SequenceStep"]] = relationship(
@@ -934,6 +1082,11 @@ class SequenceStep(TimestampMixin, Base):
     followup_delay_hours: Mapped[int] = mapped_column(
         Integer, default=72, server_default=text("72"), nullable=False
     )
+    # --- Feature Group 5 (migration 0026): LinkedIn steps only ------------
+    # auto | connect | message | inmail. `auto` = message if connected,
+    # InMail for a Premium lead, else a connection request. NULL on every
+    # non-LinkedIn step.
+    linkedin_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     sequence: Mapped["Sequence"] = relationship(back_populates="steps")
 
@@ -1010,6 +1163,26 @@ class Message(TimestampMixin, Base):
     # M8-C4 (migration 0010_m8c4): field-presence personalization score
     # computed at send time (0.0–1.0).
     personalization_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Feature Group 2 (migration 0025): what this message was written FROM --
+    # {linkedin_post_url, news_url, style_profile: bool, loom_cta: bool}.
+    # Kept so "why did the email open with that?" has an answer, and so the
+    # learning loop can later compare post-hooked against news-hooked emails.
+    personalization_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Feature Group 5 (migration 0026): what a LinkedIn send actually did
+    # (connect / message / inmail -- `auto` resolved) and from which account.
+    linkedin_action: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    linkedin_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("linkedin_accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    # --- Feature Group 3 (migration 0028): email open tracking ------------
+    # First genuine open (the tracking pixel, minus the prefetch window --
+    # see app/services/open_tracking.py) and how many times it was loaded.
+    # The OPENED outcome row is written once, on the first open; the counter
+    # is what "opened 4 times" in the lead timeline reads.
+    opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    open_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
 
     sequence: Mapped["Sequence"] = relationship(back_populates="messages")
     lead: Mapped["Lead"] = relationship(back_populates="messages")
@@ -1297,8 +1470,11 @@ class IntegrationToken(TimestampMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    # NULL = SYSTEM scope: a deployment-wide credential set by an admin (the
+    # OpenAI key behind the consensus engine, the Slack app's client secret).
+    # Nullable since migration 0023; see app/services/credentials.py.
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
     )
     provider: Mapped[str] = mapped_column(String(40), index=True)   # apollo, hunter, gmail...
     token_kind: Mapped[str] = mapped_column(String(40), default="api_key")
@@ -1356,6 +1532,14 @@ class WebhookTarget(TimestampMixin, Base):
     event_types: Mapped[list] = mapped_column(JSON, default=list)
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # --- Feature Group 4 (migration 0029) ---------------------------------
+    # api | zapier | make -- who registered it. A Zapier REST-hook
+    # subscription is removed by Zapier itself when the Zap is turned off.
+    source: Mapped[str] = mapped_column(
+        String(20), default="api", server_default="api", nullable=False
+    )
+    # Why the target stopped receiving (e.g. "410 Gone from receiver").
+    disabled_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class WebhookDelivery(Base):
@@ -1380,6 +1564,11 @@ class WebhookDelivery(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Feature Group 4 (migration 0029): the M8 code wrote this column and it
+    # never existed; the delivery log shows it.
+    last_attempt_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -1962,3 +2151,880 @@ class MeetingParticipant(Base):
     )
 
     meeting: Mapped["Meeting"] = relationship(back_populates="participants")
+
+
+# --------------------------------------------------------------------------
+# Feature expansion — foundation (migration 0023)
+# --------------------------------------------------------------------------
+
+
+class SystemSetting(Base):
+    """One admin-controlled, deployment-wide setting.
+
+    The allowed keys, their types and their defaults are declared in
+    app/services/system_settings.py::DEFAULTS, not here: a key with no row
+    reads as its default, so an empty table is a correctly configured
+    deployment. `value_json` wraps the value as {"v": ...} so a bare boolean
+    or number round-trips through every JSON column implementation the same.
+    """
+
+    __tablename__ = "system_settings"
+    __table_args__ = (
+        UniqueConstraint("key", name="system_setting_key"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    key: Mapped[str] = mapped_column(String(80), nullable=False)
+    value_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature Group 7 — meeting preparation, outcomes, deals (migration 0023)
+# --------------------------------------------------------------------------
+
+
+class MeetingPrepStatus(str, enum.Enum):
+    PENDING = "pending"
+    GENERATING = "generating"
+    READY = "ready"
+    FAILED = "failed"
+
+
+class MeetingOutcomeKind(str, enum.Enum):
+    """The five choices behind "Log Meeting Outcome"."""
+    INTERESTED = "interested"
+    NEEDS_FOLLOW_UP = "needs_follow_up"
+    NOT_A_FIT = "not_a_fit"
+    CLOSED_WON = "closed_won"
+    CLOSED_LOST = "closed_lost"
+
+
+class DealStage(str, enum.Enum):
+    OPEN = "open"
+    WON = "won"
+    LOST = "lost"
+
+
+class Deal(TimestampMixin, Base):
+    """Revenue, linked back to the lead and campaign that produced it.
+
+    MONEY IS INTEGER CENTS. A Float column cannot represent 0.10 exactly, and
+    the revenue dashboard sums these across campaigns -- summing floats is how
+    an ROI figure ends up off by a cent that nobody can explain. Numeric would
+    also work on PostgreSQL but round-trips through SQLite as a float with a
+    warning, and the test suite runs on SQLite.
+
+    `strategy_id` IS "the campaign": in this schema one strategy owns one
+    outreach campaign (see Strategy.campaign_state). It is denormalized from
+    the lead rather than joined through it, because a deal can outlive its
+    lead (GDPR delete sets lead_id NULL) and still has to count toward the
+    campaign that earned it.
+    """
+
+    __tablename__ = "deals"
+    __table_args__ = (
+        Index("ix_deals_user_close", "user_id", "close_date"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    value_cents: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    currency: Mapped[str] = mapped_column(
+        String(3), default="USD", server_default="USD", nullable=False
+    )
+    stage: Mapped[DealStage] = mapped_column(
+        _enum(DealStage), default=DealStage.OPEN, index=True
+    )
+    close_date: Mapped[datetime | None] = mapped_column(Date, nullable=True)
+    # manual | meeting_outcome | hubspot | salesforce
+    source: Mapped[str] = mapped_column(
+        String(30), default="manual", server_default="manual", nullable=False
+    )
+    # The CRM's own id for this deal once synced (HubSpot deal id,
+    # Salesforce Opportunity id), so a stage-change webhook can find it.
+    external_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    lead: Mapped["Lead | None"] = relationship()
+
+
+class MeetingPrepBrief(TimestampMixin, Base):
+    """The document a user reads before a booked call.
+
+    ONE ROW PER BOOKING, NOT PER GENERATION. (lead, source, external_ref) is
+    unique -- external_ref is the Calendly event URI or our own booking id --
+    so a Calendly retry, or the same booking reaching both paths, cannot
+    produce two briefs, and "Regenerate" rewrites this row in place.
+
+    The row doubles as the REMINDER LEDGER. reminder_24h_sent_at and
+    reminder_1h_sent_at are claimed by a conditional UPDATE before a reminder
+    goes out, which is what makes the five-minute sweep at-most-once across
+    any number of workers. `cancelled_at` stops both.
+
+    `content_md` is the rendered brief; `sections_json` and `profile_json` are
+    the structured halves it was rendered from, kept so the UI can lay the
+    brief out as cards and the one-hour reminder can lift the opening script
+    without re-parsing Markdown.
+    """
+
+    __tablename__ = "meeting_prep_briefs"
+    __table_args__ = (
+        UniqueConstraint("lead_id", "source", "external_ref",
+                         name="meeting_prep_brief_source_ref"),
+        Index("ix_meeting_prep_briefs_start", "meeting_start_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True
+    )
+    booking_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("calendar_bookings.id", ondelete="SET NULL"), nullable=True
+    )
+    # calendly | leadpilot_calendar | manual
+    source: Mapped[str] = mapped_column(String(30))
+    external_ref: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    meeting_start_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    meeting_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    status: Mapped[MeetingPrepStatus] = mapped_column(
+        _enum(MeetingPrepStatus), default=MeetingPrepStatus.PENDING, index=True
+    )
+    content_md: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sections_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    profile_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    opening_script: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    notified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reminder_24h_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reminder_1h_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    lead: Mapped["Lead"] = relationship()
+
+
+class MeetingOutcome(TimestampMixin, Base):
+    """One "Log Meeting Outcome" submission and the follow-up it produced.
+
+    Append-only in spirit: a second submission for the same lead is a second
+    row (the meeting went well, then the deal fell through a week later), and
+    the lead's status reflects the latest. `previous_status` / `new_status`
+    record exactly what this submission changed, so an accidental click is
+    reversible by reading one row.
+
+    The follow-up email lives here, not only in Gmail. Gmail is where the user
+    sends it from, but a revoked grant, a missing scope or a deleted draft
+    must not lose the text the model wrote -- the UI can always show it and
+    offer "copy" when `draft_status` is not `draft_saved`.
+    """
+
+    __tablename__ = "meeting_outcomes"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    meeting_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meetings.id", ondelete="SET NULL"), nullable=True
+    )
+    brief_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting_prep_briefs.id", ondelete="SET NULL"), nullable=True
+    )
+    deal_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("deals.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome: Mapped[MeetingOutcomeKind] = mapped_column(_enum(MeetingOutcomeKind))
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    previous_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    new_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    followup_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    followup_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # pending | draft_saved | sent | not_connected | reauth_required |
+    # suppressed | no_address | generation_failed | failed
+    draft_status: Mapped[str] = mapped_column(
+        String(30), default="pending", server_default="pending", nullable=False
+    )
+    draft_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    gmail_draft_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    gmail_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    lead: Mapped["Lead"] = relationship()
+
+
+# --------------------------------------------------------------------------
+# Feature Group 1 — AI intelligence layer (migration 0024)
+# --------------------------------------------------------------------------
+
+
+class StrategyModelOutput(Base):
+    """One model's raw answer to one research step, when consensus ran.
+
+    Claude's answer is ALSO the step's research_steps.output -- it stays the
+    canonical text the document is assembled from. This table keeps both
+    models' raw outputs side by side, which is what the "compare" view on an
+    uncertain zone shows and what an audit of a disagreement needs.
+
+    Unique per (strategy, pipeline, step, provider): a resumed pipeline that
+    re-runs a step replaces its row rather than accumulating copies.
+    """
+
+    __tablename__ = "strategy_model_outputs"
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "pipeline", "step_no", "provider",
+                         name="strategy_model_output_step_provider"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    pipeline: Mapped[PipelineKind] = mapped_column(_enum(PipelineKind))
+    phase: Mapped[int] = mapped_column(Integer)
+    step_no: Mapped[int] = mapped_column(Integer)
+    provider: Mapped[str] = mapped_column(String(20))   # anthropic | openai
+    model: Mapped[str] = mapped_column(String(64))
+    output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class StrategyUncertainZone(Base):
+    """A section where Claude and GPT-4o meaningfully disagreed.
+
+    "Meaningfully" is the consensus judge's call, instructed to ignore
+    wording, ordering and emphasis and to flag only different
+    recommendations, contradictory facts, or a different target
+    segment/channel/price. Only medium and high severity are stored.
+    `similarity` is the TF-IDF cosine of the two outputs -- a second, dumb
+    signal kept next to the judge's verdict so a zone is never just the
+    opinion of a model about two models.
+    """
+
+    __tablename__ = "strategy_uncertain_zones"
+    __table_args__ = (
+        Index("ix_strategy_uncertain_zones_step", "strategy_id", "pipeline", "step_no"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    pipeline: Mapped[PipelineKind] = mapped_column(_enum(PipelineKind))
+    phase: Mapped[int] = mapped_column(Integer)
+    step_no: Mapped[int] = mapped_column(Integer)
+    section_title: Mapped[str] = mapped_column(String(200))
+    topic: Mapped[str] = mapped_column(String(300))
+    claude_position: Mapped[str] = mapped_column(Text)
+    gpt_position: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(10))    # medium | high
+    similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class StrategyVersion(TimestampMixin, Base):
+    """A revision of a strategy's document -- today, a MUTATION.
+
+    Version 1 is a snapshot of the document as the pipeline produced it,
+    written the first time anything mutates it, so "what did we start from"
+    is always answerable. Later versions point at their parent.
+
+    A mutation is PROPOSED, never applied on its own: it can change the
+    messaging every future email is written from, and that is the user's
+    call. `status`: original | proposed | applied | superseded | dismissed.
+    """
+
+    __tablename__ = "strategy_versions"
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "version_no", name="strategy_version_no"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    version_no: Mapped[int] = mapped_column(Integer)
+    parent_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategy_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    document: Mapped[str] = mapped_column(Text)
+    change_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # {diagnosis, messaging_angle, channel, icp_refinement}
+    changes_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # The outcome numbers the mutation was reasoned from, frozen.
+    outcome_snapshot_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    trigger: Mapped[str] = mapped_column(String(30))   # original | idle_no_replies | manual
+    status: Mapped[str] = mapped_column(
+        String(20), default="proposed", server_default="proposed", nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    applied_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature Group 5 — LinkedIn channel (migration 0026)
+# --------------------------------------------------------------------------
+
+
+class LinkedInAccount(TimestampMixin, Base):
+    """One LinkedIn account a user connected through Unipile.
+
+    The user signs in on Unipile's hosted page; LeadPilot stores only the
+    Unipile account id, never a LinkedIn credential. Several per user is the
+    point: sends rotate across them (linkedin_limits.pick_account) so no one
+    account exceeds its daily ceiling.
+
+    Daily usage lives in Redis (TTL'd per day), not here -- it is a counter
+    that must be atomic across workers and forgotten at midnight. What lives
+    here is what outlasts a day: whether the account can send InMail, how many
+    InMail credits it has, and how many it has spent.
+    """
+
+    __tablename__ = "linkedin_accounts"
+    __table_args__ = (
+        UniqueConstraint("unipile_account_id", name="linkedin_account_unipile_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    unipile_account_id: Mapped[str] = mapped_column(String(120))
+    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    profile_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Premium / Sales Navigator on OUR side -- required to send InMail.
+    has_premium: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    # NULL = unknown (Unipile did not report a balance); sending InMail is
+    # then allowed and the provider is the judge.
+    inmail_credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    inmail_sent_total: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    # ok | credentials_needed | restricted -- from Unipile account events.
+    status: Mapped[str] = mapped_column(
+        String(30), default="ok", server_default="ok", nullable=False
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class LinkedInSuppression(Base):
+    """LinkedIn profiles that must never be contacted on LinkedIn again.
+
+    A table beside `suppression_list` rather than a third column on it:
+    suppression_list's CHECK constraint requires an email or a phone, and
+    rewriting that constraint in a SQLite batch migration is exactly the kind
+    of change that silently drops a constraint. lead_tasks.is_suppressed
+    checks both, so every send path honours both.
+
+    `profile` is the normalised public identifier (the slug after
+    linkedin.com/in/, lower-cased), so two spellings of one URL match.
+    """
+
+    __tablename__ = "linkedin_suppressions"
+    __table_args__ = (
+        UniqueConstraint("profile", name="linkedin_suppression_profile"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    profile: Mapped[str] = mapped_column(String(200))
+    reason: Mapped[str] = mapped_column(String(200))
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature Group 6 — AI phone calls (migration 0027)
+# --------------------------------------------------------------------------
+
+
+class CallOutcome(str, enum.Enum):
+    VOICEMAIL_DROPPED = "voicemail_dropped"   # voicemail detected, message left
+    VOICEMAIL = "voicemail"                   # voicemail detected, no message left
+    NO_ANSWER = "no_answer"
+    ANSWERED = "answered"                     # a conversation, not yet classified
+    INTERESTED = "interested"
+    NOT_INTERESTED = "not_interested"
+    FAILED = "failed"
+
+
+class Call(TimestampMixin, Base):
+    """One AI outbound call to one lead.
+
+    Created in the send path BEFORE the provider is asked to dial, so the
+    script and voicemail that were prepared survive a provider failure. The
+    provider's end-of-call webhook fills in what happened; the transcript
+    analysis (Claude) fills `analysis_json` and settles `outcome`.
+
+    `provider_call_id` is unique: the webhook finds the call by it, and a
+    retried webhook delivery updates the same row.
+    """
+
+    __tablename__ = "calls"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_call_id", name="call_provider_id"),
+        Index("ix_calls_strategy_created", "strategy_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(String(20))       # vapi | elevenlabs
+    provider_call_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    to_number: Mapped[str] = mapped_column(String(40))
+    # queued | ringing | in_progress | ended | failed
+    status: Mapped[str] = mapped_column(
+        String(20), default="queued", server_default="queued", nullable=False
+    )
+    outcome: Mapped[CallOutcome | None] = mapped_column(_enum(CallOutcome), nullable=True,
+                                                        index=True)
+    # {first_message, objective, talking_points, objection_handling,
+    #  questions, close}
+    script_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    voicemail_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    voicemail_audio_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    recording_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    transcript: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ended_reason: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # {outcome, summary, objections[], interest_signals[], next_step, sentiment}
+    analysis_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    lead: Mapped["Lead"] = relationship()
+
+
+# ==========================================================================
+# Feature Group 3 -- analytics & revenue intelligence (migration 0028)
+# ==========================================================================
+
+
+class CampaignCost(TimestampMixin, Base):
+    """A cost the user records against a campaign (or the whole account).
+
+    `strategy_id` NULL = an account-wide cost (the Apollo subscription, a
+    sales tool): the revenue report spreads those across campaigns by their
+    share of sends in the period, so a campaign's cost per meeting is not
+    flattered just because its data bill was paid centrally. Time is a cost
+    too -- `hours` is kept so "4.5 h at $60" stays legible after the fact.
+
+    Integer cents, for the same reason as Deal.value_cents.
+    """
+
+    __tablename__ = "campaign_costs"
+    __table_args__ = (
+        Index("ix_campaign_costs_user_incurred", "user_id", "incurred_on"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # data | tools | ai | time | ads | other
+    category: Mapped[str] = mapped_column(String(20), default="other")
+    description: Mapped[str] = mapped_column(String(300), default="")
+    amount_cents: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    currency: Mapped[str] = mapped_column(
+        String(3), default="USD", server_default="USD", nullable=False
+    )
+    hours: Mapped[float | None] = mapped_column(Float, nullable=True)
+    incurred_on: Mapped[datetime] = mapped_column(Date)
+
+
+class ApiUsage(Base):
+    """Metered model/API spend, attributed to the campaign that caused it.
+
+    Written by app/services/usage_meter.py when a metering scope closes (the
+    pipeline run, one send, a scoring batch). `cost_micros` is millionths of
+    a US dollar -- one Claude call costs fractions of a cent, and integer
+    cents would round most of them to zero. The price used is the admin's
+    configured estimate AT THE TIME of the call, so changing a price later
+    does not rewrite history. Immutable: no updated_at.
+    """
+
+    __tablename__ = "api_usage"
+    __table_args__ = (
+        Index("ix_api_usage_strategy_ts", "strategy_id", "ts"),
+        Index("ix_api_usage_user_ts", "user_id", "ts"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    provider: Mapped[str] = mapped_column(String(30))       # anthropic | openai
+    model: Mapped[str] = mapped_column(String(80), default="")
+    purpose: Mapped[str] = mapped_column(String(40), default="other")
+    calls: Mapped[int] = mapped_column(Integer, default=1)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_micros: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ReplySentimentWeek(TimestampMixin, Base):
+    """One campaign-week of reply classifications (Monday-start, UTC).
+
+    Written by the weekly Beat task; the objection-spike alert compares a
+    week with the one before and stamps `alerted_at` so a re-run never alerts
+    twice for the same week. Only HUMAN replies are counted -- out-of-office,
+    bounces and automated responses are not sentiment.
+    """
+
+    __tablename__ = "reply_sentiment_weeks"
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "week_start", name="sentiment_strategy_week"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    week_start: Mapped[datetime] = mapped_column(Date)
+    total: Mapped[int] = mapped_column(Integer, default=0)
+    interested: Mapped[int] = mapped_column(Integer, default=0)
+    question: Mapped[int] = mapped_column(Integer, default=0)
+    objection: Mapped[int] = mapped_column(Integer, default=0)
+    not_interested: Mapped[int] = mapped_column(Integer, default=0)
+    unsubscribe: Mapped[int] = mapped_column(Integer, default=0)
+    objection_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# ==========================================================================
+# Feature Group 4 -- CRM & ecosystem (migration 0029)
+# ==========================================================================
+
+
+class CrmConnection(TimestampMixin, Base):
+    """One user's connection to an external CRM (HubSpot or Salesforce).
+
+    Tokens are NOT here -- they live encrypted in TokenStore under the
+    provider name. This row holds what is not secret and must be queryable:
+    which HubSpot portal / Salesforce org the user connected (an inbound
+    webhook names the portal, and this is how it finds the user), the
+    Salesforce instance URL, and the sync health the settings page shows.
+    """
+
+    # "external_" keeps these apart from M9's native CRM tables (crm_*), which
+    # tests/test_crm_migration.py pins to migration 0019 by prefix.
+    __tablename__ = "external_crm_connections"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", name="crm_connection_user_provider"),
+        Index("ix_external_crm_connections_provider_account", "provider", "account_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(20))          # hubspot | salesforce
+    account_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    account_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    instance_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # connected | error | revoked
+    status: Mapped[str] = mapped_column(
+        String(20), default="connected", server_default="connected", nullable=False
+    )
+    last_push_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_pull_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    settings_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class CrmSyncLink(TimestampMixin, Base):
+    """A LeadPilot record <-> the CRM record it is synced with.
+
+    Both directions are unique: one lead is one HubSpot contact, and one
+    HubSpot contact is one lead, per user. That is what makes sync
+    idempotent -- a retried push updates the linked record instead of
+    creating a duplicate contact, and an inbound change finds exactly one
+    local row to apply to. `local_id` has no foreign key because it points at
+    a lead OR a deal (`local_type`); deleting either removes its links in
+    app/services/crm_sync.py.
+    """
+
+    __tablename__ = "external_crm_links"
+    __table_args__ = (
+        UniqueConstraint("user_id", "provider", "local_type", "local_id",
+                         name="crm_link_local"),
+        UniqueConstraint("user_id", "provider", "remote_type", "remote_id",
+                         name="crm_link_remote"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(20))
+    local_type: Mapped[str] = mapped_column(String(10))        # lead | deal
+    local_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    remote_type: Mapped[str] = mapped_column(String(20))       # contact | deal | lead | opportunity
+    remote_id: Mapped[str] = mapped_column(String(64))
+    last_pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_pulled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    remote_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class ApiKey(Base):
+    """A long-lived personal API key (Zapier, Make, scripts).
+
+    Access tokens expire in minutes, which no Zap can live with. The key is
+    shown ONCE at creation; only its SHA-256 is stored, so a database leak
+    does not leak working keys. `prefix` (the first characters) is kept in
+    clear so the user can tell keys apart in the list.
+    """
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    prefix: Mapped[str] = mapped_column(String(16))
+    key_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ==========================================================================
+# Feature Group 8 -- workspaces, roles, approvals, white label (migration 0030)
+# ==========================================================================
+
+
+class Workspace(TimestampMixin, Base):
+    """A team around ONE owner's account.
+
+    The workspace's data is its owner's data: every product, strategy, lead
+    and integration keeps its existing `user_id` ownership, and a member
+    acting in the workspace acts on the owner's records (app/services/auth.py
+    ::get_current_user resolves that). Nothing that already scopes by
+    Product.user_id had to change, which is the point -- thirteen modules
+    resolve ownership that way.
+
+    Every user has exactly one workspace they own (created on first use);
+    they may be a member of any number of others.
+    """
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(60), unique=True, index=True)
+    owner_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    # SDR campaign launches wait for a manager (the owner can turn it off).
+    approval_required: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    # --- white label ---------------------------------------------------------
+    white_label_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    brand_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    primary_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    support_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    custom_domain: Mapped[str | None] = mapped_column(
+        String(253), unique=True, index=True, nullable=True
+    )
+    domain_verification_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    domain_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class WorkspaceMember(Base):
+    """A user's role in a workspace: owner | manager | sdr | viewer."""
+
+    __tablename__ = "workspace_members"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "user_id", name="workspace_member"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    role: Mapped[str] = mapped_column(String(20))
+    invited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class WorkspaceInvitation(Base):
+    """An emailed invitation. Only the token's SHA-256 is stored; the link in
+    the email is the only copy of the token."""
+
+    __tablename__ = "workspace_invitations"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(20))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    invited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# ==========================================================================
+# Feature Group 9 -- trust & deliverability (migration 0031)
+# ==========================================================================
+
+
+class DeliverabilityCheck(Base):
+    """One health or blacklist check of one sending domain. Append-only: the
+    history is what the health chart and the "newly listed?" test read."""
+
+    __tablename__ = "deliverability_checks"
+    __table_args__ = (
+        Index("ix_deliverability_checks_user_kind_checked", "user_id", "kind", "checked_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    domain: Mapped[str] = mapped_column(String(253))
+    kind: Mapped[str] = mapped_column(String(20))            # health | blacklist
+    source: Mapped[str] = mapped_column(String(20))          # dns | mailreach | mxtoolbox | dnsbl
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    listed_on: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    details_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ComplianceAuditLog(Base):
+    """What LeadPilot knew and decided, per send, about the rules that apply
+    to its recipient -- region, regime, the checks made and the outcome.
+    Append-only. Survives a GDPR erase with the lead reference nulled, so the
+    fact that a lawful decision was made outlives the personal data."""
+
+    __tablename__ = "compliance_audit_log"
+    __table_args__ = (
+        Index("ix_compliance_audit_log_user_ts", "user_id", "ts"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    channel: Mapped[str] = mapped_column(String(20))
+    region: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    regime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # sent | blocked_suppressed | skipped_no_consent | ...
+    decision: Mapped[str] = mapped_column(String(30))
+    checks_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

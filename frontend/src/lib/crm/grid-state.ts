@@ -46,6 +46,10 @@ export const GRID_COLUMNS: GridColumnDef[] = [
   { key: "title", label: "Title", sortable: true, filterable: true, editable: false, defaultWidth: 180 },
   { key: "email", label: "Email", sortable: true, filterable: true, editable: false, defaultWidth: 240 },
   { key: "status", label: "Status", sortable: true, filterable: true, editable: true, defaultWidth: 150 },
+  // Feature Group 1. Sortable (crm_service.GRID_COLUMNS knows it); not
+  // filterable (the server's filters are text/`in`), never editable -- the
+  // score is the model's and the data's, and Rescore is how to change it.
+  { key: "ai_booking_likelihood", label: "AI score", sortable: true, filterable: false, editable: false, defaultWidth: 100, numeric: true },
   { key: "tags", label: "Tags", sortable: false, filterable: false, editable: true, defaultWidth: 200 },
   { key: "priority", label: "Priority", sortable: false, filterable: false, editable: true, defaultWidth: 120 },
   { key: "owner_user_id", label: "Owner", sortable: false, filterable: false, editable: true, defaultWidth: 140 },

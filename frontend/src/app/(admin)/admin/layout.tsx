@@ -6,7 +6,7 @@ import { useAuthStore } from "@/lib/stores/authStore";
 import { LogoMark } from "@/components/ui/Logo";
 import {
   Users, AlertCircle, Shield, BookOpen, Heart, Zap, List,
-  GraduationCap, LifeBuoy
+  GraduationCap, LifeBuoy, KeyRound, SlidersHorizontal
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -18,6 +18,10 @@ const NAV_ITEMS = [
   { href: "/admin/support-tickets",  label: "Support Tickets",   icon: LifeBuoy   },
   { href: "/admin/tutorials",        label: "Tutorials",         icon: GraduationCap },
   { href: "/admin/health",           label: "System Health",     icon: Heart      },
+  // Feature expansion: deployment-wide API keys (TokenStore, never env vars)
+  // and the feature switches/limits the new features read.
+  { href: "/admin/integrations",     label: "Integrations",      icon: KeyRound   },
+  { href: "/admin/system-settings",  label: "System Settings",   icon: SlidersHorizontal },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -253,7 +253,8 @@ def get_celery_stats() -> dict[str, Any]:
     try:
         from app.core.redis_client import get_sync_redis
         redis = get_sync_redis()
-        for queue_name in ["pipeline", "outreach", "learning", "default"]:
+        for queue_name in ["pipeline", "outreach", "learning", "default",
+                           "notifications"]:
             depth = redis.llen(queue_name)
             stats["queues"][queue_name] = {"depth": depth}
     except Exception as e:

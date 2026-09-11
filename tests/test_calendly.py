@@ -128,14 +128,14 @@ class TestSequenceApi:
         assert r.status_code == 201, r.text
         assert [s["step_no"] for s in r.json()["steps"]] == [1, 2]
 
-    def test_whatsapp_sequence_requires_template_linkedin_still_rejected(
+    def test_whatsapp_sequence_requires_template_linkedin_now_available(
             self, leads_client, verified_strategy):
-        """MODIFIED in M4 Chunk 4 (was test_non_email_channel_rejected_in_m3):
-        M3 rejected any non-email channel outright; since M4 Chunk 3
-        WhatsApp is a real channel, so the OLD assertion passed for the
-        wrong reason. The correct M4 behavior: a cold WhatsApp step without
-        an approved-template reference is rejected (422, template required),
-        and linkedin remains unavailable."""
+        """MODIFIED in M4 Chunk 4 (was test_non_email_channel_rejected_in_m3)
+        and again in Feature Group 5. A cold WhatsApp step without an
+        approved-template reference is still rejected (422, template
+        required). LinkedIn USED to be rejected as "not available yet"; it is
+        a real channel since Feature Group 5, so a LinkedIn sequence is now
+        created, with its steps defaulting to linkedin_action "auto"."""
         r = leads_client.post(f"/strategies/{verified_strategy.id}/sequences", json={
             "name": "WA", "channel": "whatsapp",
             "steps": [{"step_no": 1, "template": "hi"}],
@@ -146,8 +146,8 @@ class TestSequenceApi:
             "name": "LI", "channel": "linkedin",
             "steps": [{"step_no": 1, "template": "hi"}],
         })
-        assert r.status_code == 422
-        assert "linkedin" in r.json()["detail"]
+        assert r.status_code == 201, r.text
+        assert r.json()["steps"][0]["linkedin_action"] == "auto"
 
     def test_gapped_steps_rejected(self, leads_client, verified_strategy):
         r = leads_client.post(f"/strategies/{verified_strategy.id}/sequences", json={

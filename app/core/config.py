@@ -238,6 +238,29 @@ class Settings(BaseSettings):
     NOTE: read from app/core/config.py, not app/config.py.
     """
 
+    RATE_LIMIT_PUBLIC_VIDEO: int = 120
+    # Feature Group 3: loads of ONE open pixel per hour (keyed by token, not
+    # IP -- Gmail proxies every recipient's images through shared IPs).
+    RATE_LIMIT_OPEN_PIXEL: int = 30
+    """Max GET /public/video per client IP per hour (Feature Group 2). The
+    endpoint is unauthenticated -- a prospect opens it from an email -- and
+    returns only a first name, a company and a Loom embed id, behind an
+    encrypted token; the limit stops it being used to brute-force tokens.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
+    RATE_LIMIT_AI_ACTION: int = 60
+    """Max user-triggered AI generations per user per hour (feature expansion):
+    regenerating a meeting prep brief, logging a meeting outcome (which drafts
+    a follow-up), rescoring a lead, extracting a style profile. Each is one
+    Claude call billed to the deployment's key, so this is a spend ceiling
+    like RATE_LIMIT_SUPPORT_CHAT, sized for a busy day of calls rather than
+    for a script.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
     RATE_LIMIT_CRM_WRITE: int = 600
     """Max CRM write calls per user per hour (M9). Default: 600.
 

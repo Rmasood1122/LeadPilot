@@ -19,7 +19,7 @@ export function OnboardingChecklist() {
 
   const { data, isLoading } = useQuery({
     queryKey: ["onboarding-state"],
-    queryFn: () => apiClient.get("/onboarding/state").then((r: any) => r.data),
+    queryFn: () => apiClient.get("/onboarding/state"),
     staleTime: 30_000,
   });
 

@@ -27,7 +27,7 @@ export function SendTimeCard({
 
   const { data, isLoading } = useQuery({
     queryKey: ["send-times", channel, icpIndustry, icpCompanySize],
-    queryFn: () => apiClient.get(`/playbook/send-times?${params}`).then((r: any) => r.data),
+    queryFn: () => apiClient.get(`/playbook/send-times?${params}`),
   });
 
   if (isLoading) {
