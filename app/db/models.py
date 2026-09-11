@@ -3028,3 +3028,30 @@ class ComplianceAuditLog(Base):
     ts: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class ToolIntegrationSettings(TimestampMixin, Base):
+    """Per-tool key/value config for AegisAudit, PostIQ and SIGNALFORGE
+    (migration 0032). user_id NULL is a workspace-level (admin) setting;
+    otherwise the row belongs to that user (e.g. their PostIQ Web App URL).
+    Secrets are Fernet-encrypted and flagged by is_encrypted -- see
+    app/services/tool_integrations.py."""
+
+    __tablename__ = "tool_integration_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "tool_name", "config_key", name="uq_tool_integration"),
+        # NULLs are distinct in the constraint above, so workspace-level rows
+        # need their own partial unique index.
+        Index("uq_tool_integration_workspace", "tool_name", "config_key", unique=True,
+              postgresql_where=text("user_id IS NULL"),
+              sqlite_where=text("user_id IS NULL")),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    tool_name: Mapped[str] = mapped_column(String(64))       # aegisaudit | postiq | signalforge
+    config_key: Mapped[str] = mapped_column(String(128))
+    config_value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False)

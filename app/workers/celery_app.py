@@ -47,6 +47,9 @@ celery_app = Celery(
         "app.workers.intelligence_tasks",
         # Feature Group 6: AI call transcript analysis.
         "app.workers.call_tasks",
+        # Tool integrations: AegisAudit draft audit, PostIQ drafts,
+        # SIGNALFORGE lead research.
+        "app.workers.tool_integration_tasks",
     ],
 )
 
@@ -110,6 +113,9 @@ celery_app.conf.task_routes = {
     "app.workers.crm_tasks.*": {"queue": "default"},
     # Feature Group 9: outbound DNS / API lookups, one user at a time.
     "app.workers.deliverability_tasks.*": {"queue": "default"},
+    # Tool integrations: one outbound call to an internal/partner service at
+    # a time -- integration I/O like CRM sync and webhook delivery.
+    "tool_integrations.*": {"queue": "default"},
 }
 
 celery_app.conf.update(
