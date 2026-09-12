@@ -29,11 +29,11 @@ import asyncio
 import json
 import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
@@ -51,6 +51,7 @@ from app.db.models import (
     CrmSavedView,
     CrmTag,
     CrmViewType,
+    InboundReply,
     Lead,
     LeadStatus,
     User,
@@ -1051,3 +1052,161 @@ async def crm_stream(request: Request, ticket: str = Query(...)) -> StreamingRes
             "Connection": "keep-alive",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Feature 2 — reply intelligence
+# ---------------------------------------------------------------------------
+#
+# The reply row itself is written by whichever channel received it (the Gmail
+# poller, the Unipile webhook, the WhatsApp webhook); these two routes are the
+# only place a human touches the AI's reading of it.
+#
+# NOTHING HERE SENDS ANYTHING. `approved_draft` puts the draft in front of a
+# person -- an activity row on the lead's timeline, a note holding the copy,
+# and a notification -- it does not put it in an outbox. An outbound system
+# that answers a human by itself is one bad classification away from an
+# apology, so approval is a handoff, not a trigger.
+
+
+class ReplyIntelligenceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    reply_id: uuid.UUID
+    lead_id: uuid.UUID | None
+    # NULL on all five: the reply has not been classified (yet, or at all).
+    # That is a different fact from "classified as nothing".
+    category: str | None
+    confidence: float | None
+    next_action: str | None
+    draft_response: str | None
+    reschedule_date: date | None
+    classified_at: datetime | None
+
+
+class ReplyIntelligenceIn(BaseModel):
+    reschedule_date: date | None = None
+    approved_draft: bool | None = None
+
+
+def _owned_reply(db: Session, reply_id: uuid.UUID, current_user: User) -> tuple:
+    """(reply, lead) for a reply this user owns, else 404.
+
+    An UNMATCHED reply (lead_id NULL -- an inbound the poller could not tie to
+    any lead) is 404 for everybody: it has no owner, so there is no account it
+    can safely be shown to. Ownership of a matched reply is the lead's, via
+    the same lead -> strategy -> product -> user chain the rest of this router
+    walks, and answers 404 rather than 403 so existence cannot be inferred.
+    """
+    reply = db.get(InboundReply, reply_id)
+    if reply is None or reply.lead_id is None:
+        raise HTTPException(status_code=404, detail="reply not found")
+    lead = crm_service.owned_lead(db, reply.lead_id, current_user)
+    return reply, lead
+
+
+def _intelligence_out(reply: InboundReply) -> ReplyIntelligenceOut:
+    return ReplyIntelligenceOut(
+        reply_id=reply.id,
+        lead_id=reply.lead_id,
+        category=reply.reply_category,
+        confidence=reply.category_confidence,
+        next_action=reply.ai_next_action,
+        draft_response=reply.ai_draft_response,
+        reschedule_date=reply.reschedule_date,
+        classified_at=reply.classified_at,
+    )
+
+
+@router.get("/replies/{reply_id}/intelligence", response_model=ReplyIntelligenceOut)
+def get_reply_intelligence(
+    reply_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ReplyIntelligenceOut:
+    """What the AI made of one inbound reply: category, next action, draft.
+
+    Every field is nullable. A reply whose classification task has not run yet
+    (or failed) returns nulls rather than a placeholder category -- the UI must
+    be able to show "not classified" honestly.
+    """
+    reply, _lead = _owned_reply(db, reply_id, current_user)
+    return _intelligence_out(reply)
+
+
+@router.patch("/replies/{reply_id}/intelligence", response_model=ReplyIntelligenceOut)
+def patch_reply_intelligence(
+    reply_id: uuid.UUID,
+    body: ReplyIntelligenceIn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ReplyIntelligenceOut:
+    """Move a NOT_NOW follow-up date, and/or approve the draft for sending.
+
+    `reschedule_date` is how 30 days becomes 60 or 90. It may not be in the
+    past: a follow-up date behind today is either a typo or a way to make the
+    lead look due forever, and neither is worth accepting silently.
+
+    `approved_draft=true` hands the draft to a human, in three places at once:
+    an activity row on the lead's timeline, a note holding the copy itself so
+    it is editable where the user already edits copy, and a notification
+    through the hub. It does NOT send, schedule or enqueue an outbound
+    message -- see the note at the top of this section.
+    """
+    enforce_rate_limit(str(current_user.id), "crm_write", _WRITE_LIMIT)
+    reply, lead = _owned_reply(db, reply_id, current_user)
+
+    if body.reschedule_date is None and body.approved_draft is None:
+        raise HTTPException(status_code=422,
+                            detail="give reschedule_date, approved_draft, or both")
+
+    if body.reschedule_date is not None:
+        if body.reschedule_date < datetime.now(timezone.utc).date():
+            raise HTTPException(status_code=422,
+                                detail="reschedule_date must not be in the past")
+        previous = reply.reschedule_date
+        reply.reschedule_date = body.reschedule_date
+        crm_service.log_activity(
+            db, lead, CrmActivityKind.FIELD_CHANGED, actor=current_user,
+            from_value=previous.isoformat() if previous else None,
+            to_value=body.reschedule_date.isoformat(),
+            meta={"field": "reply.reschedule_date", "reply_id": str(reply.id)},
+        )
+
+    approved = False
+    if body.approved_draft:
+        if not (reply.ai_draft_response or "").strip():
+            raise HTTPException(status_code=409,
+                                detail="this reply has no draft to approve")
+        db.add(CrmNote(
+            lead_id=lead.id, author_user_id=current_user.id,
+            body=("Approved reply draft "
+                  f"({reply.reply_category or 'uncategorised'}):\n\n"
+                  f"{reply.ai_draft_response}"),
+        ))
+        crm_service.log_activity(
+            db, lead, CrmActivityKind.TASK_CREATED, actor=current_user,
+            to_value="reply draft approved",
+            meta={"reply_id": str(reply.id), "category": reply.reply_category,
+                  "next_action": reply.ai_next_action},
+        )
+        approved = True
+
+    db.commit()
+
+    if approved:
+        from app.workers import notification_tasks  # noqa: PLC0415
+
+        notification_tasks.enqueue_event(
+            current_user.id, "reply_draft_approved", push=True, slack=True,
+            title="Reply draft ready to send",
+            body=f"{lead.full_name or lead.email or 'A lead'} - "
+                 f"{reply.reply_category or 'reply'}",
+            deep_link=f"/crm/leads/{lead.id}",
+            webhook_payload={"reply_id": str(reply.id), "lead_id": str(lead.id),
+                             "category": reply.reply_category,
+                             "next_action": reply.ai_next_action,
+                             "draft_response": reply.ai_draft_response},
+        )
+
+    return _intelligence_out(reply)

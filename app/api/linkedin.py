@@ -339,6 +339,13 @@ async def unipile_webhook(request: Request, db: Session = Depends(get_db)) -> di
             lead.linkedin_connection_status = "connected"
             lead.linkedin_connected_at = datetime.now(timezone.utc)
         db.commit()
+        # Feature 2: classify what the human does next. After the commit, and
+        # off-thread -- two model calls inside this handler would have Unipile
+        # retrying the delivery on timeout and creating a duplicate reply.
+        from app.workers import reply_tasks  # noqa: PLC0415
+
+        reply_tasks.enqueue(reply.id)
+
         from app.workers.outreach_tasks import route_linkedin_inbound_impl  # noqa: PLC0415
 
         classification = route_linkedin_inbound_impl(db, lead, reply)

@@ -144,6 +144,19 @@ class FakeClaude:
         # Feature Group 2.
         self.style_response: object | None = None
         self.video_script_response: object | None = None
+        # Feature 2 (reply intelligence). Same contract as the others: a dict
+        # is returned verbatim, an Exception instance is raised.
+        self.reply_intelligence_response: object | None = None
+        self.reply_intelligence_prompts: list[str] = []
+        self.reply_intelligence_systems: list[str] = []
+        # Feature 3 (founder voice cloning). Same contract.
+        self.voice_profile_response: object | None = None
+        self.voice_profile_prompts: list[str] = []
+        # Feature 4 (competitor displacement DMs). Same contract, and a list
+        # is a SCRIPT (one response per call, the last one repeating) so the
+        # Day 0 rule-repair path can be exercised.
+        self.displacement_dm_response: object | None = None
+        self.displacement_dm_prompts: list[str] = []
         # Every (system, prompt) the personalization engine received, so a
         # test can assert on the voice suffix and the post/news/video blocks.
         self.personalization_calls: list[tuple[str, str]] = []
@@ -282,6 +295,47 @@ class FakeClaude:
                                    "rationale": "Smaller firms feel the pain."},
                 "revised_messaging": "Hook: failed inspections cost contracts.",
             }
+        if "displacement DM writer" in system:  # Feature 4
+            self.displacement_dm_prompts.append(prompt)
+            if isinstance(self.displacement_dm_response, Exception):
+                raise self.displacement_dm_response
+            if self.displacement_dm_response is not None:
+                if isinstance(self.displacement_dm_response, list):
+                    index = min(len(self.displacement_dm_prompts) - 1,
+                                len(self.displacement_dm_response) - 1)
+                    return self.displacement_dm_response[index]
+                return self.displacement_dm_response
+            return {"dm": "You wrote that cold email stopped converting for "
+                          "you. That usually means the list moved, not the "
+                          "copy. What changed about who you were writing to?"}
+        if "voice analyst" in system:  # Feature 3
+            self.voice_profile_prompts.append(prompt)
+            if isinstance(self.voice_profile_response, Exception):
+                raise self.voice_profile_response
+            if self.voice_profile_response is not None:
+                return self.voice_profile_response
+            return {"avg_sentence_length": "short", "punctuation_style": "minimal",
+                    "opens_with": "question", "uses_numbers": True,
+                    "emoji_usage": "none", "paragraph_length": "single-line",
+                    "vocabulary_level": "conversational",
+                    "signature_phrases": ["here is the thing", "no fluff"]}
+        if "reply intelligence engine" in system:  # Feature 2
+            self.reply_intelligence_prompts.append(prompt)
+            self.reply_intelligence_systems.append(system)
+            if isinstance(self.reply_intelligence_response, Exception):
+                raise self.reply_intelligence_response
+            if self.reply_intelligence_response is not None:
+                # A list is a SCRIPT: one response per call, last one repeats.
+                # That is how the banned-word repair path is exercised.
+                if isinstance(self.reply_intelligence_response, list):
+                    index = min(len(self.reply_intelligence_prompts) - 1,
+                                len(self.reply_intelligence_response) - 1)
+                    return self.reply_intelligence_response[index]
+                return self.reply_intelligence_response
+            return {"category": "BUYING_SIGNAL", "confidence": 0.88,
+                    "next_action": "send_step_3_product_intro",
+                    "draft_response": "Happy to show you how it works. "
+                                      "Would Thursday morning suit?"}
         if "sales analyst" in system:  # pattern recognition
             return dict(self.pattern_result)
         if "writing style analyst" in system:  # Feature Group 2
@@ -392,6 +446,11 @@ def fake_claude(monkeypatch):
         "app.services.message_personalization.get_client",
         "app.services.meeting_ai.get_client",
         "app.services.reply_classification.get_client",
+        "app.services.reply_intelligence.get_client",   # Feature 2
+        "app.services.displacement_monitor.get_client",  # Feature 4
+        # Feature 3 (voice_profiler) and style_profile both reach it as
+        # anthropic_client.get_client() at call time, so the module
+        # attribute patched first in this list is what takes effect.
         "app.services.whatsapp_templates.get_client",
         # Feature 3 reaches get_client through the MODULE at call time
         # (anthropic_client.get_client()), so patching the module attribute
@@ -460,6 +519,36 @@ def queued_jobs(monkeypatch):
         return True
 
     monkeypatch.setattr("app.workers.analytics_tasks.enqueue_send_windows", _windows)
+
+    jobs["site_generate"] = []
+    jobs["site_export"] = []
+
+    def _site_generate(page_id):
+        jobs["site_generate"].append(str(page_id))
+        return True
+
+    def _site_export(output_dir="/tmp/leadpilot_site_export"):
+        jobs["site_export"].append(str(output_dir))
+        return True
+
+    monkeypatch.setattr("app.workers.site_tasks.enqueue_generation", _site_generate)
+    monkeypatch.setattr("app.workers.site_tasks.enqueue_export", _site_export)
+
+    jobs["voice"] = []
+
+    def _voice(product_id, posts):
+        jobs["voice"].append((str(product_id), list(posts)))
+        return "task-voice-" + str(product_id)
+
+    monkeypatch.setattr("app.workers.voice_tasks.enqueue", _voice)
+
+    jobs["replies"] = []
+
+    def _reply(reply_id):
+        jobs["replies"].append(str(reply_id))
+        return True
+
+    monkeypatch.setattr("app.workers.reply_tasks.enqueue", _reply)
 
     jobs["crm"] = []
     jobs["webhooks"] = []

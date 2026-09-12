@@ -34,6 +34,20 @@ dependencies = [
     # first-deploy sequence tells you to run inside the container.
     "typer>=0.12",
     "rich>=13.7",
+    # Feature 5, the shareable ROI proof card. These are declared HERE and not
+    # only in requirements.txt because the Dockerfile installs `pip install .`
+    # -- exactly the gap that left structlog out of every production image
+    # (see the note above it).
+    #
+    # WeasyPrint renders app/templates/roi_card.html; it emits PDF only since
+    # v53, so pypdfium2 rasters the page to PNG. WeasyPrint additionally needs
+    # system Pango, installed in the Dockerfile. Pillow backs the fallback
+    # renderer that runs when any of that is unavailable, so the endpoint
+    # always returns an image (see app/services/roi_card.py).
+    "weasyprint>=60.0",
+    "pypdfium2>=4.25",
+    "jinja2>=3.1",
+    "pillow>=10.0",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +63,13 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+# The ROI proof card template is not a .py file, so `pip install .` would
+# otherwise drop it and app/services/roi_card.py would fall back to the Pillow
+# renderer in any deployment that runs from the INSTALLED package rather than
+# from the source tree.
+[tool.setuptools.package-data]
+app = ["templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

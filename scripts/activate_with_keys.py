@@ -58,7 +58,7 @@ EXIT_ABORTED = 2
 # The alembic head. tests/test_activation_script.py asserts this IS the
 # head, so adding a migration without moving this line fails there rather
 # than in production against a database missing the new tables.
-TARGET_REVISION = "0032_tool_integrations"
+TARGET_REVISION = "0038_website_builder"
 SENDING_DOMAIN = "calendarharvest.com"
 ADVERSARIAL_MIN_PASS = 28
 ADVERSARIAL_TOTAL = 32
@@ -368,6 +368,20 @@ def check_migrations(ctx: dict) -> CheckResult:
                  "support_tickets" in tables, "table missing"),
                 ("tutorial_catalogue table exists (Task 3)",
                  "tutorial_catalogue" in tables, "table missing"),
+                # 0033-0037: pipeline health, reply intelligence, founder
+                # voice, displacement alerts, client ROI. Only the new TABLES
+                # are asserted here; the added columns are pinned far more
+                # precisely by tests/test_pipeline_features_migration.py,
+                # which diffs every migration against the models.
+                ("voice_profiles table exists (voice cloning)",
+                 "voice_profiles" in tables, "table missing"),
+                ("displacement_alerts table exists (displacement alerts)",
+                 "displacement_alerts" in tables, "table missing"),
+                ("roi_snapshots table exists (client ROI)",
+                 "roi_snapshots" in tables, "table missing"),
+                # 0038: the AI-generated marketing site.
+                ("site_pages table exists (website builder)",
+                 "site_pages" in tables, "table missing"),
             ]
             failed = [(label, why) for label, ok, why in assertions if not ok]
             for label, ok, _why in assertions:

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ campaign_name }} — LeadPilot results</title>
+<style>
+  /* 1200x628 is LinkedIn's link-preview size. The @page rule is what
+     WeasyPrint lays out against; `margin: 0` matters because WeasyPrint's
+     default page margin would otherwise shrink the card inside the canvas
+     and leave a white border on every share.
+
+     NO EXTERNAL FONTS, NO CDN, NO REMOTE IMAGES anywhere in this file. The
+     renderer runs inside the API process; a stylesheet or webfont fetched at
+     render time would be a network call on a request path, a silent failure
+     when it is blocked, and a way to leak that a card was generated. Every
+     face below is a system stack. */
+  @page { size: 1200px 628px; margin: 0; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    width: 1200px;
+    height: 628px;
+    background: #ffffff;
+    color: #101828;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    padding: 44px 52px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ---- header ---- */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #101828;
+    padding-bottom: 20px;
+  }
+  .logo {
+    width: 52px; height: 52px;
+    border: 2px solid #101828;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: 700; letter-spacing: -1px;
+  }
+  .titles { margin-left: 18px; flex: 1; }
+  .eyebrow {
+    font-size: 13px; font-weight: 600; letter-spacing: 1.6px;
+    text-transform: uppercase; color: #667085;
+  }
+  .campaign {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.6px;
+    margin-top: 4px;
+    /* A long campaign name must not push the date range off the card. */
+    max-width: 700px; overflow: hidden; white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .daterange { text-align: right; font-size: 14px; color: #667085; line-height: 1.5; }
+  .daterange strong { display: block; font-size: 15px; color: #101828; font-weight: 600; }
+
+  /* ---- 2 rows x 3 columns of metric tiles ---- */
+  .tiles {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 16px;
+    padding: 22px 0;
+  }
+  .tile {
+    border: 1px solid #e4e7ec;
+    border-radius: 12px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .tile .value {
+    font-size: 42px; font-weight: 700; letter-spacing: -1.4px; line-height: 1.05;
+  }
+  .tile .label {
+    margin-top: 8px;
+    font-size: 13px; font-weight: 600; letter-spacing: 0.9px;
+    text-transform: uppercase; color: #667085;
+  }
+  /* A stock, not a flow -- the footnote says so on the card itself rather
+     than in a tooltip nobody sees once it has been screenshotted. */
+  .tile .note { margin-top: 5px; font-size: 11px; color: #98a2b3; }
+
+  /* ---- footer ---- */
+  .footer {
+    border-top: 1px solid #e4e7ec;
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #667085;
+  }
+  .footer .brand { font-weight: 700; color: #101828; letter-spacing: -0.2px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">LP</div>
+    <div class="titles">
+      <div class="eyebrow">Outbound results</div>
+      <div class="campaign">{{ campaign_name }}</div>
+    </div>
+    <div class="daterange">
+      <strong>{{ date_from }} &ndash; {{ date_to }}</strong>
+      {{ day_count }} day{{ '' if day_count == 1 else 's' }}
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile">
+      <div class="value">{{ meetings_booked }}</div>
+      <div class="label">Meetings booked</div>
+    </div>
+    <div class="tile">
+      <div class="value">{{ pipeline_value }}</div>
+      <div class="label">Pipeline value</div>
+      <div class="note">open + won, as of today</div>
+    </div>
+    <div class="tile">
+      <div class="value">{{ messages_sent }}</div>
+      <div class="label">Messages sent</div>
+    </div>
+    <div class="tile">
+      <div class="value">{{ reply_rate }}</div>
+      <div class="label">Reply rate</div>
+    </div>
+    <div class="tile">
+      <div class="value">{{ time_saved_hours }}</div>
+      <div class="label">Hours saved</div>
+    </div>
+    <div class="tile">
+      <div class="value">{{ revenue_attributed }}</div>
+      <div class="label">Revenue attributed</div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div>Generated {{ generated_on }}</div>
+    <div>Powered by <span class="brand">LeadPilot</span></div>
+  </div>
+</body>
+</html>

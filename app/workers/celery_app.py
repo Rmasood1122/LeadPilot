@@ -50,6 +50,18 @@ celery_app = Celery(
         # Tool integrations: AegisAudit draft audit, PostIQ drafts,
         # SIGNALFORGE lead research.
         "app.workers.tool_integration_tasks",
+        # Feature 1: six-hourly pipeline health score.
+        "app.workers.health_tasks",
+        # Feature 2: reply intelligence (category + next action + draft).
+        "app.workers.reply_tasks",
+        # Feature 3: founder voice cloning from LinkedIn posts.
+        "app.workers.voice_tasks",
+        # Feature 4: twelve-hourly competitor displacement sweep.
+        "app.workers.displacement_tasks",
+        # Feature 5: nightly client ROI snapshots.
+        "app.workers.roi_tasks",
+        # Website builder: page generation + static export (on demand only).
+        "app.workers.site_tasks",
     ],
 )
 
@@ -116,6 +128,29 @@ celery_app.conf.task_routes = {
     # Tool integrations: one outbound call to an internal/partner service at
     # a time -- integration I/O like CRM sync and webhook delivery.
     "tool_integrations.*": {"queue": "default"},
+    # Feature 1: the pipeline health sweep is aggregation over outcomes,
+    # enrollments and leads -- the same shape of work as the learning loop,
+    # and never time-critical to the minute.
+    "app.workers.health_tasks.*": {"queue": "learning"},
+    # Feature 2: classifying an inbound reply is the reply path, same as
+    # leadpilot.outreach.poll_replies and call_tasks above.
+    "app.workers.reply_tasks.*": {"queue": "outreach"},
+    # Feature 3: one user-triggered model call with a human watching for the
+    # result. NOT `pipeline` -- that queue runs 72/144-step strategy builds at
+    # concurrency 2, and a voice analysis behind one would take minutes.
+    "app.workers.voice_tasks.*": {"queue": "default"},
+    # Feature 4: batched external-API-plus-model work over every lead's posts
+    # -- the same shape as intelligence_tasks' rescoring, and it must not sit
+    # in front of a time-sensitive send or a meeting reminder.
+    "app.workers.displacement_tasks.*": {"queue": "pipeline"},
+    # Feature 5: nightly aggregation, with the other nightly aggregations.
+    "app.workers.roi_tasks.*": {"queue": "learning"},
+    # Website builder. A page is the largest single generation in this system
+    # (up to 8k output tokens of HTML), so it belongs with the other long
+    # model calls and must not sit in front of a time-sensitive send. Note
+    # the task names are "workers.site_tasks.*", not "app.workers.site_tasks.*"
+    # -- they are registered under an explicit short name.
+    "workers.site_tasks.*": {"queue": "pipeline"},
 }
 
 celery_app.conf.update(
@@ -234,6 +269,28 @@ celery_app.conf.beat_schedule = {
     "deliverability-checks": {
         "task": "app.workers.deliverability_tasks.run_daily_checks",
         "schedule": crontab(hour=6, minute=10),
+    },
+    # Feature 1: recompute every campaign's pipeline health score. Every six
+    # hours, at :40 past the hour, so it never starts in the same minute as
+    # the learning-loop jobs (:05/:15/:25/:35/:50) that share this queue.
+    "refresh-pipeline-health": {
+        "task": "app.workers.health_tasks.refresh_all_pipeline_health",
+        "schedule": crontab(hour="*/6", minute=40),
+    },
+    # Feature 4: competitor displacement sweep. Every twelve hours at :20 --
+    # offset from the health sweep (:40) and the learning-loop hour so the
+    # three never contend for the same worker minute.
+    "scan-displacement-signals": {
+        "task": "app.workers.displacement_tasks.scan_all_strategies",
+        "schedule": crontab(hour="*/12", minute=20),
+    },
+    # Feature 5: the client ROI snapshot, daily at 01:00 UTC. Late enough
+    # that yesterday has closed everywhere the product sells (US -> NZ), and
+    # finished before the 02:00 learning-loop aggregation wants the same
+    # worker.
+    "refresh-roi-snapshots": {
+        "task": "app.workers.roi_tasks.refresh_all_roi_snapshots",
+        "schedule": crontab(hour=1, minute=0),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

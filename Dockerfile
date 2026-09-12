@@ -21,7 +21,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /code
 
 # System deps kept minimal; psycopg2-binary needs no build toolchain.
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+#
+# The Pango packages are WeasyPrint's, for Feature 5's ROI proof card.
+# WeasyPrint is a pure-Python wheel but binds Pango at IMPORT time and raises
+# when it is missing, so without these the card silently renders through the
+# Pillow fallback instead (see app/services/roi_card.py). fonts-dejavu-core is
+# what the card's system font stack resolves to in a slim image -- with no font
+# installed at all, every tile renders blank. Cairo is deliberately NOT here:
+# WeasyPrint dropped it in v53.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first for better layer caching.

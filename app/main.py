@@ -54,6 +54,7 @@ from app.api.api_keys import router as api_keys_router                 # FG4
 from app.api.crm_integrations import router as crm_integrations_router # FG4
 from app.api.slack_integration import router as slack_router           # FG4
 from app.api.tool_integrations import router as tool_integrations_router  # AegisAudit / PostIQ / SIGNALFORGE
+from app.api.website_builder import router as website_builder_router  # SEO site
 from app.api.workspaces import router as workspaces_router             # FG8
 from app.api.trust import router as trust_router                       # FG9
 
@@ -220,6 +221,7 @@ app.include_router(tracking_router)              # FG3: /t/o/{token}.gif (public
 app.include_router(api_keys_router)              # FG4: /me/api-keys (Zapier / Make auth)
 app.include_router(slack_router)                 # FG4: /integrations/slack/*
 app.include_router(tool_integrations_router)     # /integrations/tools/*
+app.include_router(website_builder_router)        # /site/* incl. public sitemap.xml + robots.txt
 app.include_router(crm_integrations_router)      # FG4: HubSpot / Salesforce + their webhooks
 app.include_router(workspaces_router)            # FG8: /workspaces/*, public /branding
 app.include_router(trust_router)                 # FG9: /deliverability, /compliance/audit

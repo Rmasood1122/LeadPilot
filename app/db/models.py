@@ -19,7 +19,8 @@ Design rules applied here:
 
 import enum
 import uuid
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timezone
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -33,6 +34,7 @@ from sqlalchemy import (
     Index,
     Integer,
     JSON,
+    Numeric,
     String,
     Text,
     Time,
@@ -96,6 +98,9 @@ class LeadStatus(str, enum.Enum):
     CONTACTED = "contacted"
     REPLIED = "replied"
     MEETING_BOOKED = "meeting_booked"
+    # Feature 5 (migration 0037): the stage between a meeting and a decision.
+    # VARCHAR-backed like every enum here, so adding it touches no column.
+    PROPOSAL_SENT = "proposal_sent"
     # Feature Group 7: what happens AFTER the meeting, written by "Log Meeting
     # Outcome" (app/services/meeting_followup.py) and by the HubSpot/Salesforce
     # deal-stage webhooks. VARCHAR-backed, so a data-free addition -- no
@@ -323,6 +328,32 @@ def _enum(e: type[enum.Enum]) -> Enum:
 # --------------------------------------------------------------------------
 # Mixins
 # --------------------------------------------------------------------------
+
+
+class PageType(str, enum.Enum):
+    """What kind of marketing page this is -- it decides the schema.org
+    markup the generator emits, so it is CHECK-constrained in the database
+    rather than left as a free VARCHAR like the enums above."""
+    LANDING = "landing"
+    BLOG = "blog"
+    CASE_STUDY = "case_study"
+    COMPARISON = "comparison"
+    LOCATION = "location"
+
+
+class PageStatus(str, enum.Enum):
+    """draft -> published -> archived. `published` is the one that decides
+    whether a page is written into the public static export, which is why it
+    is CHECK-constrained too."""
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    ARCHIVED = "archived"
+
+
+class AssetType(str, enum.Enum):
+    IMAGE = "image"
+    CSS = "css"
+    JS = "js"
 
 
 class TimestampMixin:
@@ -732,6 +763,54 @@ class PastClient(TimestampMixin, Base):
     product: Mapped["Product"] = relationship(back_populates="past_clients")
 
 
+class VoiceProfile(Base):
+    """Feature 3 (migration 0035) — the founder's own writing voice.
+
+    Extracted from up to 20 of their LinkedIn posts and applied to every
+    outgoing message for this product, so outreach reads like the person
+    whose name is on it rather than like a template.
+
+    ONE PER PRODUCT, enforced by the schema. A product with two profiles has
+    no defined answer to "which voice does this email go out in?", so
+    re-analysing updates this row rather than inserting another.
+
+    NOT a TimestampMixin table: `last_analyzed_at` is the only "when" that
+    means anything here (it is what the UI shows and what a staleness check
+    would read), and an `updated_at` that also moves when nothing was
+    re-analysed would be a second, contradictory answer to the same question.
+
+    `raw_posts_json` is kept for auditability and re-extraction. It NEVER
+    reaches an outreach prompt -- only the extracted dimensions do, exactly
+    as in app/services/style_profile.py -- so a phrase from the founder's own
+    post cannot be pasted verbatim into a stranger's inbox.
+    """
+
+    __tablename__ = "voice_profiles"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), unique=True
+    )
+    raw_posts_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # {avg_sentence_length, punctuation_style, opens_with, uses_numbers,
+    #  emoji_usage, paragraph_length, vocabulary_level} -- see
+    #  app/services/voice_profiler.py::DIMENSIONS for the allowed values.
+    style_dimensions_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Up to five phrases the founder uses repeatedly.
+    sample_phrases: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    last_analyzed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    post_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    product: Mapped["Product"] = relationship()
+
+
 class Strategy(TimestampMixin, Base):
     __tablename__ = "strategies"
 
@@ -801,6 +880,20 @@ class Strategy(TimestampMixin, Base):
     send_windows_computed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Feature 1 (migration 0033): pipeline health score ----------------
+    # One 0-100 number the founder can read instead of four dashboards, plus
+    # the band and the sentence the UI shows. Recomputed every six hours by
+    # app/workers/health_tasks.py from live outcome/enrollment/lead data --
+    # these columns are a CACHE, not the source of truth, so
+    # GET /strategies/{id}/health recomputes when they are stale or NULL.
+    # NULL = never scored (a campaign created before the sweep last ran),
+    # which reads differently from a genuine score of 0.
+    pipeline_health_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    health_band: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    health_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    health_message: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     product: Mapped["Product"] = relationship(back_populates="strategies")
     research_steps: Mapped[list["ResearchStep"]] = relationship(
@@ -984,11 +1077,124 @@ class Lead(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     last_call_outcome: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # --- Feature 5 (migration 0037): what this lead is worth ---------------
+    # Numeric, never Float: a pipeline summed in binary floating point
+    # disagrees with itself by cents at scale. NULL means nobody has put a
+    # number on this lead, which is not the same as a deal worth nothing --
+    # the ROI sums skip NULL rather than reading it as zero.
+    estimated_deal_value: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2), nullable=True
+    )
 
     strategy: Mapped["Strategy"] = relationship(back_populates="leads")
     batch: Mapped["LeadBatch | None"] = relationship(back_populates="leads")
     messages: Mapped[list["Message"]] = relationship(back_populates="lead")
     outcomes: Mapped[list["Outcome"]] = relationship(back_populates="lead")
+
+
+class DisplacementAlert(Base):
+    """Feature 4 (migration 0036) — a lead just complained in public.
+
+    Written by the twelve-hourly sweep when a lead's recent LinkedIn post
+    names a competitor tool or describes the pain this product removes. It
+    carries the evidence (the matched keywords and the post excerpt) and a DM
+    that references that specific post, so acting on it is one read and one
+    click rather than a research task.
+
+    No updated_at: the only mutation an alert ever receives is a status
+    change, and `acted_at` records that precisely. A generic updated_at would
+    be a second, vaguer answer to the same question.
+
+    LIFECYCLE. pending -> acted | dismissed. A pending alert past `expires_at`
+    is stale and is filtered out of the pending list rather than deleted --
+    the record of "we saw this and did nothing" is worth keeping.
+    """
+
+    __tablename__ = "displacement_alerts"
+    __table_args__ = (
+        # Both hot paths are "the most recent alerts for this lead": the
+        # 14-day dedup check on every sweep, and the alerts list.
+        Index("ix_displacement_alerts_lead_created", "lead_id",
+              text("created_at DESC")),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    # The exact keywords/phrases that fired, so an alert is always explainable
+    # and a noisy trigger group can be identified from the data.
+    matched_keywords: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    post_excerpt: Mapped[str] = mapped_column(Text)
+    post_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # NULL when the DM could not be generated -- the alert is still worth
+    # showing, because the evidence is the valuable half.
+    suggested_dm: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # pending | acted | dismissed
+    alert_status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False
+    )
+    acted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    lead: Mapped["Lead"] = relationship()
+
+
+class ROISnapshot(Base):
+    """Feature 5 (migration 0037) — one campaign's results on one day.
+
+    Written by the 01:00 UTC sweep (app/workers/roi_tasks.py) so the ROI
+    dashboard and the shareable proof card can render a trend without
+    recomputing six aggregates per day per campaign on every page load.
+
+    UNIQUE (strategy_id, snapshot_date) is what makes the daily sweep
+    idempotent: a retried or double-scheduled run UPDATES the day's row
+    instead of appending a second one, so a day can never be counted twice.
+
+    Money columns are Numeric, never Float -- see Lead.estimated_deal_value.
+
+    No updated_at: a snapshot is a statement about one day, and the only
+    write it ever receives is that day's recomputation.
+    """
+
+    __tablename__ = "roi_snapshots"
+    __table_args__ = (
+        UniqueConstraint("strategy_id", "snapshot_date", name="roi_strategy_day"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    snapshot_date: Mapped[date] = mapped_column(Date)
+    meetings_booked: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    pipeline_value: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=0, server_default=text("0"), nullable=False
+    )
+    messages_sent: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    reply_rate: Mapped[float] = mapped_column(
+        Float, default=0.0, server_default=text("0"), nullable=False
+    )
+    time_saved_hours: Mapped[float] = mapped_column(
+        Float, default=0.0, server_default=text("0"), nullable=False
+    )
+    revenue_attributed: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=0, server_default=text("0"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    strategy: Mapped["Strategy"] = relationship()
 
 
 class Sequence(TimestampMixin, Base):
@@ -1330,6 +1536,24 @@ class InboundReply(TimestampMixin, Base):
     body: Mapped[str] = mapped_column(Text)
     classification: Mapped[str | None] = mapped_column(String(40), nullable=True)
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # --- Feature 2 (migration 0034): reply intelligence -------------------
+    # `classification` above answers "how does the SYSTEM route this?"
+    # (unsubscribe, bounce, out-of-office). These answer a different
+    # question -- "what does the HUMAN do next?" -- which is why both exist.
+    # BUYING_SIGNAL | OBJECTION | NOT_NOW | WRONG_PERSON; NULL = never
+    # classified, which is not the same as "no category fit".
+    reply_category: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    category_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_next_action: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # A DRAFT, never a sent message. Nothing in this system replies to a
+    # human on its own -- the sender reads this, edits it, and sends it.
+    ai_draft_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    classified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # NOT_NOW only: the day to come back. Defaulted to +30 days and editable
+    # to 60 or 90 through PATCH /crm/replies/{id}/intelligence.
+    reschedule_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
 class WhatsAppTemplate(TimestampMixin, Base):
@@ -3055,3 +3279,143 @@ class ToolIntegrationSettings(TimestampMixin, Base):
     config_key: Mapped[str] = mapped_column(String(128))
     config_value: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_encrypted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+# --------------------------------------------------------------------------
+# Website builder (migration 0038)
+# --------------------------------------------------------------------------
+
+
+def _checked_enum(e: type[enum.Enum], length: int) -> Enum:
+    """VARCHAR-backed enum at an EXACT length.
+
+    `_enum` above hardcodes length=32. These three columns are pinned to the
+    widths migration 0038 declares (30 / 20 / 20), and
+    tests/test_website_builder_migration.py diffs the two -- so the helper
+    takes the length rather than the column silently widening.
+    """
+    return Enum(e, native_enum=False, length=length,
+                values_callable=lambda x: [i.value for i in x])
+
+
+class SitePage(Base):
+    """One AI-generated, SEO-optimised marketing page.
+
+    This is the whole CMS. A page is generated by Claude
+    (app/services/website_builder.py), stored here as a complete HTML5
+    document, scored deterministically against on-page SEO rules, and
+    exported to static files. There is no Webflow, no WordPress and no
+    external service in the path -- which is the point: the pages that sell
+    the product cannot depend on a vendor the product does not control.
+
+    NOT a TimestampMixin table. It carries four different "when"s that each
+    mean something specific -- created_at, last_generated_at, published_at,
+    and generation_version -- and a generic updated_at that moves when any
+    column changes would be a fifth, vaguer answer that nothing reads.
+
+    `slug` IS the public URL path, so it is UNIQUE at the schema level: two
+    rows claiming the same path have no defined answer for what gets served,
+    and the static export writes one file per slug.
+
+    `workspace_id` NULL means a global/admin page -- the leadpilot.io
+    marketing site itself, which belongs to no customer workspace.
+    """
+
+    __tablename__ = "site_pages"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_site_pages_slug"),
+        # The list screen filters on both, always together.
+        Index("ix_site_pages_status_type", "status", "page_type"),
+        Index("ix_site_pages_target_keyword", "target_keyword"),
+        CheckConstraint(
+            "page_type IN ('landing', 'blog', 'case_study', 'comparison', 'location')",
+            name="ck_site_pages_page_type"),
+        CheckConstraint("status IN ('draft', 'published', 'archived')",
+                        name="ck_site_pages_status"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    page_type: Mapped[PageType] = mapped_column(_checked_enum(PageType, 30))
+    slug: Mapped[str] = mapped_column(String(200))
+    title: Mapped[str] = mapped_column(String(200))
+    # 70 and 165 are not arbitrary: they are where Google truncates a title
+    # and a description in the SERP. A column that allows more allows a page
+    # to ship with an ellipsis where its call to action should be.
+    meta_title: Mapped[str] = mapped_column(String(70))
+    meta_description: Mapped[str] = mapped_column(String(165))
+    target_keyword: Mapped[str] = mapped_column(String(200))
+    # The content brief the page was generated from. Kept so a regenerate
+    # reproduces the same page rather than unrelated copy at the same URL --
+    # see migration 0038's note on why this is not in the original spec.
+    brief: Mapped[str] = mapped_column(Text, default="", server_default="",
+                                       nullable=False)
+    secondary_keywords: Mapped[list] = mapped_column(
+        JSON, default=list, server_default=text("'[]'"), nullable=False
+    )
+    # The complete HTML5 document, head and all. Empty string until the
+    # generation task has run -- NOT NULL, because "no page yet" is the empty
+    # document, and a NULL here would reach the export as the string "None".
+    html_content: Mapped[str] = mapped_column(Text, default="")
+    word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reading_time_mins: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schema_markup_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    internal_links_json: Mapped[list] = mapped_column(
+        JSON, default=list, server_default=text("'[]'"), nullable=False
+    )
+    status: Mapped[PageStatus] = mapped_column(
+        _checked_enum(PageStatus, 20), default=PageStatus.DRAFT,
+        server_default="draft", nullable=False
+    )
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_generated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Bumped on every regenerate, so a page that was rewritten four times is
+    # distinguishable from one generated once.
+    generation_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default=text("1"), nullable=False
+    )
+    seo_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    seo_issues_json: Mapped[list] = mapped_column(
+        JSON, default=list, server_default=text("'[]'"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    assets: Mapped[list["SiteAsset"]] = relationship(
+        back_populates="page", lazy="select", cascade="all, delete-orphan"
+    )
+
+
+class SiteAsset(Base):
+    """An image, stylesheet or script belonging to one page.
+
+    Stored in the database rather than on disk so a page is a single
+    self-contained row set: the export writes it out, and nothing depends on
+    a filesystem that a container restart discards.
+    """
+
+    __tablename__ = "site_assets"
+    __table_args__ = (
+        CheckConstraint("asset_type IN ('image', 'css', 'js')",
+                        name="ck_site_assets_asset_type"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("site_pages.id", ondelete="CASCADE"), index=True
+    )
+    asset_type: Mapped[AssetType] = mapped_column(_checked_enum(AssetType, 20))
+    filename: Mapped[str] = mapped_column(String(300))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    page: Mapped["SitePage"] = relationship(back_populates="assets")

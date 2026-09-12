@@ -101,13 +101,20 @@ def render_message(
 ) -> tuple[str, str]:
     """Returns (subject, body) — the caller persists them before sending.
 
+    Feature 3: the step's brief is enriched with the product's founder voice
+    profile (app/services/voice_profiler.py) when one has been analysed, so
+    the copy reads like the person whose name is on it. Recorded in
+    `inputs_out` as `voice_profile`.
+
     Feature Group 2: the prompt carries the lead's recent LinkedIn posts and
     company news (personalization_context), the personal-video CTA on step 2
     when one was recorded (loom_video), and the system prompt carries the
     sender's voice profile (style_profile). `inputs_out`, when given, is
     filled with what the message was written from, for messages.personalization_json.
     """
-    from app.services import loom_video, personalization_context, style_profile  # noqa: PLC0415
+    from app.services import (  # noqa: PLC0415
+        loom_video, personalization_context, style_profile, voice_profiler,
+    )
 
     enrichment = lead.enrichment_json or {}
     highlights = {
@@ -126,6 +133,16 @@ def render_message(
         context = f"{context}\n\n{cta}".strip()
     voice = style_profile.suffix_for_strategy(session, strategy)
     used["style_profile"] = bool(voice)
+    # Feature 3: the founder's own voice, cloned from their LinkedIn posts and
+    # appended to the STEP BRIEF rather than the system prompt. The brief is
+    # where "how to write this particular message" already lives, and keeping
+    # the two voice sources in different places is deliberate: the account-wide
+    # style profile above says "write like this person", and this says "and
+    # specifically, in this product's founder voice". Never raises -- a missing
+    # or broken profile returns the template unchanged.
+    template, voice_profile_used = voice_profiler.brief_for_strategy(
+        session, strategy, step.template)
+    used["voice_profile"] = voice_profile_used
     if inputs_out is not None:
         inputs_out.update(used)
     data = get_client().complete_json(
@@ -134,7 +151,7 @@ def render_message(
             context=f"{context}\n\n" if context else "",
             step_no=step.step_no,
             variant=step.variant,
-            template=step.template,
+            template=template,
             playbook=_playbook(session, strategy),
             full_name=lead.full_name or "there",
             title=lead.title or "unknown",

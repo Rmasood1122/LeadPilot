@@ -819,7 +819,7 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
     classification = classify_reply(inbound.from_address, inbound.subject, inbound.body,
                                     session=session)
 
-    session.add(InboundReply(
+    reply_row = InboundReply(
         lead_id=lead.id if lead else None,
         message_id=matched_message.id if matched_message else None,
         account_ref=str(account.id),
@@ -830,8 +830,17 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
         body=inbound.body,
         classification=classification,
         received_at=inbound.received_at,
-    ))
+    )
+    session.add(reply_row)
     session.commit()
+
+    # Feature 2: classify what the HUMAN should do next. Dispatched AFTER the
+    # commit so the task can never look up a row that is not there yet, and
+    # before the routing below so a slow model call cannot delay the hard
+    # stop / suppression that routing performs. enqueue() never raises.
+    from app.workers import reply_tasks  # noqa: PLC0415
+
+    reply_tasks.enqueue(reply_row.id)
 
     if lead is None:
         return f"unmatched_{classification}"

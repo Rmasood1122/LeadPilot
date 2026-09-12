@@ -153,8 +153,12 @@ class TestRenderPrompt:
         assert "Post 1: our inspection backlog is brutal" in prompt
         assert "Acme Fire wins state contract" in prompt
         assert "Old Acme Fire news" not in prompt                # outside 30 days
+        # `voice_profile` is Feature 3: False here because this product has no
+        # analysed founder voice. It is recorded either way so
+        # messages.personalization_json always answers "was a voice applied?".
         assert used == {"linkedin_post_url": "https://li/p/1", "news_url": "https://n/1",
-                        "loom_cta": False, "style_profile": True}
+                        "loom_cta": False, "style_profile": True,
+                        "voice_profile": False}
 
     def test_plain_lead_renders_as_before(self, db_session, lead, verified_strategy,
                                           email_sequence, fake_claude):

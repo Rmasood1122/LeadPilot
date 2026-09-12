@@ -344,6 +344,13 @@ def _handle_inbound(db: Session, msg: dict, phone_number_id: str | None) -> None
             lead.status = LeadStatus.REPLIED
     db.commit()
 
+    # Feature 2: classify what the human does next. After the commit, and off
+    # this thread -- Meta retries a webhook that does not answer quickly, and
+    # a retry here would mean a second copy of the same message.
+    from app.workers import reply_tasks  # noqa: PLC0415
+
+    reply_tasks.enqueue(reply_row.id)
+
     if lead is None:
         return
 

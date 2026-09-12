@@ -45,6 +45,21 @@ google-api-python-client>=2.133.0
 # TODO: verify latest stable firebase-admin version compatible with Python 3.11+
 firebase-admin>=6.5.0
 
+# ── Proof card rendering (Feature 5) ─────────────────────────────────────────
+# The shareable ROI card is a Jinja2 HTML template rendered server-side.
+#
+# WeasyPrint is the HTML renderer named by the feature spec. Note that it has
+# emitted PDF ONLY since v53 -- `write_png` was removed -- so the card is
+# rendered HTML -> PDF (WeasyPrint) -> PNG (pypdfium2, a pure wheel with no
+# system libraries). WeasyPrint itself DOES need native Pango/cairo, which a
+# slim image or a Windows dev box often lacks, so app/services/roi_card.py
+# also carries a Pillow renderer that draws the same card directly. The
+# endpoint therefore always returns a PNG; see that module for which path ran.
+weasyprint>=60.0            # HTML -> PDF (needs system Pango/cairo)
+pypdfium2>=4.25             # PDF -> PNG raster; pure wheel, no system deps
+jinja2>=3.1                 # app/templates/roi_card.html
+pillow>=10.0                # the dependency-free fallback renderer
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv>=1.0.1
 tenacity>=8.4.1        # retry logic with exponential backoff

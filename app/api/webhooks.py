@@ -2,7 +2,16 @@
 
 invitee.created  -> lead meeting_booked, sequences stop, `booked` outcome
 invitee.canceled -> lead back to replied, event recorded
-Deliveries are signature-verified and idempotent (Calendly retries)."""
+Deliveries are signature-verified and idempotent (Calendly retries).
+
+NOTE FOR FEATURE 2 (reply intelligence). This module handles BOOKINGS; it
+never creates an InboundReply, so there is nothing here to classify. The
+`process_inbound_reply` dispatch lives at the three places that actually
+create one:
+    app/workers/outreach_tasks.py   the Gmail reply poller
+    app/api/linkedin.py             the Unipile message_received webhook
+    app/api/webhooks_whatsapp.py    the WhatsApp inbound webhook
+"""
 
 import logging
 

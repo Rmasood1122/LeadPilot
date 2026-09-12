@@ -5,6 +5,10 @@ GET  /strategies/{id}/analytics?granularity=day
     a per-variant aggregate (sent/replied/booked by A/B variant) — the
     groundwork the M8 learning loop and the Analytics page both read.
 POST /strategies/{id}/campaign/pause   — manual pause (state + reason)
+GET  /strategies/{id}/health
+    Feature 1: the 0-100 pipeline health score, its band and the one-line
+    instruction that goes with it. Available on every plan — a founder on
+    the free tier needs to know their pipeline is empty most of all.
 POST /strategies/{id}/campaign/resume  — clears a manual OR bounce pause
     (resuming after a bounce pause is a deliberate human decision; the 3%
     monitor will simply pause again if bounces continue).
@@ -14,13 +18,14 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.db.models import Lead, Message, Outcome, OutcomeEvent, Product, Strategy, User
-from app.services import sequence_engine as engine
+from app.services import pipeline_health, sequence_engine as engine
 
 router = APIRouter(tags=["analytics"])
 
@@ -135,3 +140,66 @@ def resume_campaign(
     db.commit()
     return {"campaign_state": strategy.campaign_state,
             "campaign_pause_reason": None}
+
+
+# ---------------------------------------------------------------------------
+# Feature 1 — pipeline health score
+# ---------------------------------------------------------------------------
+
+
+class PipelineHealthComponents(BaseModel):
+    """Each sub-score on its own 0-100 scale, BEFORE weighting.
+
+    Exposed because "your pipeline is 46" is not actionable and "your reply
+    rate is fine, you have added no leads in three weeks" is.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    reply_rate: float
+    completion: float
+    freshness: float
+    conversations: float
+
+
+class PipelineHealthOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    score: int
+    band: str
+    message: str
+    components: PipelineHealthComponents
+    updated_at: datetime | None
+
+
+@router.get("/strategies/{strategy_id}/health", response_model=PipelineHealthOut)
+def pipeline_health_score(
+    strategy_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PipelineHealthOut:
+    """The strategy's current pipeline health score.
+
+    Recomputed live on every call rather than read out of the cache columns:
+    the whole point of the number is to answer "right now?", and four indexed
+    aggregates is a cheaper query than the analytics endpoint next to it. The
+    freshly computed result is written back to the strategy's cache columns
+    (app/services/pipeline_health.py::persist) so lists and dashboards that
+    render many strategies at once can show the score without repeating the
+    work.
+
+    No plan gate: this is available on every tier, deliberately. The founder
+    whose pipeline is emptiest is the one least likely to be paying.
+    """
+    strategy = _owned_strategy(strategy_id, db, current_user)
+    result = pipeline_health.compute_health_score(db, strategy.id)
+    pipeline_health.persist(db, strategy, result)
+    return PipelineHealthOut(
+        score=result["score"],
+        band=result["band"],
+        message=result["message"],
+        components=PipelineHealthComponents(**result["components"]),
+        # None only when persist declined to write (a failed measurement),
+        # which is exactly when "as of" must not claim to be now.
+        updated_at=strategy.health_updated_at,
+    )

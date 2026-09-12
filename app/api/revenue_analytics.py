@@ -8,6 +8,8 @@ GET    /strategies/{id}/send-time
 PUT    /strategies/{id}/send-time            {"smart_send_time": bool}
 POST   /strategies/{id}/send-time/recompute
 GET    /strategies/{id}/sentiment?weeks=12
+GET    /strategies/{id}/roi?date_from&date_to      Feature 5
+GET    /strategies/{id}/roi/card                   Feature 5 (image/png)
 
 Ownership follows the codebase rule: anything not yours is a 404.
 """
@@ -16,10 +18,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -27,8 +30,11 @@ from app.api.analytics import _owned_strategy
 from app.api.deps import get_current_user
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
-from app.db.models import CampaignCost, User
-from app.services import funnel, reply_sentiment, revenue_analytics, send_windows
+from app.db.models import CampaignCost, Product, User
+from app.services import (
+    funnel, reply_sentiment, revenue_analytics, roi_calculator, roi_card,
+    send_windows,
+)
 
 router = APIRouter(tags=["revenue-analytics"])
 
@@ -256,3 +262,121 @@ def strategy_sentiment(
 ) -> dict:
     _owned_strategy(strategy_id, db, current_user)
     return reply_sentiment.trend(db, strategy_id, weeks=weeks)
+
+
+# --------------------------------------------------------------------------
+# Feature 5 — client ROI dashboard + shareable proof card
+# --------------------------------------------------------------------------
+#
+# This sits beside /analytics/revenue deliberately rather than replacing it.
+# That endpoint is the FINANCE view: the deals table, real currencies, real
+# close dates, costs and true ROI. This is the RETENTION artefact -- the six
+# numbers a founder forwards to a peer -- computed from the lead statuses they
+# drag around the CRM board themselves. See app/services/roi_calculator.py.
+
+_ROI_DEFAULT_DAYS = 30
+
+
+class ROIOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    meetings_booked: int
+    # A STOCK, not a flow: the value in the pipeline right now, deliberately
+    # not bounded by the date range. The field name below says so, and the
+    # proof card prints "as of today" under the tile.
+    pipeline_value: Decimal
+    pipeline_value_is_as_of_today: bool = True
+    messages_sent: int
+    reply_rate: float
+    time_saved_hours: float
+    revenue_attributed: Decimal
+    leads_contacted: int
+    leads_replied: int
+    date_from: date
+    date_to: date
+
+
+def _roi_range(date_from: date | None, date_to: date | None) -> tuple[date, date]:
+    """Validated (from, to), defaulting to the last 30 days inclusive."""
+    today = datetime.now(timezone.utc).date()
+    date_to = date_to or today
+    date_from = date_from or (date_to - timedelta(days=_ROI_DEFAULT_DAYS - 1))
+    if date_from > date_to:
+        raise HTTPException(status_code=422, detail="date_from must not be after date_to")
+    if (date_to - date_from).days > _MAX_SPAN_DAYS:
+        raise HTTPException(status_code=422, detail="the period may span at most 3 years")
+    return date_from, date_to
+
+
+@router.get("/strategies/{strategy_id}/roi", response_model=ROIOut)
+def strategy_roi(
+    strategy_id: uuid.UUID,
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ROIOut:
+    """What this campaign produced over the range (default: the last 30 days).
+
+    Computed live rather than read from roi_snapshots: the snapshots exist so
+    a trend can be drawn without recomputing, but an arbitrary range the
+    caller chose is not a sum of daily rows -- reply RATE does not add up, and
+    a lead that replied on two days would be counted twice.
+    """
+    _owned_strategy(strategy_id, db, current_user)
+    date_from, date_to = _roi_range(date_from, date_to)
+    metrics = roi_calculator.compute_roi_snapshot(db, strategy_id, date_from, date_to)
+    if metrics.get("error"):
+        raise HTTPException(status_code=503,
+                            detail="the ROI figures could not be computed just now")
+    return ROIOut(**{key: metrics[key] for key in
+                     ("meetings_booked", "pipeline_value", "messages_sent",
+                      "reply_rate", "time_saved_hours", "revenue_attributed",
+                      "leads_contacted", "leads_replied", "date_from", "date_to")})
+
+
+@router.get("/strategies/{strategy_id}/roi/card",
+            response_class=Response,
+            responses={200: {"content": {"image/png": {}},
+                             "description": "The 1200x628 proof card."}})
+def strategy_roi_card(
+    strategy_id: uuid.UUID,
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """The same six numbers as a 1200x628 PNG, sized for a LinkedIn preview.
+
+    Rendered server-side from app/templates/roi_card.html. The image carries
+    no lead names, no email addresses and no client identities -- only
+    aggregates and the campaign's own name -- because the whole point of the
+    card is that it gets forwarded.
+
+    `Cache-Control: private` and no public caching: it is a per-account
+    artefact behind authentication, and a shared cache holding one founder's
+    numbers to serve another is not a risk worth taking for an image that
+    takes milliseconds to draw.
+    """
+    strategy = _owned_strategy(strategy_id, db, current_user)
+    date_from, date_to = _roi_range(date_from, date_to)
+    metrics = roi_calculator.compute_roi_snapshot(db, strategy_id, date_from, date_to)
+    if metrics.get("error"):
+        raise HTTPException(status_code=503,
+                            detail="the ROI figures could not be computed just now")
+
+    product = db.get(Product, strategy.product_id)
+    png = roi_card.render_card_png(
+        metrics,
+        campaign_name=getattr(product, "name", None) or "Campaign",
+        date_from=date_from, date_to=date_to,
+    )
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={
+            "Cache-Control": "private, max-age=0, no-store",
+            "Content-Disposition":
+                f'inline; filename="leadpilot-roi-{date_from}-{date_to}.png"',
+        },
+    )
