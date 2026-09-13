@@ -743,6 +743,8 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Four dashboards (pipeline, leads, campaigns, activity)
 - Real-time SSE stream with a polling fallback and a kill switch
 - `followup_status` badge per lead
+- Lead assignment to workspace members: per-lead picker, bulk assign, and
+  least-loaded round-robin across SDRs (idempotent — only unassigned leads move)
 - CSV export (one-way, by design)
 </details>
 
@@ -1013,9 +1015,12 @@ page, not a document.
   writes the answer.
 - **LinkedIn is not implemented.** The API rejects it explicitly rather than
   half-supporting it.
-- **No team accounts.** Ownership is single-user; the CRM's owner field is
-  binary (mine / unassigned) because a user picker would imply a capability
-  that does not exist.
+- **Data ownership is still one account per workspace.** Workspaces
+  (`docs/features/workspaces.md`) let members act on the owner's records with
+  roles, and leads can now be **assigned** to members (see below), but leads,
+  strategies and campaigns were deliberately NOT migrated to an
+  `organization_id`. Every tenant-scoped query still scopes by the owner's
+  `user_id`, which is the property the cross-tenant fixes in 4.4 rely on.
 - **Cold WhatsApp requires an approved Meta template and a recorded opt-in.**
   There is no free-form cold path, by design.
 - **Completed sequences are not auto-followed-up.** That would be an unbounded
@@ -1024,6 +1029,15 @@ page, not a document.
 - **CSV export is one-way.** See Stage 11.
 
 **Known gaps, with the reason**
+
+- **Lead assignment is who works a lead, not who sends.** Outreach still goes
+  out from the workspace owner's connected Gmail / LinkedIn accounts and voice
+  profile. An assignee gets no notification when a lead is handed to them, the
+  grid cannot yet filter by assignee, and a member removed from the workspace
+  keeps their assignments (shown as "Former member") until a manager
+  reassigns them. Round-robin in the UI works on the grid selection; the
+  whole-campaign form (`strategy_id`) is API-only and capped at 500 leads per
+  call, with `more_remaining` in the response.
 
 - **Google Meet and Zoom have never been called against the live APIs** — no
   credentials exist yet. Both adapters are written against the documented APIs

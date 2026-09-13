@@ -22,6 +22,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const UNASSIGN = "__unassign__";
+
 const STATUSES: LeadStatus[] = [
   "sourced",
   "enriched",
@@ -348,6 +350,9 @@ export function BulkActionBar({
   onExport,
   onClear,
   busy,
+  assignees = [],
+  onAssign,
+  onRoundRobin,
 }: {
   count: number;
   tags: CrmTag[];
@@ -357,6 +362,11 @@ export function BulkActionBar({
   onExport: () => void;
   onClear: () => void;
   busy: boolean;
+  /** Who the selection may be assigned to (null value = unassign). */
+  assignees?: { value: string | null; label: string }[];
+  onAssign?: (ownerId: string | null) => void;
+  /** Present only for managers and owners. */
+  onRoundRobin?: () => void;
 }) {
   if (count === 0) return null;
 
@@ -431,6 +441,37 @@ export function BulkActionBar({
             ))}
           </select>
         </>
+      )}
+
+      {onAssign && assignees.length > 0 && (
+        <select
+          defaultValue=""
+          disabled={busy}
+          onChange={(event) => {
+            const raw = event.target.value;
+            if (raw) {
+              // "" is the placeholder, so unassign travels as a sentinel.
+              onAssign(raw === UNASSIGN ? null : raw);
+              event.target.value = "";
+            }
+          }}
+          aria-label="Assign selected leads"
+          className="h-8 rounded border border-border bg-card px-2 text-xs"
+        >
+          <option value="">Assign to…</option>
+          {assignees.map((choice) => (
+            <option key={choice.value ?? UNASSIGN} value={choice.value ?? UNASSIGN}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {onRoundRobin && (
+        <Button size="sm" variant="outline" disabled={busy} onClick={onRoundRobin}
+                title="Spread the unassigned leads in this selection across your SDRs, least-loaded first">
+          Distribute to SDRs
+        </Button>
       )}
 
       <Button size="sm" variant="outline" onClick={onExport}>

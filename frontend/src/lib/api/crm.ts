@@ -127,8 +127,32 @@ export function bulkPatchLeads(body: {
   status?: LeadStatus;
   add_tag_ids?: string[];
   remove_tag_ids?: string[];
+  /** Present = assign (null = unassign). A reassignment the caller's role
+   *  does not allow comes back per row in `skipped`. */
+  owner_user_id?: string | null;
 }): Promise<BulkResult> {
   return api("/crm/leads/bulk", { method: "POST", body });
+}
+
+export interface RoundRobinResult {
+  assigned: { lead_id: string; owner_user_id: string }[];
+  assigned_count: number;
+  /** Leads somebody already held — a retry or a double click lands here. */
+  skipped: { lead_id: string; reason: string }[];
+  skipped_count: number;
+  /** user_id -> leads handed to them by THIS call. */
+  per_member: Record<string, number>;
+  /** A campaign with more than 500 unassigned leads needs another call. */
+  more_remaining: boolean;
+}
+
+/** Managers and owners only. Exactly one of lead_ids or strategy_id. */
+export function assignRoundRobin(body: {
+  lead_ids?: string[];
+  strategy_id?: string;
+  roles?: string[];
+}): Promise<RoundRobinResult> {
+  return api("/crm/leads/assign-round-robin", { method: "POST", body });
 }
 
 // --------------------------------------------------------------------------

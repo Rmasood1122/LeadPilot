@@ -64,8 +64,37 @@ The branded experience is served to:
 the frontend host (Render/Railway custom domains, which also issue TLS), and
 add its origin to the API's CORS allowed origins.
 
+## Lead assignment
+The CRM grid's **Owner** column is the lead's assignee inside the workspace
+(`crm_lead_meta.owner_user_id` — no new column, no migration). Data ownership
+does not change: the lead still belongs to the workspace owner, and every
+tenant-scoped query still scopes by the owner's `user_id`.
+
+| | Owner | Manager | SDR | Viewer |
+|---|---|---|---|---|
+| Assign any lead to any member, or unassign | ✓ | ✓ | – | – |
+| Claim an unassigned lead / release own lead | ✓ | ✓ | ✓ | – |
+| Round-robin a selection or a campaign | ✓ | ✓ | – | – |
+
+- `PATCH /crm/leads/{id}` `{"owner_user_id": …}` and `POST /crm/leads/bulk`
+  (same field) — an assignee outside the workspace is a 422; a reassignment the
+  role does not allow is a 403 (single) or a per-row `skipped` entry (bulk).
+- `POST /crm/leads/assign-round-robin` `{lead_ids | strategy_id, roles}` —
+  managers and owners. Each unassigned lead goes to the eligible member (default
+  role `sdr`) holding the fewest **open** assigned leads, ties by user id. There
+  is no stored rotation cursor. Writes are `UPDATE … WHERE owner_user_id IS
+  NULL`, so a retry or a concurrent run moves nothing that is already held.
+- The `owner_changed` activity records the person who acted
+  (`request.state.actor`), not the workspace owner the request runs as.
+- Code: `app/services/lead_assignment.py`, `app/api/crm.py`,
+  `frontend/src/lib/crm/assignment.ts`. Tests: `tests/test_lead_assignment.py`,
+  `frontend/src/tests/lead-assignment.test.ts`.
+
 ## Limits
 - One owner's data per workspace; a member's own account stays separate.
+- Assignment does not change the sender: outreach still uses the owner's
+  connected accounts. Assignees are not notified, and the grid cannot filter by
+  assignee yet.
 - The voice profile used for outreach is the account owner's (`/me` is personal).
 - Branded transactional email uses the brand name in invitations only; outreach
   is sent from the owner's connected Gmail, as before.
