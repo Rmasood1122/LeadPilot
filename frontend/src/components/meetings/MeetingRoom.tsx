@@ -23,6 +23,7 @@ import { CircleDot, Clock, Play, Square, User } from "lucide-react";
 
 import type { MeetingDetail } from "@/lib/api/meetings";
 import { PlatformLauncher } from "./PlatformLauncher";
+import { RecordingControl } from "./RecordingControl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -176,6 +177,7 @@ export function MeetingRoom({
             platform={meeting.platform}
             meetingUrl={meeting.meeting_url}
           />
+          <RecordingControl meeting={meeting} />
         </aside>
       </div>
 

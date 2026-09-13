@@ -2443,6 +2443,19 @@ class Meeting(TimestampMixin, Base):
     key_points: Mapped[list | None] = mapped_column(JSON, nullable=True)
     next_steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
     sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # --- Feature 3 (migration 0049): recording-provider transcripts ---------
+    # recording_bot_id is the ONLY key a recording webhook is matched to a
+    # meeting by (unique), never an id carried in the payload. transcript_status
+    # is requesting | pending | received | failed | timed_out; summary_source is
+    # notes | transcript. See app/services/meeting_recording.py.
+    recording_bot_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, unique=True, index=True
+    )
+    transcript_status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    transcript_deadline_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    summary_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     booking: Mapped["CalendarBooking | None"] = relationship()
     lead: Mapped["Lead | None"] = relationship()

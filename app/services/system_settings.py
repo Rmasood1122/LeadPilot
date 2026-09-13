@@ -177,6 +177,14 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "reengagement_min_delay_days": (14, "Shortest wait after a lead's last "
                                     "sequence send before re-engagement may "
                                     "contact them."),
+    # Feature 3 -- recording-provider transcripts
+    "meeting_transcript_wait_minutes": (60, "After a recorded meeting ends, how "
+                                        "long the panel waits for the "
+                                        "provider's transcript before marking "
+                                        "it timed out. The notes-only summary "
+                                        "is generated immediately either way, "
+                                        "and a late transcript still upgrades "
+                                        "it."),
 }
 
 

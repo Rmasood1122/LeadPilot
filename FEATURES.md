@@ -730,6 +730,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Meeting room: live notes, timer, platform launcher
 - Google Meet / Zoom / Teams / any URL
 - Transcript ingestion (HMAC-signed; closed by default)
+- Recall.ai recording bots: transcript pulled in on `transcript.done` and the
+  summary upgraded from notes to transcript + notes. The summary never waits
+  for it: a missing transcript times out and leaves the notes-only summary
 - AI summary: summary, key points, action items, next steps, sentiment
 - Searchable transcript viewer with TXT and PDF export
 - Action-item checkboxes that survive regeneration
@@ -1066,10 +1069,20 @@ page, not a document.
   than an error.
 - **The `calendar.events` Google scope is new**, so accounts connected before
   it shipped will be asked to reconnect the first time they choose Meet.
-- **Nothing calls the transcript endpoint yet.** The endpoint, its HMAC scheme
-  and its size cap are implemented and tested; the browser extension or
-  recording-provider webhook that feeds it is the next piece. Until then the AI
-  summary works from the user's live notes alone.
+- **Recall.ai transcripts are built and tested with mocks, never called live.**
+  A host can send a Recall.ai bot to a call. Its `transcript.done` webhook
+  (Svix-signed, de-duplicated, matched to the meeting only by the stored bot
+  id) pulls the transcript in and upgrades the summary
+  (`docs/features/meeting-transcripts.md`). No Recall credentials exist in any
+  environment. The signing scheme, event payload and transcript format were
+  checked against docs.recall.ai on 2026-09-13; the auth header and endpoint
+  paths carry `# TODO: verify`, because Recall's quickstart and API reference
+  disagree on `Token` vs `Bearer`. The docs name no webhook replay tolerance,
+  so five minutes (the Svix default) is a choice, not a documented value.
+- **LeadPilot does not collect consent to record.** Sending a bot records
+  everyone on the call. Some US states, and GDPR for EU/UK participants,
+  require every party's consent. The meeting room tells the host to announce
+  it; nothing enforces that.
 - **`/book/:slug` needs a hosting rewrite.** `frontend/vercel.json` ships it
   for the documented target; on another host, links use `/book/?slug=…` until
   an equivalent rewrite exists. This is a consequence of `output: 'export'`,

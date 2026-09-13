@@ -50,6 +50,7 @@ from app.api.linkedin import router as linkedin_router                 # FG5
 from app.api.calls import router as calls_router                       # FG6
 from app.api.revenue_analytics import router as revenue_analytics_router  # FG3
 from app.api.reengagement import router as reengagement_router  # Feature 5
+from app.api.recording import router as recording_router  # Feature 3 (transcripts)
 from app.api.tracking import router as tracking_router                 # FG3
 from app.api.api_keys import router as api_keys_router                 # FG4
 from app.api.crm_integrations import router as crm_integrations_router # FG4
@@ -268,6 +269,7 @@ app.include_router(share_links_router)           # /share-links, /public/roi/{to
 # /sequences/{id} (GET) -- a longer literal path, so no collision.
 app.include_router(sequence_reviews_router)      # pre-send adversarial review
 app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/reengagement
+app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
 
 
 # ---------------------------------------------------------------------------

@@ -43,7 +43,14 @@ export interface Meeting {
   key_points: string[] | null;
   next_steps: string[] | null;
   recording_url: string | null;
+  /** Feature 3: a recording bot's transcript. null = no bot was sent. */
+  transcript_status: TranscriptStatus | null;
+  transcript_deadline_at: string | null;
+  /** What the current summary was built from. "notes" until a transcript upgrades it. */
+  summary_source: "notes" | "transcript" | null;
 }
+
+export type TranscriptStatus = "requesting" | "pending" | "received" | "failed" | "timed_out";
 
 export interface MeetingDetail extends Meeting {
   raw_notes: string | null;
@@ -118,6 +125,20 @@ export function endMeeting(
 
 export function generateSummary(id: string): Promise<MeetingDetail> {
   return api(`/meetings/${id}/generate-summary`, { method: "POST" });
+}
+
+export interface RecordingStatus {
+  meeting_id: string;
+  recording: boolean;
+  transcript_status: TranscriptStatus | null;
+  transcript_deadline_at: string | null;
+  summary_source: "notes" | "transcript" | null;
+}
+
+/** Send a Recall.ai bot to record and transcribe. Calling it twice is a no-op.
+ *  503 = an admin has not configured Recall; 502 = the provider declined. */
+export function startRecordingBot(id: string): Promise<RecordingStatus> {
+  return api(`/meetings/${id}/recording-bot`, { method: "POST" });
 }
 
 export function getActionItems(

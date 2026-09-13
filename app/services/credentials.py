@@ -125,6 +125,14 @@ CATALOGUE: tuple[ProviderSpec, ...] = (
     ProviderSpec("mailreach", "Mailreach", ("api_key",),
                  "Email account health: spam score, inbox placement, "
                  "SPF/DKIM/DMARC.", "both"),
+    ProviderSpec("recall", "Recall.ai", ("api_key", "region"),
+                 "Meeting recording bots: a bot joins Meet/Zoom/Teams calls and "
+                 "its transcript feeds the AI meeting summary. `region` is the "
+                 "API region slug, e.g. us-east-1. `webhook_secret` is the "
+                 "workspace verification secret (whsec_...) that signs "
+                 "deliveries to /webhooks/recall; without it that endpoint "
+                 "stays closed.", "system",
+                 optional=("webhook_secret",)),
 )
 
 _BY_PROVIDER = {spec.provider: spec for spec in CATALOGUE}

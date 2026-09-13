@@ -325,10 +325,11 @@ change needed.
    for the documented target (Vercel). On any other host, links must use
    `/book/?slug=…` until an equivalent rewrite is added.
 
-4. **Transcript ingestion has no client yet.** The endpoint, its HMAC scheme
-   and its cap are implemented and tested; nothing calls it. A browser
-   extension or a Recall.ai webhook is the next piece, and until one exists the
-   AI summary works from the user's live notes alone.
+4. **Transcript ingestion now has a client: Recall.ai** (see
+   [`meeting-transcripts.md`](meeting-transcripts.md)). It has not been
+   exercised against the live service: no Recall credentials exist yet. The
+   HMAC chunk endpoint above is unchanged and remains the generic path for any
+   other provider.
 
 5. **Meetings are hosted by one Zoom account.** Zoom server-to-server OAuth
    means the LeadPilot operator authorises once and every meeting is created

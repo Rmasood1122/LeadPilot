@@ -257,6 +257,12 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.calendar_tasks.close_stale_meetings",
         "schedule": 3600.0,
     },
+    # Feature 3: mark recording-provider transcripts that never arrived as
+    # timed out. The notes-only summary already exists; this only ends the wait.
+    "expire-transcript-waits": {
+        "task": "app.workers.calendar_tasks.expire_transcript_waits",
+        "schedule": 600.0,
+    },
     # Feature Group 7: 24h and 1h pre-meeting reminders. Every five minutes;
     # each reminder is claimed with a conditional UPDATE, so overlapping
     # sweeps cannot double-send (see meeting_prep_tasks).

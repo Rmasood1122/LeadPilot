@@ -137,6 +137,11 @@ class MeetingOut(BaseModel):
     key_points: list | None
     next_steps: list | None
     recording_url: str | None
+    # Feature 3: recording-provider transcript state, and what the current
+    # summary was built from ("notes" until a transcript upgrades it).
+    transcript_status: str | None = None
+    transcript_deadline_at: datetime | None = None
+    summary_source: str | None = None
 
 
 class MeetingDetailOut(MeetingOut):
@@ -468,6 +473,12 @@ def end_meeting(
     if meeting.actual_end_at is None:
         meeting.actual_end_at = now
     meeting.status = MeetingStatus.COMPLETED
+    # Feature 3: if a recording bot is transcribing, start the wait -- but the
+    # summary below is still queued NOW, from the notes. A transcript that
+    # arrives later upgrades it; one that never arrives costs nothing.
+    from app.services import meeting_recording  # noqa: PLC0415
+
+    meeting_recording.set_deadline(db, meeting, now)
     db.commit()
 
     if generate_summary:

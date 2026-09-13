@@ -58,6 +58,16 @@ _ADDED_TO_SEQUENCE_STEPS = ["followup_enabled", "followup_delay_hours"]
 
 MIGRATIONS = ["0020_followup_delay.py", "0021_calendar.py", "0022_meetings.py"]
 
+# Later migrations that ALTER one of the tables above. They are applied on top
+# when building the migrated schema, because the models describe the table as
+# it is NOW -- comparing 0022's meetings against today's model would fail for a
+# correct chain, and dropping the new columns from the comparison would hide
+# exactly the drift this file exists to catch. Kept out of MIGRATIONS so the
+# 0020-0022 chain and "nothing destructive" checks below stay about those three.
+LATER_ALTERATIONS = [
+    "0049_meeting_recording.py",   # Feature 3: meetings recording/transcript columns
+]
+
 
 def _load(name: str):
     """Import a revision file by path — alembic/versions is not a package."""
@@ -128,7 +138,7 @@ def from_migration(tmp_path):
         for column in removed:
             steps.append_column(column)
 
-    for name in MIGRATIONS:
+    for name in MIGRATIONS + LATER_ALTERATIONS:
         with engine.begin() as connection:
             with Operations.context(MigrationContext.configure(connection)):
                 _load(name).upgrade()
