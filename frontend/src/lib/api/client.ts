@@ -183,7 +183,6 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 // the call sites.
 // `T = any` keeps the typing those call sites always had: they were written
 // against `.then((r: any) => ...)`, so their data was `any` all along.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Loose = any;
 export const apiClient = {
   get:    <T = Loose>(path: string, opts?: RequestOptions) => api<T>(path, { method: "GET",    ...opts }),
