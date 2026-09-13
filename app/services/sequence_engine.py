@@ -72,14 +72,23 @@ def lead_timezone(lead: Lead) -> str:
     return settings.send_window_timezone
 
 
-def next_window_slot(dt: datetime, tz_name: str) -> datetime:
-    """Earliest instant >= dt inside the send window (returned in UTC)."""
+def next_window_slot(dt: datetime, tz_name: str,
+                     window: tuple[int, int, bool] | None = None) -> datetime:
+    """Earliest instant >= dt inside the send window (returned in UTC).
+
+    `window` is (start_hour, end_hour, skip_weekends) from a resolved
+    compliance rule (Feature 8); None is the deployment baseline. The caller
+    must not pass an empty window -- compliance_rules.Effective.window_empty.
+    """
     tz = ZoneInfo(tz_name)
     local = dt.astimezone(tz)
-    start_h, end_h = settings.send_window_start_hour, settings.send_window_end_hour
+    if window is None:
+        window = (settings.send_window_start_hour, settings.send_window_end_hour,
+                  settings.send_window_skip_weekends)
+    start_h, end_h, skip_weekends = window
 
     for _ in range(14):  # never loops more than two weeks
-        is_weekend = local.weekday() >= 5 and settings.send_window_skip_weekends
+        is_weekend = local.weekday() >= 5 and skip_weekends
         if not is_weekend:
             if local.time() < time(start_h):
                 local = local.replace(hour=start_h, minute=0, second=0, microsecond=0)
@@ -93,8 +102,9 @@ def next_window_slot(dt: datetime, tz_name: str) -> datetime:
     raise RuntimeError("could not find a send window slot within 14 days")
 
 
-def in_send_window(dt: datetime, tz_name: str) -> bool:
-    return next_window_slot(dt, tz_name) <= dt
+def in_send_window(dt: datetime, tz_name: str,
+                   window: tuple[int, int, bool] | None = None) -> bool:
+    return next_window_slot(dt, tz_name, window) <= dt
 
 
 # --------------------------------------------------------------------------
@@ -102,13 +112,15 @@ def in_send_window(dt: datetime, tz_name: str) -> bool:
 # --------------------------------------------------------------------------
 
 
-def daily_allowance(account: GmailAccount, on_date: date) -> int:
+def daily_allowance(account: GmailAccount, on_date: date, cap: int | None = None) -> int:
     """Warm-up ramp: start low, add the increment each day, cap at the
-    configured daily cap. Day 0 = the day the account was connected."""
+    configured daily cap. Day 0 = the day the account was connected.
+    `cap` (Feature 8 compliance rule) can only lower the ceiling."""
     connected = account.created_at.date() if account.created_at else on_date
     age_days = max(0, (on_date - connected).days)
     ramped = settings.gmail_warmup_start_sends + settings.gmail_warmup_daily_increment * age_days
-    return min(settings.gmail_daily_cap, ramped)
+    ceiling = settings.gmail_daily_cap if cap is None else min(cap, settings.gmail_daily_cap)
+    return min(ceiling, ramped)
 
 
 def sends_today(session: Session, sender_ref: str, now: datetime) -> int:
@@ -122,8 +134,9 @@ def sends_today(session: Session, sender_ref: str, now: datetime) -> int:
     ).scalar_one()
 
 
-def allowance_left(session: Session, account: GmailAccount, now: datetime) -> int:
-    return daily_allowance(account, now.astimezone(timezone.utc).date()) - sends_today(
+def allowance_left(session: Session, account: GmailAccount, now: datetime,
+                   cap: int | None = None) -> int:
+    return daily_allowance(account, now.astimezone(timezone.utc).date(), cap) - sends_today(
         session, str(account.id), now
     )
 
@@ -145,7 +158,7 @@ def whatsapp_sends_today(session: Session, now: datetime) -> int:
     ).scalar_one()
 
 
-def whatsapp_daily_allowance(session: Session, on_date: date) -> int:
+def whatsapp_daily_allowance(session: Session, on_date: date, cap: int | None = None) -> int:
     """Warm-up ramp for the WhatsApp number, anchored to the date of the
     FIRST WhatsApp message ever sent (there is no per-user account row
     like Gmail's — one business number per deployment)."""
@@ -155,18 +168,20 @@ def whatsapp_daily_allowance(session: Session, on_date: date) -> int:
             Message.status == MessageStatus.SENT,
         )
     ).scalar_one()
+    ceiling = (settings.whatsapp_daily_cap if cap is None
+               else min(cap, settings.whatsapp_daily_cap))
     if first_sent is None:
-        return settings.whatsapp_warmup_start_sends
+        return min(ceiling, settings.whatsapp_warmup_start_sends)
     first_date = first_sent.date() if isinstance(first_sent, datetime) else on_date
     age_days = max(0, (on_date - first_date).days)
     ramped = (settings.whatsapp_warmup_start_sends
               + settings.whatsapp_warmup_daily_increment * age_days)
-    return min(settings.whatsapp_daily_cap, ramped)
+    return min(ceiling, ramped)
 
 
-def whatsapp_allowance_left(session: Session, now: datetime) -> int:
+def whatsapp_allowance_left(session: Session, now: datetime, cap: int | None = None) -> int:
     return whatsapp_daily_allowance(
-        session, now.astimezone(timezone.utc).date()
+        session, now.astimezone(timezone.utc).date(), cap
     ) - whatsapp_sends_today(session, now)
 
 
@@ -486,10 +501,15 @@ def check_bounce_rate(session: Session, strategy: Strategy) -> bool:
         .where(Lead.strategy_id == strategy.id, Outcome.event == OutcomeEvent.BOUNCED)
     ).scalar_one()
     rate = bounced / sent
-    if rate > settings.bounce_rate_pause_threshold and strategy.campaign_state == CAMPAIGN_ACTIVE:
+    # Feature 8: the workspace's compliance rule may lower the threshold,
+    # never raise it past the deployment baseline.
+    from app.services import compliance_rules  # noqa: PLC0415
+
+    threshold = compliance_rules.bounce_threshold(session, strategy)
+    if rate > threshold and strategy.campaign_state == CAMPAIGN_ACTIVE:
         strategy.campaign_state = CAMPAIGN_PAUSED_BOUNCE
         strategy.campaign_pause_reason = (
-            f"bounce rate {rate:.1%} exceeded {settings.bounce_rate_pause_threshold:.0%} "
+            f"bounce rate {rate:.1%} exceeded {threshold:.1%} "
             f"({bounced}/{sent}) — human review required"
         )
         session.commit()

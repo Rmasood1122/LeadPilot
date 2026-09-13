@@ -716,6 +716,10 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Opt-in post-sequence re-engagement: one email per completed, neutral
   enrollment, per-campaign toggle (off by default), own daily/weekly caps under
   admin ceilings, re-gated at send time
+- Configurable compliance rules: send window, weekend skipping, daily cap,
+  consent requirement and bounce-pause threshold per workspace, recipient
+  region and channel. Resolved at send time, and fail-closed: an empty table is
+  the old baseline, and an invalid or unreadable rule only ever tightens
 </details>
 
 <details open>
@@ -1043,6 +1047,21 @@ page, not a document.
 
 **Known gaps, with the reason**
 
+- **Compliance rules govern the send moment, not every surface.**
+  (`docs/features/compliance-rules.md`)
+  - **Scheduling:** it still places messages with the baseline window, and the
+    send-time check reschedules anything a rule forbids. The smart-send-time
+    heatmap's "schedulable" shading is the same baseline.
+  - **Caps:** rule caps apply to Gmail and WhatsApp. LinkedIn and phone keep
+    their own per-account limits in System Settings.
+  - **Dashboards:** the campaign overview and the CRM campaigns dashboard still
+    display the baseline bounce threshold, not a workspace's lower one. The
+    pause itself uses the rule.
+  - **Consent:** a consent rule on email or LinkedIn stops those sends, because
+    LeadPilot records no consent for either channel.
+  - **Region:** it is only as good as the lead's enrichment country or timezone.
+    Leads with neither fall under `unknown`, which only `*` or `unknown` rules
+    match.
 - **Re-engagement is email-only, and the conversion gate will hold many of its
   leads.** WhatsApp needs an approved template no step names. LinkedIn's `auto`
   action would send a second connection request. An unprompted AI call is a

@@ -4020,3 +4020,45 @@ class BenchmarkBucket(Base):
     p75: Mapped[float] = mapped_column(Float)
     window_days: Mapped[int] = mapped_column(Integer)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+# --------------------------------------------------------------------------
+# Feature 8 — configurable compliance rules (migration 0051)
+# --------------------------------------------------------------------------
+
+
+class ComplianceRule(TimestampMixin, Base):
+    """One override of the send-time compliance baseline.
+
+    `scope` is "global" or a workspace id (as a string), so UNIQUE (scope,
+    region, channel) holds for global rows too -- a nullable workspace_id in
+    the key would let two "global" rows for the same region coexist, because
+    NULLs never collide. workspace_id is kept alongside for the cascade.
+
+    Every rule field is NULLABLE = "not set here, inherit". The resolution,
+    the hard bounds and the fail-closed rules live in
+    app/services/compliance_rules.py -- this table only stores intent.
+    """
+
+    __tablename__ = "compliance_rules"
+    __table_args__ = (
+        UniqueConstraint("scope", "region", "channel", name="compliance_rule_scope"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    scope: Mapped[str] = mapped_column(String(40))
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    region: Mapped[str] = mapped_column(String(10))     # us|ca|eu|uk|sg|au|nz|other|unknown|*
+    channel: Mapped[str] = mapped_column(String(20))    # email|whatsapp|linkedin|phone|*
+    send_start_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    send_end_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    skip_weekends: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    daily_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    consent_required: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    bounce_pause_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

@@ -58,7 +58,7 @@ EXIT_ABORTED = 2
 # The alembic head. tests/test_activation_script.py asserts this IS the
 # head, so adding a migration without moving this line fails there rather
 # than in production against a database missing the new tables.
-TARGET_REVISION = "0050_benchmarks"
+TARGET_REVISION = "0051_compliance_rules"
 SENDING_DOMAIN = "calendarharvest.com"
 ADVERSARIAL_MIN_PASS = 28
 ADVERSARIAL_TOTAL = 32

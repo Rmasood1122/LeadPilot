@@ -49,7 +49,7 @@ from app.services.message_personalization import (
     render_whatsapp_variables,
 )
 from app.services.reply_classification import classify_reply
-from app.services import reengagement
+from app.services import compliance_rules, reengagement
 from app.services import whatsapp_optin as optin_svc
 from app.services.whatsapp_window import window_state_for_lead
 from app.workers.celery_app import celery_app
@@ -254,10 +254,28 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 session.commit()
                 return "needs_template_not_approved"
 
+    # ---- Feature 8: the resolved compliance rule for THIS lead + channel ----
+    # Workspace / region / channel overrides of the baseline, resolved now.
+    # Fails closed -- see app/services/compliance_rules.py.
+    rules = compliance_rules.resolve(session, lead, message.channel.value, strategy)
+    if rules.consent_required and not compliance_rules.has_consent(
+            session, lead, message.channel):
+        # Skipped, not failed: the sequence continues on its other steps, the
+        # same way a WhatsApp step without opt-in is skipped.
+        engine.skip_message(session, message, reason="skipped_consent_required", now=now)
+        return "skipped_consent_required"
+
     # ---- send window --------------------------------------------------------
     tz = engine.lead_timezone(lead)
-    if not engine.in_send_window(now, tz):
-        message.scheduled_at = engine.next_window_slot(now, tz)
+    if rules.window_empty:
+        # Conflicting (or invalid) rules leave no permitted hour. Closed:
+        # nothing transmits, and the message is looked at again tomorrow.
+        message.scheduled_at = now + timedelta(days=1)
+        message.error = "no permitted send window under the current compliance rules"
+        session.commit()
+        return "deferred_no_send_window"
+    if not engine.in_send_window(now, tz, rules.window):
+        message.scheduled_at = engine.next_window_slot(now, tz, rules.window)
         session.commit()
         return "deferred_window"
 
@@ -281,20 +299,20 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             return stopped
     elif is_whatsapp:
         account = None
-        if engine.whatsapp_allowance_left(session, now) <= 0:
+        if engine.whatsapp_allowance_left(session, now, rules.daily_cap) <= 0:
             tomorrow = now.astimezone(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
-            message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+            message.scheduled_at = engine.next_window_slot(tomorrow, tz, rules.window)
             session.commit()
             return "deferred_cap"
     else:
         account = _account_for_strategy(session, strategy)
-        if engine.allowance_left(session, account, now) <= 0:
+        if engine.allowance_left(session, account, now, rules.daily_cap) <= 0:
             tomorrow = now.astimezone(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
-            message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+            message.scheduled_at = engine.next_window_slot(tomorrow, tz, rules.window)
             session.commit()
             return "deferred_cap"
 

@@ -6,7 +6,7 @@ import { useAuthStore } from "@/lib/stores/authStore";
 import { LogoMark } from "@/components/ui/Logo";
 import {
   Users, AlertCircle, Shield, BookOpen, Heart, Zap, List,
-  GraduationCap, LifeBuoy, KeyRound, SlidersHorizontal, ShieldAlert
+  GraduationCap, LifeBuoy, KeyRound, SlidersHorizontal, ShieldAlert, ShieldCheck
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -24,6 +24,9 @@ const NAV_ITEMS = [
   // and the feature switches/limits the new features read.
   { href: "/admin/integrations",     label: "Integrations",      icon: KeyRound   },
   { href: "/admin/system-settings",  label: "System Settings",   icon: SlidersHorizontal },
+  // Feature 8: send windows, caps, consent and bounce thresholds per
+  // workspace / region / channel, resolved fail-closed at send time.
+  { href: "/admin/compliance-rules", label: "Compliance Rules",  icon: ShieldCheck },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
