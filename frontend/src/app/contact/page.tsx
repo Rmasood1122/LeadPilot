@@ -15,10 +15,14 @@ export const metadata: Metadata = {
     "Talk to Rehan directly. If LeadPilot is a fit, we will tell you honestly. If it is not, we will tell you that too.",
 };
 
-// TODO(Ahmad): replace with the live Calendly event URL.
-const CALENDLY_URL = "https://calendly.com/rehan-masood";
-const EMAIL = "rehan@calendarharvest.com";
-const LINKEDIN_URL = "https://www.linkedin.com/in/rehan-rana-ai-engineer";
+const CALENDLY_URL = "https://calendly.com/rmasood112224/30min";
+const EMAIL = "ahmadshahid@calendarharvest.com";
+const LINKEDIN_URL = "https://www.linkedin.com/company/leadpilot-app";
+
+const WHATSAPP = [
+  { label: "+92 342 696 7730 (Pakistan)", href: "https://wa.me/923426967730" },
+  { label: "+1 646 756 0056 (US)", href: "https://wa.me/16467560056" },
+];
 
 const FOR_YOU = [
   "You run a boutique agency with 3–30 staff in the US, UK, Canada, Australia, New Zealand, Ireland, or Singapore.",
@@ -89,23 +93,45 @@ export default function ContactPage() {
             </div>
 
             <div className="rounded-md border border-white/10 p-8">
-              <h2 className="text-2xl font-bold">Send a message</h2>
-              <p className="mt-4 leading-relaxed text-gray-300">Prefer email? Reach out directly.</p>
-              <p className="mt-8">
-                <a href={`mailto:${EMAIL}`} className="break-all text-lg font-medium text-blue-500 hover:text-blue-400">
-                  {EMAIL}
-                </a>
-              </p>
-              <p className="mt-4">
-                <a
-                  href={LINKEDIN_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-medium text-blue-500 hover:text-blue-400"
-                >
-                  Connect on LinkedIn
-                </a>
-              </p>
+              <h2 className="text-2xl font-bold">Get in touch</h2>
+              <dl className="mt-6 space-y-6">
+                <div>
+                  <dt className="text-sm font-medium uppercase tracking-wider text-gray-400">Email</dt>
+                  <dd className="mt-1">
+                    <a href={`mailto:${EMAIL}`} className="break-all text-lg font-medium text-blue-500 hover:text-blue-400">
+                      {EMAIL}
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium uppercase tracking-wider text-gray-400">LinkedIn</dt>
+                  <dd className="mt-1">
+                    <a
+                      href={LINKEDIN_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-lg font-medium text-blue-500 hover:text-blue-400"
+                    >
+                      LeadPilot on LinkedIn
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium uppercase tracking-wider text-gray-400">WhatsApp</dt>
+                  {WHATSAPP.map((w) => (
+                    <dd key={w.href} className="mt-1">
+                      <a
+                        href={w.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-lg font-medium text-blue-500 hover:text-blue-400"
+                      >
+                        {w.label}
+                      </a>
+                    </dd>
+                  ))}
+                </div>
+              </dl>
             </div>
           </div>
         </section>

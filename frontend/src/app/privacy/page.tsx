@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   robots: "index, follow",
 };
 
-const EMAIL = "rehan@calendarharvest.com";
+const EMAIL = "ahmadshahid@calendarharvest.com";
 
 export default function PrivacyPage() {
   return (
