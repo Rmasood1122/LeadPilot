@@ -241,6 +241,13 @@ celery_app.conf.beat_schedule = {
         "task": "leadpilot.outreach.check_followup_due",
         "schedule": float(settings.followup_sweep_interval_seconds),
     },
+    # Feature 5: opt-in post-sequence re-engagement. Hourly: its delays are
+    # measured in weeks. Enqueues at most each campaign's remaining
+    # re-engagement allowance; every send is re-gated in send_message_impl.
+    "check-reengagement-due": {
+        "task": "leadpilot.outreach.check_reengagement_due",
+        "schedule": 3600.0,
+    },
     # Engagement Hub, Feature 3: close meetings nobody pressed End on. Hourly
     # rather than on a schedule tied to meeting times, because the thing being
     # cleaned up is precisely the case where nobody was watching. A meeting

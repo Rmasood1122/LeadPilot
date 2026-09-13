@@ -163,6 +163,20 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                "Off by default: rewritten links are a spam-filter "
                                "signal. Never applied where open tracking is off "
                                "(EU/EEA/UK leads)."),
+    # Feature 5 -- opt-in post-sequence re-engagement. Each campaign is still
+    # OFF until its owner or a manager turns it on; these bound what they may
+    # choose. A missing or mistyped row returns the default below.
+    "reengagement_allowed": (True, "Allow campaigns to turn on post-sequence "
+                             "re-engagement. Off stops every pending "
+                             "re-engagement send at its next send-time check."),
+    "reengagement_daily_cap_ceiling": (25, "Highest re-engagement sends per "
+                                       "campaign per day. Campaign caps above "
+                                       "it are clamped."),
+    "reengagement_weekly_cap_ceiling": (100, "Highest re-engagement sends per "
+                                        "campaign per rolling 7 days."),
+    "reengagement_min_delay_days": (14, "Shortest wait after a lead's last "
+                                    "sequence send before re-engagement may "
+                                    "contact them."),
 }
 
 

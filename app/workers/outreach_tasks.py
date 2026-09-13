@@ -49,6 +49,7 @@ from app.services.message_personalization import (
     render_whatsapp_variables,
 )
 from app.services.reply_classification import classify_reply
+from app.services import reengagement
 from app.services import whatsapp_optin as optin_svc
 from app.services.whatsapp_window import window_state_for_lead
 from app.workers.celery_app import celery_app
@@ -193,6 +194,16 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if enrollment.status is not EnrollmentStatus.STOPPED:
             engine.stop_enrollment(session, enrollment, reason="suppressed")
         return "cancelled_suppressed"
+
+    # ---- Feature 5: opt-in re-engagement's own switch and cap -------------
+    # IN ADDITION to every gate here, never instead of one. A campaign whose
+    # re-engagement was switched off since scheduling cancels; an exhausted
+    # re-engagement cap defers to tomorrow. The channel daily cap below still
+    # applies on top.
+    if message.origin == reengagement.ORIGIN:
+        held = reengagement.send_time_hold(session, strategy, lead, message, now)
+        if held is not None:
+            return held
 
     # ---- Feature A5: live conversion probability / kill signals -----------
     # A lead that has gone cold is not sent to: the gate pauses (cooling) or
@@ -1457,6 +1468,113 @@ def send_followup_task(self, enrollment_id: str, step_no: int) -> str:
         session.rollback()
         logger.exception("auto follow-up failed for enrollment %s step %s — "
                          "retrying", enrollment_id, step_no)
+        raise self.retry(exc=exc, countdown=300)
+    finally:
+        session.close()
+
+
+# --------------------------------------------------------------------------
+# Feature 5 — opt-in post-sequence re-engagement
+# --------------------------------------------------------------------------
+#
+# The sweep only ENQUEUES, and never more per campaign than the campaign's
+# remaining re-engagement allowance. The send claims a reengagement_attempts
+# row (UNIQUE per enrollment) BEFORE creating a message, then hands the message
+# to send_message_impl like any other send. See app/services/reengagement.py.
+
+
+def check_reengagement_due_impl(session: Session, now: datetime | None = None,
+                                enqueue=None) -> list[str]:
+    now = now or _now()
+    enqueue = enqueue or (lambda eid: send_reengagement_task.delay(eid))
+    if not reengagement.allowed(session):
+        return []
+
+    strategies = session.execute(
+        select(Strategy).where(Strategy.reengagement_enabled.is_(True),
+                               Strategy.campaign_state == engine.CAMPAIGN_ACTIVE)
+    ).scalars().all()
+
+    due: list[str] = []
+    for strategy in strategies:
+        left = reengagement.allowance_left(session, strategy, now)
+        for enrollment in reengagement.candidates(session, strategy, now, left):
+            enqueue(str(enrollment.id))
+            due.append(str(enrollment.id))
+    return due
+
+
+def send_reengagement_impl(session: Session, enrollment_id: uuid.UUID,
+                           now: datetime | None = None) -> str:
+    """Send one re-engagement. Idempotent: a second call for the same
+    enrollment returns skipped_already_attempted and creates nothing."""
+    now = now or _now()
+    enrollment = session.get(SequenceEnrollment, enrollment_id)
+    if enrollment is None:
+        return "missing"
+    reason = reengagement.ineligibility(session, enrollment, now)
+    if reason is not None:
+        return f"skipped_{reason}"
+
+    lead = session.get(Lead, enrollment.lead_id)
+    strategy = session.get(Strategy, lead.strategy_id)
+    # Checked before claiming: an over-cap enrollment stays unclaimed, so a
+    # later sweep can still re-engage it once allowance frees up.
+    if reengagement.allowance_left(session, strategy, now) <= 0:
+        return "deferred_reengagement_cap"
+
+    last = reengagement._last_sent(session, enrollment)  # noqa: SLF001
+    attempt = reengagement.claim(session, enrollment, lead, strategy)
+    if attempt is None:
+        return "skipped_already_attempted"
+
+    template = personalization.build_reengagement_brief(
+        session, strategy, lead, channel=last.channel.value)
+    message = Message(
+        sequence_id=enrollment.sequence_id,
+        lead_id=lead.id,
+        channel=last.channel,
+        step_no=last.step_no + 1,
+        template=template,
+        variant=last.variant,
+        origin=reengagement.ORIGIN,
+        status=MessageStatus.SCHEDULED,
+        # Same reason as the follow-up: keeps the beat dispatcher off the row
+        # for the moment it takes to send it here, so the outcome keeps its tag.
+        scheduled_at=now + _FOLLOWUP_DISPATCH_GUARD,
+    )
+    session.add(message)
+    session.flush()
+    attempt.message_id = message.id
+    attempt.status = "scheduled"
+    session.commit()
+
+    result = send_message_impl(session, message.id, now=now,
+                               outcome_source=reengagement.OUTCOME_SOURCE)
+    attempt.status = "sent" if result == "sent" else "held"
+    attempt.detail = result[:200]
+    session.commit()
+    logger.info("re-engagement for enrollment %s: %s", enrollment_id, result)
+    return result
+
+
+@celery_app.task(name="leadpilot.outreach.check_reengagement_due")
+def check_reengagement_due() -> int:
+    session = SessionLocal()
+    try:
+        return len(check_reengagement_due_impl(session))
+    finally:
+        session.close()
+
+
+@celery_app.task(name="leadpilot.outreach.send_reengagement", bind=True, max_retries=3)
+def send_reengagement_task(self, enrollment_id: str) -> str:
+    session = SessionLocal()
+    try:
+        return send_reengagement_impl(session, uuid.UUID(enrollment_id))
+    except Exception as exc:
+        session.rollback()
+        logger.exception("re-engagement failed for enrollment %s — retrying", enrollment_id)
         raise self.retry(exc=exc, countdown=300)
     finally:
         session.close()

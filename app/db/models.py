@@ -943,6 +943,22 @@ class Strategy(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     health_message: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # --- Feature 5 (migration 0048): opt-in post-sequence re-engagement ----
+    # OFF by default and per campaign. Its caps are separate from the channel
+    # daily cap -- a re-engagement send counts against BOTH -- and are clamped
+    # to the admin ceilings in system_settings. See app/services/reengagement.py.
+    reengagement_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    reengagement_delay_days: Mapped[int] = mapped_column(
+        Integer, default=30, server_default=text("30"), nullable=False
+    )
+    reengagement_daily_cap: Mapped[int] = mapped_column(
+        Integer, default=10, server_default=text("10"), nullable=False
+    )
+    reengagement_weekly_cap: Mapped[int] = mapped_column(
+        Integer, default=25, server_default=text("25"), nullable=False
+    )
 
     product: Mapped["Product"] = relationship(back_populates="strategies")
     research_steps: Mapped[list["ResearchStep"]] = relationship(
@@ -1452,6 +1468,13 @@ class Message(TimestampMixin, Base):
     open_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default=text("0"), nullable=False
     )
+    # --- Feature 5 (migration 0048) -----------------------------------------
+    # WHY this message exists when it is not an ordinary sequence step. NULL for
+    # every scheduled step (their rows are unchanged); "reengagement" for the
+    # opt-in post-sequence touch. A real indexed column, not outcome meta_json,
+    # because the re-engagement cap counts these rows at send time and a JSON
+    # predicate is spelled differently on SQLite and PostgreSQL.
+    origin: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
 
     sequence: Mapped["Sequence"] = relationship(back_populates="messages")
     lead: Mapped["Lead"] = relationship(back_populates="messages")
@@ -3908,3 +3931,44 @@ class SequenceReview(TimestampMixin, Base):
     )
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Feature 5 — opt-in post-sequence re-engagement (migration 0048)
+# --------------------------------------------------------------------------
+
+
+class ReengagementAttempt(TimestampMixin, Base):
+    """The claim that makes re-engagement once-per-enrollment, structurally.
+
+    UNIQUE (enrollment_id) is the whole idempotency story, in the same spirit
+    as research_steps' (strategy_id, pipeline, step_no): a retried task, two
+    overlapping sweeps, or a worker killed after the insert can never produce a
+    second re-engagement for the same enrollment, because the second INSERT
+    fails. The row is written BEFORE any message exists.
+
+    It is the claim, not the record of what was sent -- the message row is
+    that. `status` is claimed | scheduled | sent | held, and `detail` carries
+    send_message_impl's result (e.g. deferred_window) for the audit trail.
+    """
+
+    __tablename__ = "reengagement_attempts"
+    __table_args__ = (
+        UniqueConstraint("enrollment_id", name="reengagement_enrollment"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sequence_enrollments.id", ondelete="CASCADE")
+    )
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20))
+    detail: Mapped[str | None] = mapped_column(String(200), nullable=True)

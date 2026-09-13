@@ -18,6 +18,7 @@ import { Modal } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { StrategyCalls } from "@/components/calls/CallHistory";
 import { FunnelHeatmap } from "@/components/campaigns/FunnelHeatmap";
+import { ReengagementPanel } from "@/components/campaigns/ReengagementPanel";
 import { SendTimePanel } from "@/components/campaigns/SendTimePanel";
 import { SentimentTrend } from "@/components/campaigns/SentimentTrend";
 import { SequenceReviewPanel } from "@/components/campaigns/SequenceReviewPanel";
@@ -537,6 +538,9 @@ export default function CampaignsPage() {
 
               {/* Feature Group 3: per-campaign smart send time. */}
               <SendTimePanel strategyId={effectiveStratId} />
+
+              {/* Feature 5: opt-in post-sequence re-engagement. */}
+              <ReengagementPanel strategyId={effectiveStratId} />
             </div>
           )}
         </AsyncState>

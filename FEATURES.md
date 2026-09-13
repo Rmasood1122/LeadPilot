@@ -713,6 +713,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - CAN-SPAM footer + RFC 8058 one-click unsubscribe on every email
 - Reply classification and routing; **no auto-reply to humans**
 - Automated follow-up with per-step delay and enable/disable
+- Opt-in post-sequence re-engagement: one email per completed, neutral
+  enrollment, per-campaign toggle (off by default), own daily/weekly caps under
+  admin ceilings, re-gated at send time
 </details>
 
 <details open>
@@ -1023,13 +1026,29 @@ page, not a document.
   `user_id`, which is the property the cross-tenant fixes in 4.4 rely on.
 - **Cold WhatsApp requires an approved Meta template and a recorded opt-in.**
   There is no free-form cold path, by design.
-- **Completed sequences are not auto-followed-up.** That would be an unbounded
-  mass-send with no user-facing cap; it needs its own opt-in and its own
-  compliance story before it ships.
+- **Completed sequences are re-engaged only on request, once, and capped.**
+  Opt-in re-engagement (`docs/features/reengagement.md`) is off per campaign
+  until an owner or manager turns it on. It has its own daily and weekly caps
+  under admin ceilings, reaches only leads whose last outcome was neutral, sends
+  at most one email per enrollment (enforced by a UNIQUE constraint), and runs
+  every send through the same Stage 6 gauntlet. Nothing sweeps completed
+  sequences otherwise.
 - **CSV export is one-way.** See Stage 11.
 
 **Known gaps, with the reason**
 
+- **Re-engagement is email-only, and the conversion gate will hold many of its
+  leads.** WhatsApp needs an approved template no step names. LinkedIn's `auto`
+  action would send a second connection request. An unprompted AI call is a
+  TCPA question. Every re-engagement send also passes the live
+  conversion-probability gate. A lead who finished a sequence with
+  `conversion_min_unanswered_sends` or more unanswered touches is often judged
+  cold, and the send is held (`held_cooling` / `held_archived`), not sent. That
+  is the gate working, not a bypass to add. The "would qualify" count in the
+  panel is computed before that gate runs, so it is an upper bound. A message
+  deferred by the cap and later sent by the dispatcher leaves its attempt row
+  at `held` with the first result. The message row is the record of what
+  actually went out.
 - **Lead assignment is who works a lead, not who sends.** Outreach still goes
   out from the workspace owner's connected Gmail / LinkedIn accounts and voice
   profile. An assignee gets no notification when a lead is handed to them, the
