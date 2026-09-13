@@ -765,6 +765,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Subject-line pattern extraction
 - Send-time optimisation
 - Personalisation-depth scoring with reply correlation
+- Anonymised benchmarks: nightly per-account reply / meeting / bounce rate
+  percentiles by industry and channel, published only above a minimum account
+  count, shown next to the user's own numbers
 </details>
 
 <details open>
@@ -1094,7 +1097,17 @@ page, not a document.
   and `app/integrations/zoom.py` is the module that would change.
 - **No public benchmark numbers.** Reply rates, booking rates and deliverability
   depend on the sender, the list and the offer. This document makes
-  architectural claims, not performance claims.
+  architectural claims, not performance claims. The in-app benchmark panel
+  (`docs/features/benchmarks.md`) is not an exception. It shows the spread
+  across *this deployment's* accounts, labelled as exactly that, and publishes
+  nothing for a bucket with fewer than 10 accounts (never fewer than 5, whatever
+  the setting says).
+- **Benchmark anonymity has a limit.** Only rounded percentiles across accounts
+  are stored, and an account needs 30 sends to count. But in a small bucket a
+  percentile is, by construction, one account's rounded rate, and an operator
+  who controls several accounts could stack a bucket. Industry comes from the
+  strategy's ICP: a strategy targeting several industries lands in `multiple`,
+  not in each of them.
 
 ---
 

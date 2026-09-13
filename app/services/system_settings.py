@@ -185,6 +185,14 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                         "is generated immediately either way, "
                                         "and a late transcript still upgrades "
                                         "it."),
+    # Feature 6 -- anonymised benchmarks. benchmarks.HARD_MIN_ACCOUNTS is a
+    # floor no value here can lower.
+    "benchmark_min_accounts": (10, "Distinct accounts a benchmark bucket needs "
+                               "before it is published. Never below 5."),
+    "benchmark_min_account_sends": (30, "Sends an account needs in a bucket "
+                                    "before its rates count toward it."),
+    "benchmark_window_days": (90, "Trailing window, in days, benchmarks are "
+                              "computed over (7-365)."),
 }
 
 

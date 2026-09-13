@@ -11,6 +11,7 @@ import {
   Legend, ResponsiveContainer,
 } from "recharts";
 import { AsyncState } from "@/components/ui/skeleton";
+import { BenchmarkPanel } from "@/components/analytics/BenchmarkPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -145,6 +146,9 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Feature 6: anonymised benchmarks across LeadPilot accounts. */}
+        <BenchmarkPanel strategyId={effectiveId || undefined} />
 
         {/* M8 learning insights placeholder */}
         <Card className="border-dashed">

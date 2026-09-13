@@ -3985,3 +3985,38 @@ class ReengagementAttempt(TimestampMixin, Base):
     )
     status: Mapped[str] = mapped_column(String(20))
     detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Feature 6 — anonymised benchmarks (migration 0050)
+# --------------------------------------------------------------------------
+
+
+class BenchmarkBucket(Base):
+    """One published benchmark: a metric's spread across ACCOUNTS for one
+    (industry, channel) in the trailing window.
+
+    Rows exist ONLY for buckets that cleared the minimum-accounts threshold.
+    A suppressed bucket is never written, so nothing downstream -- API, admin
+    query, export -- can read a number built from too few accounts. The nightly
+    job replaces the whole table in one transaction.
+
+    No user id, strategy id or raw count lives here: percentiles (rounded) and
+    an account count only. See app/services/benchmarks.py.
+    """
+
+    __tablename__ = "benchmark_buckets"
+    __table_args__ = (
+        UniqueConstraint("industry", "channel", "metric", name="benchmark_bucket"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    industry: Mapped[str] = mapped_column(String(120))   # "*" = all industries
+    channel: Mapped[str] = mapped_column(String(20))
+    metric: Mapped[str] = mapped_column(String(20))      # reply_rate | meeting_rate | bounce_rate
+    account_count: Mapped[int] = mapped_column(Integer)
+    p25: Mapped[float] = mapped_column(Float)
+    p50: Mapped[float] = mapped_column(Float)
+    p75: Mapped[float] = mapped_column(Float)
+    window_days: Mapped[int] = mapped_column(Integer)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

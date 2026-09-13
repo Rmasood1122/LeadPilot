@@ -70,6 +70,8 @@ celery_app = Celery(
         "app.workers.channel_tasks",
         # Feature A5: hourly conversion-probability rescore.
         "app.workers.conversion_tasks",
+        # Feature 6: nightly anonymised benchmark snapshot.
+        "app.workers.benchmark_tasks",
     ],
 )
 
@@ -168,6 +170,8 @@ celery_app.conf.task_routes = {
     "app.workers.channel_tasks.*": {"queue": "outreach"},
     # Feature A5: scoring over outcomes, like the other learning sweeps.
     "app.workers.conversion_tasks.*": {"queue": "learning"},
+    # Feature 6: read-only aggregation over outcomes, with the nightly jobs.
+    "app.workers.benchmark_tasks.*": {"queue": "learning"},
 }
 
 celery_app.conf.update(
@@ -276,6 +280,12 @@ celery_app.conf.beat_schedule = {
     "check-idle-campaigns": {
         "task": "app.workers.intelligence_tasks.check_idle_campaigns",
         "schedule": crontab(hour=_aggregation_hour(), minute=50),
+    },
+    # Feature 6: anonymised benchmarks, after the aggregation (:05) and
+    # promotion (:35) so they read the same night's outcomes.
+    "compute-benchmarks": {
+        "task": "app.workers.benchmark_tasks.compute_benchmarks",
+        "schedule": crontab(hour=_aggregation_hour(), minute=40),
     },
     # Feature Group 3: recompute every campaign's smart-send windows after
     # the aggregation, and roll up last week's reply sentiment (Mondays) --
