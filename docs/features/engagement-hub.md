@@ -305,21 +305,20 @@ change needed.
 
 ## Outstanding
 
-1. **Google Calendar and Zoom have never been called for real.** Both adapters
-   are written against the documented APIs and carry `# TODO: verify against
-   current docs` markers on every endpoint and field name, matching the
-   convention the Calendly and WhatsApp adapters use. Nothing in the product
-   breaks without them — `platform=custom` is the fully working path, and a
-   platform failure returns a created meeting with `platform_error` — but the
-   Meet and Zoom link creation should be exercised once against real
-   credentials before it is advertised.
+1. **Google Calendar and Zoom have still never been called for real (OPEN).**
+   Feature 7 re-checked both adapters against current docs, fixed the Google
+   health check, added delete for cleanup and moved Zoom credentials to Admin ›
+   Integrations. A live check is ready for whoever holds credentials:
+   `scripts/verify_meeting_platforms.py` and
+   `tests/test_meeting_platforms_live.py`. Until one passes, `platform=custom`
+   is the only verified path, and a platform failure still returns a created
+   meeting with `platform_error` (plus `platform_action`).
 
-2. **The Google `calendar.events` scope is new.** It was added to
-   `GMAIL_SCOPES`, so accounts connecting from now on grant it. An account
-   connected *before* this shipped does not gain it retroactively: Google
-   answers 403 and `GoogleCalendarNotAuthorized` tells the user to reconnect at
-   `/integrations/gmail/auth-url`. Existing users will hit this the first time
-   they pick Google Meet.
+2. **The Google `calendar.events` scope and the reconnect flow.** The stored
+   grant is checked before any call. Accounts connected before the scope
+   shipped see "Reconnect for Calendar" in Settings and get
+   `platform_action: reconnect_google` when they pick Meet. The auth URL sends
+   `include_granted_scopes=true`, so reconnecting keeps their Gmail access.
 
 3. **`/book/:slug` needs the hosting rewrite.** `frontend/vercel.json` ships it
    for the documented target (Vercel). On any other host, links must use

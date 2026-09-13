@@ -1083,14 +1083,42 @@ page, not a document.
   whole-campaign form (`strategy_id`) is API-only and capped at 500 leads per
   call, with `more_remaining` in the response.
 
-- **Google Meet and Zoom have never been called against the live APIs** — no
-  credentials exist yet. Both adapters are written against the documented APIs
-  and carry `# TODO: verify against current docs` markers, matching the
-  convention the Calendly and WhatsApp adapters use. `platform=custom` is the
-  fully working path, and a platform failure returns a created meeting rather
-  than an error.
-- **The `calendar.events` Google scope is new**, so accounts connected before
-  it shipped will be asked to reconnect the first time they choose Meet.
+- **OPEN — Google Meet and Zoom are still NOT verified against the live APIs.**
+  No credentials exist yet. Built without them (Feature 7):
+  - **Adapters checked against current docs (2026-09-13):**
+    - Google: `conferenceDataVersion=1`, the `hangoutsMeet` type, the Meet link
+      read from `hangoutLink` or `conferenceData.entryPoints`, and one re-read
+      when conference creation is `pending`.
+    - Zoom: the server-to-server token request.
+  - **Fixed:** the Google health check used `calendarList`, which needs a scope
+    the app never requests, so it reported every connected account unhealthy.
+  - **Cleanup:** both adapters can delete what they create. The shared plumbing
+    now accepts an empty 204 body.
+  - **Zoom credentials:** move to Admin › Integrations, with the old `ZOOM_*`
+    environment variables as fallback. The host is configurable (`host_user`),
+    because Zoom's docs do not say whether `me` works for a server-to-server
+    app.
+  - **Reconnect flow:** the stored Google grant is checked before any call. An
+    account without `calendar.events` gets `platform_action: reconnect_google`
+    on meeting create and a "Reconnect for Calendar" prompt in Settings. The
+    auth URL now sends `include_granted_scopes=true`, so the reconnect keeps
+    Gmail access.
+
+  Still unverified, pending credentials:
+  - The Zoom create-meeting path, body fields and `users/me` for a
+    server-to-server app (`# TODO: verify`).
+  - That both providers accept these requests at all.
+
+  To close this item: `scripts/verify_meeting_platforms.py --google
+  --user-email … --execute` and `--zoom --execute`, or
+  `tests/test_meeting_platforms_live.py` with the `LEADPILOT_LIVE_*` variables.
+  Until one of them passes, `platform=custom` is the only verified path. A
+  platform failure still returns a created meeting, not an error.
+- **The `calendar.events` Google scope is newer than some connections.**
+  Accounts connected before it shipped are told to reconnect: in Settings, and
+  when they choose Meet. An account whose grant was stored without any scopes
+  (`calendar_access: unknown`) is not blocked; Google decides, and a 403 maps
+  to the same reconnect error.
 - **Recall.ai transcripts are built and tested with mocks, never called live.**
   A host can send a Recall.ai bot to a call. Its `transcript.done` webhook
   (Svix-signed, de-duplicated, matched to the meeting only by the stored bot

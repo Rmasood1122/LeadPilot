@@ -65,6 +65,8 @@ export interface MeetingDetail extends Meeting {
  *  is a field on a 201 rather than a failed request. */
 export interface MeetingCreateResult extends MeetingDetail {
   platform_error: string | null;
+  /** Feature 7: the fix to offer for platform_error. */
+  platform_action: "reconnect_google" | "configure_zoom" | null;
 }
 
 export function createMeeting(body: {

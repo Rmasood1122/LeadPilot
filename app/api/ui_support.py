@@ -209,11 +209,16 @@ def integrations_status(
     account = db.execute(
         select(GmailAccount).where(GmailAccount.user_id == current_user.id)
     ).scalars().first()
+    from app.integrations.google_meet import calendar_scope_state  # noqa: PLC0415
+
     return {
         "gmail": {
             "connected": account is not None,
             "email": account.email_address if account else None,
             "healthy": None,  # populated by POST /integrations/gmail/test
+            # Feature 7: "missing" = connected before calendar.events was
+            # requested; Settings offers a reconnect for Google Meet links.
+            "calendar_access": calendar_scope_state(account),
         },
         "whatsapp": {
             "configured": bool(settings.whatsapp_access_token

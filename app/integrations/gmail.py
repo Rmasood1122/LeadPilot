@@ -46,10 +46,10 @@ GMAIL_SCOPES = [
     # the same account.
     #
     # An account connected BEFORE this line existed does not gain the scope
-    # retroactively -- Google answers 403, and google_meet.py turns that one
-    # status into GoogleCalendarNotAuthorized with a message telling the user
-    # to reconnect. Adding it here is what makes every new connection work
-    # without that step.
+    # retroactively. Feature 7: google_meet.calendar_scope_state() reads the
+    # stored grant, Settings shows a Reconnect prompt, and meeting creation
+    # refuses before calling Google (platform_action "reconnect_google"). The
+    # reconnect adds the scope incrementally -- see include_granted_scopes below.
     "https://www.googleapis.com/auth/calendar.events",
     # Feature Group 7: "Log Meeting Outcome" saves the follow-up email as a
     # Gmail DRAFT for the user to review, which gmail.send cannot do. Same
@@ -106,6 +106,10 @@ class GmailOAuth:
             "scope": " ".join(GMAIL_SCOPES),
             "access_type": "offline",   # required for a refresh_token
             "prompt": "consent",        # re-consent so refresh_token is always returned
+            # Incremental authorization (Google OAuth 2.0 web-server docs,
+            # checked 2026-09-13): the new token also covers scopes granted
+            # earlier, so reconnecting for calendar.events keeps Gmail access.
+            "include_granted_scopes": "true",
             "state": state,
         }
         return f"{GOOGLE_AUTH_ENDPOINT}?{urlencode(params)}"

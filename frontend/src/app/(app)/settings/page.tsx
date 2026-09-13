@@ -302,6 +302,12 @@ function IntegrationsSettings() {
                     ? `Connected: ${data.gmail.email}`
                     : "Not connected"}
                 </p>
+                {data.gmail.connected && data.gmail.calendar_access === "missing" && (
+                  <p role="status" className="mt-1 text-xs text-[rgb(var(--warning))]">
+                    Calendar access missing — reconnect to create Google Meet links.
+                    Your Gmail access is kept.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 {data.gmail.connected && (
@@ -311,7 +317,11 @@ function IntegrationsSettings() {
                   </Button>
                 )}
                 <Button size="sm" onClick={connectGmail}>
-                  {data.gmail.connected ? "Reconnect" : "Connect"}
+                  {!data.gmail.connected
+                    ? "Connect"
+                    : data.gmail.calendar_access === "missing"
+                      ? "Reconnect for Calendar"
+                      : "Reconnect"}
                 </Button>
               </div>
             </CardContent>

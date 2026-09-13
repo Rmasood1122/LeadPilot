@@ -163,6 +163,10 @@ class MeetingCreateOut(MeetingDetailOut):
     # declined. See the module docstring for why this is a field and not a
     # failed request.
     platform_error: str | None = None
+    # Feature 7: what the client can offer to fix a platform_error --
+    # "reconnect_google" (a Reconnect button) or "configure_zoom" (an admin
+    # task). None when there is nothing the user can do from here.
+    platform_action: str | None = None
 
 
 class NotesIn(BaseModel):
@@ -259,9 +263,9 @@ def create_meeting(
         status=MeetingStatus.SCHEDULED,
     )
 
-    platform_error = None
+    platform_error = platform_action = None
     if not meeting.meeting_url:
-        meeting.meeting_url, meeting.external_event_id, platform_error = (
+        meeting.meeting_url, meeting.external_event_id, platform_error, platform_action = (
             _provision_link(db, current_user, meeting, booking)
         )
 
@@ -275,7 +279,8 @@ def create_meeting(
         booking.meeting_link = meeting.meeting_url[:500]
     db.commit()
 
-    return {**_detail(meeting), "platform_error": platform_error}
+    return {**_detail(meeting), "platform_error": platform_error,
+            "platform_action": platform_action}
 
 
 def _title_for(db: Session, booking: CalendarBooking | None) -> str:
@@ -307,7 +312,8 @@ def _seed_participants(db: Session, meeting: Meeting, host: User,
 
 def _provision_link(db: Session, user: User, meeting: Meeting,
                     booking: CalendarBooking | None):
-    """(join_url, external_event_id, error). Never raises — see the docstring.
+    """(join_url, external_event_id, error, action). Never raises — see the
+    module docstring. `action` is the exception's fix hint when it has one.
 
     CUSTOM is not an error case: it means "the user will paste their own
     link", and asking a provider for one would be wrong.
@@ -330,20 +336,20 @@ def _provision_link(db: Session, user: User, meeting: Meeting,
                 int((meeting.end_at - meeting.start_at).total_seconds() // 60),
             )
             result = create_zoom_meeting(
-                topic=meeting.title or "Meeting", start_at=meeting.start_at,
+                db, topic=meeting.title or "Meeting", start_at=meeting.start_at,
                 duration_minutes=minutes,
             )
         else:
             # TEAMS has no adapter yet, and CUSTOM never wants one. Both mean
             # the same thing here: the user supplies the URL.
-            return None, None, None
+            return None, None, None, None
     except Exception as exc:  # noqa: BLE001 — see the module docstring
         logger.warning("meetings.platform_link_failed",
                        platform=meeting.platform.value, error=str(exc))
-        return None, None, f"{type(exc).__name__}: {exc}"
+        return None, None, f"{type(exc).__name__}: {exc}", getattr(exc, "action", None)
 
     return (result.get("join_url") or None,
-            result.get("external_event_id") or None, None)
+            result.get("external_event_id") or None, None, None)
 
 
 @router.get("", response_model=list[MeetingOut])
