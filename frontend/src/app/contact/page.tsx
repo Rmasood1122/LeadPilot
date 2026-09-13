@@ -8,6 +8,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "Book a Call | LeadPilot Enterprise",
@@ -178,7 +179,7 @@ export default function ContactPage() {
         </section>
       </main>
 
-      <SiteFooter />
+      <Footer />
     </div>
   );
 }
@@ -193,25 +194,10 @@ function SiteNav() {
         <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-300">
           <li><Link href="/how-it-works" className="hover:text-white">How it Works</Link></li>
           <li><Link href="/about" className="hover:text-white">About</Link></li>
-          <li><Link href="/contact" aria-current="page" className="text-white">Contact</Link></li>
           <li><Link href="/pricing" className="hover:text-white">Pricing</Link></li>
+          <li><Link href="/contact" aria-current="page" className="text-white">Contact</Link></li>
         </ul>
       </nav>
     </header>
-  );
-}
-
-function SiteFooter() {
-  return (
-    <footer className="border-t border-white/10 px-6 py-10">
-      <div className="mx-auto flex max-w-6xl flex-col gap-4 text-sm text-gray-400 sm:flex-row sm:items-center sm:justify-between">
-        <p>&copy; 2026 Clanderharvest. All rights reserved.</p>
-        <ul className="flex flex-wrap gap-6">
-          <li><Link href="/privacy" className="hover:text-white">Privacy</Link></li>
-          <li><Link href="/terms" className="hover:text-white">Terms</Link></li>
-          <li><Link href="/contact" className="hover:text-white">Contact</Link></li>
-        </ul>
-      </div>
-    </footer>
   );
 }
