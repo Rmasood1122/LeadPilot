@@ -56,6 +56,14 @@ os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("EMAIL_PROVIDER", "memory")
 os.environ.setdefault("PUBLIC_BASE_URL", "http://testserver")
 os.environ.setdefault("FRONTEND_URL", "http://frontend.test")
+# Sections B/C/D (migration 0039). No test may reach a real geolocation, VPN
+# detection or SMS provider: geolocation and VPN detection are disabled (tests
+# that exercise them patch a fake provider in), blocking is explicitly off, and
+# SMS uses the in-process transport so a test can read the code it was sent.
+os.environ.setdefault("GEOLOCATION_PROVIDER", "disabled")
+os.environ.setdefault("VPN_BLOCK_ENABLED", "false")
+os.environ.setdefault("VPN_DETECTION_PROVIDER", "disabled")
+os.environ.setdefault("SMS_PROVIDER", "memory")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -157,6 +165,13 @@ class FakeClaude:
         # Day 0 rule-repair path can be exercised.
         self.displacement_dm_response: object | None = None
         self.displacement_dm_prompts: list[str] = []
+        # Feature A1 (claim engine). Same contract: dict returned, Exception
+        # raised; default "no claims found" so the rules alone decide.
+        self.claim_extraction_response: object | None = None
+        self.claim_extraction_prompts: list[str] = []
+        # Feature A7 (pre-send red team). Same contract; default no findings.
+        self.red_team_response: object | None = None
+        self.red_team_prompts: list[str] = []
         # Every (system, prompt) the personalization engine received, so a
         # test can assert on the voice suffix and the post/news/video blocks.
         self.personalization_calls: list[tuple[str, str]] = []
@@ -402,6 +417,20 @@ class FakeClaude:
             import re as _re
             numbers = _re.findall(r"\{\{(\d+)\}\} ->", prompt)
             return {n: f"value{n}" for n in numbers}
+        if "pre-send red-team auditor" in system:  # Feature A7
+            self.red_team_prompts.append(prompt)
+            if isinstance(self.red_team_response, Exception):
+                raise self.red_team_response
+            if self.red_team_response is not None:
+                return self.red_team_response
+            return {"findings": []}
+        if "claim extractor" in system:  # Feature A1
+            self.claim_extraction_prompts.append(prompt)
+            if isinstance(self.claim_extraction_response, Exception):
+                raise self.claim_extraction_response
+            if self.claim_extraction_response is not None:
+                return self.claim_extraction_response
+            return {"claims": []}
         if "automated-reply detector" in system:  # Feature Group 9
             self.automated_reply_prompts.append(prompt)
             if isinstance(self.automated_reply_response, Exception):
@@ -691,6 +720,17 @@ def mailbox():
     reset_sent_messages()
     yield SENT_MESSAGES
     reset_sent_messages()
+
+
+@pytest.fixture(autouse=True)
+def sms_outbox():
+    """The in-process SMS transport, emptied around every test (same reason as
+    `mailbox`: module-level state leaks between tests otherwise)."""
+    from app.integrations.sms import SENT_SMS, reset_sent_sms
+
+    reset_sent_sms()
+    yield SENT_SMS
+    reset_sent_sms()
 
 
 def verification_link(mailbox_messages) -> str:

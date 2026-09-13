@@ -186,3 +186,131 @@ def _get_state(db: Session, user_id: str) -> dict:
     except Exception as e:
         logger.warning("onboarding.get_state_failed", user_id=user_id, error=str(e))
     return {}
+
+
+# ---------------------------------------------------------------------------
+# Identity, location and phone verification (Sections B + C, migration 0039)
+# ---------------------------------------------------------------------------
+#
+# Sync `def` handlers (unlike the async ones above): they do blocking DB and
+# HTTP work (geolocation, SMS), which FastAPI runs on its threadpool for a sync
+# handler instead of stalling the event loop.
+#
+# Rate limits are enforced INSIDE the handlers, after body validation, per the
+# Finding 3 ordering rule in app/core/rate_limiting.py::enforce_rate_limit.
+
+from fastapi import HTTPException, Request  # noqa: E402
+from pydantic import Field  # noqa: E402
+
+from app.core.rate_limiting import client_ip, enforce_rate_limit  # noqa: E402
+from app.services import identity as identity_svc  # noqa: E402
+from app.services import phone_verification as phone_svc  # noqa: E402
+from app.services.countries import country_list  # noqa: E402
+
+OTP_SEND_WINDOW_SECONDS = 3600
+OTP_VERIFY_WINDOW_SECONDS = 900
+
+
+class IdentityIn(BaseModel):
+    personal_country: str = Field(min_length=2, max_length=2)
+    account_type: str = Field(pattern="^(individual|company)$")
+    company_name: Optional[str] = Field(default=None, max_length=200)
+    company_country: Optional[str] = Field(default=None, min_length=2, max_length=2)
+
+
+class PhoneSendIn(BaseModel):
+    phone_number: str = Field(min_length=8, max_length=32)
+
+
+class PhoneVerifyIn(BaseModel):
+    code: str = Field(min_length=4, max_length=12)
+
+
+@router.get("/countries")
+def list_countries() -> dict:
+    """Public: the ISO country list the verification form offers."""
+    return {"countries": country_list()}
+
+
+@router.get("/verification")
+def verification_status(current_user=Depends(get_current_user)) -> dict:
+    return identity_svc.status(current_user)
+
+
+@router.put("/identity")
+def submit_identity(
+    body: IdentityIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    """Store where the person is, individual vs company, and the company's
+    country; cross-check the personal country against the request's IP.
+
+    A mismatch never fails this request -- it queues an admin review."""
+    try:
+        return identity_svc.submit_identity(
+            db, current_user, personal_country=body.personal_country,
+            account_type=body.account_type, company_name=body.company_name,
+            company_country=body.company_country, ip=client_ip(request))
+    except identity_svc.IdentityError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+def _phone_error(exc: "phone_svc.PhoneVerificationError") -> HTTPException:
+    headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after else None
+    return HTTPException(status_code=exc.status_code, detail=str(exc), headers=headers)
+
+
+@router.post("/phone/send")
+def send_phone_code(
+    body: PhoneSendIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    if current_user.phone_verified:
+        raise HTTPException(status_code=409, detail="Your phone number is already verified.")
+    try:
+        phone = phone_svc.normalize_phone(body.phone_number)
+    except phone_svc.PhoneVerificationError as exc:
+        raise _phone_error(exc)
+    # Two keys, like /auth/login: per account stops one user cycling numbers,
+    # per number stops many accounts pumping one (possibly premium) number.
+    enforce_rate_limit(f"user:{current_user.id}", "otp_send", "RATE_LIMIT_OTP_SEND",
+                       OTP_SEND_WINDOW_SECONDS)
+    enforce_rate_limit(f"phone:{phone}", "otp_send_phone", "RATE_LIMIT_OTP_SEND",
+                       OTP_SEND_WINDOW_SECONDS)
+    try:
+        result = phone_svc.send_code(db, current_user, phone)
+    except phone_svc.PhoneVerificationError as exc:
+        raise _phone_error(exc)
+    from app.integrations.sms import mask_phone  # noqa: PLC0415
+
+    return {"status": "sent", "phone_number_masked": mask_phone(result.phone_number),
+            "expires_at": result.expires_at.isoformat(),
+            "resend_available_at": result.resend_available_at.isoformat()}
+
+
+@router.post("/phone/verify")
+def verify_phone_code(
+    body: PhoneVerifyIn,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> dict:
+    enforce_rate_limit(f"user:{current_user.id}", "otp_verify", "RATE_LIMIT_OTP_VERIFY",
+                       OTP_VERIFY_WINDOW_SECONDS)
+    try:
+        outcome, remaining = phone_svc.verify_code(db, current_user, body.code)
+    except phone_svc.PhoneVerificationError as exc:
+        raise _phone_error(exc)
+    if outcome == phone_svc.VERIFIED:
+        return {"status": "verified", **identity_svc.status(current_user)}
+    messages = {
+        phone_svc.INVALID: "That code is not right. Check the text and try again.",
+        phone_svc.EXPIRED: "That code has expired. Ask for a new one.",
+        phone_svc.LOCKED: "Too many wrong attempts. Ask for a new code.",
+        phone_svc.NO_CODE: "Ask for a code first.",
+    }
+    raise HTTPException(status_code=400, detail=messages[outcome],
+                        headers={"X-Attempts-Remaining": str(remaining)}
+                        if remaining is not None else None)

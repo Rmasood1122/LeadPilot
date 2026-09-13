@@ -738,6 +738,92 @@ async def celery_stats(_admin=Depends(require_admin)) -> dict:
 # Encryption key rotation
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Identity reviews (Section B, migration 0039)
+# ---------------------------------------------------------------------------
+# A declared-vs-detected country mismatch at onboarding lands here as
+# geo_review_status="pending". The admin clears it (travel, VPN, remote
+# founder) or confirms it as a risk; neither suspends the account on its own --
+# suspension stays the explicit action it already is above.
+
+
+class IdentityReviewDecision(BaseModel):
+    decision: str = Field(pattern="^(cleared|confirmed_risk)$")
+    note: str = Field(default="", max_length=500)
+
+
+@router.get("/identity-reviews")
+def list_identity_reviews(
+    status: str = Query("pending", pattern="^(pending|cleared|confirmed_risk|all)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+) -> dict:
+    from sqlalchemy import select  # noqa: PLC0415
+    from app.services import identity as identity_svc  # noqa: PLC0415
+
+    query = select(User).where(User.geo_review_status.isnot(None))
+    if status != "all":
+        query = query.where(User.geo_review_status == status)
+    rows = db.execute(query.order_by(User.identity_submitted_at.desc())
+                      .offset((page - 1) * page_size).limit(page_size)).scalars().all()
+    pending = db.query(func.count(User.id)).filter(
+        User.geo_review_status == identity_svc.REVIEW_PENDING).scalar() or 0
+    return {"pending_count": int(pending),
+            "reviews": [identity_svc.review_out(u) for u in rows]}
+
+
+@router.post("/identity-reviews/{user_id}")
+def decide_identity_review(
+    user_id: str,
+    body: IdentityReviewDecision,
+    db: Session = Depends(get_db),
+    admin=Depends(require_admin),
+) -> dict:
+    import uuid as _uuid  # noqa: PLC0415
+    from app.services import identity as identity_svc  # noqa: PLC0415
+
+    try:
+        user = db.get(User, _uuid.UUID(user_id))
+    except ValueError:
+        user = None
+    if user is None or user.geo_review_status is None:
+        raise HTTPException(status_code=404, detail="No identity review for that user")
+    identity_svc.review(db, user, decision=body.decision, reviewer_email=admin.email,
+                        note=body.note)
+    logger.info("admin.identity_review", user_id=user_id, decision=body.decision,
+                by=admin.email)
+    return identity_svc.review_out(user)
+
+
+@router.get("/security-events")
+def list_security_events(
+    user_id: Optional[str] = None,
+    event: Optional[str] = Query(None, max_length=40),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    _admin=Depends(require_admin),
+) -> list[dict]:
+    import uuid as _uuid  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+    from app.db.models import AccountSecurityEvent  # noqa: PLC0415
+
+    query = select(AccountSecurityEvent)
+    if user_id:
+        try:
+            query = query.where(AccountSecurityEvent.user_id == _uuid.UUID(user_id))
+        except ValueError:
+            raise HTTPException(status_code=422, detail="user_id must be a UUID")
+    if event:
+        query = query.where(AccountSecurityEvent.event == event)
+    rows = db.execute(query.order_by(AccountSecurityEvent.ts.desc()).limit(limit)).scalars()
+    return [{"id": str(r.id), "user_id": str(r.user_id) if r.user_id else None,
+             "email": r.email, "event": r.event, "ip": r.ip, "country": r.country,
+             "details": r.details_json, "ts": r.ts.isoformat() if r.ts else None}
+            for r in rows]
+
+
 @router.post("/rotate-encryption-key")
 async def rotate_encryption_key(
     db: Session = Depends(get_db),

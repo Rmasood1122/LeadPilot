@@ -1118,6 +1118,95 @@ def _intelligence_out(reply: InboundReply) -> ReplyIntelligenceOut:
     )
 
 
+# ---------------------------------------------------------------------------
+# Feature A3: the reply inbox with real-time authenticity
+# ---------------------------------------------------------------------------
+
+
+def _authenticity_out(reply: InboundReply, lead: Lead | None = None) -> dict:
+    scored = reply.authenticity_kind is not None
+    return {
+        "reply_id": str(reply.id),
+        "lead": ({"id": str(lead.id), "full_name": lead.full_name, "company": lead.company,
+                  "status": lead.status.value if lead.status else None} if lead else None),
+        "channel": reply.channel, "from_address": reply.from_address,
+        "subject": reply.subject, "body_preview": (reply.body or "")[:280],
+        "classification": reply.classification,
+        "reply_category": reply.reply_category,
+        "received_at": (reply.received_at or reply.created_at).isoformat()
+        if (reply.received_at or reply.created_at) else None,
+        "authenticity": {
+            "kind": reply.authenticity_kind,
+            "authenticity_score": reply.authenticity_score,
+            "buyer_intent_score": reply.buyer_intent_score,
+            "confidence": reply.authenticity_confidence,
+            "signals": reply.authenticity_signals_json or [],
+            "scored_at": reply.authenticity_scored_at.isoformat()
+            if reply.authenticity_scored_at else None,
+        } if scored else None,
+    }
+
+
+@router.get("/replies")
+def list_replies(
+    kind: str | None = Query(default=None,
+                             pattern="^(genuine|out_of_office|auto_responder|bot|bounce|automated)$"),
+    min_intent: float | None = Query(default=None, ge=0.0, le=1.0),
+    channel: str | None = Query(default=None, max_length=20),
+    sort: str = Query(default="newest", pattern="^(newest|intent)$"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Every reply on the account's leads, with its authenticity. `kind=automated`
+    is every non-genuine kind together -- the "noise" view."""
+    from sqlalchemy import func as _func, select as _select  # noqa: PLC0415
+
+    from app.db.models import Product, Strategy  # noqa: PLC0415
+
+    query = (_select(InboundReply, Lead)
+             .join(Lead, Lead.id == InboundReply.lead_id)
+             .join(Strategy, Strategy.id == Lead.strategy_id)
+             .join(Product, Product.id == Strategy.product_id)
+             .where(Product.user_id == current_user.id))
+    if kind == "automated":
+        query = query.where(InboundReply.authenticity_kind.in_(
+            ("out_of_office", "auto_responder", "bot", "bounce")))
+    elif kind:
+        query = query.where(InboundReply.authenticity_kind == kind)
+    if min_intent is not None:
+        query = query.where(InboundReply.buyer_intent_score >= min_intent)
+    if channel:
+        query = query.where(InboundReply.channel == channel)
+    total = db.execute(_select(_func.count()).select_from(query.subquery())).scalar_one()
+    order = ((InboundReply.buyer_intent_score.desc(), InboundReply.created_at.desc())
+             if sort == "intent" else (InboundReply.created_at.desc(),))
+    rows = db.execute(query.order_by(*order).offset(offset).limit(limit)).all()
+    return {"total": int(total), "limit": limit, "offset": offset,
+            "items": [_authenticity_out(reply, lead) for reply, lead in rows]}
+
+
+@router.get("/replies/{reply_id}/authenticity")
+def get_reply_authenticity(reply_id: uuid.UUID, db: Session = Depends(get_db),
+                           current_user: User = Depends(get_current_user)) -> dict:
+    reply, lead = _owned_reply(db, reply_id, current_user)
+    return _authenticity_out(reply, lead)
+
+
+@router.post("/replies/{reply_id}/authenticity/rescore")
+def rescore_reply_authenticity(reply_id: uuid.UUID, db: Session = Depends(get_db),
+                               current_user: User = Depends(get_current_user)) -> dict:
+    """Re-run the deterministic scorer -- for replies stored before Feature A3,
+    or after its rules change. No model call, so it is not rate limited."""
+    from app.services import reply_authenticity  # noqa: PLC0415
+
+    reply, lead = _owned_reply(db, reply_id, current_user)
+    reply_authenticity.apply(db, reply)
+    db.commit()
+    return _authenticity_out(reply, lead)
+
+
 @router.get("/replies/{reply_id}/intelligence", response_model=ReplyIntelligenceOut)
 def get_reply_intelligence(
     reply_id: uuid.UUID,

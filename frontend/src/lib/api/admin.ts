@@ -4,7 +4,34 @@
  */
 import { apiClient } from "./client";
 
+/** Section B: one onboarding identity review (GET /admin/identity-reviews). */
+export interface IdentityReview {
+  user_id: string;
+  email: string;
+  personal_country: string | null;
+  geo_detected_country: string | null;
+  geo_check_status: string | null;
+  geo_review_status: "pending" | "cleared" | "confirmed_risk" | null;
+  account_type: "individual" | "company" | null;
+  company_name: string | null;
+  company_country: string | null;
+  signup_ip: string | null;
+  phone_verified: boolean;
+  identity_submitted_at: string | null;
+  geo_reviewed_by: string | null;
+  geo_reviewed_at: string | null;
+  geo_review_note: string | null;
+}
+
 export const adminApi = {
+  listIdentityReviews: async (status = "pending") =>
+    apiClient.get<{ pending_count: number; reviews: IdentityReview[] }>(
+      `/admin/identity-reviews?status=${encodeURIComponent(status)}`),
+
+  decideIdentityReview: async (userId: string, decision: "cleared" | "confirmed_risk",
+                               note: string) =>
+    apiClient.post<IdentityReview>(`/admin/identity-reviews/${userId}`, { decision, note }),
+
   // -------------------------------------------------------------------
   // Users
   // -------------------------------------------------------------------

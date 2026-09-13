@@ -194,6 +194,16 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             engine.stop_enrollment(session, enrollment, reason="suppressed")
         return "cancelled_suppressed"
 
+    # ---- Feature A5: live conversion probability / kill signals -----------
+    # A lead that has gone cold is not sent to: the gate pauses (cooling) or
+    # stops (archived) its sequence and the send ends here. Probability alone
+    # only judges after conversion_min_unanswered_sends unanswered sends.
+    from app.services import conversion_probability  # noqa: PLC0415
+
+    held = conversion_probability.send_gate(session, lead, enrollment, now=now)
+    if held is not None:
+        return held
+
     # ---- WhatsApp engine rules (defense in depth — the adapter's own
     # guard re-checks all of this; the ENGINE checks it too so a lead
     # without opt-in is SKIPPED and the sequence continues, rather than
@@ -435,6 +445,15 @@ def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
     subject, body = render_message(session, strategy, lead,
                                    _step_of(session, message), booking_url,
                                    inputs_out=used)
+    # Feature A1: every claim about the prospect must be backed by stored data.
+    # BEFORE the compliance footer is appended, so the footer is never parsed
+    # for claims and never altered.
+    from app.services import claim_verification  # noqa: PLC0415
+
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead, message=message,
+                                         channel="email",
+                                         fields={"subject": subject, "body": body})
+    subject, body = checked["subject"], checked["body"]
     subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
     message.subject = subject
     message.body = body
@@ -446,8 +465,12 @@ def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
 
     metadata = {}
     if open_tracking.tracking_enabled(session, lead):
+        # Feature A2: links in the HTML twin go through the click redirect when
+        # click tracking is on (off by default -- link rewriting is a spam signal).
+        click = ((lambda url: open_tracking.click_url(message.id, url))
+                 if open_tracking.click_tracking_enabled(session, lead) else None)
         metadata["html_body"] = open_tracking.html_body(
-            body, open_tracking.pixel_url(message.id))
+            body, open_tracking.pixel_url(message.id), click_url=click)
     return OutboundMessage(
         message_id=str(message.id),
         lead_id=str(lead.id),
@@ -465,11 +488,16 @@ def _render_whatsapp_outbound(session: Session, strategy: Strategy, lead: Lead,
     """Build the WhatsApp OutboundMessage: template variables filled via
     the same personalization path as email, rendered preview persisted on
     the row BEFORE transmit."""
+    from app.services import claim_verification  # noqa: PLC0415
+
     if message.whatsapp_kind is WhatsAppStepKind.TEXT:
         # Reply-handling step inside an open window: the step brief is
         # rendered by the same email personalizer minus subject.
         _, body = render_message(session, strategy, lead,
                                  _step_of(session, message), None)
+        body = claim_verification.enforce(session, strategy=strategy, lead=lead,
+                                          message=message, channel="whatsapp",
+                                          fields={"body": body})["body"]
         message.body = body
         return OutboundMessage(
             message_id=str(message.id),
@@ -487,6 +515,14 @@ def _render_whatsapp_outbound(session: Session, strategy: Strategy, lead: Lead,
         variable_descriptions=tmpl.variable_descriptions_json or {},
         variable_mapping=getattr(step, "variable_mapping_json", None),
     )
+    # Feature A1: the template is Meta-approved and fixed; only the variables
+    # are model-written, so they are what gets checked. An unsupported claim in
+    # a slot is replaced with a neutral value rather than leaving it empty.
+    if values:
+        checked = claim_verification.enforce(
+            session, strategy=strategy, lead=lead, message=message, channel="whatsapp",
+            fields={f"variable:{n}": v for n, v in values.items()})
+        values = {n: checked[f"variable:{n}"] for n in values}
     message.body = preview_whatsapp_body(tmpl.body or "", values)
     components = []
     if values:
@@ -609,8 +645,17 @@ def _render_linkedin_outbound(session: Session, strategy: Strategy, lead: Lead,
                               message: Message, account, action: str) -> OutboundMessage:
     from app.services import linkedin_outreach  # noqa: PLC0415
 
+    from app.services import claim_verification  # noqa: PLC0415
+
     rendered = linkedin_outreach.render(session, strategy, lead,
                                         _step_of(session, message), action)
+    # Feature A1. A LinkedIn subject (InMail) is short-form like an email's.
+    fields = {"body": rendered["text"]}
+    if rendered.get("subject"):
+        fields["subject"] = rendered["subject"]
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead, message=message,
+                                         channel="linkedin", fields=fields)
+    rendered = {**rendered, "text": checked["body"], "subject": checked.get("subject")}
     message.body = rendered["text"]
     message.subject = rendered.get("subject")
     return OutboundMessage(
@@ -691,6 +736,31 @@ def _render_phone_outbound(session: Session, strategy: Strategy, lead: Lead,
     call, meta = phone_calls.prepare_call(session, strategy, lead,
                                           _step_of(session, message).template,
                                           owner_id=owner, message=message)
+    # Feature A1: the call script is spoken verbatim, so its claims are checked
+    # like an email's. Talking points with an unsupported claim are dropped; the
+    # system prompt is rebuilt from the checked script.
+    from app.services import claim_verification  # noqa: PLC0415
+
+    script = dict(call.script_json or {})
+    points = [p for p in (script.get("talking_points") or []) if isinstance(p, str)]
+    fields = {"first_message": script.get("first_message"), "voicemail": script.get("voicemail"),
+              "close": script.get("close")}
+    fields.update({f"item:talking_point:{i}": p for i, p in enumerate(points)})
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead, message=message,
+                                         channel="phone", fields=fields)
+    script["first_message"] = checked["first_message"] or script.get("first_message")
+    script["close"] = checked["close"]
+    script["talking_points"] = [checked[f"item:talking_point:{i}"] for i in range(len(points))
+                                if checked[f"item:talking_point:{i}"]]
+    if checked["voicemail"] != script.get("voicemail"):
+        script["voicemail"] = checked["voicemail"]
+        call.voicemail_text = checked["voicemail"] or None
+        # The pre-rendered audio says the unchecked text; never play it.
+        call.voicemail_audio_url = None
+    call.script_json = script
+    meta = {**meta, "first_message": script["first_message"],
+            "voicemail_text": call.voicemail_text,
+            "system_prompt": phone_calls.system_prompt(script, lead)}
     message.body = call.script_json["first_message"]
     message.subject = None
     return OutboundMessage(message_id=str(message.id), lead_id=str(lead.id),
@@ -775,6 +845,26 @@ def _notify_new_reply(session: Session, lead: Lead, classification: str | None =
             deep_link=link, data={"leadId": str(lead.id)}, webhook_payload=payload)
 
 
+def _score_authenticity(session: Session, reply: InboundReply, lead: Lead,
+                        classification: str, channel: ChannelType) -> None:
+    """Feature A3 for the chat channels: score against the most recent send
+    on the same channel (a reply seconds after it is almost always a machine).
+    Never raises -- scoring is advisory, routing is not."""
+    from app.services import reply_authenticity  # noqa: PLC0415
+
+    try:
+        sent_at = session.execute(
+            select(Message.sent_at)
+            .where(Message.lead_id == lead.id, Message.channel == channel,
+                   Message.sent_at.isnot(None))
+            .order_by(Message.sent_at.desc()).limit(1)
+        ).scalar_one_or_none()
+    except Exception:  # noqa: BLE001
+        sent_at = None
+    reply_authenticity.safe_apply(session, reply, classification=classification,
+                                  sent_at=sent_at)
+
+
 def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
     """Match an inbound message to a lead and apply the routing rules.
     Never auto-replies to humans."""
@@ -831,6 +921,14 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
         classification=classification,
         received_at=inbound.received_at,
     )
+    # Feature A3: scored in the same commit the reply is stored in, so the
+    # inbox never shows a reply without its authenticity. Never raises.
+    from app.services import reply_authenticity  # noqa: PLC0415
+
+    reply_authenticity.safe_apply(
+        session, reply_row, classification=classification,
+        headers=reply_authenticity.headers_from_raw(getattr(inbound, "raw", None)),
+        sent_at=matched_message.sent_at if matched_message else None)
     session.add(reply_row)
     session.commit()
 
@@ -905,6 +1003,7 @@ def route_whatsapp_inbound_impl(session: Session, lead: Lead,
     Never auto-replies to humans."""
     classification = classify_reply(reply.from_address, None, reply.body, session=session)
     reply.classification = classification
+    _score_authenticity(session, reply, lead, classification, ChannelType.WHATSAPP)
     session.commit()
     if classification == "automated_response":   # Feature Group 9
         return classification
@@ -970,6 +1069,7 @@ def route_linkedin_inbound_impl(session: Session, lead: Lead,
     auto-replies to humans."""
     classification = classify_reply(reply.from_address, None, reply.body, session=session)
     reply.classification = classification
+    _score_authenticity(session, reply, lead, classification, ChannelType.LINKEDIN)
     session.commit()
     if classification == "automated_response":   # Feature Group 9
         return classification

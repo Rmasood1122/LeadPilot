@@ -197,6 +197,96 @@ def update_send_time_scores(db_session) -> int:
     return keys_written
 
 
+# --------------------------------------------------------------------------
+# Feature A5: outcome-based optimisation
+# --------------------------------------------------------------------------
+#
+# Reply rate alone optimises for conversations. What the customer pays for is
+# meetings, so both the slot scores and the channel ranking below weight a
+# booking BOOKING_WEIGHT times a reply. Rates are Laplace-smoothed so a channel
+# with one send and one lucky reply does not outrank one with a real sample.
+
+BOOKING_WEIGHT = 3.0
+
+
+def _outcome_rows(session, strategy_id=None):
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.db.models import Lead, Outcome, OutcomeEvent  # noqa: PLC0415
+
+    query = (select(Outcome.lead_id, Outcome.event, Outcome.channel, Outcome.ts)
+             .join(Lead, Lead.id == Outcome.lead_id)
+             .where(Outcome.event.in_([OutcomeEvent.SENT, OutcomeEvent.REPLIED,
+                                       OutcomeEvent.BOOKED])))
+    if strategy_id is not None:
+        query = query.where(Lead.strategy_id == strategy_id)
+    return session.execute(query).all()
+
+
+def channel_conversion_rates(session, strategy_id) -> dict[str, dict]:
+    """{channel: {sends, replies, bookings, score}} for one strategy.
+
+    A reply or booking is credited to the channel of the lead's most recent
+    send before it (a Calendly booking arrives on channel "calendly" but was
+    earned by an email or a LinkedIn message)."""
+    from collections import defaultdict  # noqa: PLC0415
+
+    rows = sorted(_outcome_rows(session, strategy_id), key=lambda r: (r.ts is None, r.ts))
+    stats: dict[str, dict] = defaultdict(lambda: {"sends": 0, "replies": 0, "bookings": 0})
+    last_channel: dict = {}
+    credited: set = set()
+    for lead_id, event, channel, _ts in rows:
+        event = getattr(event, "value", event)
+        if event == "sent":
+            stats[channel or "email"]["sends"] += 1
+            last_channel[lead_id] = channel or "email"
+        elif lead_id in last_channel and (lead_id, event) not in credited:
+            credited.add((lead_id, event))
+            stats[last_channel[lead_id]]["replies" if event == "replied" else "bookings"] += 1
+    out = {}
+    for channel, s in stats.items():
+        s["score"] = round((s["replies"] + BOOKING_WEIGHT * s["bookings"] + 0.1)
+                           / (s["sends"] + 2), 4)
+        out[channel] = dict(s)
+    return out
+
+
+def channel_ranking_for_lead(session, lead) -> list[str]:
+    """Channels best-first for this lead's strategy, by outcome score. Used by
+    the stagnation step (app/pipeline/channel_orchestrator.py) to choose the
+    next channel; channels with no sends yet keep their default order after
+    the measured ones."""
+    rates = channel_conversion_rates(session, lead.strategy_id)
+    measured = sorted(rates, key=lambda ch: rates[ch]["score"], reverse=True)
+    return measured + [ch for ch in ("email", "linkedin", "phone", "whatsapp") if ch not in rates]
+
+
+def outcome_weighted_slots(session, strategy_id=None, limit: int = MAX_SLOTS) -> list[dict]:
+    """Top (day_of_week, hour_utc) send slots by replies + weighted bookings
+    per send, credited to the slot of the lead's most recent send."""
+    from collections import defaultdict  # noqa: PLC0415
+
+    rows = sorted(_outcome_rows(session, strategy_id), key=lambda r: (r.ts is None, r.ts))
+    slots: dict[tuple, list[float]] = defaultdict(lambda: [0, 0.0])
+    last_slot: dict = {}
+    for lead_id, event, _channel, ts in rows:
+        if ts is None:
+            continue
+        event = getattr(event, "value", event)
+        if event == "sent":
+            key = ((ts.weekday() + 1) % 7, ts.hour)   # Sunday=0, as pick_next_send_datetime
+            slots[key][0] += 1
+            last_slot[lead_id] = key
+        elif lead_id in last_slot:
+            slots[last_slot[lead_id]][1] += BOOKING_WEIGHT if event == "booked" else 1.0
+    ranked = sorted(
+        ({"day_of_week": dow, "hour_utc": hour, "sends": sends,
+          "score": round((wins + 0.1) / (sends + 2), 4),
+          "is_reliable": sends >= 30} for (dow, hour), (sends, wins) in slots.items()),
+        key=lambda s: s["score"], reverse=True)
+    return ranked[:limit]
+
+
 def pick_next_send_datetime(
     recommendation: SendTimeRecommendation,
     from_datetime,           # datetime.datetime (UTC)

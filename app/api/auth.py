@@ -42,6 +42,8 @@ from app.db.base import get_db
 from app.db.models import User
 from app.services import auth as auth_svc
 from app.services import email_verification as verify_svc
+from app.services import identity as identity_svc
+from app.services import network_guard
 from app.services.email_sender import EmailSendError
 
 logger = logging.getLogger(__name__)
@@ -102,6 +104,12 @@ def _user_out(user: User) -> dict:
         # instead of letting them reach the dashboard and discover it as a 403
         # on the first data fetch.
         "email_verified": bool(getattr(user, "email_verified", False)),
+        # Identity onboarding (migration 0039). The Shell routes a user with
+        # identity_required and an incomplete identity/phone to
+        # /onboarding/verify, the same way it routes email_verified=false.
+        "identity_required": bool(getattr(user, "identity_required", False)),
+        "identity_complete": identity_svc.identity_complete(user),
+        "phone_verified": bool(getattr(user, "phone_verified", False)),
     }
 
 
@@ -142,6 +150,10 @@ def signup(request: Request, body: Credentials,
     # malformed payload cannot burn a slot.
     enforce_rate_limit(f"ip:{client_ip(request)}", "auth_ip",
                        "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+    # Section D: no signups through a VPN/proxy/Tor/datacenter address. After
+    # the limiter (a blocked flood still spends quota, and cannot turn the
+    # provider lookup into the thing being flooded), before any account work.
+    network_guard.enforce_clean_network(db, request, "signup", email=body.email)
 
     email = body.email.lower().strip()
     user = db.execute(select(User).where(User.email == email)).scalars().first()
@@ -161,6 +173,11 @@ def signup(request: Request, body: Credentials,
     # only runs for a row that had no password, i.e. one nobody has used.)
     user.email_verified = False
     user.email_verified_at = None
+    # Migration 0039: accounts created from here on go through the identity
+    # questions and phone verification. Rows that existed before 0039 keep the
+    # FALSE server default and are never forced through it.
+    user.identity_required = True
+    user.signup_ip = (client_ip(request) or "")[:64] or None
     db.commit()
 
     # Tokens are still returned. The account cannot DO anything with them --
@@ -278,6 +295,10 @@ def login(request: Request, body: Credentials,
     # bucket and casing cannot be used to multiply the allowance.
     enforce_rate_limit(f"acct:{email}", "auth_account",
                        "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+    # Section D: same network rule as signup, same position (after both
+    # limiters, before the password is checked -- so a VPN'd attacker learns
+    # nothing about whether the credentials were right).
+    network_guard.enforce_clean_network(db, request, "login", email=email)
 
     user = db.execute(select(User).where(User.email == email)).scalars().first()
     if user is None or not auth_svc.verify_password(body.password,

@@ -223,6 +223,19 @@ def _launch_checks(db: Session, sequence: Sequence) -> None:
                                    f"{strategy.campaign_pause_reason}")
 
 
+def _review_gate(db: Session, sequence: Sequence, current_user: User) -> None:
+    """Feature A7: 409 SEQUENCE_REVIEW_BLOCKED while the current content has
+    unresolved blocking findings and no override. The findings themselves are
+    at GET /sequences/{id}/review (the detail stays a string -- the frontend
+    only renders string details)."""
+    from app.services import adversarial_review  # noqa: PLC0415
+
+    review = adversarial_review.ensure_review(db, sequence, current_user.id)
+    if review is not None and review.status == "blocked":
+        raise HTTPException(status_code=409, detail=adversarial_review.REVIEW_BLOCKED,
+                            headers={"X-Review-Id": str(review.id)})
+
+
 def _launch(db: Session, sequence: Sequence, lead_statuses) -> int:
     enrolled = engine.enroll_leads(db, sequence, lead_statuses=lead_statuses)
     if enrolled and sequence.status in (SequenceStatus.DRAFT, SequenceStatus.PENDING_APPROVAL):
@@ -246,7 +259,15 @@ def enroll(
     requires approval, is held as `pending_approval` instead -- nothing is
     enrolled or scheduled until a manager approves it."""
     sequence = _owned_sequence(db, sequence_id, current_user)
+    # Migration 0039: outreach from an account whose phone is unproved (post-
+    # 0039 signups only) is refused with PHONE_NOT_VERIFIED.
+    from app.services import identity as identity_svc  # noqa: PLC0415
+
+    identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
+    # Feature A7: the red-team review gates the launch request itself, so an
+    # SDR cannot queue blocked content for a manager to approve blind.
+    _review_gate(db, sequence, current_user)
     if _needs_approval(db, request, sequence):
         return _request_approval(db, request, sequence, body)
     result = {"enrolled": _launch(db, sequence, body.lead_statuses)}
@@ -340,7 +361,11 @@ def approve_sequence(
     sequence = _owned_sequence(db, sequence_id, current_user)
     if sequence.status is not SequenceStatus.PENDING_APPROVAL:
         raise HTTPException(status_code=409, detail="this sequence is not awaiting approval")
+    from app.services import identity as identity_svc  # noqa: PLC0415
+
+    identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
+    _review_gate(db, sequence, current_user)
     actor = _actor(request, current_user)
     payload = EnrollRequest(**(sequence.approval_payload_json or {}))
     sequence.approved_by_user_id = actor.id

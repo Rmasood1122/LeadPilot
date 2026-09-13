@@ -317,6 +317,9 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
                          params={"format": "metadata"})
         return {"labelIds": data.get("labelIds", []), "threadId": data.get("threadId")}
 
+    _AUTO_REPLY_HEADERS = ("auto-submitted", "x-autoreply", "x-autorespond",
+                           "x-auto-response-suppress", "precedence", "x-mailer")
+
     @staticmethod
     def _parse_inbound(data: dict) -> InboundMessage:
         payload = data.get("payload") or {}
@@ -344,6 +347,14 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
 
         _, from_addr = parseaddr(headers.get("from", ""))
         _, to_addr = parseaddr(headers.get("to", ""))
+        raw = {"labelIds": data.get("labelIds", [])}
+        # Feature A3: keep the handful of headers auto-responders set (RFC
+        # 3834 Auto-Submitted and friends) -- the strongest evidence that a
+        # "reply" is a machine. Only when present, and never anything else.
+        auto = {name: headers[name] for name in GmailChannel._AUTO_REPLY_HEADERS
+                if headers.get(name)}
+        if auto:
+            raw["headers"] = auto
         return InboundMessage(
             provider_message_id=data.get("id", ""),
             thread_ref=data.get("threadId"),
@@ -352,7 +363,7 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
             subject=headers.get("subject"),
             body=text,
             received_at=None,
-            raw={"labelIds": data.get("labelIds", [])},
+            raw=raw,
         )
 
     # ---- live now --------------------------------------------------------

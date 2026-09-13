@@ -62,6 +62,14 @@ celery_app = Celery(
         "app.workers.roi_tasks",
         # Website builder: page generation + static export (on demand only).
         "app.workers.site_tasks",
+        # Section E: pay-per-meeting charging sweep (+ the metering listener).
+        "app.workers.billing_tasks",
+        # Feature A2: seal the hash-chained activity audit trail (+ its listener).
+        "app.workers.audit_tasks",
+        # Feature A4: hourly cross-channel stagnation step.
+        "app.workers.channel_tasks",
+        # Feature A5: hourly conversion-probability rescore.
+        "app.workers.conversion_tasks",
     ],
 )
 
@@ -151,6 +159,15 @@ celery_app.conf.task_routes = {
     # the task names are "workers.site_tasks.*", not "app.workers.site_tasks.*"
     # -- they are registered under an explicit short name.
     "workers.site_tasks.*": {"queue": "pipeline"},
+    # Section E: one Stripe call per due meeting -- integration I/O, like CRM
+    # sync and webhook delivery.
+    "app.workers.billing_tasks.*": {"queue": "default"},
+    # Feature A2: short per-account database work.
+    "app.workers.audit_tasks.*": {"queue": "default"},
+    # Feature A4: may re-channel a scheduled send -- runs beside the sends.
+    "app.workers.channel_tasks.*": {"queue": "outreach"},
+    # Feature A5: scoring over outcomes, like the other learning sweeps.
+    "app.workers.conversion_tasks.*": {"queue": "learning"},
 }
 
 celery_app.conf.update(
@@ -291,6 +308,27 @@ celery_app.conf.beat_schedule = {
     "refresh-roi-snapshots": {
         "task": "app.workers.roi_tasks.refresh_all_roi_snapshots",
         "schedule": crontab(hour=1, minute=0),
+    },
+    # Section E: charge pay-per-meeting usage whose 48h cancellation grace has
+    # passed. Every 30 minutes, so a charge lands within half an hour of it.
+    "charge-due-meetings": {
+        "task": "app.workers.billing_tasks.charge_due_meetings",
+        "schedule": 1800.0,
+    },
+    # Feature A2: chain newly recorded audit events every five minutes.
+    "seal-audit-trails": {
+        "task": "app.workers.audit_tasks.seal_audit_trails",
+        "schedule": 300.0,
+    },
+    # Feature A4: suggest (or switch to) the next channel for quiet leads.
+    "detect-channel-stagnation": {
+        "task": "app.workers.channel_tasks.detect_channel_stagnation",
+        "schedule": crontab(minute=25),
+    },
+    # Feature A5: cool / archive leads that went cold between sends.
+    "rescore-conversion-probability": {
+        "task": "app.workers.conversion_tasks.rescore_conversion_probability",
+        "schedule": crontab(minute=40),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

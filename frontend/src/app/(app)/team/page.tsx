@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
+import { SequenceReviewPanel } from "@/components/campaigns/SequenceReviewPanel";
 
 const selectClass = "rounded border border-border bg-card px-2 py-1 text-sm";
 
@@ -276,6 +277,9 @@ function ApprovalsPanel({ role }: { role: Role }) {
                     </div>
                   )}
                 </div>
+                {/* Feature A7: approval is refused while the review is blocked;
+                    the findings (and the override) are right here. */}
+                {a.state === "pending" && <SequenceReviewPanel sequenceId={a.sequence_id} />}
                 {declining === a.sequence_id && (
                   <form className="space-y-2"
                         onSubmit={(e) => { e.preventDefault(); decline.mutate({ id: a.sequence_id, n: note }); }}>

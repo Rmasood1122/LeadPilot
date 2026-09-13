@@ -42,6 +42,16 @@ def _weight(days_since: float, lam: float) -> float:
     return math.exp(-lam * days_since)
 
 
+def engagement_weight(days_since: float, half_life_days: int) -> float:
+    """Public decay weight for per-lead engagement (Feature A5).
+
+    The same exponential as the playbook scores -- 1.0 now, 0.5 at one
+    half-life -- exposed so conversion_probability decays an old open or a long
+    silence on the same curve the learning loop decays old outcomes on.
+    """
+    return _weight(max(float(days_since), 0.0), _lambda(half_life_days))
+
+
 def compute_decayed_score(
     outcomes: list[dict],
     metric_key: str = "is_reply",

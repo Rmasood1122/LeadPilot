@@ -37,13 +37,20 @@ import { MeetingPrepPanel } from "@/components/leads/MeetingPrepPanel";
 import { OutcomeHistory } from "@/components/leads/OutcomeHistory";
 import { PersonalizationPanel } from "@/components/leads/PersonalizationPanel";
 import { LeadCalls } from "@/components/calls/CallHistory";
+import { ClaimChecksPanel } from "@/components/leads/ClaimChecksPanel";
+import { ConversationThread } from "@/components/leads/ConversationThread";
+import { ConversionCard } from "@/components/leads/ConversionCard";
 
 const TABS = [
   { value: "overview", label: "Overview" },
+  // Feature A4: every channel in one timeline, plus channel-switch suggestions.
+  { value: "conversation", label: "Conversation" },
   { value: "personalization", label: "Personalization" },
   { value: "calls", label: "Calls" },
   { value: "prep", label: "Meeting Prep" },
   { value: "outcomes", label: "Outcomes" },
+  // Feature A1: what the claim engine verified or removed before sending.
+  { value: "claims", label: "Claim checks" },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
 
@@ -116,12 +123,14 @@ export default function LeadDetailPage() {
                 ))}
               </TabsList>
               <TabsContent value="overview"><LeadOverview lead={lead} /></TabsContent>
+              <TabsContent value="conversation"><ConversationThread leadId={lead.id} /></TabsContent>
               <TabsContent value="personalization">
                 <PersonalizationPanel leadId={lead.id} score={lead.ai_booking_likelihood} />
               </TabsContent>
               <TabsContent value="calls"><LeadCalls lead={lead} /></TabsContent>
               <TabsContent value="prep"><MeetingPrepPanel leadId={lead.id} /></TabsContent>
               <TabsContent value="outcomes"><OutcomeHistory leadId={lead.id} /></TabsContent>
+              <TabsContent value="claims"><ClaimChecksPanel leadId={lead.id} /></TabsContent>
             </Tabs>
 
             <LogOutcomeDialog lead={lead} open={logOpen} onClose={() => setLogOpen(false)} />
@@ -202,6 +211,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <LeadScoreCard lead={lead} />
+      {/* Feature A5: the live number the send gate acts on. */}
+      <ConversionCard leadId={lead.id} />
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent>

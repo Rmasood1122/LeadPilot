@@ -57,8 +57,13 @@ from app.db.base import Base
 class PlanTier(str, enum.Enum):
     FREE = "free"
     STARTER = "starter"      # M8-C5 plan enforcement tier
-    PRO = "pro"
+    PRO = "pro"              # legacy: no longer sold, kept for existing rows
     ENTERPRISE = "enterprise"
+    # Section E (migration 0040). VARCHAR-backed, so these are data-free
+    # additions -- see the module docstring.
+    GROWTH = "growth"
+    SCALE = "scale"
+    PAY_PER_MEETING = "pay_per_meeting"
 
 
 class ProductType(str, enum.Enum):
@@ -176,6 +181,9 @@ class OutcomeEvent(str, enum.Enum):
     NOTIFICATION_SENT = "notification_sent"  # M7 push audit
     CIRCUIT_OPENED = "circuit_opened"  # M8-C3 circuit breaker audit
     AB_PROMOTED = "ab_promoted"        # M8-C2 promotion idempotency marker
+    # Feature A2: a tracked link in an outreach email was followed (first click
+    # per message+URL). VARCHAR-backed, so a data-free addition.
+    CLICKED = "clicked"
 
 
 class WhatsAppTemplateStatus(str, enum.Enum):
@@ -423,6 +431,47 @@ class User(TimestampMixin, Base):
     style_profile_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     style_samples_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
     style_profile_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # --- Identity, location and phone verification (migration 0039) --------
+    # identity_required is TRUE only for accounts created after 0039 (signup
+    # sets it). Every pre-existing row keeps the server default FALSE, so the
+    # new onboarding gate and the phone gate never lock out an account that
+    # signed up before either existed -- the same lesson as 0015's backfill.
+    identity_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    # ISO 3166-1 alpha-2, upper case.
+    personal_country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    # individual | company
+    account_type: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    company_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Where the company is registered/operating. May differ from where the
+    # person sits -- a Karachi founder of a Delaware C-corp is ordinary.
+    company_country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    identity_submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    signup_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # What IP geolocation said when the identity was submitted.
+    geo_detected_country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    # match | mismatch | unknown -- unknown is "we could not tell", never "ok".
+    geo_check_status: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    # NULL (nothing to review) | pending | cleared | confirmed_risk
+    geo_review_status: Mapped[str | None] = mapped_column(
+        String(20), nullable=True, index=True
+    )
+    geo_reviewed_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    geo_reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    geo_review_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # E.164. Only written once the code has been proved.
+    phone_number: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    phone_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    phone_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
@@ -1085,6 +1134,20 @@ class Lead(TimestampMixin, Base):
     estimated_deal_value: Mapped[Decimal | None] = mapped_column(
         Numeric(12, 2), nullable=True
     )
+    # --- Feature A5 (migration 0045): live conversion probability ---------
+    # 0..1, recomputed at send time and by the hourly sweep
+    # (app/services/conversion_probability.py). NULL = never estimated.
+    conversion_probability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    conversion_probability_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # active | cooling (sequence paused) | archived (sequence stopped) | won.
+    # NULL behaves as active.
+    engagement_state: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    # bounced | unsubscribed | not_interested | probability_below_archive
+    kill_signal: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # The factors the estimate was built from, so it can always be explained.
+    conversion_factors_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     strategy: Mapped["Strategy"] = relationship(back_populates="leads")
     batch: Mapped["LeadBatch | None"] = relationship(back_populates="leads")
@@ -1554,6 +1617,19 @@ class InboundReply(TimestampMixin, Base):
     # NOT_NOW only: the day to come back. Defaulted to +30 days and editable
     # to 60 or 90 through PATCH /crm/replies/{id}/intelligence.
     reschedule_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # --- Feature A3 (migration 0043): real-time authenticity ---------------
+    # A third question beside routing (`classification`) and next action
+    # (`reply_category`): is a REAL BUYER on the other end, and how sure are
+    # we? Scored the moment the reply is stored; see reply_authenticity.py.
+    # genuine | out_of_office | auto_responder | bot | bounce; NULL = not scored
+    authenticity_kind: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    authenticity_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    buyer_intent_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    authenticity_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    authenticity_signals_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    authenticity_scored_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class WhatsAppTemplate(TimestampMixin, Base):
@@ -3419,3 +3495,416 @@ class SiteAsset(Base):
     )
 
     page: Mapped["SitePage"] = relationship(back_populates="assets")
+
+
+# --------------------------------------------------------------------------
+# Identity, location and phone verification (migration 0039)
+# --------------------------------------------------------------------------
+
+
+class PhoneVerificationCode(Base):
+    """One SMS one-time code sent to one number for one account.
+
+    Only an HMAC of the code is stored (keyed by the JWT secret and bound to
+    the user and the number), so a database read does not yield live codes and
+    a code proved for one number cannot verify another. `attempts` counts wrong
+    guesses against THIS code; past PHONE_OTP_MAX_ATTEMPTS it is dead even if
+    the right code arrives later. No updated_at: the only mutations are the
+    attempt counter and `consumed_at`, each recorded precisely.
+    """
+
+    __tablename__ = "phone_verification_codes"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    phone_number: Mapped[str] = mapped_column(String(20))
+    code_hash: Mapped[str] = mapped_column(String(64))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    consumed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AccountSecurityEvent(Base):
+    """Append-only account risk and verification audit (migration 0039).
+
+    What the identity flow and the network guard observed and decided: a
+    declared-vs-detected country mismatch, a signup or login refused for
+    coming through a VPN, a phone verified, an admin's review decision.
+    `user_id` is nullable because a blocked SIGNUP has no account yet --
+    `email` carries who tried. Survives the user's deletion with the id
+    nulled, like compliance_audit_log.
+    """
+
+    __tablename__ = "account_security_events"
+    __table_args__ = (
+        Index("ix_account_security_events_event_ts", "event", "ts"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    event: Mapped[str] = mapped_column(String(40))
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    details_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Billing (migration 0040) -- Section E
+# --------------------------------------------------------------------------
+
+
+class BillingSubscription(TimestampMixin, Base):
+    """How one account pays: a monthly tier or pay-per-meeting.
+
+    One row per account (UNIQUE user_id); switching plans updates it. Stripe
+    is the source of truth for money and this row mirrors it -- statuses are
+    Stripe's own (incomplete | trialing | active | past_due | canceled), set
+    from its webhooks. `is_stub` marks a row activated WITHOUT Stripe (no
+    STRIPE_SECRET_KEY configured), so a stub subscription can never be
+    mistaken for a paying customer in a report.
+    """
+
+    __tablename__ = "billing_subscriptions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    billing_model: Mapped[str] = mapped_column(String(20))   # monthly | pay_per_meeting
+    tier: Mapped[str] = mapped_column(String(20))            # starter..enterprise | pay_per_meeting
+    status: Mapped[str] = mapped_column(
+        String(20), default="incomplete", server_default="incomplete", nullable=False
+    )
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(
+        String(64), nullable=True, unique=True
+    )
+    stripe_checkout_session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    trial_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    current_period_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancel_at_period_end: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_stub: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+
+
+class BillableMeeting(TimestampMixin, Base):
+    """One booked meeting a pay-per-meeting account owes for (migration 0040).
+
+    Written by usage_meter.record_meeting_usage the moment a BOOKED outcome is
+    flushed for a lead owned by a pay-per-meeting account. UNIQUE
+    (user_id, dedupe_key) with dedupe_key = the lead id is the "once per
+    prospect" rule enforced by the schema: a prospect who books, cancels and
+    rebooks is one charge, never two.
+
+    LIFECYCLE
+      pending   inside the cancellation grace window (charge_after)
+      charged   invoiced through Stripe (is_stub: marked charged without Stripe)
+      waived    the meeting was cancelled before charge_after, or an admin
+                upheld a dispute
+      disputed  the customer disputed it inside the grace window; an admin decides
+      failed    Stripe refused the charge (failure_reason)
+
+    `lead_id`/`strategy_id` are SET NULL on delete so the billing record
+    outlives a GDPR erase of the prospect -- an invoice must stay explicable.
+    """
+
+    __tablename__ = "billable_meetings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "dedupe_key", name="billable_meeting_once"),
+        Index("ix_billable_meetings_status_charge_after", "status", "charge_after"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    dedupe_key: Mapped[str] = mapped_column(String(80))
+    # the BOOKED outcome's channel: calendly | leadpilot_calendar | ...
+    source: Mapped[str] = mapped_column(String(20))
+    amount_cents: Mapped[int] = mapped_column(BigInteger)
+    currency: Mapped[str] = mapped_column(String(3), default="usd", server_default="usd")
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False
+    )
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    charge_after: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    charged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    stripe_invoice_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    stripe_invoice_item_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_stub: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolution_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Feature A1: fabrication-proof claim engine (migration 0041)
+# --------------------------------------------------------------------------
+
+
+class ClaimVerificationLog(Base):
+    """One claim an AI-written message made about a prospect, and what the
+    claim engine (app/services/claim_verification.py) decided about it.
+
+    Append-only audit: verified claims are logged with the evidence that
+    supported them (source + excerpt), stripped/rewritten ones with the tokens
+    that could not be found and the replacement text, so "why did my email lose
+    its opening line?" always has an answer. Written in the same transaction as
+    the rendered message it describes. `lead_id`/`message_id` are SET NULL on
+    delete: the record that a claim was refused outlives the prospect's data.
+    """
+
+    __tablename__ = "claim_verification_log"
+    __table_args__ = (
+        Index("ix_claim_verification_log_lead_created", "lead_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    channel: Mapped[str] = mapped_column(String(20))
+    # subject | body | first_message | voicemail | variable:<n>
+    field: Mapped[str] = mapped_column(String(30))
+    # funding | headcount | hiring | job_change | news | metrics | expansion |
+    # their_content | other
+    category: Mapped[str] = mapped_column(String(30))
+    claim_text: Mapped[str] = mapped_column(Text)
+    verdict: Mapped[str] = mapped_column(String(20))     # verified | stripped | rewritten
+    extractor: Mapped[str] = mapped_column(String(10))   # rules | model
+    evidence_source: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    evidence_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unsupported_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    replacement_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature A2: tamper-evident send/reply audit trail (migration 0042)
+# --------------------------------------------------------------------------
+
+
+class ActivityAuditEvent(Base):
+    """One send / open / click / reply / meeting-booked event, hash-chained.
+
+    APPEND-ONLY AND TAMPER-EVIDENT (app/services/audit_trail.py):
+      content_hash  sha256 of the row's canonical content, fixed at insert
+      prev_hash     the previous sealed record's chain_hash for this account
+      chain_hash    sha256(prev_hash + content_hash)
+      seq_no        position in the account's chain (1, 2, 3 ...)
+    Changing, inserting or deleting any sealed record breaks every chain_hash
+    after it, which `verify_chain` detects and a signed export proves.
+
+    Events are recorded at insert time (in the same transaction as the Outcome
+    that caused them) and SEALED into the chain by a separate step, so two
+    concurrent sends never race for the same seq_no inside a business
+    transaction -- the sealer serialises per account instead.
+
+    NO FOREIGN KEYS on the *_ref columns, deliberately: an FK with ON DELETE
+    SET NULL would silently rewrite hashed content when a lead is erased, and
+    the chain would then "prove" tampering that never happened. The refs are
+    opaque ids and the payload carries no personal data, so the trail outlives
+    a GDPR erase intact. PostgreSQL additionally refuses DELETE and content
+    UPDATEs with a trigger (migration 0042); the ORM refuses them everywhere.
+    """
+
+    __tablename__ = "activity_audit_events"
+    __table_args__ = (
+        UniqueConstraint("user_id", "seq_no", name="audit_event_user_seq"),
+        UniqueConstraint("outcome_ref", name="audit_event_outcome"),
+        Index("ix_activity_audit_events_user_created", "user_id", "created_at"),
+        Index("ix_activity_audit_events_lead_ref", "lead_ref"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid)
+    lead_ref: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    strategy_ref: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    message_ref: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    outcome_ref: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    event: Mapped[str] = mapped_column(String(20))      # sent | opened | clicked | replied | booked
+    channel: Mapped[str] = mapped_column(String(20))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    payload_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    seq_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    prev_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    chain_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    sealed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature A4: cross-channel conversation + stagnation (migration 0044)
+# --------------------------------------------------------------------------
+
+
+class ChannelSuggestion(TimestampMixin, Base):
+    """"This lead has gone quiet on email -- try LinkedIn."
+
+    Written by the stagnation step (app/pipeline/channel_orchestrator.py) when
+    a lead has had N sends on one channel with no genuine reply. The unified
+    conversation thread itself is NOT a table: it is assembled from the
+    source-of-truth rows (messages, inbound_replies, calls, bookings, meetings)
+    by app/services/conversation_thread.py, so it can never disagree with them.
+    This table holds the one thing those rows cannot: the recommendation and
+    what was decided about it.
+
+    LIFECYCLE
+      suggested      waiting for a person
+      accepted       a person switched the lead's next scheduled message
+      auto_switched  the system did (system setting stagnation_auto_switch_enabled)
+      dismissed      a person declined
+    """
+
+    __tablename__ = "channel_suggestions"
+    __table_args__ = (
+        Index("ix_channel_suggestions_lead_status", "lead_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("leads.id", ondelete="CASCADE"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    enrollment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("sequence_enrollments.id", ondelete="SET NULL"), nullable=True
+    )
+    from_channel: Mapped[str] = mapped_column(String(20))
+    to_channel: Mapped[str] = mapped_column(String(20))
+    sends_without_reply: Mapped[int] = mapped_column(Integer)
+    reason: Mapped[str] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(
+        String(20), default="suggested", server_default="suggested", nullable=False
+    )
+    switched_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Feature A6: client-facing shareable ROI dashboard (migration 0046)
+# --------------------------------------------------------------------------
+
+
+class ShareLink(TimestampMixin, Base):
+    """A signed, revocable, expiring link to a read-only ROI dashboard.
+
+    The link is the credential -- whoever holds it sees the dashboard, with no
+    login -- so it is handled like an API key: the token is shown ONCE at
+    creation and only its SHA-256 is stored (a database read yields no working
+    link); `token_prefix` lets the owner tell links apart. Every link EXPIRES
+    (expires_at is NOT NULL) and can be REVOKED at once. `strategy_id` NULL
+    scopes it to the whole account (the workspace), a value to one campaign.
+    """
+
+    __tablename__ = "share_links"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), nullable=True
+    )
+    label: Mapped[str] = mapped_column(String(120))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    token_prefix: Mapped[str] = mapped_column(String(12))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    view_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+
+
+# --------------------------------------------------------------------------
+# Feature A7: pre-send adversarial review (migration 0047)
+# --------------------------------------------------------------------------
+
+
+class SequenceReview(TimestampMixin, Base):
+    """One red-team pass over a sequence's content before it may launch.
+
+    `content_hash` is a SHA-256 of everything that decides what a lead will
+    receive (every step's channel, brief, WhatsApp template and variable
+    mapping, the booking link). A review -- and an override of it -- applies
+    only while the hash still matches: editing the copy after an override
+    brings the gate back, so an override can never be used to wave through
+    content nobody reviewed.
+
+    status: passed | blocked | overridden. An override keeps the findings and
+    records who, when and why (also written to account_security_events).
+    """
+
+    __tablename__ = "sequence_reviews"
+    __table_args__ = (
+        Index("ix_sequence_reviews_sequence_created", "sequence_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    sequence_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sequences.id", ondelete="CASCADE")
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    content_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(20))
+    findings_json: Mapped[list] = mapped_column(JSON, default=list)
+    blocking_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    warning_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    # rules | rules+model
+    reviewer: Mapped[str] = mapped_column(String(20))
+    overridden_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

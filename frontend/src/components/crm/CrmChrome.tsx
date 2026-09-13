@@ -25,6 +25,8 @@ const TABS = [
   { href: "/crm/dashboard/campaigns", label: "Campaigns" },
   { href: "/crm/dashboard/activity", label: "Activity" },
   { href: "/crm/table", label: "Table" },
+  // Feature A3: replies with real-time authenticity + buyer-intent scores.
+  { href: "/crm/replies", label: "Replies" },
 ];
 
 export function CrmTabs() {

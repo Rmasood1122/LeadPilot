@@ -17,8 +17,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, Query, Request
+from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.core.rate_limiting import enforce_rate_limit
@@ -56,3 +56,22 @@ def open_pixel(token: str, request: Request, db: Session = Depends(get_db)) -> R
         db.rollback()
         logger.exception("open pixel: could not record open for message %s", message_id)
     return _pixel()
+
+
+@router.get("/t/c/{token}", include_in_schema=False)
+def click_redirect(token: str, u: str = Query(default="", max_length=2000),
+                   db: Session = Depends(get_db)) -> Response:
+    """Feature A2: a tracked link. Redirects ONLY to the destination the token
+    was minted for (HMAC-bound), so this is never an open redirector. A forged
+    or mismatched token is a plain 404 -- there is no safe place to send it."""
+    message_id = open_tracking.parse_click_token(token, u)
+    if message_id is None:
+        return Response(content="Link not found", status_code=404, media_type="text/plain")
+    try:
+        enforce_rate_limit(token, "click_redirect", "RATE_LIMIT_OPEN_PIXEL")
+        open_tracking.record_click(db, message_id, u)
+    except Exception:  # noqa: BLE001 -- the person still reaches the page
+        db.rollback()
+        logger.info("click redirect: not recorded for message %s", message_id)
+    return RedirectResponse(url=u, status_code=302,
+                            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})

@@ -84,23 +84,30 @@ _URL = re.compile(r"https?://[^\s<>\"']+")
 _TRAILING = ".,;:!?)"
 
 
-def _linkify(escaped: str) -> str:
+def _linkify(escaped: str, click_url=None) -> str:
     def repl(m: re.Match) -> str:
         url = m.group(0)
         tail = ""
         while url and url[-1] in _TRAILING:
             tail = url[-1] + tail
             url = url[:-1]
-        return f'<a href="{url}">{url}</a>{tail}'
+        # Feature A2: the href may point at the click redirect; the visible
+        # text is always the real destination, so the reader sees where the
+        # link goes.
+        href = html.escape(click_url(html.unescape(url))) if click_url else url
+        return f'<a href="{href}">{url}</a>{tail}'
     return _URL.sub(repl, escaped)
 
 
-def html_body(text: str, pixel: str | None) -> str:
+def html_body(text: str, pixel: str | None, click_url=None) -> str:
     """The HTML twin of a plain-text email: same words, links clickable,
     paragraphs kept, plus the pixel. No styling -- cold email that looks
-    like a newsletter is filtered like one."""
+    like a newsletter is filtered like one.
+
+    `click_url`, when given, maps a destination URL to its tracked redirect
+    (click tracking, off by default -- see system setting click_tracking_enabled)."""
     paragraphs = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
-    parts = [f"<p>{_linkify(html.escape(p)).replace(chr(10), '<br>')}</p>"
+    parts = [f"<p>{_linkify(html.escape(p), click_url).replace(chr(10), '<br>')}</p>"
              for p in paragraphs]
     if pixel:
         parts.append(f'<img src="{html.escape(pixel)}" width="1" height="1" alt="" '
@@ -148,6 +155,88 @@ def record_open(session: Session, message_id: uuid.UUID, *,
     session.commit()
     if lead is not None:
         _maybe_compute_windows(session, lead.strategy_id)
+    return "recorded"
+
+
+# --------------------------------------------------------------------------
+# Feature A2: click tracking
+# --------------------------------------------------------------------------
+#
+# /t/c/<token>?u=<destination>. The token is the message id plus an HMAC over
+# (message id, destination), so the redirect can never be pointed at a URL the
+# message did not contain -- an unauthenticated redirect that accepted any `u`
+# would be an open redirector on our domain, which phishing uses and spam
+# filters punish.
+
+
+def _click_mac(raw: bytes, url: str) -> bytes:
+    return hmac.new(_key(), b"click:" + raw + url.encode(), hashlib.sha256).digest()[:_MAC_BYTES]
+
+
+def make_click_token(message_id, url: str) -> str:
+    raw = uuid.UUID(str(message_id)).bytes
+    return base64.urlsafe_b64encode(raw + _click_mac(raw, url)).decode().rstrip("=")
+
+
+def parse_click_token(token: str, url: str) -> uuid.UUID | None:
+    try:
+        data = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
+    except (ValueError, TypeError):
+        return None
+    if len(data) != 16 + _MAC_BYTES or not url.lower().startswith(("http://", "https://")):
+        return None
+    raw, mac = data[:16], data[16:]
+    if not hmac.compare_digest(mac, _click_mac(raw, url)):
+        return None
+    return uuid.UUID(bytes=raw)
+
+
+def click_url(message_id, url: str) -> str:
+    from urllib.parse import quote  # noqa: PLC0415
+
+    return (f"{settings.public_base_url.rstrip('/')}/t/c/{make_click_token(message_id, url)}"
+            f"?u={quote(url, safe='')}")
+
+
+def click_tracking_enabled(session: Session, lead: Lead) -> bool:
+    from app.services import system_settings  # noqa: PLC0415
+
+    return tracking_enabled(session, lead) and bool(
+        system_settings.get(session, "click_tracking_enabled"))
+
+
+def record_click(session: Session, message_id: uuid.UUID, url: str, *,
+                 now: datetime | None = None) -> str:
+    """Apply one click. recorded | repeat | prefetch | not_sent | unknown.
+
+    Only the FIRST click on a given link of a given message writes a CLICKED
+    outcome; security scanners that follow links on delivery are ignored with
+    the same prefetch window as the open pixel."""
+    from app.services import system_settings  # noqa: PLC0415
+
+    now = now or datetime.now(timezone.utc)
+    message = session.get(Message, message_id)
+    if message is None:
+        return "unknown"
+    sent_at = _aware(message.sent_at)
+    if sent_at is None:
+        return "not_sent"
+    if (now - sent_at).total_seconds() < system_settings.get(session, "open_prefetch_seconds"):
+        return "prefetch"
+    earlier = session.execute(
+        select(Outcome.meta_json).where(Outcome.message_id == message.id,
+                                        Outcome.event == OutcomeEvent.CLICKED)
+    ).scalars().all()
+    if any((meta or {}).get("url") == url[:500] for meta in earlier):
+        return "repeat"
+    lead = session.get(Lead, message.lead_id)
+    session.add(Outcome(
+        lead_id=message.lead_id, message_id=message.id,
+        strategy_id=lead.strategy_id if lead else None, variant=message.variant,
+        event=OutcomeEvent.CLICKED, channel=message.channel.value if message.channel else "email",
+        meta_json={"url": url[:500], "source": "click_redirect"},
+    ))
+    session.commit()
     return "recorded"
 
 

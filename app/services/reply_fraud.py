@@ -55,6 +55,63 @@ DETECTOR_SYSTEM = (
 )
 
 
+# --------------------------------------------------------------------------
+# Feature A3: header and out-of-office detectors, used by the real-time
+# authenticity scorer (app/services/reply_authenticity.py). The functions
+# above keep their exact behaviour -- classify_reply's second pass depends
+# on them.
+# --------------------------------------------------------------------------
+
+# RFC 3834 Auto-Submitted, and the de-facto headers auto-responders set.
+_AUTO_HEADERS = {
+    "auto-submitted": lambda v: v.strip().lower() not in ("", "no"),
+    "x-autoreply": lambda v: bool(v.strip()),
+    "x-autorespond": lambda v: bool(v.strip()),
+    "x-auto-response-suppress": lambda v: bool(v.strip()),
+    "precedence": lambda v: v.strip().lower() in ("bulk", "junk", "auto_reply", "list"),
+    "x-mailer": lambda v: any(bot in v.lower() for bot in ("zendesk", "freshdesk",
+                                                           "helpscout", "intercom")),
+}
+
+_OOO_SUBJECT = re.compile(r"\b(out of (the )?office|ooo\b|away from (the )?office|on vacation|"
+                          r"on holiday|annual leave|abwesenheit|absence)\b", re.I)
+_OOO_BODY = [re.compile(p, re.I) for p in (
+    r"\bi('m| am)( currently)? (out of (the )?office|away|on (annual |parental |maternity |"
+    r"paternity )?leave|on vacation|on holiday|travell?ing)\b",
+    r"\b(limited|no) access to (my )?e-?mail\b",
+    r"\b(i will|i'll) (be back|return|respond)( to your (e-?mail|message))? (on|after|when)\b",
+    r"\bback (in the office )?on (monday|tuesday|wednesday|thursday|friday|\d)",
+    r"\bfor (urgent|immediate) (matters|assistance|requests)\b",
+    r"\bplease contact .{0,60} in my absence\b",
+)]
+_BOUNCE = re.compile(r"(mailer-daemon|postmaster@|delivery status notification|"
+                     r"address not found|undeliverable|delivery has failed|"
+                     r"message (was )?not delivered|550 5\.\d\.\d)", re.I)
+
+
+def header_signals(headers: dict | None) -> list[str]:
+    found = []
+    for name, value in (headers or {}).items():
+        check = _AUTO_HEADERS.get(str(name).strip().lower())
+        if check is not None and isinstance(value, str) and check(value):
+            found.append(f"header:{str(name).lower()}")
+    return found
+
+
+def out_of_office_signals(subject: str | None, body: str | None) -> list[str]:
+    found = []
+    if subject and _OOO_SUBJECT.search(subject):
+        found.append("ooo:subject")
+    text = (body or "")[:4000]
+    found.extend(f"ooo:{p.pattern[:40]}" for p in _OOO_BODY if p.search(text))
+    return found
+
+
+def bounce_signals(from_address: str | None, subject: str | None, body: str | None) -> list[str]:
+    haystack = " ".join(filter(None, [from_address, subject, (body or "")[:2000]]))
+    return ["bounce:delivery failure notice"] if _BOUNCE.search(haystack) else []
+
+
 def signals(from_address: str | None, subject: str | None, body: str | None) -> list[str]:
     found = []
     if from_address and _FROM.match(from_address.strip()):

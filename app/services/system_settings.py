@@ -108,6 +108,61 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     # Feature Group 8 -- white label
     "white_label_allowed": (True, "Allow workspace owners to enable "
                             "white-label mode."),
+    # Feature A1 -- fabrication-proof claim engine
+    "claim_verification_enabled": (True, "Check every factual claim an AI-written "
+                                   "message makes about a prospect against stored "
+                                   "data, and strip or rewrite what cannot be "
+                                   "verified before it sends."),
+    "claim_model_extraction_enabled": (True, "Also ask the model to find claims "
+                                       "the rules miss (one extra Claude call per "
+                                       "outbound message)."),
+    # Feature A7 -- pre-send adversarial review
+    "sequence_review_enabled": (True, "Red-team every sequence before it launches "
+                                "(spam/tone, compliance, unverifiable claims) and "
+                                "block activation on blocking findings until they "
+                                "are fixed or explicitly overridden."),
+    "sequence_review_model_enabled": (True, "Add an AI red-team pass to the rule "
+                                      "checks (its findings are warnings only; "
+                                      "one Claude call per review)."),
+    # Feature A5 -- conversion probability + kill signals
+    "conversion_gate_enabled": (True, "Estimate each lead's live conversion "
+                                "probability before every send and pause or stop "
+                                "the sequence when it has gone cold."),
+    "conversion_default_prior": (0.10, "Starting probability for a lead with no "
+                                 "AI booking score."),
+    "conversion_cooling_threshold": (0.05, "Below this probability a lead is "
+                                     "tagged cooling and its sequence paused."),
+    "conversion_archive_threshold": (0.015, "Below this probability a lead is "
+                                     "archived and its sequence stopped."),
+    "conversion_min_unanswered_sends": (4, "Unanswered sends a lead must have "
+                                        "before probability alone can cool or "
+                                        "archive it (kill signals apply anytime)."),
+    "conversion_cooling_pause_days": (21, "How long a cooling lead's sequence "
+                                      "stays paused before it resumes on its own."),
+    "conversion_inactivity_half_life_days": (30, "Half-life of the inactivity "
+                                             "decay applied to a lead that has "
+                                             "stopped engaging."),
+    # Feature A4 -- cross-channel stagnation
+    "stagnation_detection_enabled": (True, "Look hourly for leads with several "
+                                     "unanswered sends on one channel and "
+                                     "suggest the next best channel."),
+    "stagnation_email_sends": (3, "Unanswered emails in a row before a lead "
+                               "counts as stagnant on email."),
+    "stagnation_other_sends": (2, "Unanswered LinkedIn / WhatsApp / call touches "
+                               "in a row before a lead counts as stagnant there."),
+    "stagnation_min_hours": (48, "Hours since the last send before stagnation is "
+                             "judged -- a lead gets time to reply first."),
+    "stagnation_auto_switch_enabled": (False, "Switch the lead's next scheduled "
+                                       "message to the suggested channel "
+                                       "automatically instead of waiting for a "
+                                       "person (never for WhatsApp, which needs "
+                                       "an approved template)."),
+    # Feature A2 -- audit trail
+    "click_tracking_enabled": (False, "Route links in outreach email through a "
+                               "click redirect so clicks reach the audit trail. "
+                               "Off by default: rewritten links are a spam-filter "
+                               "signal. Never applied where open tracking is off "
+                               "(EU/EEA/UK leads)."),
 }
 
 

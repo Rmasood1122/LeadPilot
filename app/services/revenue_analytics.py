@@ -10,6 +10,9 @@ COST      four sources, all integer cents:
              spread across campaigns by their share of sends in the period
   api        metered Claude/OpenAI spend (usage_meter / api_usage)
   voice      AI-call minutes x the admin's voice_cost_per_minute
+  platform   LeadPilot's own pay-per-meeting fees (billable_meetings, Section
+             E): pending and charged meetings, by the day they were booked.
+             Waived, disputed and failed meetings are not a cost.
 
 CURRENCY
 The report is in one currency: the user's most common deal currency (USD if
@@ -32,6 +35,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import (
     ApiUsage,
+    BillableMeeting,
     Call,
     CampaignCost,
     Deal,
@@ -173,6 +177,22 @@ def report(session: Session, user_id, date_from: date, date_to: date) -> dict:
             if usd:
                 cost_items.append((_day(day), sid, cents, "voice"))
 
+    # Section E: pay-per-meeting fees are priced in USD like API and voice
+    # spend, so the same currency rule applies.
+    platform_usd_cents = 0
+    for day, sid, cents in session.execute(
+        select(func.date(BillableMeeting.occurred_at), BillableMeeting.strategy_id,
+               func.sum(BillableMeeting.amount_cents))
+        .where(BillableMeeting.user_id == user_id,
+               BillableMeeting.status.in_(("pending", "charged")),
+               BillableMeeting.occurred_at >= start, BillableMeeting.occurred_at < end)
+        .group_by(func.date(BillableMeeting.occurred_at), BillableMeeting.strategy_id)
+    ).all():
+        platform_usd_cents += int(cents or 0)
+        if usd:
+            cost_items.append((_day(day), sid, int(cents or 0),
+                               "platform" if sid else "shared"))
+
     # ---- per campaign ----------------------------------------------------
     total_sends = sum(sends.values())
     shared_total = sum(c for _, sid, c, kind in cost_items if kind == "shared")
@@ -190,7 +210,8 @@ def report(session: Session, user_id, date_from: date, date_to: date) -> dict:
         kinds = by_kind.get(sid, Counter())
         allocated = round(shared_total * sends.get(sid, 0) / total_sends) if total_sends else 0
         allocated_total += allocated
-        total_cost = kinds["direct"] + kinds["api"] + kinds["voice"] + allocated
+        total_cost = (kinds["direct"] + kinds["api"] + kinds["voice"] + kinds["platform"]
+                      + allocated)
         revenue = revenue_by.get(sid, 0)
         booked = meetings.get(sid, 0)
         won = won_count.get(sid, 0)
@@ -199,7 +220,8 @@ def report(session: Session, user_id, date_from: date, date_to: date) -> dict:
             "sends": sends.get(sid, 0), "meetings": booked, "deals_won": won,
             "revenue_cents": revenue,
             "direct_cost_cents": kinds["direct"], "api_cost_cents": kinds["api"],
-            "voice_cost_cents": kinds["voice"], "allocated_cost_cents": allocated,
+            "voice_cost_cents": kinds["voice"], "platform_cost_cents": kinds["platform"],
+            "allocated_cost_cents": allocated,
             "total_cost_cents": total_cost,
             "cost_per_meeting_cents": _per(total_cost, booked),
             "cost_per_deal_cents": _per(total_cost, won),
@@ -242,9 +264,11 @@ def report(session: Session, user_id, date_from: date, date_to: date) -> dict:
         "notes": {
             "excluded_deals": excluded_deals,
             "excluded_costs": excluded_costs,
-            "usd_costs_excluded": not usd and (api_usd_cents + voice_usd_cents) > 0,
+            "usd_costs_excluded": not usd and (api_usd_cents + voice_usd_cents
+                                               + platform_usd_cents) > 0,
             "api_cost_usd_cents": api_usd_cents,
             "voice_cost_usd_cents": voice_usd_cents,
+            "platform_fee_usd_cents": platform_usd_cents,
         },
         "api_usage": usage_breakdown(session, user_id, ids, start, end),
     }

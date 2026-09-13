@@ -291,6 +291,32 @@ class Settings(BaseSettings):
     RATE_LIMIT_GET: int = 300
     """Max GET endpoint calls per user per minute. Default: 300."""
 
+    RATE_LIMIT_OTP_SEND: int = 5
+    """Max SMS verification codes per HOUR, applied to TWO keys: the account
+    and the destination number. Every send costs money (Twilio bills per
+    segment) and an unlimited resend is an SMS-pumping fraud vector, so this is
+    a spend ceiling first. 5/hour covers a mistyped number plus two resends.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
+    RATE_LIMIT_OTP_VERIFY: int = 10
+    """Max code-verification attempts per account per 15 minutes. A six-digit
+    code has a million values; each code additionally dies after
+    PHONE_OTP_MAX_ATTEMPTS wrong guesses, so this bounds guessing ACROSS
+    resends rather than within one code.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
+    RATE_LIMIT_PUBLIC_SHARE: int = 120
+    """Max public ROI share-link views per client IP per hour. The dashboard is
+    unauthenticated by design (a link a founder forwards to a client), so the
+    limit is what stops it being used to brute-force tokens.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
     RATE_LIMIT_AUTH: int = 10
     # Feature 3: AI support chat messages per user per DAY. Every message
     # spends the account's Anthropic key, so this is a cost ceiling as much as

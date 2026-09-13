@@ -332,6 +332,99 @@ class Settings(BaseSettings):
     # would put every open tab into a tight connect/disconnect loop.
     crm_stream_max_seconds: int = 3600
 
+    # --- Identity & location verification (onboarding, migration 0039) ----
+    # Which IP-geolocation service answers "what country is this request
+    # from?" at onboarding. The answer is a RISK SIGNAL compared with the
+    # country the user declares -- a mismatch is flagged for admin review and
+    # never blocks signup (VPNs and travel are normal).
+    #   ipapi_co  https://ipapi.co   -- no key needed, ~1k lookups/day free
+    #   ipinfo    https://ipinfo.io  -- GEOLOCATION_API_KEY is the token
+    #   disabled  never look anything up (the test suite)
+    geolocation_provider: str = "ipapi_co"
+    geolocation_api_key: str = ""
+    geolocation_timeout_seconds: float = 4.0
+
+    # --- VPN / proxy / datacenter blocking at signup and login -------------
+    # UNSET MEANS "ON IN PRODUCTION, OFF EVERYWHERE ELSE" (see
+    # vpn_blocking_active below). Setting it explicitly wins in both
+    # directions, so a dev box can exercise the block and a production
+    # incident can switch it off with an env var and a restart.
+    vpn_block_enabled: bool | None = None
+    #   proxycheck      https://proxycheck.io (key optional; 1k/day without)
+    #   ipqualityscore  https://www.ipqualityscore.com (key required)
+    #   disabled        never classify (treated as clean)
+    vpn_detection_provider: str = "proxycheck"
+    vpn_detection_api_key: str = ""
+    vpn_detection_timeout_seconds: float = 4.0
+    # When the provider is DOWN: false (default) lets the request through and
+    # logs it, because failing closed turns a third-party outage into "nobody
+    # can log in". Set true only if a VPN getting through is the worse outcome.
+    vpn_detection_fail_closed: bool = False
+    # One lookup per IP per hour is plenty: an IP's VPN status does not change
+    # between a failed and a retried login, and every lookup spends quota.
+    vpn_detection_cache_seconds: int = 3600
+    # Comma-separated IPs that are never blocked (an office egress that a
+    # provider misclassifies as hosting, a monitoring probe).
+    vpn_allowlist_ips: str = ""
+
+    # --- Phone verification (SMS one-time code) ----------------------------
+    #   twilio   Twilio Messages API (TWILIO_* below)
+    #   console  log a MASKED notice, deliver nothing (local dev)
+    #   memory   in-process list the test suite reads the code from
+    # Explicit rather than inferred from which keys exist, for the same reason
+    # as email_provider: a typo'd key must fail loudly, not silently log codes.
+    sms_provider: str = "console"
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    # E.164 sender, or a Messaging Service SID (starts "MG").
+    twilio_from_number: str = ""
+    sms_send_timeout_seconds: float = 10.0
+    phone_otp_ttl_seconds: int = 600
+    phone_otp_max_attempts: int = 5
+    phone_otp_resend_cooldown_seconds: int = 60
+    # KILL SWITCH, matching REQUIRE_EMAIL_VERIFICATION: while true, accounts
+    # created after migration 0039 cannot start outreach, take a paid plan or
+    # mint public share links until their phone is verified.
+    require_phone_verification: bool = True
+
+    # --- Billing: Stripe (Section E, migration 0040) -----------------------
+    # EMPTY SECRET KEY = STUB MODE. Checkout activates the chosen plan locally
+    # and marks it is_stub; per-meeting charges are marked charged with
+    # is_stub. Every stub path logs "TODO: connect live Stripe keys". See
+    # BUILD_BLOCKERS.md.
+    stripe_secret_key: str = ""
+    # whsec_... from the Stripe dashboard webhook endpoint for /webhooks/stripe.
+    # EMPTY MEANS THE WEBHOOK IS CLOSED (503), never "accept unsigned events".
+    stripe_webhook_secret: str = ""
+    stripe_api_base: str = "https://api.stripe.com"
+    stripe_timeout_seconds: float = 20.0
+    # Optional pre-created recurring Price ids per monthly tier. Unset, checkout
+    # sends inline price_data built from app/core/billing_catalog.py, so the
+    # page and the charge cannot disagree.
+    stripe_price_starter: str = ""
+    stripe_price_growth: str = ""
+    stripe_price_scale: str = ""
+    stripe_price_enterprise: str = ""
+    # Seconds of clock skew tolerated on a Stripe-Signature timestamp.
+    stripe_webhook_tolerance_seconds: int = 300
+
+    # --- Feature A2: tamper-evident audit trail ----------------------------
+    # Base64 of a 32-byte Ed25519 seed that signs audit-trail exports. EMPTY =
+    # derived from SECRET_KEY (stable for a deployment). Set it explicitly
+    # before rotating SECRET_KEY, or reports signed earlier will no longer
+    # verify against GET /audit/public-key.
+    audit_signing_key: str = ""
+
+    @property
+    def billing_stub_mode(self) -> bool:
+        return not (self.stripe_secret_key or "").strip()
+
+    @property
+    def vpn_blocking_active(self) -> bool:
+        if self.vpn_block_enabled is not None:
+            return bool(self.vpn_block_enabled)
+        return (self.app_env or "").strip().lower() in {"production", "prod", "live"}
+
     @property
     def broker_url(self) -> str:
         return self.celery_broker_url or self.redis_url

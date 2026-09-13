@@ -6,11 +6,13 @@ import { useAuthStore } from "@/lib/stores/authStore";
 import { LogoMark } from "@/components/ui/Logo";
 import {
   Users, AlertCircle, Shield, BookOpen, Heart, Zap, List,
-  GraduationCap, LifeBuoy, KeyRound, SlidersHorizontal
+  GraduationCap, LifeBuoy, KeyRound, SlidersHorizontal, ShieldAlert
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin/users",            label: "Users",             icon: Users      },
+  // Section B: onboarding location mismatches awaiting a human decision.
+  { href: "/admin/identity-reviews", label: "Identity Reviews",  icon: ShieldAlert },
   { href: "/admin/task-errors",      label: "Task Errors",       icon: AlertCircle},
   { href: "/admin/circuit-breakers", label: "Circuit Breakers",  icon: Zap        },
   { href: "/admin/suppression-list", label: "Suppression List",  icon: List       },

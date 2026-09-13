@@ -139,6 +139,77 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
                     pass
 
 
+def record_meeting_usage(session: Session, outcome, *, now=None):
+    """Meter one booked meeting for a pay-per-meeting account (Section E).
+
+    Called from app/services/billing.py's before_flush listener for every new
+    Outcome(event=BOOKED), inside that flush and under no_autoflush. Adds (does
+    not commit) a BillableMeeting when the lead's owner currently pays per
+    meeting; otherwise does nothing. Returns the row or None.
+
+    Once per prospect: a lead already metered for this account -- in the
+    database or earlier in this same flush -- is not metered again. The UNIQUE
+    (user_id, dedupe_key) constraint backs that up at the schema level.
+
+    Model spend above is metered in micro-dollars against a scope; a meeting is
+    metered in whole cents against the ACCOUNT, because it is what the customer
+    is invoiced for rather than what the platform spent.
+    """
+    from datetime import datetime, timedelta, timezone  # noqa: PLC0415
+
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.core import billing_catalog  # noqa: PLC0415
+    from app.db.models import (  # noqa: PLC0415
+        BillableMeeting, BillingSubscription, Lead, Product, Strategy,
+    )
+
+    if outcome is None or outcome.lead_id is None:
+        return None
+    row = session.execute(
+        select(Product.user_id, Lead.strategy_id).select_from(Lead)
+        .join(Strategy, Strategy.id == Lead.strategy_id)
+        .join(Product, Product.id == Strategy.product_id)
+        .where(Lead.id == outcome.lead_id)
+    ).first()
+    if row is None:
+        return None
+    owner_id, strategy_id = row
+    sub = session.execute(
+        select(BillingSubscription).where(BillingSubscription.user_id == owner_id)
+    ).scalar_one_or_none()
+    if (sub is None or sub.billing_model != billing_catalog.PAY_PER_MEETING
+            or sub.status not in ("trialing", "active", "past_due")):
+        return None
+
+    key = str(outcome.lead_id)
+    if session.execute(select(BillableMeeting.id).where(
+            BillableMeeting.user_id == owner_id,
+            BillableMeeting.dedupe_key == key)).first() is not None:
+        return None
+    if any(isinstance(obj, BillableMeeting) and obj.user_id == owner_id
+           and obj.dedupe_key == key for obj in session.new):
+        return None
+
+    if outcome.id is None:
+        outcome.id = uuid.uuid4()  # the column default only fires at INSERT
+    now = now or datetime.now(timezone.utc)
+    plan = billing_catalog.PAY_PER_MEETING_PLAN
+    meeting = BillableMeeting(
+        user_id=owner_id, lead_id=outcome.lead_id, strategy_id=strategy_id,
+        outcome_id=outcome.id, dedupe_key=key,
+        source=str(outcome.channel or "booking")[:20],
+        amount_cents=billing_catalog.meeting_price_cents(),
+        currency=billing_catalog.CURRENCY, status="pending", occurred_at=now,
+        charge_after=now + timedelta(hours=int(plan["grace_hours"])),
+        is_stub=bool(sub.is_stub),
+    )
+    session.add(meeting)
+    logger.info("usage_meter: metered booked meeting for lead %s (account %s)",
+                outcome.lead_id, owner_id)
+    return meeting
+
+
 def owner_scope(session: Session, strategy, purpose: str):
     """scope() for a Strategy object, resolving its owner."""
     from app.services import notifications  # noqa: PLC0415

@@ -127,7 +127,12 @@ class TestPipelinePage:
     def test_bookings_trend_is_bucketed_by_day(self, client, db_session,
                                                funnel_data):
         lead = funnel_data["leads"][0]
-        now = datetime.now(timezone.utc)
+        # Anchored at noon UTC: with a raw now(), "a day ago" and "a day and
+        # two hours ago" straddle midnight whenever the suite runs between
+        # 00:00 and 02:00 UTC, and this test failed for exactly that window
+        # (observed 2026-09-13 00:31 UTC) while the bucketing was correct.
+        now = datetime.now(timezone.utc).replace(hour=12, minute=0, second=0,
+                                                 microsecond=0)
         db_session.add_all([
             m.Outcome(lead_id=lead.id, event=m.OutcomeEvent.BOOKED,
                       ts=now - timedelta(days=1)),

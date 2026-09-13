@@ -28,7 +28,9 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # Routes that are about the PERSON, not the workspace's data: they always
 # act as the signed-in user, whatever workspace is selected.
 PERSONAL_PREFIXES = ("/auth", "/me", "/devices", "/support", "/tutorials", "/onboarding",
-                     "/workspaces", "/branding")
+                     "/workspaces", "/branding",
+                     # Section E: a member buys/cancels only for their own account.
+                     "/billing")
 
 # Writes an SDR may not make: account plumbing and money.
 SDR_BLOCKED_PREFIXES = ("/integrations", "/webhooks/outbound", "/webhooks/targets", "/costs",

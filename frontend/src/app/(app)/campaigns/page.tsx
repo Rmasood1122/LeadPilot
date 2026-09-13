@@ -20,6 +20,7 @@ import { StrategyCalls } from "@/components/calls/CallHistory";
 import { FunnelHeatmap } from "@/components/campaigns/FunnelHeatmap";
 import { SendTimePanel } from "@/components/campaigns/SendTimePanel";
 import { SentimentTrend } from "@/components/campaigns/SentimentTrend";
+import { SequenceReviewPanel } from "@/components/campaigns/SequenceReviewPanel";
 import { pct } from "@/lib/utils";
 
 // --------------------------------------------------------------------------
@@ -399,6 +400,10 @@ function SequencesPanel({ strategyId }: { strategyId: string }) {
                 sends. Auto follow-up is separate: it fires when this step gets
                 no reply and nothing else is queued for that lead.
               </p>
+              {/* Feature A7: the red-team review that gates this sequence's launch. */}
+              <div className="mt-3">
+                <SequenceReviewPanel sequenceId={seq.id} />
+              </div>
             </CardContent>
           </Card>
         ))}

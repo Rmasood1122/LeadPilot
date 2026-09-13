@@ -81,11 +81,9 @@ export function PlanCard() {
             {!plan.playbook_access && upgradePlan.playbook_access ? " playbook learning," : ""}
             {" "}unlimited{upgradePlan.max_strategies === -1 ? " strategies" : ""} and more.
           </p>
-          <a
-            href={`mailto:upgrade@clienthunter.io?subject=Upgrade to ${upgradePlan.display_name}&body=Hi, I'd like to upgrade from ${plan.display_name ?? currentPlan} to ${upgradePlan.display_name}.`}
-            className="inline-block mt-1 text-primary text-xs underline"
-          >
-            Contact us to upgrade →
+          {/* Section E: self-serve checkout replaced the upgrade mailto. */}
+          <a href="/pricing" className="inline-block mt-1 text-primary text-xs underline">
+            Compare plans and upgrade →
           </a>
         </div>
       )}

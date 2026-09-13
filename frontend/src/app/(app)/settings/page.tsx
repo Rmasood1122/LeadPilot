@@ -25,9 +25,12 @@ import { CrmCards } from "@/components/settings/CrmCards";
 import { ApiKeysCard, WebhooksCard } from "@/components/settings/WebhooksCard";
 import { oauthResultMessage } from "@/lib/api/ecosystem";
 import { ComplianceAuditCard, DeliverabilityCard } from "@/components/settings/DeliverabilityCard";
+import { AuditTrailCard } from "@/components/settings/AuditTrailCard";
+import { ShareLinksCard } from "@/components/settings/ShareLinksCard";
 import { cn } from "@/lib/utils";
 
-type SettingsTab = "appearance" | "voice" | "integrations" | "deliverability" | "suppression";
+type SettingsTab = "appearance" | "voice" | "integrations" | "deliverability" | "sharing"
+  | "suppression";
 
 // ------------------------------------------------------------------ Theme --
 
@@ -472,7 +475,7 @@ function SuppressionViewer() {
 // -------------------------------------------------------------------  Main
 
 const SETTINGS_TABS: SettingsTab[] = ["appearance", "voice", "integrations", "deliverability",
-                                      "suppression"];
+                                      "sharing", "suppression"];
 
 export default function SettingsPage() {
   // Feature Group 4: the Slack / HubSpot / Salesforce OAuth callbacks land on
@@ -513,8 +516,12 @@ export default function SettingsPage() {
         <div className="space-y-3">
           <DeliverabilityCard />
           <ComplianceAuditCard />
+          {/* Feature A2: the hash-chained activity trail + signed export. */}
+          <AuditTrailCard />
         </div>
       )}
+      {/* Feature A6: client-facing ROI dashboard links. */}
+      {tab === "sharing" && <ShareLinksCard />}
       {tab === "suppression" && <SuppressionViewer />}
     </div>
   );

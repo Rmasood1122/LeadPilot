@@ -10,6 +10,13 @@ export interface UserOut {
    *  the dashboard. Optional because a cached response from a backend that
    *  predates the feature will not carry it. */
   email_verified?: boolean;
+  /** Identity onboarding (migration 0039). True only for accounts created
+   *  after it shipped; the Shell routes those to /onboarding/verify until the
+   *  identity questions are answered and the phone is verified. Optional for
+   *  the same backward-compat reason as email_verified. */
+  identity_required?: boolean;
+  identity_complete?: boolean;
+  phone_verified?: boolean;
 }
 
 export interface TokenBundle {

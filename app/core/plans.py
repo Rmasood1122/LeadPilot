@@ -74,6 +74,57 @@ PLANS: dict[str, dict[str, Any]] = {
         "display_name": "Starter",
         "upgrade_to": "pro",
     },
+    # Section E (app/core/billing_catalog.py): the four monthly tiers are
+    # starter -> growth -> scale -> enterprise. `pro` is no longer sold; it
+    # stays so accounts already on it keep exactly what they have.
+    "growth": {
+        "max_strategies": 25,
+        "max_leads_per_strategy": 2500,
+        "max_sequence_steps": 15,
+        "channels": ["gmail", "whatsapp", "linkedin"],
+        "ab_testing": True,
+        "playbook_access": True,
+        "multi_variate": True,
+        "website_builder": True,
+        "max_site_pages": 25,
+        "api_rate_limit_multiplier": 3.0,
+        "analytics_history_days": 365,
+        "display_name": "Growth",
+        "upgrade_to": "scale",
+    },
+    "scale": {
+        "max_strategies": -1,
+        "max_leads_per_strategy": 10000,
+        "max_sequence_steps": -1,
+        "channels": ["gmail", "whatsapp", "linkedin", "phone"],
+        "ab_testing": True,
+        "playbook_access": True,
+        "multi_variate": True,
+        "website_builder": True,
+        "max_site_pages": -1,
+        "api_rate_limit_multiplier": 5.0,
+        "analytics_history_days": -1,
+        "display_name": "Scale",
+        "upgrade_to": "enterprise",
+    },
+    # Section E option 2: no monthly fee, billed per booked meeting. Growth's
+    # channels and testing, with tighter volume caps -- the account pays per
+    # outcome, so the caps bound the platform's own sending cost.
+    "pay_per_meeting": {
+        "max_strategies": 10,
+        "max_leads_per_strategy": 1000,
+        "max_sequence_steps": 10,
+        "channels": ["gmail", "whatsapp", "linkedin"],
+        "ab_testing": True,
+        "playbook_access": True,
+        "multi_variate": False,
+        "website_builder": False,
+        "max_site_pages": 0,
+        "api_rate_limit_multiplier": 2.0,
+        "analytics_history_days": 365,
+        "display_name": "Pay per meeting",
+        "upgrade_to": "growth",
+    },
     "pro": {
         "max_strategies": -1,
         "max_leads_per_strategy": -1,
@@ -95,13 +146,13 @@ PLANS: dict[str, dict[str, Any]] = {
         "max_strategies": -1,
         "max_leads_per_strategy": -1,
         "max_sequence_steps": -1,
-        "channels": ["gmail", "whatsapp"],
+        "channels": ["gmail", "whatsapp", "linkedin", "phone"],
         "ab_testing": True,
         "playbook_access": True,
         "multi_variate": True,
         "website_builder": True,
         "max_site_pages": -1,
-        "api_rate_limit_multiplier": 5.0,
+        "api_rate_limit_multiplier": 10.0,
         "analytics_history_days": -1,
         "display_name": "Enterprise",
         "upgrade_to": None,
@@ -110,8 +161,12 @@ PLANS: dict[str, dict[str, Any]] = {
 
 _PLAN_UPGRADE_PATH = {
     "free": "starter",
-    "starter": "pro",
+    "starter": "growth",
+    "growth": "scale",
+    "scale": "enterprise",
+    "pay_per_meeting": "growth",
     "pro": None,
+    "enterprise": None,
 }
 
 

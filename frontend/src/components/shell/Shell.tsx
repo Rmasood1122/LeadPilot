@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/ui/Logo";
 import { ChatWidget } from "@/components/support/ChatWidget";
 import { useBranding } from "@/lib/branding";
+import { isPhoneDeferred, needsVerification } from "@/lib/identity";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
@@ -50,6 +51,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
           router.replace(`/check-email?email=${encodeURIComponent(user.email)}`);
           return;
         }
+        // Migration 0039: accounts created since then answer the identity
+        // questions and verify a phone before the dashboard. Pre-0039
+        // accounts carry identity_required=false and never land here.
+        if (!pathname.startsWith("/onboarding/verify")
+            && needsVerification(user, isPhoneDeferred())) {
+          router.replace("/onboarding/verify");
+          setReady(true);
+          return;
+        }
         setReady(true);
       })
       .catch((err) => {
@@ -67,6 +77,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
+    // pathname is read once per mount on purpose: re-running /auth/me on
+    // every navigation would add a request to every page change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   if (!ready) return null;

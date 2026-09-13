@@ -57,6 +57,13 @@ from app.api.tool_integrations import router as tool_integrations_router  # Aegi
 from app.api.website_builder import router as website_builder_router  # SEO site
 from app.api.workspaces import router as workspaces_router             # FG8
 from app.api.trust import router as trust_router                       # FG9
+from app.api.billing import router as billing_router                   # Section E
+from app.api.claims import router as claims_router                     # Feature A1
+from app.api.audit import router as audit_router                       # Feature A2
+from app.api.conversations import router as conversations_router       # Feature A4
+from app.api.conversion import router as conversion_router             # Feature A5
+from app.api.share_links import router as share_links_router           # Feature A6
+from app.api.sequence_reviews import router as sequence_reviews_router # Feature A7
 
 # M7
 from app.api.devices import router as devices_router
@@ -78,6 +85,18 @@ from app.api.strategies_advanced import plans_router
 from app.services.crm_events import install as _install_crm_events
 
 _install_crm_events()
+
+# Section E: registers the before_flush listener that meters booked meetings
+# for pay-per-meeting accounts. Imported for its side effect, like the line above.
+from app.services.billing import install as _install_billing_meter  # noqa: E402
+
+_install_billing_meter()
+
+# Feature A2: the before_flush listener that records every send/open/click/
+# reply/booking into the hash-chained audit trail, and its append-only guard.
+from app.services.audit_trail import install as _install_audit_trail  # noqa: E402
+
+_install_audit_trail()
 
 from app.core.errors import global_exception_handler
 from app.core.logging import RequestIDMiddleware
@@ -225,6 +244,28 @@ app.include_router(website_builder_router)        # /site/* incl. public sitemap
 app.include_router(crm_integrations_router)      # FG4: HubSpot / Salesforce + their webhooks
 app.include_router(workspaces_router)            # FG8: /workspaces/*, public /branding
 app.include_router(trust_router)                 # FG9: /deliverability, /compliance/audit
+# Section E. /billing/* and /webhooks/stripe are new paths; /admin/billing/* is
+# not declared by app/api/admin.py. /billing/catalog and the signature-verified
+# /webhooks/stripe are the only unauthenticated routes it adds.
+app.include_router(billing_router)               # /billing/*, /webhooks/stripe
+# Feature A1. /leads/{id}/claim-checks is a new sub-path; /claim-checks is new.
+app.include_router(claims_router)                # /leads/{id}/claim-checks, /claim-checks/summary
+# Feature A2. /audit/* is new. /audit/public-key and /audit/verify are
+# unauthenticated by design (the buyer verifying a report has no account).
+app.include_router(audit_router)                 # /audit/trail*, /audit/public-key, /audit/verify
+# Feature A4. /leads/{id}/conversation and /leads/{id}/channel-suggestions are
+# new sub-paths; /channel-suggestions is a new prefix.
+app.include_router(conversations_router)         # unified thread + stagnation suggestions
+# Feature A5. /leads/{id}/conversion*, /conversion/at-risk and
+# /strategies/{id}/channel-performance are new paths (no collision with
+# strategies.py / strategies_advanced.py, checked by route enumeration).
+app.include_router(conversion_router)            # live conversion probability + kill signals
+# Feature A6. /share-links is new; /public/roi/{token} is the one
+# unauthenticated route it adds (256-bit token, per-IP limit, uniform 404).
+app.include_router(share_links_router)           # /share-links, /public/roi/{token}
+# Feature A7. /sequences/{id}/review* are new sub-paths under sequences.py's
+# /sequences/{id} (GET) -- a longer literal path, so no collision.
+app.include_router(sequence_reviews_router)      # pre-send adversarial review
 
 
 # ---------------------------------------------------------------------------
