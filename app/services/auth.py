@@ -81,16 +81,33 @@ def verify_password(password: str, stored: str | None) -> bool:
 # --------------------------------------------------------------------------
 
 
-def _issue(user_id: uuid.UUID, typ: str, ttl_seconds: int) -> str:
+def _issue(user_id: uuid.UUID, typ: str, ttl_seconds: int,
+           extra: dict | None = None) -> str:
     now = datetime.now(timezone.utc)
     return jwt.encode(
-        {"sub": str(user_id), "typ": typ, "iat": now,
+        {**(extra or {}), "sub": str(user_id), "typ": typ, "iat": now,
          "exp": now + timedelta(seconds=ttl_seconds)},
         _secret(), algorithm="HS256",
     )
 
 
+def issue_access_token(user_id: uuid.UUID) -> str:
+    return _issue(user_id, "access", settings.jwt_access_ttl_seconds)
+
+
+def issue_refresh_token(user_id: uuid.UUID, *, session_id: uuid.UUID,
+                        family_id: uuid.UUID, ttl_seconds: int) -> str:
+    """A refresh token bound to an auth_sessions row (jti) -- see
+    app/services/auth_sessions.py, the only caller."""
+    return _issue(user_id, "refresh", ttl_seconds,
+                  {"jti": str(session_id), "fam": str(family_id)})
+
+
 def issue_tokens(user_id: uuid.UUID) -> dict:
+    """STATELESS token pair (no server-side session). Kept for callers that
+    only need an access token -- tests, scripts. Anything that signs a person
+    in uses auth_sessions.issue_session_tokens instead, so the refresh token
+    can be rotated and revoked."""
     return {
         "access_token": _issue(user_id, "access",
                                settings.jwt_access_ttl_seconds),
@@ -101,9 +118,11 @@ def issue_tokens(user_id: uuid.UUID) -> dict:
     }
 
 
-def decode_token(token: str, expected_typ: str) -> uuid.UUID:
+def decode_token_payload(token: str, expected_typ: str, *,
+                         verify_exp: bool = True) -> dict:
     try:
-        payload = jwt.decode(token, _secret(), algorithms=["HS256"])
+        payload = jwt.decode(token, _secret(), algorithms=["HS256"],
+                             options={"verify_exp": verify_exp})
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="token expired")
     except jwt.InvalidTokenError:
@@ -111,7 +130,15 @@ def decode_token(token: str, expected_typ: str) -> uuid.UUID:
     if payload.get("typ") != expected_typ:
         raise HTTPException(status_code=401,
                             detail=f"not a {expected_typ} token")
-    return uuid.UUID(payload["sub"])
+    try:
+        uuid.UUID(str(payload.get("sub")))
+    except ValueError:
+        raise HTTPException(status_code=401, detail="invalid token")
+    return payload
+
+
+def decode_token(token: str, expected_typ: str) -> uuid.UUID:
+    return uuid.UUID(decode_token_payload(token, expected_typ)["sub"])
 
 
 # --------------------------------------------------------------------------

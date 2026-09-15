@@ -132,7 +132,34 @@ class Settings(BaseSettings):
     # generated a fresh random secret and logged every user out.)
     jwt_secret: str = Field(default="", alias="SECRET_KEY")  # REQUIRED in production
     jwt_access_ttl_seconds: int = 900
-    jwt_refresh_ttl_seconds: int = 1209600  # 14 days
+    # Persistent sign-in ("keep me signed in"). A SLIDING window: every
+    # refresh rotates the token and restarts it, so an account in regular use
+    # is never asked to sign in again, while one left idle this long is.
+    jwt_refresh_ttl_seconds: int = 2592000  # 30 days
+    # "Keep me signed in" unticked: the cookie is a browser-session cookie and
+    # the server-side session also dies after this long, whichever is first.
+    auth_ephemeral_session_ttl_seconds: int = 43200  # 12 hours
+    # Web clients receive the refresh token ONLY as an HttpOnly cookie (see
+    # app/services/auth_sessions.py). PATH scopes it to the refresh/logout
+    # routes -- set it to e.g. /api/v1/auth when a proxy mounts the API under a
+    # prefix. DOMAIN empty = host-only. SAMESITE lax suits a frontend and API
+    # on the same site (leadpilot.com + api.leadpilot.com); a frontend on a
+    # different site needs "none", which forces Secure.
+    auth_refresh_cookie_name: str = "lp_refresh"
+    auth_refresh_cookie_path: str = "/auth"
+    auth_refresh_cookie_domain: str = ""
+    auth_refresh_cookie_samesite: str = "lax"
+    # None = Secure in production, not in development (http://localhost).
+    auth_refresh_cookie_secure: bool | None = None
+    # Two tabs refreshing at the same moment present the same token; the loser
+    # of that race is inside this window and gets an access token instead of
+    # tripping reuse detection (which would sign the user out everywhere).
+    auth_refresh_reuse_grace_seconds: int = 30
+    # Refresh tokens issued before server-side sessions existed carry no
+    # session id. Accepting them (once -- they are exchanged for a tracked
+    # session) keeps everyone signed in across the deploy. Turn this off once
+    # jwt_refresh_ttl_seconds has passed since that deploy.
+    auth_accept_legacy_refresh_tokens: bool = True
     # Where theme background images are stored + served from.
     media_dir: str = "media"
 
@@ -436,6 +463,21 @@ class Settings(BaseSettings):
     @property
     def is_test(self) -> bool:
         return self.app_env == "test"
+
+    @property
+    def refresh_cookie_samesite(self) -> str:
+        value = (self.auth_refresh_cookie_samesite or "").strip().lower()
+        return value if value in {"lax", "strict", "none"} else "lax"
+
+    @property
+    def refresh_cookie_secure(self) -> bool:
+        # Browsers drop a SameSite=None cookie that is not Secure, so "none"
+        # always implies it regardless of the explicit setting.
+        if self.refresh_cookie_samesite == "none":
+            return True
+        if self.auth_refresh_cookie_secure is not None:
+            return bool(self.auth_refresh_cookie_secure)
+        return (self.app_env or "").strip().lower() in {"production", "prod", "live"}
 
 
 @lru_cache

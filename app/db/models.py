@@ -4062,3 +4062,83 @@ class ComplianceRule(TimestampMixin, Base):
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+
+# --------------------------------------------------------------------------
+# Persistent sign-in sessions + security audit log (migration 0052)
+# --------------------------------------------------------------------------
+
+
+class AuthSession(Base):
+    """One refresh token, as the server remembers it.
+
+    The row id IS the refresh JWT's `jti`, so a token can be revoked (logout)
+    and a replayed one recognised. Every refresh ROTATES: this row is marked
+    revoked_reason="rotated" and a new row in the same `family_id` replaces
+    it. Presenting a rotated token again after the grace window is the
+    signature of a stolen token, and revokes the whole family -- the thief and
+    the victim are both signed out, and the victim signs back in.
+
+    The raw token is never stored: it is a signed JWT whose only secret part is
+    the signature, and the jti alone cannot be turned back into one.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    family_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True, nullable=False)
+    # False = "keep me signed in" was unticked (short server-side lifetime and
+    # a browser-session cookie).
+    persistent: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # rotated | logout | reuse_detected
+    revoked_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SecurityAuditEvent(Base):
+    """Security-relevant account actions: destructive deletes, denied password
+    confirmations, refresh-token reuse, sign-outs.
+
+    Distinct from ActivityAuditEvent (the hash-chained send/reply trail a buyer
+    verifies) -- this one answers "who did what to this account, and when".
+    NO FOREIGN KEYS, on purpose: the record of a deletion must outlive both the
+    deleted row and, if it comes to that, the account that deleted it.
+
+    user_id is the person who signed in (the ACTOR); owner_user_id is whose
+    data it was, which differs when a workspace member acts on the owner's
+    records (app/services/auth.py::_workspace_principal).
+    """
+
+    __tablename__ = "security_audit_events"
+    __table_args__ = (
+        Index("ix_security_audit_events_user_created", "user_id", "created_at"),
+        Index("ix_security_audit_events_target", "target_type", "target_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    # strategy.deleted | strategy.delete_denied | auth.logout | auth.refresh_reuse_detected
+    action: Mapped[str] = mapped_column(String(60), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    target_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    details_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

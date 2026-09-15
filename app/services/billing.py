@@ -522,6 +522,46 @@ def usage_summary(db: Session, user: User, now: datetime | None = None) -> dict:
     }
 
 
+def plan_access(db: Session, user: User) -> dict:
+    """Does this account have a plan that lets it use the product?
+
+    Returned on every sign-in, refresh and /auth/me, computed from the
+    database each time rather than cached on the token. The frontend sends a
+    user without one to /pricing straight after an explicit sign-in only.
+
+    True when any of:
+      * its own subscription is in a GRANTING status (trialing counts: the
+        trial IS a purchased plan -- a card or checkout was completed);
+      * users.plan is not free -- _sync_plan keeps it in step with the
+        subscription, and it also covers plans set before billing existed
+        (legacy pro/enterprise rows) or granted by an operator;
+      * it is an operator (is_admin), who must reach the admin panel;
+      * it is a member of someone else's workspace whose OWNER has a plan --
+        a member works on the owner's account and is never asked to buy one.
+    """
+    sub = get_subscription(db, user.id)
+    status = sub.status if sub is not None else None
+    plan = str(getattr(user.plan, "value", user.plan) or "free")
+    active = status in GRANTING or plan != PlanTier.FREE.value or bool(user.is_admin)
+    if not active:
+        from app.db.models import Workspace, WorkspaceMember  # noqa: PLC0415
+
+        owners = db.execute(
+            select(User.plan, BillingSubscription.status)
+            .select_from(WorkspaceMember)
+            .join(Workspace, Workspace.id == WorkspaceMember.workspace_id)
+            .join(User, User.id == Workspace.owner_user_id)
+            .outerjoin(BillingSubscription, BillingSubscription.user_id == User.id)
+            .where(WorkspaceMember.user_id == user.id, Workspace.owner_user_id != user.id)
+        ).all()
+        active = any(
+            owner_status in GRANTING
+            or str(getattr(owner_plan, "value", owner_plan) or "free") != PlanTier.FREE.value
+            for owner_plan, owner_status in owners
+        )
+    return {"has_active_plan": bool(active), "subscription_status": status}
+
+
 def overview(db: Session, user: User) -> dict:
     return {
         "plan": getattr(user.plan, "value", user.plan) or "free",
