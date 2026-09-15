@@ -17,14 +17,23 @@ export interface UserOut {
   identity_required?: boolean;
   identity_complete?: boolean;
   phone_verified?: boolean;
+  /** Whether the account has a purchased (or trialing) plan, read from the
+   *  database on every sign-in, refresh and /auth/me. False routes the user
+   *  to /pricing. Optional for the same backward-compat reason as
+   *  email_verified: absent means "unknown", which never gates anyone. */
+  has_active_plan?: boolean;
+  subscription_status?: string | null;
 }
 
 export interface TokenBundle {
   user: UserOut;
   access_token: string;
-  refresh_token: string;
+  /** Native / SDK clients only. The web app receives it as an HttpOnly cookie
+   *  and never sees it; a grace-window refresh omits it for everyone. */
+  refresh_token?: string;
   token_type: string;
   expires_in: number;
+  session_persistent?: boolean;
   /** Present on the /auth/signup response only. */
   email_verification_required?: boolean;
   /** False when the account was created but the mail transport was down —

@@ -18,11 +18,41 @@
 
 import {
   clearSession as clearAuthSession,
+  getAccessToken,
   getAccessTokenSync,
   getRefreshToken,
+  removeStoredRefreshToken,
+  setAccessToken,
   setSession,
 } from "../auth-session";
+import { isNative } from "../platform";
 import { WORKSPACE_HEADER, getActiveWorkspace, setActiveWorkspace } from "../workspace";
+
+/** PERSISTENT SIGN-IN
+ *
+ *  Web: the refresh token is an HttpOnly, Secure, SameSite cookie the API sets
+ *  on /auth/login, /auth/signup and /auth/refresh. Script never sees it. Every
+ *  request to /auth/* is sent with `credentials: "include"` and the
+ *  X-Auth-Transport header — the API reads the cookie ONLY when that header is
+ *  present, which is what stops another site from driving those routes with
+ *  the user's cookie (it cannot send a custom header past CORS).
+ *
+ *  Native (Capacitor): cookies in a WebView are unreliable across app restarts,
+ *  so the refresh token stays in OS storage and travels in the request body,
+ *  exactly as before.
+ *
+ *  Either way, restoreSession() turns "no access token in this tab" into a
+ *  silent refresh, so a returning user is signed straight back in. */
+export const AUTH_TRANSPORT_HEADER = "X-Auth-Transport";
+
+export function usesCookieTransport(): boolean {
+  return !isNative();
+}
+
+function authRouteInit(path: string): { headers: Record<string, string>; credentials?: RequestCredentials } {
+  if (!path.startsWith("/auth/") || !usesCookieTransport()) return { headers: {} };
+  return { headers: { [AUTH_TRANSPORT_HEADER]: "cookie" }, credentials: "include" };
+}
 
 export class ApiError extends Error {
   status: number;
@@ -60,30 +90,68 @@ if (!API_URL && process.env.NODE_ENV === "production") {
 
 export const BASE = API_URL ?? "http://localhost:8000";
 
-export function saveSession(tokens: { access_token: string; refresh_token: string }) {
-  // Fire-and-forget is fine here: callers (login/signup) already await the
-  // network request before this runs, and storage.set() on web is a
-  // synchronous sessionStorage write wrapped in a resolved promise — by
-  // the time the caller's next `await` (or the redirect) runs, it's done.
+// Refresh a minute before the access token expires, so an active user never
+// has a request bounce off a 401 first. The 401 path below remains the
+// backstop (a laptop that slept through the timer, a revoked session).
+const PROACTIVE_REFRESH_LEAD_SECONDS = 60;
+let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleProactiveRefresh(expiresIn?: number) {
+  if (typeof window === "undefined" || !expiresIn || expiresIn <= 0) return;
+  if (proactiveRefreshTimer) clearTimeout(proactiveRefreshTimer);
+  const delayMs = Math.max(expiresIn - PROACTIVE_REFRESH_LEAD_SECONDS, 30) * 1000;
+  proactiveRefreshTimer = setTimeout(() => {
+    proactiveRefreshTimer = null;
+    void refreshSession();
+  }, delayMs);
+}
+
+export function saveSession(tokens: {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+}) {
+  // Fire-and-forget is fine here: the access token is cached in memory
+  // synchronously inside setSession, before its first await, so the caller's
+  // next request already carries it.
+  const native = !usesCookieTransport();
   void setSession({
     accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token,
+    // Web never stores a refresh token: the API put it in an HttpOnly cookie.
+    refreshToken: native ? tokens.refresh_token : undefined,
   });
+  if (!native) void removeStoredRefreshToken();
+  scheduleProactiveRefresh(tokens.expires_in);
 }
 
 export function clearSession() {
+  if (proactiveRefreshTimer) {
+    clearTimeout(proactiveRefreshTimer);
+    proactiveRefreshTimer = null;
+  }
   void clearAuthSession();
 }
 
-/** Synchronous by necessity — several call sites (route guards run in
- * layout effects, before any async storage read could resolve) need an
- * immediate answer. Uses auth-session.ts's documented sync shim, which
- * reads sessionStorage directly on web. On native this returns false even
- * when a session exists (Preferences is native-async-only) — a known gap;
- * TODO: migrate Shell.tsx / app/page.tsx / authStore.ts / ThemeProvider.tsx
- * to the async hasSession() in auth-session.ts for correct native behavior. */
+/** Synchronous: is there an access token in THIS tab right now? A returning
+ *  visitor has none until restoreSession() has run, so route guards must use
+ *  restoreSession(); this stays for render-time checks that must not wait. */
 export function hasSession(): boolean {
   return !!getAccessTokenSync();
+}
+
+/** Resolve to whether the user is signed in, silently restoring the session
+ *  from the refresh credential when this tab has no access token yet. Safe to
+ *  call from every guard at once: concurrent calls share one refresh. */
+export async function restoreSession(): Promise<boolean> {
+  if (getAccessTokenSync()) return true;
+  if (!usesCookieTransport()) {
+    const stored = await getAccessToken();
+    if (stored) {
+      await setAccessToken(stored); // warm the in-memory copy for sync readers
+      return true;
+    }
+  }
+  return refreshSession();
 }
 
 /** Normalize any backend/network failure into ApiError with a human
@@ -108,18 +176,46 @@ export async function normalizeError(resp: Response): Promise<ApiError> {
   return new ApiError(resp.status, detail);
 }
 
-async function tryRefresh(): Promise<boolean> {
-  const refresh = await getRefreshToken();
-  if (!refresh) return false;
-  const resp = await fetch(`${BASE}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refresh }),
-  });
-  if (!resp.ok) {
+let refreshInflight: Promise<boolean> | null = null;
+
+/** Exchange the refresh credential for a new access token.
+ *
+ *  SINGLE-FLIGHT. The API rotates the refresh token on every use, so five
+ *  requests hitting 401 at once must not become five refreshes — four of them
+ *  would present an already-rotated token. They all await this one promise.
+ *
+ *  Only a 401 ends the session. A network error or a 5xx is transient: signing
+ *  the user out because the API blipped would be the opposite of "stay signed
+ *  in", so the session is kept and the caller's request fails normally. */
+export function refreshSession(): Promise<boolean> {
+  if (!refreshInflight) {
+    refreshInflight = performRefresh().finally(() => {
+      refreshInflight = null;
+    });
+  }
+  return refreshInflight;
+}
+
+async function performRefresh(): Promise<boolean> {
+  const init = authRouteInit("/auth/refresh");
+  let body: string | undefined;
+  if (!usesCookieTransport()) {
+    const refresh = await getRefreshToken();
+    if (!refresh) return false;
+    body = JSON.stringify({ refresh_token: refresh });
+    init.headers["Content-Type"] = "application/json";
+  }
+  let resp: Response;
+  try {
+    resp = await fetch(`${BASE}/auth/refresh`, { method: "POST", body, ...init });
+  } catch {
+    return false;
+  }
+  if (resp.status === 401) {
     clearSession();
     return false;
   }
+  if (!resp.ok) return false;
   saveSession(await resp.json());
   return true;
 }
@@ -133,7 +229,7 @@ export interface RequestOptions {
 
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const doFetch = async () => {
-    const headers: Record<string, string> = {};
+    const { headers, credentials } = authRouteInit(path);
     if (!opts.formData) headers["Content-Type"] = "application/json";
     if (opts.auth !== false) {
       const token = getAccessTokenSync();
@@ -147,11 +243,12 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
       method: opts.method ?? (opts.body || opts.formData ? "POST" : "GET"),
       headers,
       body: opts.formData ?? (opts.body ? JSON.stringify(opts.body) : undefined),
+      ...(credentials ? { credentials } : {}),
     });
   };
 
   let resp = await doFetch();
-  if (resp.status === 401 && opts.auth !== false && (await tryRefresh())) {
+  if (resp.status === 401 && opts.auth !== false && (await refreshSession())) {
     resp = await doFetch();
   }
   if (!resp.ok) {

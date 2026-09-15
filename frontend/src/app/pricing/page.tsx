@@ -13,11 +13,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarCheck2, Check, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
-import { ApiError, hasSession } from "@/lib/api/client";
+import { ApiError, restoreSession } from "@/lib/api/client";
+import { me } from "@/lib/api/auth";
 import { billingApi } from "@/lib/api/billing";
 import { PHONE_NOT_VERIFIED } from "@/lib/identity";
 import {
@@ -34,6 +35,17 @@ import { cn } from "@/lib/utils";
 
 export default function PricingPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  // Signed-in state (and whether the account already has a plan). Restores a
+  // persistent session first, so a returning visitor is recognised here too.
+  const { data: viewer } = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: async () => ((await restoreSession()) ? me() : null),
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+  const signedIn = !!viewer;
+  const needsPlan = viewer?.has_active_plan === false;
   const { data: catalog, isLoading, isError } = useQuery({
     queryKey: ["billing", "catalog"],
     queryFn: billingApi.catalog,
@@ -52,6 +64,7 @@ export default function PricingPage() {
         return;
       }
       toast.success("Your plan is active.");
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
       router.push("/settings?billing=success");
     },
     onError: (err) => {
@@ -65,7 +78,7 @@ export default function PricingPage() {
   });
 
   function choose(model: "monthly" | "pay_per_meeting", tier?: string) {
-    if (!hasSession()) {
+    if (!signedIn) {
       router.push("/signup");
       return;
     }
@@ -83,8 +96,8 @@ export default function PricingPage() {
         <Link href="/" className="flex items-center gap-2 font-semibold">
           <LogoMark size={22} /> LeadPilot
         </Link>
-        <Link href={hasSession() ? "/pipeline" : "/login"} className="text-sm underline">
-          {hasSession() ? "Back to app" : "Sign in"}
+        <Link href={signedIn ? "/pipeline" : "/login"} className="text-sm underline">
+          {signedIn ? "Back to app" : "Sign in"}
         </Link>
       </header>
 
@@ -94,6 +107,11 @@ export default function PricingPage() {
           <p className="mt-3 text-muted-foreground">
             A predictable monthly plan, or pay only when a prospect books a meeting.
           </p>
+          {needsPlan && (
+            <p role="status" className="mt-4 rounded-lg border border-border bg-card p-3 text-sm">
+              Welcome, {viewer?.email}. Choose a plan to start using LeadPilot.
+            </p>
+          )}
         </div>
 
         {isLoading && <p className="text-center text-muted-foreground">Loading plans…</p>}

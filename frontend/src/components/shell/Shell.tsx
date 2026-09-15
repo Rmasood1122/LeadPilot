@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu } from "lucide-react";
 import { NAV } from "./nav";
 import { cn } from "@/lib/utils";
-import { hasSession } from "@/lib/api/client";
+import { restoreSession } from "@/lib/api/client";
 import { isUnverifiedError, logout, me } from "@/lib/api/auth";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/ui/Logo";
@@ -17,7 +17,9 @@ import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
- *  gate: no session -> /login, unverified email -> /check-email. */
+ *  gate: no session (after a silent restore attempt) -> /login, unverified
+ *  email -> /check-email. The plan check is NOT here: it runs once, straight
+ *  after sign-in (see lib/post-login.ts). */
 export function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -30,10 +32,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
     : <LogoMark size={22} />;
 
   useEffect(() => {
-    if (!hasSession()) {
-      router.replace("/login");
-      return;
-    }
+    let mounted = true;
     // A session is not the same as a usable account. Someone can arrive here
     // with valid tokens and an unverified address -- a bookmarked /pipeline, a
     // second tab, a restored mobile session -- and every data fetch on the
@@ -43,9 +42,16 @@ export function Shell({ children }: { children: React.ReactNode }) {
     // GET /auth/me is the cheapest request that goes through the same
     // get_current_user dependency as everything else, so it gives the same
     // answer the rest of the page would get, once, before anything renders.
-    let mounted = true;
-    me()
+    restoreSession()
+      .then((signedIn) => {
+        if (!signedIn) {
+          if (mounted) router.replace("/login");
+          return null;
+        }
+        return me();
+      })
       .then((user) => {
+        if (!user) return;
         if (!mounted) return;
         if (user.email_verified === false) {
           router.replace(`/check-email?email=${encodeURIComponent(user.email)}`);
@@ -130,8 +136,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             variant="ghost"
             className="w-full justify-start gap-3"
             onClick={() => {
-              logout();
-              router.replace("/login");
+              void logout().then(() => router.replace("/login"));
             }}
           >
             <LogOut size={18} aria-hidden="true" />
