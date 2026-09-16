@@ -13,6 +13,7 @@ import {
 import { AsyncState } from "@/components/ui/skeleton";
 import { BenchmarkPanel } from "@/components/analytics/BenchmarkPanel";
 import { ReplyQualityPanel } from "@/components/analytics/ReplyQualityPanel";
+import { CompletionPanel } from "@/components/analytics/CompletionPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -83,6 +84,9 @@ export default function AnalyticsPage() {
 
         {/* Part 1 Feature 1: positive reply rate beside the raw reply rate. */}
         <ReplyQualityPanel strategyId={effectiveId || undefined} />
+
+        {/* Part 1 Feature 3: did enrolled prospects get the whole sequence? */}
+        <CompletionPanel strategyId={effectiveId || undefined} />
 
         <Card aria-label="Volume over time">
           <CardHeader><CardTitle className="text-sm">Messages sent over time</CardTitle></CardHeader>

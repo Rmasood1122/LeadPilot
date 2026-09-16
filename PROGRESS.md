@@ -16,7 +16,7 @@ Each feature below moves through: **migration → service → API → frontend �
 |---|---------|--------|
 | 1 | Positive Reply Classifier | **done** (0053) |
 | 2 | F-P-T-A Scoring Engine | **done** (0054) |
-| 3 | Sequence Completion Guarantee + metric | not started |
+| 3 | Sequence Completion Guarantee + metric | **done** (0055) |
 | 4 | Deliverability Health Score (per mailbox) | not started |
 | 5 | Human Review Queue for high-risk sends | not started |
 | 6 | Unified Cross-Channel Inbox | not started |
@@ -88,6 +88,29 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 — Feature 3 done.** Migration `0055_sequence_completion`
+  (`planned_steps`, `steps_sent`, `completed_at`, `stopped_at`,
+  `stop_category` on `sequence_enrollments`),
+  `app/services/sequence_completion.py`, `stop_enrollment` now records when
+  and what kind, `schedule_next_step` counts only advancing sends,
+  `skip_message` explicitly does not count, endpoints
+  `/strategies/{id}/completion`, `/strategies/{id}/completion/dropped`,
+  `/sequences/{id}/completion`, a `completion` block on strategy analytics,
+  and `CompletionPanel` on the analytics page. Tests:
+  `tests/test_sequence_completion.py` (49),
+  `tests/test_sequence_completion_migration.py` (6),
+  `frontend/src/tests/sequenceCompletion.test.ts` (15). Regression: 130 tests
+  across the engine-touching suites still green; `tsc --noEmit` clean.
+  Decisions: `planned_steps` is a SNAPSHOT because counting a sequence's steps
+  at read time means adding a step next month retroactively un-completes every
+  finished enrollment; `stop_category` is decided at WRITE time so a new call
+  site inventing a reason lands in `other` and is logged rather than silently
+  widening a bucket; running enrollments are in neither half of the rate (a
+  campaign on step 2 of 5 has not failed, it has not finished);
+  `dropped_unauthorised` is reported separately from the rate because 60%
+  completion is fine if the rest replied and alarming if the system dropped
+  them. Docs: `docs/features/sequence-completion.md`.
 
 - **2026-09-16 — Features 2 and 12 done.** Migration `0054_fpta_scoring`
   (8 nullable columns on `leads`, `fpta_overall` indexed),

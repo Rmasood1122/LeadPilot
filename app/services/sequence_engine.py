@@ -227,7 +227,11 @@ def enroll_leads(
         if lead.id in existing or is_suppressed(session, lead.email, lead.phone,
                                                 linkedin=lead.linkedin_url):
             continue
-        enrollment = SequenceEnrollment(sequence_id=sequence.id, lead_id=lead.id)
+        # Part 1 Feature 3: the plan this prospect was enrolled INTO, frozen
+        # here. Editing the sequence later must not retroactively turn a
+        # completed enrollment into an incomplete one.
+        enrollment = SequenceEnrollment(sequence_id=sequence.id, lead_id=lead.id,
+                                        planned_steps=len(steps))
         session.add(enrollment)
         session.flush()
         _schedule_step_message(session, sequence, enrollment, lead, steps[0], base_time=now)
@@ -245,11 +249,23 @@ def enroll_leads(
     return enrolled
 
 
-def stop_enrollment(session: Session, enrollment: SequenceEnrollment, reason: str) -> None:
+def stop_enrollment(session: Session, enrollment: SequenceEnrollment, reason: str,
+                    now: datetime | None = None) -> None:
     """HARD STOP. Cancels every pending message. Irreversible by design —
-    a stopped enrollment can never send again."""
+    a stopped enrollment can never send again.
+
+    Part 1 Feature 3: also records WHEN it stopped and WHAT KIND of stop it
+    was. The category is decided here, at write time, so a call site that
+    invents a new reason lands in `other` and is logged — rather than
+    silently widening the "dropped without a decision" bucket that the
+    completion metric reports.
+    """
+    from app.services import sequence_completion  # noqa: PLC0415
+
     enrollment.status = EnrollmentStatus.STOPPED
     enrollment.stop_reason = reason
+    enrollment.stopped_at = now or _now()
+    enrollment.stop_category = sequence_completion.categorize(reason)
     pending = session.execute(
         select(Message).where(
             Message.sequence_id == enrollment.sequence_id,
@@ -333,15 +349,25 @@ def _schedule_step_message(
     return msg
 
 
-def schedule_next_step(session: Session, message: Message, now: datetime) -> Message | None:
+def schedule_next_step(session: Session, message: Message, now: datetime,
+                       counts_as_sent: bool = True) -> Message | None:
     """After a successful send: schedule the following step, or complete
-    the enrollment when there is none."""
+    the enrollment when there is none.
+
+    `counts_as_sent=False` is the SKIP path (app/services/sequence_engine
+    ::skip_message): the sequence advances, but the prospect did not receive
+    that step, so it must not count towards Feature 3's completion.
+    """
     enrollment = session.execute(
         select(SequenceEnrollment).where(
             SequenceEnrollment.sequence_id == message.sequence_id,
             SequenceEnrollment.lead_id == message.lead_id,
         )
     ).scalar_one()
+    # Only ADVANCING counts: a transient failure that re-sends the same step
+    # arrives here once, when the step finally lands.
+    if counts_as_sent and message.step_no > enrollment.current_step:
+        enrollment.steps_sent = (enrollment.steps_sent or 0) + 1
     enrollment.current_step = message.step_no
 
     sequence = session.get(Sequence, message.sequence_id)
@@ -351,6 +377,7 @@ def schedule_next_step(session: Session, message: Message, now: datetime) -> Mes
         return None
     if not next_steps:
         enrollment.status = EnrollmentStatus.COMPLETED
+        enrollment.completed_at = now
         _flag_if_all_skipped(session, enrollment)
         session.commit()
         return None
@@ -370,7 +397,9 @@ def skip_message(session: Session, message: Message,
     session.commit()
     logger.info("message %s skipped: %s (lead %s)",
                 message.id, reason, message.lead_id)
-    return schedule_next_step(session, message, now=now)
+    # Part 1 Feature 3: a skipped step advances the sequence but was never
+    # received, so it does not count towards completion.
+    return schedule_next_step(session, message, now=now, counts_as_sent=False)
 
 
 def _flag_if_all_skipped(session: Session, enrollment: SequenceEnrollment) -> None:
@@ -385,7 +414,10 @@ def _flag_if_all_skipped(session: Session, enrollment: SequenceEnrollment) -> No
         )
     ).scalars().all()
     if statuses and all(st is MessageStatus.SKIPPED for st in statuses):
+        from app.services import sequence_completion  # noqa: PLC0415
+
         enrollment.stop_reason = "completed_all_skipped_needs_attention"
+        enrollment.stop_category = sequence_completion.ALL_STEPS_SKIPPED
 
 
 # --------------------------------------------------------------------------

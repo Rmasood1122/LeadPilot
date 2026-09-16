@@ -25,7 +25,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.db.models import Lead, Message, Outcome, OutcomeEvent, Product, Strategy, User
-from app.services import pipeline_health, reply_intent, sequence_engine as engine
+from app.services import (
+    pipeline_health,
+    reply_intent,
+    sequence_completion,
+    sequence_engine as engine,
+)
 
 router = APIRouter(tags=["analytics"])
 
@@ -103,6 +108,9 @@ def analytics(
         # rate, never in place of it -- a high reply rate with a low positive
         # rate is a different problem from having neither.
         "reply_quality": reply_intent.strategy_metrics(db, strategy_id),
+        # Part 1 Feature 3: did enrolled prospects receive the whole sequence,
+        # and when they did not, was there a decision behind it?
+        "completion": sequence_completion.strategy_metrics(db, strategy_id),
         # M8 fills this with playbook scores; the UI renders the container.
         "learning_insights": None,
     }
@@ -219,3 +227,40 @@ def pipeline_health_score(
         # which is exactly when "as of" must not claim to be now.
         updated_at=strategy.health_updated_at,
     )
+
+
+@router.get("/strategies/{strategy_id}/completion")
+def sequence_completion_metrics(
+    strategy_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Part 1 Feature 3: the sequence completion rate and its reason breakdown.
+
+    `completion_rate` counts only enrollments that have FINISHED — a campaign
+    on step 2 of 5 has not failed to complete, it simply has not finished, so
+    running enrollments are in neither the numerator nor the denominator.
+    `dropped_unauthorised` is the number that matters: prospects who stopped
+    being contacted without a decision behind it."""
+    _owned_strategy(strategy_id, db, current_user)
+    return sequence_completion.strategy_metrics(db, strategy_id)
+
+
+@router.get("/strategies/{strategy_id}/completion/dropped")
+def dropped_prospects(
+    strategy_id: uuid.UUID,
+    unauthorised_only: bool = Query(default=False),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """The work list behind the number: who stopped early and why.
+
+    `unauthorised_only=true` is the one to act on — every prospect whose
+    sequence ended without a reply, an unsubscribe, a bounce, a booking, a
+    suppression or a human decision in the CRM."""
+    _owned_strategy(strategy_id, db, current_user)
+    items = sequence_completion.dropped_enrollments(
+        db, strategy_id, unauthorised_only=unauthorised_only, limit=limit)
+    return {"strategy_id": str(strategy_id), "unauthorised_only": unauthorised_only,
+            "total": len(items), "items": items}

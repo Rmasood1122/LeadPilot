@@ -1420,6 +1420,30 @@ class SequenceEnrollment(TimestampMixin, Base):
     stop_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
     paused_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     current_step: Mapped[int] = mapped_column(Integer, default=0)
+    # --- Part 1 Feature 3 (migration 0055): completion guarantee ----------
+    # The number of steps this prospect was enrolled INTO, frozen at
+    # enrollment. Editing the sequence later must not retroactively turn a
+    # completed enrollment into an incomplete one. NULL = enrolled before
+    # this feature.
+    planned_steps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Incremented once per send that advances the sequence -- not by a skip,
+    # and not again when a transient failure is retried.
+    steps_sent: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    stopped_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # The fixed vocabulary behind the free-text `stop_reason`, decided at
+    # WRITE time (app/services/sequence_completion.categorize) so an
+    # unrecognised reason lands in "other" and is logged, rather than
+    # quietly disappearing into a breakdown nobody reads.
+    stop_category: Mapped[str | None] = mapped_column(
+        String(30), nullable=True, index=True
+    )
 
     sequence: Mapped["Sequence"] = relationship(back_populates="enrollments")
     lead: Mapped["Lead"] = relationship()
