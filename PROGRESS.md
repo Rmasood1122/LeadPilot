@@ -21,7 +21,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 5 | Human Review Queue for high-risk sends | **done** (0057) |
 | 6 | Unified Cross-Channel Inbox | **done** (0058) |
 | 7 | Re-engagement Memory ("not now" ≠ "never") | **done** (0059) |
-| 8 | Transparent Attribution Ledger | not started |
+| 8 | Transparent Attribution Ledger | **done** (0060) |
 | 9 | Compliance & Consent Layer | not started |
 | 10 | Data Provenance Tags | not started |
 | 11 | Founder/Agency Mode (multi-client workspaces) | not started |
@@ -88,6 +88,25 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Feature 8 done.** Migration `0060_attribution_ledger` (new
+  `attribution_entries` table), `app/services/attribution.py`,
+  `app/api/attribution.py`, a quarter-hourly Celery sweep, and an
+  `AttributionPanel` on the analytics page. Tests:
+  `tests/test_attribution.py` (38), `tests/test_attribution_migration.py` (7),
+  `frontend/src/tests/attribution.test.ts` (19). `tsc --noEmit` clean.
+  Decisions: a ledger rather than a column on `outcomes`, because that table
+  is an immutable log whose `message_id` is only populated for events the send
+  path writes itself, while attribution is a later, re-computable judgement
+  that must record its own uncertainty; the METHOD and CONFIDENCE are stored
+  and always displayed, because "they replied to step 2" and "step 2 was the
+  last thing we sent three weeks earlier" are different claims and presenting
+  them identically is how users end up building a strategy on coincidence;
+  last-touch confidence decays with the gap; a SWEEP rather than hooks,
+  because outcomes are created in a dozen places and the thirteenth would be
+  forgotten -- and the sweep back-fills history for free; only replies Feature
+  1 labelled `interested` earn an entry, so "stop emailing me" never lands in
+  a ledger of positive outcomes. Docs: `docs/features/attribution-ledger.md`.
 
 - **2026-09-16 -- Feature 7 done.** Migration `0059_reengagement_memory` (new
   `reengagement_plans` table), `app/services/reengagement_memory.py`, a hook in

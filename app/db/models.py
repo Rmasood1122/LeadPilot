@@ -4179,6 +4179,64 @@ class ReengagementAttempt(TimestampMixin, Base):
     detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
+class AttributionEntry(TimestampMixin, Base):
+    """Part 1 Feature 8 -- which touch earned this outcome, and how sure we are.
+
+    WHY NOT A COLUMN ON `outcomes`. That table is the immutable event log the
+    learning loop reads. Its `message_id` is the message that CAUSED the event
+    only for events the send path writes itself (sent, opened, clicked); a
+    booking arriving by webhook three days later has no message_id and no way
+    to get one at write time. Attribution is a separate, LATER, re-computable
+    judgement -- and one that has to record its own uncertainty, which an
+    immutable log row cannot.
+
+    THE METHOD AND CONFIDENCE ARE THE POINT. "This meeting came from step 2 on
+    LinkedIn" is worth very different amounts depending on whether the prospect
+    literally replied to that message or whether it was simply the last thing
+    sent before they booked. A ledger that hides which of those happened will
+    eventually be believed when it should not be.
+    """
+
+    __tablename__ = "attribution_entries"
+    __table_args__ = (
+        UniqueConstraint("outcome_kind", "outcome_id", name="attribution_outcome"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # meeting_booked | positive_reply | won
+    outcome_kind: Mapped[str] = mapped_column(String(30))
+    outcome_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    outcome_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # The credited touch. NULL with method="none" is an honest answer: an
+    # inbound booking from someone we never messaged has no touch to credit.
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    channel: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    step_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    message_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hours_to_outcome: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # direct_reply | thread_match | last_touch | none
+    method: Mapped[str] = mapped_column(String(20))
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    evidence_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # The copy as it went out, kept so "which message earned this?" can be
+    # answered by SHOWING it -- the message row can be re-rendered or deleted.
+    subject_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    body_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 class ReengagementPlan(TimestampMixin, Base):
     """Part 1 Feature 7 -- a "not now" turned into a dated return visit.
 

@@ -314,6 +314,13 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.reply_tasks.run_reengagement_memory",
         "schedule": crontab(hour=5, minute=50),
     },
+    # Part 1 Feature 8: which touch earned each booking. Quarter-hourly at
+    # :35 (clear of the learning-loop jobs at :05/:15/:25/:50) because the
+    # question is asked the moment the meeting lands, not the next morning.
+    "attribution-sweep": {
+        "task": "app.workers.analytics_tasks.run_attribution_sweep",
+        "schedule": crontab(minute="5,20,35,50"),
+    },
     "deliverability-checks": {
         "task": "app.workers.deliverability_tasks.run_daily_checks",
         "schedule": crontab(hour=6, minute=10),

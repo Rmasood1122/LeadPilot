@@ -70,6 +70,7 @@ from app.api.share_links import router as share_links_router           # Feature
 from app.api.sequence_reviews import router as sequence_reviews_router # Feature A7
 from app.api.send_reviews import router as send_reviews_router       # Part 1 Feature 5
 from app.api.inbox import router as inbox_router                      # Part 1 Feature 6
+from app.api.attribution import router as attribution_router          # Part 1 Feature 8
 
 # M7
 from app.api.devices import router as devices_router
@@ -280,6 +281,10 @@ app.include_router(send_reviews_router)          # human review queue
 # /crm/replies (Feature A3), which lists replies by REPLY with their
 # authenticity rather than threading them by prospect.
 app.include_router(inbox_router)                 # unified cross-channel inbox
+# Part 1 Feature 8. /attribution is a new prefix and
+# /leads/{id}/attribution a new sub-path. Nothing here writes an outcome; it
+# only explains the ones that already happened.
+app.include_router(attribution_router)           # transparent attribution ledger
 app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/reengagement
 app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
 app.include_router(benchmarks_router)            # Feature 6: /benchmarks
