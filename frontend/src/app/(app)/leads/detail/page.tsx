@@ -44,6 +44,7 @@ import { FptaBadges } from "@/components/leads/FptaBadges";
 import { WhyThisProspectPanel } from "@/components/leads/WhyThisProspectPanel";
 import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPanel";
 import { ConsentPanel } from "@/components/leads/ConsentPanel";
+import { ProvenancePanel } from "@/components/leads/ProvenancePanel";
 
 const TABS = [
   { value: "overview", label: "Overview" },
@@ -225,6 +226,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
       <ReengagementMemoryPanel leadId={lead.id} />
       {/* Part 1 Feature 9: which channels are open, and why the others are not. */}
       <ConsentPanel leadId={lead.id} />
+      {/* Part 1 Feature 10: where each enriched field came from, and how old. */}
+      <ProvenancePanel leadId={lead.id} />
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent>

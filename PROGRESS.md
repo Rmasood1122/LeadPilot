@@ -23,7 +23,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 7 | Re-engagement Memory ("not now" ≠ "never") | **done** (0059) |
 | 8 | Transparent Attribution Ledger | **done** (0060) |
 | 9 | Compliance & Consent Layer | **done** (0061) |
-| 10 | Data Provenance Tags | not started |
+| 10 | Data Provenance Tags | **done** (0062) |
 | 11 | Founder/Agency Mode (multi-client workspaces) | not started |
 | 12 | "Why This Prospect" Explainability Panel | **done** (built on #2, no storage of its own) |
 
@@ -88,6 +88,27 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Feature 10 done.** Migration `0062_data_provenance`
+  (`provenance_json`, `provenance_updated_at` on `leads`),
+  `app/services/provenance.py`, tags written from the enrichment, email-finding,
+  verification and personalization-refresh stages,
+  `GET /leads/{id}/provenance`, and a `ProvenancePanel` (plus a reusable
+  `ProvenanceTag` badge) on the lead page. Tests:
+  `tests/test_provenance.py` (38), `tests/test_provenance_migration.py` (5),
+  `frontend/src/tests/provenance.test.ts` (16). `tsc --noEmit` clean.
+  Decisions: a JSON column rather than the EAV table this schema uses for
+  CUSTOM FIELDS, and for the opposite reason -- custom values are sorted and
+  filtered server-side where JSON extraction differs between SQLite and
+  PostgreSQL, whereas provenance is read once for one prospect and never
+  queried, so a per-field table would add a join to the lead page for data
+  nobody filters on; the confidence is a documented CONSTANT per source, not
+  model output, because it is a claim about the source rather than the value;
+  an unknown source is scored as `inferred` (the safe direction); AGE is kept
+  separate from confidence because a weak source and an old fact need
+  different fixes and one blended number hides which; the verifier's three
+  verdicts are three SOURCES, since deliverable, risky and unknown are
+  different claims. Docs: `docs/features/data-provenance.md`.
 
 - **2026-09-16 -- Feature 9 done.** Migration `0061_consent_ledger` (new
   append-only `consent_events` table), `app/services/consent.py`,

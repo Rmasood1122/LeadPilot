@@ -182,6 +182,24 @@ def get_strategy_lead(
     return lead
 
 
+@router.get("/leads/{lead_id}/provenance")
+def get_lead_provenance(
+    lead_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Part 1 Feature 10: where every enriched field came from.
+
+    Weakest source first, because the list exists to answer "what here should
+    I not rely on?". `tracked: false` means no provenance was ever recorded
+    for this prospect -- which is NOT the same as "unknown source", and the UI
+    says which."""
+    from app.services import provenance  # noqa: PLC0415
+
+    lead = _owned_lead(db, lead_id, current_user)
+    return provenance.for_lead(lead)
+
+
 @router.get("/leads/{lead_id}/fpta")
 def get_lead_fpta(
     lead_id: uuid.UUID,

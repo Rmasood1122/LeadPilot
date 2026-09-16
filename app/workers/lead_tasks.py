@@ -212,6 +212,13 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
                 "enrichment": enriched.enrichment,
             }
             lead.status = LeadStatus.ENRICHED
+            # Part 1 Feature 10: tag every field this stage actually filled,
+            # with the provider that filled it. Never raises -- enrichment has
+            # already succeeded and losing a tag must not lose the lead.
+            from app.services import provenance  # noqa: PLC0415
+
+            provenance.record_enrichment(session, lead, lead.source or provenance.APOLLO,
+                                         commit=False)
         try:
             session.commit()  # per-lead: resume continues from here
         except IntegrityError:
@@ -258,6 +265,14 @@ def find_missing_emails_impl(
 
         lead.email = email
         lead.status = LeadStatus.EMAIL_FOUND
+        # Part 1 Feature 10: an address BUILT from a name and a domain is not
+        # the same claim as one a provider confirmed. Verification overwrites
+        # this tag a stage later if the mailbox turns out to accept mail.
+        from app.services import provenance  # noqa: PLC0415
+
+        provenance.record(session, lead, "email", provenance.HUNTER_PATTERN,
+                          detail=f"found from the domain {domain}", value=email,
+                          commit=False)
         try:
             session.commit()
             found += 1
@@ -291,6 +306,13 @@ def verify_emails_impl(
             **(lead.enrichment_json or {}),
             "verification": {"status": result.status.value, "score": result.score},
         }
+        # Part 1 Feature 10: the verifier's three verdicts are three different
+        # SOURCES, not one source with three scores -- deliverable is a checked
+        # fact, risky is a warning, unknown was never checked at all.
+        from app.services import provenance  # noqa: PLC0415
+
+        provenance.record_email_verification(session, lead, result.status.value,
+                                             result.score, commit=False)
         session.commit()  # per-lead: resume-safe
         if lead.status is LeadStatus.VERIFIED:
             counts["verified"] += 1

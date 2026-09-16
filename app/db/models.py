@@ -1187,6 +1187,24 @@ class Lead(TimestampMixin, Base):
     fpta_scored_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Part 1 Feature 10 (migration 0062): where each field came from ----
+    # {field: {source, confidence, observed_at, detail, value}}.
+    #
+    # A JSON column rather than the EAV table this schema uses for CUSTOM
+    # FIELDS, and for the opposite reason: custom field values are sorted and
+    # filtered server-side across thousands of rows, where JSON extraction
+    # differs between SQLite and PostgreSQL. Provenance is never sorted,
+    # filtered or aggregated -- it is read once, for one prospect, when a
+    # person hovers a field and asks where it came from. One column read with
+    # the lead it describes is the cheapest possible answer.
+    #
+    # NULL = no provenance recorded, which is NOT the same as "unknown
+    # source": the service reports the difference rather than inventing a
+    # source for history.
+    provenance_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    provenance_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     strategy: Mapped["Strategy"] = relationship(back_populates="leads")
     batch: Mapped["LeadBatch | None"] = relationship(back_populates="leads")
