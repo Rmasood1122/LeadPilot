@@ -122,6 +122,19 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                "executives -- otherwise every message queues."),
     "send_review_tone": (True, "Hold a send whose rendered copy trips the "
                          "tone/spam rules."),
+    # Part 1 Feature 7 -- re-engagement memory ("not now" is not "never").
+    "reengagement_memory_enabled": (True, "Turn every 'not now' reply into a "
+                                    "dated return visit, with the reason the "
+                                    "prospect gave."),
+    "reengagement_memory_days": (90, "Days to wait when the prospect named no "
+                                 "date and gave no reason. A named date always "
+                                 "wins; a known reason uses its own interval."),
+    "reengagement_memory_auto_send": (False, "When a plan comes due, also "
+                                      "SCHEDULE the return message (it still "
+                                      "goes through suppression, compliance and "
+                                      "the review queue). Off by default: most "
+                                      "people want to read a nine-month-old "
+                                      "promise before acting on it."),
     # Feature Group 8 -- white label
     "white_label_allowed": (True, "Allow workspace owners to enable "
                             "white-label mode."),

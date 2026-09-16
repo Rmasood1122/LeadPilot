@@ -42,6 +42,7 @@ import { ConversationThread } from "@/components/leads/ConversationThread";
 import { ConversionCard } from "@/components/leads/ConversionCard";
 import { FptaBadges } from "@/components/leads/FptaBadges";
 import { WhyThisProspectPanel } from "@/components/leads/WhyThisProspectPanel";
+import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPanel";
 
 const TABS = [
   { value: "overview", label: "Overview" },
@@ -219,6 +220,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
       <LeadScoreCard lead={lead} />
       {/* Feature A5: the live number the send gate acts on. */}
       <ConversionCard leadId={lead.id} />
+      {/* Part 1 Feature 7: the dates this prospect's "not now" replies set. */}
+      <ReengagementMemoryPanel leadId={lead.id} />
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent>

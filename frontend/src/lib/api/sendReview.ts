@@ -20,13 +20,14 @@ export const countSendReviews = () =>
 export const getSendReview = (id: string) =>
   api<SendReviewItem>(`/send-reviews/${id}`);
 
+/** NOTE: `body` is passed as an OBJECT. api() stringifies it itself — passing
+ *  JSON.stringify here would send a JSON *string* and FastAPI would answer
+ *  422. See the fixed-bug note at the bottom of ./client.ts. */
 export const approveSendReview = (
   id: string, payload: { note?: string; subject?: string; body?: string } = {},
 ) => api<SendReviewItem>(`/send-reviews/${id}/approve`, {
-  method: "POST", body: JSON.stringify(payload),
+  method: "POST", body: payload,
 });
 
 export const rejectSendReview = (id: string, note: string) =>
-  api<SendReviewItem>(`/send-reviews/${id}/reject`, {
-    method: "POST", body: JSON.stringify({ note }),
-  });
+  api<SendReviewItem>(`/send-reviews/${id}/reject`, { method: "POST", body: { note } });

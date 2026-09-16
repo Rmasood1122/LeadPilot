@@ -4179,6 +4179,68 @@ class ReengagementAttempt(TimestampMixin, Base):
     detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
+class ReengagementPlan(TimestampMixin, Base):
+    """Part 1 Feature 7 -- a "not now" turned into a dated return visit.
+
+    WHY NOT `reengagement_attempts` (0048). That table is the
+    once-per-enrollment CLAIM for the opt-in post-sequence sweep; its whole
+    purpose is the UNIQUE(enrollment_id) that stops a retry sending twice, and
+    it carries no reason and no future date. This object has a different
+    lifetime: it is created by a REPLY, it outlives the enrollment and even
+    the sequence that produced it, a person can move or cancel it, and it is
+    where the prospect's own words live.
+
+    THE REASON IS STORED TWICE ON PURPOSE. `reason_kind` is what the UI groups
+    and filters by; `reason_text` is what the follow-up message quotes. A hook
+    built on their sentence survives being read back to them nine months
+    later. A paraphrase does not.
+
+    UNIQUE (source_reply_id): a webhook retry, a re-classification or two
+    overlapping sweeps cannot produce two plans for one reply.
+    """
+
+    __tablename__ = "reengagement_plans"
+    __table_args__ = (
+        UniqueConstraint("source_reply_id", name="reengagement_plan_reply"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    source_reply_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("inbound_replies.id", ondelete="SET NULL"), nullable=True
+    )
+    # budget | contract | timing | project | headcount | priority | unspecified
+    reason_kind: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    reason_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # A date the PROSPECT named ("after Q2", "in January"). NULL = they gave
+    # no date, and the default interval was used instead -- two different
+    # facts, and the UI says which.
+    stated_return_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # scheduled | due | sent | cancelled
+    status: Mapped[str] = mapped_column(
+        String(20), default="scheduled", server_default=text("'scheduled'"),
+        nullable=False, index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
 # --------------------------------------------------------------------------
 # Feature 6 — anonymised benchmarks (migration 0050)
 # --------------------------------------------------------------------------

@@ -20,7 +20,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 4 | Deliverability Health Score (per mailbox) | **done** (0056) |
 | 5 | Human Review Queue for high-risk sends | **done** (0057) |
 | 6 | Unified Cross-Channel Inbox | **done** (0058) |
-| 7 | Re-engagement Memory ("not now" ≠ "never") | not started |
+| 7 | Re-engagement Memory ("not now" ≠ "never") | **done** (0059) |
 | 8 | Transparent Attribution Ledger | not started |
 | 9 | Compliance & Consent Layer | not started |
 | 10 | Data Provenance Tags | not started |
@@ -88,6 +88,37 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Feature 7 done.** Migration `0059_reengagement_memory` (new
+  `reengagement_plans` table), `app/services/reengagement_memory.py`, a hook in
+  `reply_tasks.process_inbound_reply` right after the intent label is decided,
+  a daily 05:50 sweep, four new endpoints under `/reengagement/plans` and
+  `/leads/{id}/reengagement-plans`, three `system_settings` keys, and a
+  `ReengagementMemoryPanel` on the lead page. Tests:
+  `tests/test_reengagement_memory.py` (51),
+  `tests/test_reengagement_memory_migration.py` (7),
+  `frontend/src/tests/reengagementMemory.test.ts` (17). Regression: 172 tests
+  across the reply/CRM suites still green; `tsc --noEmit` clean. Decisions: a
+  NEW table rather than `reengagement_attempts` (0048), because that row is a
+  once-per-enrollment CLAIM designed to be consumed and forgotten while this
+  one outlives its enrollment and carries the prospect's words; the reason is
+  stored twice (a `kind` to group by, the TEXT to quote) because a hook built
+  on their sentence survives being read back nine months later; the interval
+  varies BY REASON (a contract renews on a different clock from a busy month)
+  and a date the prospect named always wins; appropriateness is re-checked
+  when the plan comes DUE, not when it was made; `auto_send` defaults OFF
+  because most people want to read a nine-month-old promise before acting on
+  it, and when on the touch is an ORDINARY message so suppression, compliance,
+  mailbox health and the review queue all still apply. Docs:
+  `docs/features/reengagement-memory.md`.
+  **Also fixed a real bug I introduced in Features 5 and 6:**
+  `frontend/src/lib/api/{sendReview,inbox}.ts` passed
+  `body: JSON.stringify(...)`, but `api()` stringifies `body` itself -- the
+  exact double-stringify bug documented at the bottom of `client.ts`, which
+  would have sent a JSON *string* and got a 422 from FastAPI on every
+  approve/reject/handled call. Both fixed, and
+  `frontend/src/tests/apiWriteBodies.test.ts` (8) now guards every new write
+  helper against it.
 
 - **2026-09-16 -- Feature 6 done.** Migration `0058_inbox_handling`
   (`handled_at`, `handled_by_user_id` on `inbound_replies`),

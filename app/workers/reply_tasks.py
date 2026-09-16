@@ -61,16 +61,27 @@ def process_inbound_reply_impl(session: Session, reply_id, force: bool = False) 
 
     intent = reply_intent.classify_and_apply(session, reply, force=force)
 
+    # Part 1 Feature 7: a "not now" is a DATE, not a dead end. Turning it into
+    # a plan happens here, right after the label is decided, and never raises
+    # -- a prospect who said "not now" must still be stored and routed exactly
+    # as before if the plan cannot be made.
+    from app.services import reengagement_memory  # noqa: PLC0415
+
+    plan = reengagement_memory.plan_for_reply(session, reply)
+
     if reply.classified_at is not None and not force:
         return {"status": "skipped", "category": reply.reply_category,
-                "intent": intent["label"]}
+                "intent": intent["label"],
+                "reengagement_plan_id": str(plan.id) if plan else None}
 
     result = reply_intelligence.classify_reply(session, reply.id)
     if result.get("error"):
-        return {"status": "failed", "category": None, "intent": intent["label"]}
+        return {"status": "failed", "category": None, "intent": intent["label"],
+                "reengagement_plan_id": str(plan.id) if plan else None}
     reply_intelligence.apply(session, reply, result)
     return {"status": "classified", "category": reply.reply_category,
-            "intent": intent["label"]}
+            "intent": intent["label"],
+            "reengagement_plan_id": str(plan.id) if plan else None}
 
 
 @celery_app.task(name="app.workers.reply_tasks.process_inbound_reply")
@@ -100,3 +111,21 @@ def enqueue(reply_id) -> bool:
     except Exception:  # noqa: BLE001 -- see the docstring
         logger.exception("reply intelligence: could not enqueue reply %s", reply_id)
         return False
+
+
+@celery_app.task(name="app.workers.reply_tasks.run_reengagement_memory")
+def run_reengagement_memory() -> dict:
+    """Part 1 Feature 7: the daily sweep over dated return visits.
+
+    DAILY, not hourly: the unit of this feature is a day ("come back in
+    March"), and nothing is made better by noticing at 03:00 rather than at
+    06:00. It runs early enough that a plan coming due today is in the user's
+    list before they start work.
+    """
+    from app.services import reengagement_memory  # noqa: PLC0415
+
+    session = SessionLocal()
+    try:
+        return reengagement_memory.run_due(session)
+    finally:
+        session.close()

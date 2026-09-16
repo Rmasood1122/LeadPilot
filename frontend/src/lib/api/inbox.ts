@@ -27,11 +27,13 @@ export const countInbox = () => api<{ needs_reply: number }>("/inbox/count");
 export const getInboxThread = (leadId: string) =>
   api<InboxThreadDetail>(`/inbox/${leadId}`);
 
+/** NOTE: `body` is passed as an OBJECT. api() stringifies it itself — passing
+ *  JSON.stringify here would send a JSON *string* and FastAPI would answer
+ *  422. See the fixed-bug note at the bottom of ./client.ts. */
 export const setThreadHandled = (leadId: string, handled = true) =>
   api<InboxThread & { lead_id: string; changed: number }>(
-    `/inbox/${leadId}/handled`, { method: "POST", body: JSON.stringify({ handled }) });
+    `/inbox/${leadId}/handled`, { method: "POST", body: { handled } });
 
 export const setReplyHandled = (replyId: string, handled = true) =>
   api<{ reply_id: string; changed: number; handled_at: string | null }>(
-    `/inbox/replies/${replyId}/handled`,
-    { method: "POST", body: JSON.stringify({ handled }) });
+    `/inbox/replies/${replyId}/handled`, { method: "POST", body: { handled } });

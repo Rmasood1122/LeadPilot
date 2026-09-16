@@ -167,6 +167,9 @@ class FakeClaude:
         # not care about the model still exercises the real merge path.
         self.fpta_response: object | None = None
         self.fpta_prompts: list[str] = []
+        # Part 1 Feature 7 (reengagement_memory). Same contract as the rest.
+        self.not_now_response: object | None = None
+        self.not_now_prompts: list[str] = []
         # Feature 3 (founder voice cloning). Same contract.
         self.voice_profile_response: object | None = None
         self.voice_profile_prompts: list[str] = []
@@ -291,6 +294,15 @@ class FakeClaude:
                 {"topic": "Tone", "a_position": "Formal",
                  "b_position": "Casual", "severity": "low"},
             ], "agreement_summary": "Agree on the ICP."}
+        if "said about coming back" in system:  # Part 1 Feature 7
+            self.not_now_prompts.append(prompt)
+            if isinstance(self.not_now_response, Exception):
+                raise self.not_now_response
+            if self.not_now_response is not None:
+                return self.not_now_response
+            return {"reason_kind": "budget",
+                    "reason_text": "no budget until the new fiscal year",
+                    "return_on": None, "confidence": 0.8}
         if "F-P-T-A prospect analyst" in system:  # Part 1 Feature 2
             self.fpta_prompts.append(prompt)
             if isinstance(self.fpta_response, Exception):

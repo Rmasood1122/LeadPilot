@@ -306,6 +306,14 @@ celery_app.conf.beat_schedule = {
     },
     # Feature Group 9: daily blacklist + health check of every sending
     # domain. A new listing pauses the user's campaigns immediately.
+    # Part 1 Feature 7: dated return visits from "not now" replies. Daily at
+    # 05:50 -- the unit of this feature is a DAY ("come back in March"), and a
+    # plan coming due today should be in the user's list before they start
+    # work. :50 keeps it clear of the 06:10 domain sweep on the same queue.
+    "reengagement-memory-due": {
+        "task": "app.workers.reply_tasks.run_reengagement_memory",
+        "schedule": crontab(hour=5, minute=50),
+    },
     "deliverability-checks": {
         "task": "app.workers.deliverability_tasks.run_daily_checks",
         "schedule": crontab(hour=6, minute=10),
