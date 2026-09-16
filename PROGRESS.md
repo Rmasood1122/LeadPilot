@@ -370,6 +370,17 @@ with later.)
 
 ## Known issues / left for Rehan
 
+- **`tests/integration/` needs a PostgreSQL on localhost:5433, which is not
+  running on this machine.** All 124 of those tests error at connection time
+  with `psycopg2.OperationalError: connection refused`, before any application
+  code runs. This is an environment dependency and predates this branch --
+  `tests/integration/conftest.py` is the real-PostgreSQL harness, deliberately
+  separate from the SQLite one the 135 root modules use. Start the container
+  (`docker compose up -d postgres`) and re-run `pytest tests/integration` to
+  cover them. Nothing in Part 1 or Part 2 is specific to PostgreSQL; every
+  migration added here was written and round-trip tested on SQLite with
+  `batch_alter_table` where the backends differ.
+
 - **Feature 11 depends on multi-mailbox support to be fully useful.**
   `GmailAccount.user_id` is UNIQUE -- one connected mailbox per account. A
   client's sending pool can name several domains, but the account still has

@@ -18,7 +18,11 @@ from app.db.base import Base
 MIGRATION = "0053_reply_intent.py"
 ADDED = ["intent_label", "intent_confidence", "intent_reason", "intent_source",
          "intent_at"]
-_PREREQ = ["users", "products", "strategies", "lead_batches", "linkedin_accounts", "leads",
+# `workspaces` and `client_workspaces` are prerequisites because
+# `strategies` gained a foreign key to the latter in migration 0063
+# (Part 1 Feature 11). Without them the pre-migration `strategies`
+# table references a table that does not exist, which SQLite refuses.
+_PREREQ = ["users", "products", "workspaces", "client_workspaces", "strategies", "lead_batches", "linkedin_accounts", "leads",
            "whatsapp_templates", "sequences", "messages", "inbound_replies"]
 
 

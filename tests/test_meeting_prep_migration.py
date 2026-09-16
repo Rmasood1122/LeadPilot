@@ -56,8 +56,12 @@ def _without_later_columns(described: dict, table: str) -> dict:
                     if not (set(value["columns"]) & later)},
     }
 
+# `workspaces` and `client_workspaces` are prerequisites because
+# `strategies` gained a foreign key to the latter in migration 0063
+# (Part 1 Feature 11). Without them the pre-migration `strategies`
+# table references a table that does not exist, which SQLite refuses.
 _PREREQ_TABLES = [
-    "users", "products", "strategies", "lead_batches", "leads",
+    "users", "products", "workspaces", "client_workspaces", "strategies", "lead_batches", "leads",
     "calendar_booking_pages", "calendar_bookings", "meetings",
     "integration_tokens",
 ]

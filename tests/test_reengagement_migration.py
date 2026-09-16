@@ -24,7 +24,11 @@ ADDED = {
                    "reengagement_daily_cap", "reengagement_weekly_cap"],
     "messages": ["origin"],
 }
-_PREREQ = ["users", "products", "strategies", "lead_batches", "leads", "whatsapp_templates",
+# `workspaces` and `client_workspaces` are prerequisites because
+# `strategies` gained a foreign key to the latter in migration 0063
+# (Part 1 Feature 11). Without them the pre-migration `strategies`
+# table references a table that does not exist, which SQLite refuses.
+_PREREQ = ["users", "products", "workspaces", "client_workspaces", "strategies", "lead_batches", "leads", "whatsapp_templates",
            "linkedin_accounts", "sequences", "sequence_enrollments", "messages"]
 
 
