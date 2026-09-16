@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.db.models import Lead, Message, Outcome, OutcomeEvent, Product, Strategy, User
-from app.services import pipeline_health, sequence_engine as engine
+from app.services import pipeline_health, reply_intent, sequence_engine as engine
 
 router = APIRouter(tags=["analytics"])
 
@@ -99,9 +99,25 @@ def analytics(
             for b, ch, ev, n in series_rows
         ],
         "variants": variants,
+        # Part 1 Feature 1: the positive reply rate sits BESIDE the raw reply
+        # rate, never in place of it -- a high reply rate with a low positive
+        # rate is a different problem from having neither.
+        "reply_quality": reply_intent.strategy_metrics(db, strategy_id),
         # M8 fills this with playbook scores; the UI renders the container.
         "learning_insights": None,
     }
+
+
+@router.get("/strategies/{strategy_id}/reply-quality")
+def reply_quality(
+    strategy_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Part 1 Feature 1, on its own so the campaign header can poll it
+    without pulling the whole outcome time series."""
+    _owned_strategy(strategy_id, db, current_user)
+    return {"strategy_id": str(strategy_id), **reply_intent.strategy_metrics(db, strategy_id)}
 
 
 @router.post("/strategies/{strategy_id}/campaign/pause")

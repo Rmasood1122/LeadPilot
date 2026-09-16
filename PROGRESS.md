@@ -14,7 +14,7 @@ Each feature below moves through: **migration → service → API → frontend �
 
 | # | Feature | Status |
 |---|---------|--------|
-| 1 | Positive Reply Classifier | not started |
+| 1 | Positive Reply Classifier | **done** (0053) |
 | 2 | F-P-T-A Scoring Engine | not started |
 | 3 | Sequence Completion Guarantee + metric | not started |
 | 4 | Deliverability Health Score (per mailbox) | not started |
@@ -89,6 +89,19 @@ with later.)
 
 ## Log
 
+- **2026-09-16 — Feature 1 done.** Migration `0053_reply_intent` (5 nullable
+  columns on `inbound_replies`), `app/services/reply_intent.py`, wired into
+  `reply_tasks.process_inbound_reply`, `reply_quality` on strategy analytics +
+  a dedicated `/strategies/{id}/reply-quality`, `intent` block on every CRM
+  reply, `ReplyQualityPanel` on the analytics page and an intent badge in the
+  reply inbox. Tests: `tests/test_reply_intent.py` (36),
+  `tests/test_reply_intent_migration.py` (5),
+  `frontend/src/tests/replyIntent.test.ts` (21). `tsc --noEmit` clean.
+  Decisions: only `interested` counts as positive (`not_now` is a future
+  opportunity, not a win for *this* campaign); a failed model call leaves the
+  reply unclassified rather than guessing `neutral`, because a guessed label
+  silently moves a headline metric; rates are `null` not `0.0` on an empty
+  denominator. Docs: `docs/features/positive-reply-classifier.md`.
 - **2026-09-16 (start)** — Surveyed the codebase (models, services, API, frontend,
   test layout, migration chain head = `0052_auth_sessions`). Confirmed backend tests
   run (`pytest tests/test_compliance_rules.py` → 31 passed). Wrote this file.

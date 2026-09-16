@@ -1653,6 +1653,20 @@ class InboundReply(TimestampMixin, Base):
     authenticity_scored_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Part 1 Feature 1 (migration 0053): positive reply classification ---
+    # A FOURTH question, and the only one the reply-rate metric cares about:
+    # was this reply POSITIVE? interested | neutral | objection | not_now |
+    # unsubscribe, with the model's own confidence and a one-line reason.
+    # NULL = never classified (not the same as "classified as neutral").
+    # `intent_source` is "model" or "rules" -- machine mail and explicit
+    # unsubscribes are decided deterministically and never cost a model call.
+    intent_label: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    intent_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    intent_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    intent_source: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    intent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class WhatsAppTemplate(TimestampMixin, Base):

@@ -57,7 +57,7 @@ from app.db.models import (
     LeadStatus,
     User,
 )
-from app.services import crm_events, crm_service, lead_assignment, rbac
+from app.services import crm_events, crm_service, lead_assignment, rbac, reply_intent
 
 logger = get_logger("api.crm")
 
@@ -1260,6 +1260,9 @@ def _authenticity_out(reply: InboundReply, lead: Lead | None = None) -> dict:
             "scored_at": reply.authenticity_scored_at.isoformat()
             if reply.authenticity_scored_at else None,
         } if scored else None,
+        # Part 1 Feature 1. Always present (never None), because "not
+        # classified" is a state the inbox has to be able to show.
+        "intent": reply_intent.intent_out(reply),
     }
 
 
@@ -1321,6 +1324,31 @@ def rescore_reply_authenticity(reply_id: uuid.UUID, db: Session = Depends(get_db
     reply_authenticity.apply(db, reply)
     db.commit()
     return _authenticity_out(reply, lead)
+
+
+@router.get("/replies/{reply_id}/intent")
+def get_reply_intent(reply_id: uuid.UUID, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user)) -> dict:
+    """Part 1 Feature 1: was this reply positive, and how sure are we?"""
+    reply, _lead = _owned_reply(db, reply_id, current_user)
+    return reply_intent.intent_out(reply)
+
+
+@router.post("/replies/{reply_id}/intent/reclassify")
+def reclassify_reply_intent(reply_id: uuid.UUID, db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user)) -> dict:
+    """Re-run the intent classifier over one reply.
+
+    For replies stored before this feature, and for the case a person
+    disagrees with the label. Costs one model call unless the rules decide
+    it, so it is rate limited with the other write paths."""
+    enforce_rate_limit(str(current_user.id), "crm_write", _WRITE_LIMIT)
+    reply, _lead = _owned_reply(db, reply_id, current_user)
+    outcome = reply_intent.classify_and_apply(db, reply, force=True)
+    if outcome["status"] == "failed":
+        raise HTTPException(status_code=503,
+                            detail="the classifier could not be reached — the reply is unchanged")
+    return reply_intent.intent_out(reply)
 
 
 @router.get("/replies/{reply_id}/intelligence", response_model=ReplyIntelligenceOut)

@@ -53,14 +53,24 @@ def process_inbound_reply_impl(session: Session, reply_id, force: bool = False) 
         return {"status": "not_found", "category": None}
     if reply is None:
         return {"status": "not_found", "category": None}
+    # Part 1 Feature 1: the positive-reply label is a SEPARATE question with
+    # its own idempotency marker (intent_at), so a reply classified before
+    # that feature existed still gets a label on the next pass without
+    # regenerating the draft the user may already be editing.
+    from app.services import reply_intent  # noqa: PLC0415
+
+    intent = reply_intent.classify_and_apply(session, reply, force=force)
+
     if reply.classified_at is not None and not force:
-        return {"status": "skipped", "category": reply.reply_category}
+        return {"status": "skipped", "category": reply.reply_category,
+                "intent": intent["label"]}
 
     result = reply_intelligence.classify_reply(session, reply.id)
     if result.get("error"):
-        return {"status": "failed", "category": None}
+        return {"status": "failed", "category": None, "intent": intent["label"]}
     reply_intelligence.apply(session, reply, result)
-    return {"status": "classified", "category": reply.reply_category}
+    return {"status": "classified", "category": reply.reply_category,
+            "intent": intent["label"]}
 
 
 @celery_app.task(name="app.workers.reply_tasks.process_inbound_reply")

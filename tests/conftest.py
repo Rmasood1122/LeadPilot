@@ -157,6 +157,11 @@ class FakeClaude:
         self.reply_intelligence_response: object | None = None
         self.reply_intelligence_prompts: list[str] = []
         self.reply_intelligence_systems: list[str] = []
+        # Part 1 Feature 1 (reply_intent). Same contract: a dict is returned
+        # verbatim, a list is a script (one per call, last repeats), an
+        # Exception is raised.
+        self.reply_intent_response: object | None = None
+        self.reply_intent_prompts: list[str] = []
         # Feature 3 (founder voice cloning). Same contract.
         self.voice_profile_response: object | None = None
         self.voice_profile_prompts: list[str] = []
@@ -438,6 +443,18 @@ class FakeClaude:
             if self.automated_reply_response is not None:
                 return self.automated_reply_response
             return {"automated": False, "reason": "reads like a person"}
+        if "reply-quality classifier" in system:  # Part 1 Feature 1
+            self.reply_intent_prompts.append(prompt)
+            if isinstance(self.reply_intent_response, Exception):
+                raise self.reply_intent_response
+            if self.reply_intent_response is not None:
+                if isinstance(self.reply_intent_response, list):
+                    index = min(len(self.reply_intent_prompts) - 1,
+                                len(self.reply_intent_response) - 1)
+                    return self.reply_intent_response[index]
+                return self.reply_intent_response
+            return {"label": "interested", "confidence": 0.9,
+                    "reason": "Asked to book a call on Thursday."}
         if "reply classifier" in system:  # M3 inbound classification
             body_part = prompt.split("BODY:", 1)[-1]
             for needle, cls in self.reply_verdicts.items():
@@ -476,6 +493,7 @@ def fake_claude(monkeypatch):
         "app.services.meeting_ai.get_client",
         "app.services.reply_classification.get_client",
         "app.services.reply_intelligence.get_client",   # Feature 2
+        "app.services.reply_intent.get_client",         # Part 1 Feature 1
         "app.services.displacement_monitor.get_client",  # Feature 4
         # Feature 3 (voice_profiler) and style_profile both reach it as
         # anthropic_client.get_client() at call time, so the module

@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { AsyncState } from "@/components/ui/skeleton";
 import { BenchmarkPanel } from "@/components/analytics/BenchmarkPanel";
+import { ReplyQualityPanel } from "@/components/analytics/ReplyQualityPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -79,6 +80,9 @@ export default function AnalyticsPage() {
       <AsyncState isLoading={isLoading} error={error}
                   empty={!data || data.series.length === 0}
                   emptyLabel="No outcome data yet — send your first campaign.">
+
+        {/* Part 1 Feature 1: positive reply rate beside the raw reply rate. */}
+        <ReplyQualityPanel strategyId={effectiveId || undefined} />
 
         <Card aria-label="Volume over time">
           <CardHeader><CardTitle className="text-sm">Messages sent over time</CardTitle></CardHeader>
