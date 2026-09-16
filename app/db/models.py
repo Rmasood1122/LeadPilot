@@ -1714,6 +1714,20 @@ class InboundReply(TimestampMixin, Base):
     intent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Part 1 Feature 6 (migration 0058): the unified inbox ---------------
+    # "Handled" is per REPLY, not per prospect: someone who replies twice in a
+    # week has one thread and two things to answer, and a per-prospect flag
+    # would let the second be cleared by a decision made about the first.
+    # It exists at all because the two cases that matter most -- a reply
+    # answered OUTSIDE LeadPilot, and a reply that needs no answer -- produce
+    # no outbound row, so "latest inbound is newer than latest outbound"
+    # alone would show them as outstanding forever.
+    handled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    handled_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
 
 
 class WhatsAppTemplate(TimestampMixin, Base):

@@ -19,7 +19,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 3 | Sequence Completion Guarantee + metric | **done** (0055) |
 | 4 | Deliverability Health Score (per mailbox) | **done** (0056) |
 | 5 | Human Review Queue for high-risk sends | **done** (0057) |
-| 6 | Unified Cross-Channel Inbox | not started |
+| 6 | Unified Cross-Channel Inbox | **done** (0058) |
 | 7 | Re-engagement Memory ("not now" ≠ "never") | not started |
 | 8 | Transparent Attribution Ledger | not started |
 | 9 | Compliance & Consent Layer | not started |
@@ -88,6 +88,25 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Feature 6 done.** Migration `0058_inbox_handling`
+  (`handled_at`, `handled_by_user_id` on `inbound_replies`),
+  `app/services/inbox.py`, `app/api/inbox.py`, a new `/inbox` page threaded by
+  prospect with the existing `ConversationThread` as the detail pane, and an
+  Inbox entry second in the main nav. Tests: `tests/test_inbox.py` (34),
+  `tests/test_inbox_migration.py` (5), `frontend/src/tests/inbox.test.ts` (18).
+  `tsc --noEmit` clean. Decisions: `thread_detail` reuses
+  `conversation_thread.build_thread` rather than re-merging the tables, so the
+  lead page and the inbox can never disagree about a prospect's history;
+  "handled" is a STORED flag because the two commonest ways a reply gets dealt
+  with (answered from Gmail, or needs no answer) leave no outbound row, and
+  inferring it from a later send would clear the thread the moment the next
+  sequence step went out; it is per REPLY because a prospect who writes twice
+  has two things to answer; `needs_reply` is ordered OLDEST first; the badge
+  counts threads, not messages. Also fixed a latent bug in the migration-test
+  helper: stripping a column from the pre-migration schema has to strip its
+  foreign key too, or the prereq CREATE TABLE references a column that is not
+  there. Docs: `docs/features/unified-inbox.md`.
 
 - **2026-09-16 — Feature 5 done.** Migration `0057_send_reviews` (new
   `send_reviews` table; `MessageStatus.AWAITING_REVIEW` needed no column
