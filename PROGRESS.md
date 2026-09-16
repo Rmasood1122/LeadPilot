@@ -2,9 +2,40 @@
 
 Branch: `feature/8-new-features`. Never merged to `master`, never force-pushed.
 
-## How to read this
-Each feature below moves through: **migration → service → API → frontend → tests → docs → commit**.
-"Done" means all seven, with the relevant test suites green.
+---
+
+## FINAL SUMMARY — read this first
+
+**Everything in Part 1 (all 12 features) and Part 2 (all 3 pieces) is built,
+tested and pushed.** Twelve migrations, `0053` through `0064`, each additive and
+each with its own migration test that asserts the schema matches the models and
+that the downgrade round-trips.
+
+### Test status
+
+| Suite | Result |
+|-------|--------|
+| Backend, `tests/*.py` (135 modules, ~2,800 tests) | **green** — run in five batches for memory; every batch exited 0 |
+| Frontend, `vitest` (49 files) | **657 passed** |
+| `tsc --noEmit` | **clean** |
+| `tests/integration/` (124 tests) | **not run — needs PostgreSQL on localhost:5433, which is not running here.** See Known issues. |
+
+New tests added: 22 modules, roughly 700 assertions.
+
+### The three things I would look at first
+
+1. **Feature 5's VIP trigger, for your ICP.** LeadPilot sells to boutique
+   agency *owners*, and "owner" is a VIP title — so with
+   `send_review_vip_titles` on (the current default) every message to your core
+   persona lands in the human review queue. Correct for someone selling into
+   enterprises, wrong for you. One setting in `/admin/settings`.
+2. **Feature 4's complaint rate is a documented proxy**, not a real
+   feedback-loop signal. It is labelled `proxy` everywhere it appears. Worth
+   deciding whether to connect Google Postmaster Tools.
+3. **Feature 11 wants multiple mailboxes per account** to be fully useful. The
+   sending-domain pool currently *refuses* wrong-domain sends rather than
+   *routing* between several mailboxes, because `GmailAccount.user_id` is
+   UNIQUE. I did not relax that constraint — see Known issues for why.
 
 ---
 
@@ -34,6 +65,35 @@ Each feature below moves through: **migration → service → API → frontend �
 | P2.1 | Auto-generated meeting brief + script | **done** (0064) |
 | P2.2 | Mock interview / roleplay mode + feedback | **done** (0064) |
 | P2.3 | Standalone practice + pre-meeting checklist | **done** |
+
+### Docs written
+
+`docs/features/` — `positive-reply-classifier.md`, `fpta-scoring.md`,
+`why-this-prospect.md`, `sequence-completion.md`, `mailbox-health.md`,
+`send-review-queue.md`, `unified-inbox.md`, `reengagement-memory.md`,
+`attribution-ledger.md`, `consent-layer.md`, `data-provenance.md`,
+`agency-mode.md`, `meeting-practice.md`.
+
+Each one leads with *why* rather than *what*, and records the decisions that
+are not obvious from the code.
+
+---
+
+## Two bugs found and fixed along the way
+
+These were pre-existing or self-inflicted, and are worth knowing about:
+
+1. **An unsubscribe by email never revoked WhatsApp consent.**
+   `sequence_engine.unsubscribe_lead` suppressed email, phone and LinkedIn but
+   left `whatsapp_opted_in` True, so the next WhatsApp step in a sequence went
+   out to someone who had asked to be left alone. Fixed in Feature 9:
+   suppression is now one act over the whole person.
+2. **Double-stringified request bodies in two new API modules I wrote.**
+   `api()` stringifies `body` itself; passing `JSON.stringify(...)` sends a
+   JSON *string* and FastAPI answers 422 — the exact bug documented at the
+   bottom of `client.ts`. Caught before shipping;
+   `frontend/src/tests/apiWriteBodies.test.ts` now guards every new write
+   helper against it.
 
 ---
 
