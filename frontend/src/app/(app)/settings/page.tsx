@@ -25,6 +25,7 @@ import { CrmCards } from "@/components/settings/CrmCards";
 import { ApiKeysCard, WebhooksCard } from "@/components/settings/WebhooksCard";
 import { oauthResultMessage } from "@/lib/api/ecosystem";
 import { ComplianceAuditCard, DeliverabilityCard } from "@/components/settings/DeliverabilityCard";
+import { MailboxHealthCard } from "@/components/settings/MailboxHealthCard";
 import { AuditTrailCard } from "@/components/settings/AuditTrailCard";
 import { ShareLinksCard } from "@/components/settings/ShareLinksCard";
 import { cn } from "@/lib/utils";
@@ -524,6 +525,9 @@ export default function SettingsPage() {
       {/* Feature Group 9: email health + the compliance audit log. */}
       {tab === "deliverability" && (
         <div className="space-y-3">
+          {/* Part 1 Feature 4: per-MAILBOX health and the auto-throttle,
+              above the per-domain card because it is the one that acts. */}
+          <MailboxHealthCard />
           <DeliverabilityCard />
           <ComplianceAuditCard />
           {/* Feature A2: the hash-chained activity trail + signed export. */}

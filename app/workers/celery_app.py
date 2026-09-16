@@ -310,6 +310,15 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.deliverability_tasks.run_daily_checks",
         "schedule": crontab(hour=6, minute=10),
     },
+    # Part 1 Feature 4: per-MAILBOX health. Every four hours at :05, because
+    # the two signals it exists to catch -- a complaint spike and a volume
+    # spike -- do their damage inside a day, which a daily sweep would only
+    # notice the morning after. Offset from the domain sweep above so the two
+    # never run in the same minute on the shared `default` queue.
+    "refresh-mailbox-health": {
+        "task": "app.workers.deliverability_tasks.refresh_mailbox_health",
+        "schedule": crontab(hour="*/4", minute=5),
+    },
     # Feature 1: recompute every campaign's pipeline health score. Every six
     # hours, at :40 past the hour, so it never starts in the same minute as
     # the learning-loop jobs (:05/:15/:25/:35/:50) that share this queue.

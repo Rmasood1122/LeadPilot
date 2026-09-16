@@ -308,11 +308,31 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             return "deferred_cap"
     else:
         account = _account_for_strategy(session, strategy)
-        if engine.allowance_left(session, account, now, rules.daily_cap) <= 0:
+        # Part 1 Feature 4: per-mailbox deliverability health. A PAUSED mailbox
+        # defers the message to tomorrow's window -- deferred, never dropped,
+        # the same rule the daily cap has always followed -- and a THROTTLED
+        # one lowers the ceiling for today. Neither can ever RAISE the cap: the
+        # throttle is combined with the compliance rule's cap by taking the
+        # smaller of the two.
+        from app.services import mailbox_health  # noqa: PLC0415
+
+        health = mailbox_health.gate(session, account.user_id, str(account.id))
+        effective_cap = rules.daily_cap
+        if health["cap"] is not None:
+            effective_cap = (health["cap"] if effective_cap is None
+                             else min(effective_cap, health["cap"]))
+        if (health["state"] == mailbox_health.PAUSED
+                or engine.allowance_left(session, account, now, effective_cap) <= 0):
             tomorrow = now.astimezone(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
             message.scheduled_at = engine.next_window_slot(tomorrow, tz, rules.window)
+            if health["state"] == mailbox_health.PAUSED:
+                # The reason travels with the message, so the lead timeline
+                # can say WHY this step has not gone out.
+                message.error = f"mailbox paused: {health['reason'] or 'deliverability health'}"
+                session.commit()
+                return "deferred_mailbox_paused"
             session.commit()
             return "deferred_cap"
 

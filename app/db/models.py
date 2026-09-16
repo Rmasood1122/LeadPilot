@@ -3390,6 +3390,69 @@ class DeliverabilityCheck(Base):
     )
 
 
+class MailboxHealth(TimestampMixin, Base):
+    """Part 1 Feature 4 -- CURRENT reputation state of one sending mailbox.
+
+    `deliverability_checks` (FG9) stays what it is: an append-only log of
+    DOMAIN checks. The domain is the wrong grain for throttling -- two
+    mailboxes on one domain can have very different reputations, and only one
+    of them should be slowed down. This table is one upserted row per mailbox,
+    read by the send gate on every send.
+
+    `mailbox_ref` is EXACTLY the value the send path writes to
+    `messages.sender_ref` (a Gmail account id, "linkedin:<id>",
+    "whatsapp:<phone id>"), which is what makes volume and complaints
+    countable per mailbox. It is a string, not a foreign key, because not
+    every sending identity lives in one table.
+    """
+
+    __tablename__ = "mailbox_health"
+    __table_args__ = (
+        UniqueConstraint("user_id", "mailbox_ref", name="mailbox_health_ref"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    mailbox_ref: Mapped[str] = mapped_column(String(64), index=True)
+    channel: Mapped[str] = mapped_column(String(20))
+    address: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # healthy | throttled | paused. Indexed because the send gate and the
+    # settings page both filter on it.
+    state: Mapped[str] = mapped_column(
+        String(20), default="healthy", server_default=text("'healthy'"),
+        nullable=False, index=True
+    )
+    # The reduced daily allowance while throttled. NULL = no reduction.
+    throttle_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    reasons_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    spf_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    dkim_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    dmarc_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    dmarc_policy: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    complaint_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounce_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sends_today: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    sends_7d: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    daily_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Resuming after a reputation pause is a HUMAN decision, same rule as the
+    # bounce pause and the blacklist pause -- so who did it is recorded.
+    resumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resumed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ComplianceAuditLog(Base):
     """What LeadPilot knew and decided, per send, about the rules that apply
     to its recipient -- region, regime, the checks made and the outcome.

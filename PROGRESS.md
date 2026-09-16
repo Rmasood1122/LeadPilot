@@ -17,7 +17,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 1 | Positive Reply Classifier | **done** (0053) |
 | 2 | F-P-T-A Scoring Engine | **done** (0054) |
 | 3 | Sequence Completion Guarantee + metric | **done** (0055) |
-| 4 | Deliverability Health Score (per mailbox) | not started |
+| 4 | Deliverability Health Score (per mailbox) | **done** (0056) |
 | 5 | Human Review Queue for high-risk sends | not started |
 | 6 | Unified Cross-Channel Inbox | not started |
 | 7 | Re-engagement Memory ("not now" ≠ "never") | not started |
@@ -89,6 +89,31 @@ with later.)
 
 ## Log
 
+- **2026-09-16 — Feature 4 done.** Migration `0056_mailbox_health` (new
+  `mailbox_health` table, one upserted row per mailbox),
+  `app/services/mailbox_health.py`, a four-hourly Celery beat sweep
+  (`refresh_mailbox_health`), the send gate in
+  `outreach_tasks.send_message_impl` (paused -> defer, throttled -> lower cap),
+  `/deliverability/mailboxes[/refresh]` and `.../{ref}/resume`, and
+  `MailboxHealthCard` above the existing per-domain card in Settings ->
+  Deliverability. Tests: `tests/test_mailbox_health.py` (50),
+  `tests/test_mailbox_health_migration.py` (5),
+  `frontend/src/tests/mailboxHealth.test.ts` (19). Regression: 58 tests across
+  trust/sequences/celery-routing still green; `tsc --noEmit` clean.
+  Decisions: a NEW table rather than more rows in `deliverability_checks`,
+  because that log is per DOMAIN and per domain is the wrong grain to throttle
+  on; `mailbox_ref` mirrors `messages.sender_ref` exactly so volume and
+  complaints are countable per mailbox; the deduction weights are sized so a
+  fully unauthenticated but quiet mailbox THROTTLES (45) while real recipient
+  harm PAUSES (a complaint or bounce rate past the danger line costs 65 on its
+  own); a pause DEFERS messages, never cancels them; resuming is a human
+  decision only, matching the bounce and blacklist pauses.
+  **Known limitation worth Rehan's attention:** there is no feedback-loop /
+  Postmaster Tools integration, so `complaint_rate` is a documented PROXY
+  (unsubscribes + "stop" replies over sends). It is labelled `proxy` in every
+  payload and in the UI. Connecting a real FBL later changes only that number
+  and the label. Docs: `docs/features/mailbox-health.md`.
+
 - **2026-09-16 — Feature 3 done.** Migration `0055_sequence_completion`
   (`planned_steps`, `steps_sent`, `completed_at`, `stopped_at`,
   `stop_category` on `sequence_enrollments`),
@@ -153,4 +178,8 @@ with later.)
 
 ## Known issues / left for Rehan
 
-(none yet)
+- **Feature 4 complaint rate is a proxy.** No FBL / Google Postmaster feed is
+  connected, so the spam-complaint rate is approximated from unsubscribes plus
+  replies asking to stop. Labelled `proxy` everywhere it appears. If you want
+  a true complaint rate, connecting Google Postmaster Tools or a relay with an
+  FBL is the change — the score, thresholds and send gate would not move.
