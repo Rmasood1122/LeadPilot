@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Building2,
   CalendarDays,
   GraduationCap,
   Inbox,
@@ -50,5 +51,9 @@ export const NAV: NavItem[] = [
   { href: "/learn", label: "Learn", icon: GraduationCap },
   // Feature Group 8: members, approvals, white label.
   { href: "/team", label: "Team", icon: Users },
+  // Part 1 Feature 11: the agency's clients -- separate reporting, separate
+  // sending-domain pools, separate invoices. Next to Team because both are
+  // "who is this account for", not "what is it doing today".
+  { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

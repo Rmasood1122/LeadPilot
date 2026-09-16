@@ -24,7 +24,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 8 | Transparent Attribution Ledger | **done** (0060) |
 | 9 | Compliance & Consent Layer | **done** (0061) |
 | 10 | Data Provenance Tags | **done** (0062) |
-| 11 | Founder/Agency Mode (multi-client workspaces) | not started |
+| 11 | Founder/Agency Mode (multi-client workspaces) | **done** (0063) |
 | 12 | "Why This Prospect" Explainability Panel | **done** (built on #2, no storage of its own) |
 
 **Part 2 — Meeting Prep & Training module**
@@ -88,6 +88,32 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Feature 11 done.** Migration `0063_client_workspaces` (new
+  `client_workspaces` and `client_sending_domains` tables, plus
+  `strategies.client_workspace_id`), `app/services/client_workspaces.py`,
+  `app/api/client_workspaces.py`, a send-path gate in
+  `outreach_tasks.send_message_impl`, and a new `/clients` page in the nav.
+  Tests: `tests/test_client_workspaces.py` (45),
+  `tests/test_client_workspaces_migration.py` (10),
+  `frontend/src/tests/clients.test.ts` (19). Regression: 61 tests across
+  workspaces/sequences/regression still green; `tsc --noEmit` clean.
+  Decisions: a NEW table rather than reusing `Workspace`, because that is a
+  TEAM around one owner with a UNIQUE `owner_user_id` that thirteen modules'
+  ownership resolution rests on -- an agency's SDRs are shared across clients
+  while the clients are separate books of business, so a client hangs OFF the
+  team workspace rather than replacing it; the sending pool is defined over
+  DOMAINS and enforced in the SEND PATH, because an isolation rule that lives
+  in a form is an isolation rule that leaks; an EMPTY pool means no
+  restriction, so an account that never creates a client behaves exactly as it
+  does today; unassigned campaigns are the agency's own work and are surfaced
+  rather than hidden, because work that belongs to nobody stops being
+  invoiced; the billing view shows its working, since a retainer plus a
+  per-meeting count is an invoice a client will query.
+  Docs: `docs/features/agency-mode.md`. **Known limitation recorded there and
+  below:** `GmailAccount.user_id` is UNIQUE (one mailbox per account), so a
+  pool currently REFUSES wrong-domain sends rather than ROUTING between
+  several mailboxes.
 
 - **2026-09-16 -- Feature 10 done.** Migration `0062_data_provenance`
   (`provenance_json`, `provenance_updated_at` on `leads`),
@@ -309,6 +335,17 @@ with later.)
   run (`pytest tests/test_compliance_rules.py` → 31 passed). Wrote this file.
 
 ## Known issues / left for Rehan
+
+- **Feature 11 depends on multi-mailbox support to be fully useful.**
+  `GmailAccount.user_id` is UNIQUE -- one connected mailbox per account. A
+  client's sending pool can name several domains, but the account still has
+  one mailbox, so the pool's practical effect today is to REFUSE a send from
+  the wrong domain rather than to ROUTE between several. Allowing several
+  mailboxes per account is the change that makes pools fully useful; nothing
+  in this feature needs to change when it lands. I did not make that change
+  because relaxing a UNIQUE constraint that `_account_for_strategy` reads with
+  `scalar_one_or_none` would silently change which mailbox every existing
+  campaign sends from.
 
 - **Feature 5: decide whether the VIP-title trigger should be ON for your
   ICP.** LeadPilot sells to boutique agency OWNERS, and "owner"/"founder" is a

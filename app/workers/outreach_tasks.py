@@ -316,6 +316,21 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         # smaller of the two.
         from app.services import mailbox_health  # noqa: PLC0415
 
+        # Part 1 Feature 11: a client's prospects must never see another
+        # client's sending domain. Checked HERE, in the send path, not only
+        # rendered in a settings page -- an isolation rule that lives in a
+        # form is an isolation rule that leaks. An empty pool means no
+        # restriction, so nothing changes for an account without clients.
+        from app.services import client_workspaces  # noqa: PLC0415
+
+        wrong_pool = client_workspaces.domain_allowed(session, strategy,
+                                                      account.email_address)
+        if wrong_pool is not None:
+            message.status = MessageStatus.FAILED
+            message.error = f"sending domain not in the client's pool: {wrong_pool}"
+            session.commit()
+            return "blocked_client_domain"
+
         health = mailbox_health.gate(session, account.user_id, str(account.id))
         effective_cap = rules.daily_cap
         if health["cap"] is not None:

@@ -898,6 +898,15 @@ class Strategy(TimestampMixin, Base):
     # not deterministic across runs, and would silently re-bucket a strategy
     # that never changed). See icp_extraction.canonical_pattern_payload.
     pattern_inputs_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # --- Part 1 Feature 11 (migration 0063) -------------------------------
+    # WHICH CLIENT this campaign is run for, when the account is an agency.
+    # NULL = the agency's own work, which is what every existing strategy is
+    # -- not a client that does not exist. An account that never creates a
+    # client workspace behaves exactly as it does today.
+    client_workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("client_workspaces.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
     # M8-C2: winning variant set by auto-promotion. Affects FUTURE message
     # rendering only — in-flight rows (sent_at IS NOT NULL) are never touched.
     default_variant: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -3349,6 +3358,81 @@ class Workspace(TimestampMixin, Base):
     domain_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class ClientWorkspace(TimestampMixin, Base):
+    """Part 1 Feature 11 -- one CLIENT an agency runs outreach for.
+
+    WHY NOT `Workspace`. That is a TEAM around one owner: `owner_user_id` is
+    UNIQUE and its docstring says "the workspace's data is its owner's data".
+    An agency's SDRs are shared across every client; the clients are separate
+    books of business. Conflating them would mean either a login per client
+    (and re-inviting the same three SDRs to each) or breaking the unique
+    constraint thirteen modules' ownership resolution rests on.
+
+    So a client hangs OFF the team workspace rather than replacing it, and
+    isolation is achieved by scoping -- reporting, the sending-domain pool and
+    the billing view all filter by this row.
+    """
+
+    __tablename__ = "client_workspaces"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "slug", name="client_workspace_slug"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(60))
+    # active | paused | archived
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'"), nullable=False
+    )
+    contact_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    billing_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # MONEY IS INTEGER CENTS, for the reason Deal.value_cents gives: a float
+    # column cannot represent 0.10 exactly, and these are summed per client.
+    monthly_fee_cents: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    per_meeting_fee_cents: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    currency: Mapped[str] = mapped_column(
+        String(3), default="USD", server_default="USD", nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class ClientSendingDomain(TimestampMixin, Base):
+    """Part 1 Feature 11 -- a domain reserved for one client's outreach.
+
+    The pool is defined over DOMAINS rather than mailbox rows because that is
+    what the isolation is actually about: a client's prospects must never see
+    another client's sending domain, whichever mailbox on it happens to send.
+
+    AN EMPTY POOL MEANS NO RESTRICTION. An agency that has not set pools up
+    sends exactly as it does today; the pool only ever narrows.
+    """
+
+    __tablename__ = "client_sending_domains"
+    __table_args__ = (
+        UniqueConstraint("client_workspace_id", "domain", name="client_sending_domain_once"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    client_workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("client_workspaces.id", ondelete="CASCADE"), index=True
+    )
+    domain: Mapped[str] = mapped_column(String(253), index=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
 class WorkspaceMember(Base):
