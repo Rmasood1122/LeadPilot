@@ -22,7 +22,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 6 | Unified Cross-Channel Inbox | **done** (0058) |
 | 7 | Re-engagement Memory ("not now" ≠ "never") | **done** (0059) |
 | 8 | Transparent Attribution Ledger | **done** (0060) |
-| 9 | Compliance & Consent Layer | not started |
+| 9 | Compliance & Consent Layer | **done** (0061) |
 | 10 | Data Provenance Tags | not started |
 | 11 | Founder/Agency Mode (multi-client workspaces) | not started |
 | 12 | "Why This Prospect" Explainability Panel | **done** (built on #2, no storage of its own) |
@@ -88,6 +88,27 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Feature 9 done.** Migration `0061_consent_ledger` (new
+  append-only `consent_events` table), `app/services/consent.py`,
+  `app/api/consent.py`, and a `ConsentPanel` on the lead page.
+  `sequence_engine.unsubscribe_lead`, the WhatsApp opt-out and opt-in paths,
+  and the GDPR delete endpoint all now go through it. Tests:
+  `tests/test_consent.py` (31), `tests/test_consent_migration.py` (7),
+  `frontend/src/tests/consent.test.ts` (18). Regression: 99 tests across the
+  compliance/WhatsApp/leads/sequence suites still green; `tsc --noEmit` clean.
+  **This fixed a real gap:** `unsubscribe_lead` suppressed email, phone and
+  LinkedIn but left `whatsapp_opted_in` True, so someone who unsubscribed by
+  email could still be messaged on WhatsApp. It is now one act over the whole
+  person. Other decisions: a separate ledger from `compliance_audit_log`,
+  because that answers "on what basis did you SEND this?" (one row per send)
+  and this answers "when did they tell you to stop, and what did you do about
+  it?"; `lead_id` is SET NULL and the erasure event is written BEFORE the
+  delete, so the proof survives the erasure it is proof of; grants are
+  recorded as well as withdrawals, since a ledger of only withdrawals cannot
+  show that contact was lawful to begin with; `requirements_for()` states each
+  regime's demands in ONE place that the send path, the UI and the tests all
+  read. Docs: `docs/features/consent-layer.md`.
 
 - **2026-09-16 -- Feature 8 done.** Migration `0060_attribution_ledger` (new
   `attribution_entries` table), `app/services/attribution.py`,

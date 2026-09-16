@@ -4179,6 +4179,57 @@ class ReengagementAttempt(TimestampMixin, Base):
     detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 
+class ConsentEvent(Base):
+    """Part 1 Feature 9 -- append-only record of every change of consent.
+
+    WHY THIS IS NOT ComplianceAuditLog. That table answers "on what basis did
+    you SEND this message?", one row per send decision. This answers the
+    question a regulator or a prospect actually asks: "when did they tell you
+    to stop, and what did you do about it?" Different lifetime, different
+    retention, different cardinality.
+
+    WHY lead_id IS SET NULL. The point of the erasure event is that it
+    survives the erasure. A ledger that deletes itself with the prospect
+    record cannot prove the request was honoured -- the one moment it exists
+    for. `identifier` is stored on the row for the same reason: after the lead
+    is gone, the suppression still has to be matchable.
+
+    No updated_at: append-only, like `outcomes`.
+    """
+
+    __tablename__ = "consent_events"
+    __table_args__ = (
+        Index("ix_consent_events_user_ts", "user_id", "ts"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # granted | withdrawn | suppressed | erased
+    kind: Mapped[str] = mapped_column(String(30))
+    # email | phone | linkedin | whatsapp | all
+    channel: Mapped[str] = mapped_column(String(20))
+    identifier: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
+    region: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    regime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    basis: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # unsubscribe_link | reply | whatsapp_stop | manual | gdpr_request |
+    # bounce | import | webhook
+    source: Mapped[str] = mapped_column(String(40))
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    meta_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class AttributionEntry(TimestampMixin, Base):
     """Part 1 Feature 8 -- which touch earned this outcome, and how sure we are.
 

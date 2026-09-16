@@ -71,6 +71,7 @@ from app.api.sequence_reviews import router as sequence_reviews_router # Feature
 from app.api.send_reviews import router as send_reviews_router       # Part 1 Feature 5
 from app.api.inbox import router as inbox_router                      # Part 1 Feature 6
 from app.api.attribution import router as attribution_router          # Part 1 Feature 8
+from app.api.consent import router as consent_router                  # Part 1 Feature 9
 
 # M7
 from app.api.devices import router as devices_router
@@ -285,6 +286,9 @@ app.include_router(inbox_router)                 # unified cross-channel inbox
 # /leads/{id}/attribution a new sub-path. Nothing here writes an outcome; it
 # only explains the ones that already happened.
 app.include_router(attribution_router)           # transparent attribution ledger
+# Part 1 Feature 9. /compliance/consent and /compliance/requirements are new
+# sub-paths under trust.py's /compliance/audit; /leads/{id}/consent* are new.
+app.include_router(consent_router)               # consent ledger + cross-channel withdrawal
 app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/reengagement
 app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
 app.include_router(benchmarks_router)            # Feature 6: /benchmarks

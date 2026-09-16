@@ -485,22 +485,20 @@ def unsubscribe_lead(session: Session, lead: Lead, source: str,
                      message_id: uuid.UUID | None = None,
                      channel: str = "email") -> None:
     """One action for BOTH the unsubscribe click and an
-    unsubscribe_request reply: instant suppression + hard stop."""
-    if lead.email and not is_suppressed(session, email=lead.email):
-        session.add(SuppressionEntry(email=lead.email.lower().strip(),
-                                     reason=f"unsubscribed_{source}"))
-    if lead.phone and not is_suppressed(session, phone=lead.phone):
-        session.add(SuppressionEntry(phone=lead.phone.strip(),
-                                     reason=f"unsubscribed_{source}"))
-    # Feature Group 5: an opt-out on any channel covers LinkedIn too.
-    if lead.linkedin_url and not is_suppressed(session, linkedin=lead.linkedin_url):
-        from app.db.models import LinkedInSuppression  # noqa: PLC0415
-        from app.services.linkedin_outreach import normalize_profile  # noqa: PLC0415
+    unsubscribe_request reply: instant suppression + hard stop.
 
-        profile = normalize_profile(lead.linkedin_url)
-        if profile:
-            session.add(LinkedInSuppression(profile=profile,
-                                            reason=f"unsubscribed_{source}"))
+    Part 1 Feature 9: the per-channel suppression that used to live here is
+    now `consent.suppress_everywhere`, for two reasons. It also revokes
+    WHATSAPP -- which this function did not, so an unsubscribe by email left
+    `whatsapp_opted_in` True and the next WhatsApp step went out anyway. And
+    it writes the consent ledger, so "when did they tell you to stop, and
+    what did you do about it?" has an answer that outlives the lead row.
+    """
+    from app.services import consent  # noqa: PLC0415
+
+    consent.suppress_everywhere(session, lead, source=source,
+                                reason=f"unsubscribed_{source}",
+                                detail=f"unsubscribed via {source} on {channel}")
     _outcome(session, lead, OutcomeEvent.UNSUBSCRIBED, message_id,
              {"source": source}, channel=channel)
     session.commit()

@@ -43,6 +43,7 @@ import { ConversionCard } from "@/components/leads/ConversionCard";
 import { FptaBadges } from "@/components/leads/FptaBadges";
 import { WhyThisProspectPanel } from "@/components/leads/WhyThisProspectPanel";
 import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPanel";
+import { ConsentPanel } from "@/components/leads/ConsentPanel";
 
 const TABS = [
   { value: "overview", label: "Overview" },
@@ -222,6 +223,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
       <ConversionCard leadId={lead.id} />
       {/* Part 1 Feature 7: the dates this prospect's "not now" replies set. */}
       <ReengagementMemoryPanel leadId={lead.id} />
+      {/* Part 1 Feature 9: which channels are open, and why the others are not. */}
+      <ConsentPanel leadId={lead.id} />
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent>

@@ -270,6 +270,13 @@ def gdpr_delete_lead(
             if not exists:
                 db.add(SuppressionEntry(phone=phone.strip(), reason="gdpr_delete"))
 
+    # Part 1 Feature 9: the erasure event is written BEFORE the data goes,
+    # with the identifier and owner denormalized onto the row, so the proof
+    # that the request was honoured survives the deletion it is proof of.
+    from app.services import consent  # noqa: PLC0415
+
+    consent.record_erasure(db, lead, actor=current_user)
+
     _suppress(lead.email, lead.phone)
     # Feature Group 5: the LinkedIn profile is personal data AND a contact
     # route -- suppress it like the email and phone, then erase it.
