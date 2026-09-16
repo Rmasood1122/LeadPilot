@@ -217,6 +217,7 @@ def enroll_leads(
     ).scalars().all()
 
     enrolled = 0
+    enrolled_ids: list = []
     existing = {
         e.lead_id for e in session.execute(
             select(SequenceEnrollment).where(SequenceEnrollment.sequence_id == sequence.id)
@@ -231,7 +232,16 @@ def enroll_leads(
         session.flush()
         _schedule_step_message(session, sequence, enrollment, lead, steps[0], base_time=now)
         enrolled += 1
+        enrolled_ids.append(lead.id)
     session.commit()
+
+    # Part 1 Feature 2: F-P-T-A is scored AT ENROLLMENT, because that is the
+    # moment the four questions become actionable -- and it runs AFTER the
+    # commit above, so a scoring failure can never undo an enrollment that
+    # already succeeded. Leads already carrying a score are left alone.
+    from app.services import fpta_scoring  # noqa: PLC0415
+
+    fpta_scoring.score_for_enrollment(session, enrolled_ids, now=now)
     return enrolled
 
 

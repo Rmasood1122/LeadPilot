@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, StickyNote } from "lucide-react";
 import { ScoreBadge } from "@/components/leads/ScoreBadge";
+import { FptaBadges } from "@/components/leads/FptaBadges";
 
 import type {
   CrmGridRow,
@@ -532,6 +533,10 @@ function GridCell({
 
   if (columnKey === "ai_booking_likelihood") {
     return <ScoreBadge score={row.ai_booking_likelihood} reason={row.ai_score_reason} compact />;
+  }
+
+  if (columnKey === "fpta_overall") {
+    return <FptaBadges lead={row} compact />;
   }
 
   if (columnKey === "note_count") {

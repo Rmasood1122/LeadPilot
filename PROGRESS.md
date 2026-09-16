@@ -15,7 +15,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | # | Feature | Status |
 |---|---------|--------|
 | 1 | Positive Reply Classifier | **done** (0053) |
-| 2 | F-P-T-A Scoring Engine | not started |
+| 2 | F-P-T-A Scoring Engine | **done** (0054) |
 | 3 | Sequence Completion Guarantee + metric | not started |
 | 4 | Deliverability Health Score (per mailbox) | not started |
 | 5 | Human Review Queue for high-risk sends | not started |
@@ -25,7 +25,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 9 | Compliance & Consent Layer | not started |
 | 10 | Data Provenance Tags | not started |
 | 11 | Founder/Agency Mode (multi-client workspaces) | not started |
-| 12 | "Why This Prospect" Explainability Panel | not started |
+| 12 | "Why This Prospect" Explainability Panel | **done** (built on #2, no storage of its own) |
 
 **Part 2 — Meeting Prep & Training module**
 
@@ -88,6 +88,28 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 — Features 2 and 12 done.** Migration `0054_fpta_scoring`
+  (8 nullable columns on `leads`, `fpta_overall` indexed),
+  `app/services/fpta_scoring.py`, scored at enrollment from
+  `sequence_engine.enroll_leads` (after the commit, and only for prospects
+  with no score yet), `GET/POST /leads/{id}/fpta[/rescore]`, a strategy
+  backfill endpoint, `sort=fpta` on the lead list, F-P-T-A columns on the CRM
+  grid, `FptaBadges` on the lead header / kanban card / grid, and
+  `WhyThisProspectPanel` (Feature 12) on the lead detail page. Tests:
+  `tests/test_fpta_scoring.py` (46), `tests/test_fpta_scoring_migration.py`
+  (5), `frontend/src/tests/fpta.test.ts` (20). `tsc --noEmit` clean; CRM
+  suites (87) still green. Decisions: four columns rather than widening
+  `ai_booking_likelihood`, because the two answer different questions and a
+  single number erases which of the four is broken; the model may move a
+  baseline by at most ±15 points and the clamp is enforced in code; a
+  dimension with no evidence says so rather than borrowing confidence from a
+  neighbour; Feature 12 adds NO storage and no model call — an explanation
+  that needed its own generation step would be a second opinion about the
+  score rather than an explanation of it. Docs:
+  `docs/features/fpta-scoring.md`, `docs/features/why-this-prospect.md`.
+  Also updated `tests/test_reply_intelligence.py`: the reply task's result now
+  carries an extra `intent` key (Feature 1).
 
 - **2026-09-16 — Feature 1 done.** Migration `0053_reply_intent` (5 nullable
   columns on `inbound_replies`), `app/services/reply_intent.py`, wired into

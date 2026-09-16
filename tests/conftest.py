@@ -162,6 +162,11 @@ class FakeClaude:
         # Exception is raised.
         self.reply_intent_response: object | None = None
         self.reply_intent_prompts: list[str] = []
+        # Part 1 Feature 2 (fpta_scoring). Default: echo each prospect's
+        # baselines back unchanged with a canned reason, so a test that does
+        # not care about the model still exercises the real merge path.
+        self.fpta_response: object | None = None
+        self.fpta_prompts: list[str] = []
         # Feature 3 (founder voice cloning). Same contract.
         self.voice_profile_response: object | None = None
         self.voice_profile_prompts: list[str] = []
@@ -286,6 +291,22 @@ class FakeClaude:
                 {"topic": "Tone", "a_position": "Formal",
                  "b_position": "Casual", "severity": "low"},
             ], "agreement_summary": "Agree on the ICP."}
+        if "F-P-T-A prospect analyst" in system:  # Part 1 Feature 2
+            self.fpta_prompts.append(prompt)
+            if isinstance(self.fpta_response, Exception):
+                raise self.fpta_response
+            if self.fpta_response is not None:
+                return self.fpta_response
+            import json as _json
+            body = prompt.split("PROSPECTS:", 1)[1]
+            prospects = _json.loads(body.rsplit("Return the JSON", 1)[0].strip())
+            return {"prospects": [
+                {"lead_id": p["lead_id"], **{
+                    dim: {"score": p["baselines"][dim],
+                          "reason": f"{dim} reason for {p.get('company') or 'them'}"}
+                    for dim in ("fit", "problem", "timing", "access")}}
+                for p in prospects
+            ]}
         if "lead scoring analyst" in system:  # Feature Group 1
             self.lead_score_prompts.append(prompt)
             if isinstance(self.lead_score_response, Exception):

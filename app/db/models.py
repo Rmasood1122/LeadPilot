@@ -1164,6 +1164,24 @@ class Lead(TimestampMixin, Base):
     kill_signal: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # The factors the estimate was built from, so it can always be explained.
     conversion_factors_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # --- Part 1 Feature 2 (migration 0054): F-P-T-A -----------------------
+    # Four 0-100 sub-scores and a weighted overall, each with its own reason
+    # and the evidence behind it. Deliberately NOT folded into
+    # ai_booking_likelihood: a lead can be a perfect fit with no timing, or
+    # desperate with no way to reach them, and one number erases that.
+    # NULL = never scored, which sorts last rather than reading as zero.
+    fpta_fit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_problem: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_timing: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_access: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_overall: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # {dimension: {score, reason, signals: [...], baseline}} -- so a score can
+    # always be explained and re-derived without the model.
+    fpta_reasons_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    fpta_method: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    fpta_scored_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     strategy: Mapped["Strategy"] = relationship(back_populates="leads")
     batch: Mapped["LeadBatch | None"] = relationship(back_populates="leads")

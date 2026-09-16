@@ -319,6 +319,17 @@ export interface LeadOut {
   phone_consent_at?: string | null;
   phone_consent_source?: string | null;
   last_call_outcome?: string | null;
+  /** Part 1 Feature 2 — F-P-T-A. On list rows AND detail; null = never scored. */
+  fpta_overall?: number | null;
+  fpta_fit?: number | null;
+  fpta_problem?: number | null;
+  fpta_timing?: number | null;
+  fpta_access?: number | null;
+  fpta_scored_at?: string | null;
+  /** Detail view only. */
+  fpta_reasons_json?: Record<string, { score: number; reason: string; signals: string[];
+                                       baseline: number }> | null;
+  fpta_method?: "model" | "heuristic" | "mixed" | null;
 }
 
 export interface LeadScoreFactors {
@@ -606,6 +617,12 @@ export interface CrmGridRow {
   /** Feature Group 1 — sortable server-side; null = never scored. */
   ai_booking_likelihood?: number | null;
   ai_score_reason?: string | null;
+  /** Part 1 Feature 2 — F-P-T-A; `fpta_overall` is sortable server-side. */
+  fpta_overall?: number | null;
+  fpta_fit?: number | null;
+  fpta_problem?: number | null;
+  fpta_timing?: number | null;
+  fpta_access?: number | null;
 }
 
 /** "due" is the one that matters: contacted, past its step's follow-up
