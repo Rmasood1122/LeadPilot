@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { Trash2 } from "lucide-react";
 import { useStrategy } from "@/lib/api/hooks";
+import { DeleteStrategyDialog } from "@/components/strategy/DeleteStrategyDialog";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,7 +90,18 @@ function Phase({ phase }: { phase: PhaseProgress }) {
 export default function StrategyDetailPage() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id") ?? "";
-  const { data, isLoading, error } = useStrategy(id);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+  const { data, isLoading, error } = useStrategy(id, !deleted);
+
+  function onDeleted() {
+    setDeleted(true);
+    setDeleteOpen(false);
+    router.replace("/strategies");
+    queryClient.removeQueries({ queryKey: ["strategy", id] });
+  }
 
   return (
     <div className="space-y-4">
@@ -103,8 +117,19 @@ export default function StrategyDetailPage() {
                     <Link href={`/strategies/document?id=${id}`}>View documents</Link>
                   </Button>
                 )}
+                <Button variant="outline" size="sm" className="gap-1 text-destructive"
+                        onClick={() => setDeleteOpen(true)}>
+                  <Trash2 size={14} aria-hidden="true" />
+                  Delete
+                </Button>
               </div>
             </div>
+            <DeleteStrategyDialog
+              strategyId={id}
+              open={deleteOpen}
+              onClose={() => setDeleteOpen(false)}
+              onDeleted={onDeleted}
+            />
 
             {data.status === "needs_human_review" && (
               <div role="alert"

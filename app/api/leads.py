@@ -25,6 +25,7 @@ from app.db.models import (
     DisplacementAlert, Lead, LeadBatch, LeadStatus, Product, Strategy,
     StrategyStatus, SuppressionEntry, User,
 )
+from app.services import fpta_scoring
 from app.services.icp_extraction import ensure_pattern_key, extract_icp_criteria
 from app.workers import lead_tasks
 
@@ -116,7 +117,7 @@ def list_leads(
     status: LeadStatus | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
-    sort: str = Query(default="score", pattern="^(score|created)$"),
+    sort: str = Query(default="score", pattern="^(score|created|fpta)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> LeadListOut:
@@ -131,8 +132,14 @@ def list_leads(
     # Unscored leads (NULL) sort LAST, not as zero, and fall back to the old
     # creation order among themselves -- so a strategy with no scores yet
     # lists exactly as it always did.
-    order = ([Lead.ai_booking_likelihood.desc().nulls_last(), Lead.created_at]
-             if sort == "score" else [Lead.created_at])
+    # Part 1 Feature 2 adds sort=fpta. Unscored leads sort LAST under both
+    # score orders -- NULL is "never scored", not zero.
+    if sort == "score":
+        order = [Lead.ai_booking_likelihood.desc().nulls_last(), Lead.created_at]
+    elif sort == "fpta":
+        order = [Lead.fpta_overall.desc().nulls_last(), Lead.created_at]
+    else:
+        order = [Lead.created_at]
     items = db.execute(
         select(Lead).where(*where).order_by(*order).limit(limit).offset(offset)
     ).scalars().all()
@@ -175,6 +182,81 @@ def get_strategy_lead(
     return lead
 
 
+@router.get("/leads/{lead_id}/provenance")
+def get_lead_provenance(
+    lead_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Part 1 Feature 10: where every enriched field came from.
+
+    Weakest source first, because the list exists to answer "what here should
+    I not rely on?". `tracked: false` means no provenance was ever recorded
+    for this prospect -- which is NOT the same as "unknown source", and the UI
+    says which."""
+    from app.services import provenance  # noqa: PLC0415
+
+    lead = _owned_lead(db, lead_id, current_user)
+    return provenance.for_lead(lead)
+
+
+@router.get("/leads/{lead_id}/fpta")
+def get_lead_fpta(
+    lead_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Part 1 Feature 2: the four sub-scores, each with its reason, the
+    evidence behind it and the weight it carries in the overall.
+
+    Returns `band: "unscored"` and null scores for a prospect that has never
+    been scored -- honest, and different from a score of zero."""
+    lead = _owned_lead(db, lead_id, current_user)
+    return {"lead_id": str(lead.id), **fpta_scoring.detail(lead),
+            "engagement": fpta_scoring.engagement_note(db, lead)}
+
+
+@router.post("/leads/{lead_id}/fpta/rescore")
+def rescore_lead_fpta(
+    lead_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Re-run F-P-T-A for one prospect.
+
+    Costs a model call, so it is rate limited with the other lead writes. A
+    model failure is not an error here: the deterministic baselines are
+    written and `method` says `heuristic`, which is a usable score."""
+    enforce_rate_limit(str(current_user.id), "fpta_rescore", "RATE_LIMIT_AI_ACTION")
+    lead = _owned_lead(db, lead_id, current_user)
+    fpta_scoring.score_lead(db, lead)
+    return {"lead_id": str(lead.id), **fpta_scoring.detail(lead),
+            "engagement": fpta_scoring.engagement_note(db, lead)}
+
+
+@router.post("/strategies/{strategy_id}/leads/fpta/rescore")
+def rescore_strategy_fpta(
+    strategy_id: uuid.UUID,
+    only_unscored: bool = Query(default=True),
+    limit: int = Query(default=200, ge=1, le=1000),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Backfill F-P-T-A across a strategy's prospects.
+
+    `only_unscored=true` (the default) is the safe one: it never overwrites a
+    score someone has already read and acted on."""
+    enforce_rate_limit(str(current_user.id), "fpta_rescore", "RATE_LIMIT_AI_ACTION")
+    strategy = _owned_strategy(db, strategy_id, current_user)
+    where = [Lead.strategy_id == strategy_id, Lead.status.in_(fpta_scoring.SCORABLE)]
+    if only_unscored:
+        where.append(Lead.fpta_scored_at.is_(None))
+    leads = db.execute(select(Lead).where(*where).limit(limit)).scalars().all()
+    scored = fpta_scoring.score_leads(db, strategy, list(leads))
+    return {"strategy_id": str(strategy_id), "scored": scored,
+            "only_unscored": only_unscored}
+
+
 @router.delete("/leads/{lead_id}", status_code=204)
 def gdpr_delete_lead(
     lead_id: uuid.UUID,
@@ -205,6 +287,13 @@ def gdpr_delete_lead(
             ).scalar_one_or_none()
             if not exists:
                 db.add(SuppressionEntry(phone=phone.strip(), reason="gdpr_delete"))
+
+    # Part 1 Feature 9: the erasure event is written BEFORE the data goes,
+    # with the identifier and owner denormalized onto the row, so the proof
+    # that the request was honoured survives the deletion it is proof of.
+    from app.services import consent  # noqa: PLC0415
+
+    consent.record_erasure(db, lead, actor=current_user)
 
     _suppress(lead.email, lead.phone)
     # Feature Group 5: the LinkedIn profile is personal data AND a contact

@@ -46,6 +46,7 @@ from app.db.models import (
     CrmCustomField,
     CrmCustomFieldValue,
     CrmFieldType,
+    CrmLeadMeta,
     CrmLeadTag,
     CrmNote,
     CrmSavedView,
@@ -56,7 +57,7 @@ from app.db.models import (
     LeadStatus,
     User,
 )
-from app.services import crm_events, crm_service
+from app.services import crm_events, crm_service, lead_assignment, rbac, reply_intent
 
 logger = get_logger("api.crm")
 
@@ -104,6 +105,24 @@ class BulkPatchIn(BaseModel):
     status: LeadStatus | None = None
     add_tag_ids: list[uuid.UUID] | None = None
     remove_tag_ids: list[uuid.UUID] | None = None
+    # Manual bulk assignment. Presence (model_fields_set), not truthiness,
+    # decides whether to touch it: an explicit null means "unassign".
+    owner_user_id: uuid.UUID | None = None
+
+
+class RoundRobinIn(BaseModel):
+    """Distribute unassigned leads across the team.
+
+    Exactly one of `lead_ids` (the grid's selection) or `strategy_id` (every
+    unassigned lead in one campaign). `roles` narrows who receives leads --
+    by default only SDRs, since handing a manager half the list is rarely what
+    "distribute to the team" means.
+    """
+
+    lead_ids: list[uuid.UUID] | None = Field(default=None, min_length=1, max_length=500)
+    strategy_id: uuid.UUID | None = None
+    roles: list[str] = Field(default_factory=lambda: list(
+        lead_assignment.DEFAULT_ROUND_ROBIN_ROLES), min_length=1, max_length=3)
 
 
 class SavedViewIn(BaseModel):
@@ -233,6 +252,7 @@ def crm_grid(
 def patch_lead(
     lead_id: uuid.UUID,
     body: LeadPatchIn,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -272,21 +292,19 @@ def patch_lead(
     if "owner_user_id" in body.model_fields_set:
         meta = crm_service.get_or_create_meta(db, lead)
         previous_owner = meta.owner_user_id
-        # Only the account holder can own their own leads. Team accounts are
-        # not built (SYSTEM_HANDOFF: "Multi-tenant team accounts" is not
-        # built), so accepting an arbitrary user id here would let one account
-        # write another account's id into its own rows -- harmless today,
-        # and exactly the kind of thing that becomes a real leak the day
-        # sharing ships.
-        if body.owner_user_id is not None and body.owner_user_id != current_user.id:
-            raise HTTPException(
-                status_code=422,
-                detail="owner_user_id must be the authenticated user "
-                       "(team accounts are not supported yet)",
-            )
+        # The assignee must belong to the workspace that owns this lead -- an
+        # arbitrary id would let one account write another account's user into
+        # its rows. And the role rule is judged against the person who ACTED
+        # (request.state.actor), not current_user, which inside a workspace is
+        # the owner. See app/services/lead_assignment.py.
+        lead_assignment.require_assignable(db, current_user, body.owner_user_id)
+        who = lead_assignment.assigner_for(request, current_user)
+        reason = lead_assignment.refusal(who, previous_owner, body.owner_user_id)
+        if reason is not None:
+            raise HTTPException(status_code=403, detail=reason)
         meta.owner_user_id = body.owner_user_id
         crm_service.log_activity(
-            db, lead, CrmActivityKind.OWNER_CHANGED, actor=current_user,
+            db, lead, CrmActivityKind.OWNER_CHANGED, actor=who.actor,
             from_value=str(previous_owner) if previous_owner else None,
             to_value=str(body.owner_user_id) if body.owner_user_id else None,
         )
@@ -351,10 +369,11 @@ def patch_lead(
 @router.post("/leads/bulk")
 def bulk_patch_leads(
     body: BulkPatchIn,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
-    """Bulk status change and bulk tag add/remove from the grid's selection.
+    """Bulk status change, tag add/remove and assignment from the grid's selection.
 
     PARTIAL SUCCESS IS THE CONTRACT, deliberately. Selecting 200 rows and
     moving them all to `contacted` will legitimately include some rows whose
@@ -386,6 +405,14 @@ def bulk_patch_leads(
         if missing:
             raise HTTPException(status_code=404, detail="tag not found")
 
+    # An assignee outside the workspace fails the WHOLE request, like a foreign
+    # lead id: it is a bad request, not a per-row condition. A role that may not
+    # make a particular reassignment is per-row, and lands in `skipped`.
+    assign = "owner_user_id" in body.model_fields_set
+    who = lead_assignment.assigner_for(request, current_user)
+    if assign:
+        lead_assignment.require_assignable(db, current_user, body.owner_user_id)
+
     for lead in leads:
         if body.status is not None and body.status is not lead.status:
             if body.status not in _ALLOWED_TRANSITIONS.get(lead.status, set()):
@@ -404,6 +431,22 @@ def bulk_patch_leads(
             )
             meta = crm_service.get_or_create_meta(db, lead)
             meta.stage_entered_at = datetime.now(timezone.utc)
+
+        if assign:
+            meta = crm_service.get_or_create_meta(db, lead)
+            previous_owner = meta.owner_user_id
+            reason = lead_assignment.refusal(who, previous_owner, body.owner_user_id)
+            if reason is not None:
+                skipped.append({"lead_id": str(lead.id), "reason": reason})
+                continue
+            if previous_owner != body.owner_user_id:
+                meta.owner_user_id = body.owner_user_id
+                crm_service.log_activity(
+                    db, lead, CrmActivityKind.OWNER_CHANGED, actor=who.actor,
+                    from_value=str(previous_owner) if previous_owner else None,
+                    to_value=str(body.owner_user_id) if body.owner_user_id else None,
+                    meta={"bulk": True},
+                )
 
         for tag_id in body.add_tag_ids or []:
             exists = db.execute(
@@ -434,6 +477,79 @@ def bulk_patch_leads(
     db.commit()
     return {"updated": updated, "updated_count": len(updated),
             "skipped": skipped, "skipped_count": len(skipped)}
+
+
+# Upper bound on one round-robin call over a whole campaign, matching the bulk
+# endpoint's 500-row cap: the response says when more remain.
+_ROUND_ROBIN_MAX = 500
+
+
+@router.post("/leads/assign-round-robin")
+def assign_round_robin(
+    body: RoundRobinIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Spread unassigned leads across the team, least-loaded first.
+
+    Managers and owners only: it assigns leads to OTHER people. Idempotent --
+    only unassigned leads are touched, each with a conditional write, so a
+    retry or a double click reports the rest as `skipped` and moves nothing.
+    See app/services/lead_assignment.py.
+    """
+    enforce_rate_limit(str(current_user.id), "crm_write", _WRITE_LIMIT)
+
+    who = lead_assignment.assigner_for(request, current_user)
+    if not rbac.at_least(who.role, "manager"):
+        raise HTTPException(status_code=403,
+                            detail="Distributing leads needs a manager in this workspace.")
+    if (body.lead_ids is None) == (body.strategy_id is None):
+        raise HTTPException(status_code=422,
+                            detail="send exactly one of lead_ids or strategy_id")
+    unknown = set(body.roles) - set(rbac.ROLES)
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"unknown role(s): {sorted(unknown)}")
+
+    more_remaining = False
+    if body.lead_ids is not None:
+        # Every id resolved first: a foreign lead 404s the whole request.
+        leads = [crm_service.owned_lead(db, lead_id, current_user)
+                 for lead_id in body.lead_ids]
+    else:
+        crm_service.owned_strategy(db, body.strategy_id, current_user)
+        # Open, unassigned leads only. A closed or dropped lead has nobody to
+        # work it, and counting it would unbalance the distribution.
+        leads = list(db.execute(
+            select(Lead)
+            .outerjoin(CrmLeadMeta, CrmLeadMeta.lead_id == Lead.id)
+            .where(Lead.strategy_id == body.strategy_id,
+                   CrmLeadMeta.owner_user_id.is_(None),
+                   Lead.status.notin_(list(crm_service.TERMINAL_STAGES)))
+            .order_by(Lead.id)
+            .limit(_ROUND_ROBIN_MAX + 1)
+        ).scalars().all())
+        more_remaining = len(leads) > _ROUND_ROBIN_MAX
+        leads = leads[:_ROUND_ROBIN_MAX]
+
+    assigned, skipped = lead_assignment.round_robin(db, current_user, leads, body.roles)
+    per_member: dict[str, int] = {}
+    for lead, assignee in assigned:
+        crm_service.log_activity(
+            db, lead, CrmActivityKind.OWNER_CHANGED, actor=who.actor,
+            to_value=str(assignee), meta={"round_robin": True},
+        )
+        per_member[str(assignee)] = per_member.get(str(assignee), 0) + 1
+    db.commit()
+    return {
+        "assigned": [{"lead_id": str(lead.id), "owner_user_id": str(assignee)}
+                     for lead, assignee in assigned],
+        "assigned_count": len(assigned),
+        "skipped": skipped,
+        "skipped_count": len(skipped),
+        "per_member": per_member,
+        "more_remaining": more_remaining,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1144,6 +1260,9 @@ def _authenticity_out(reply: InboundReply, lead: Lead | None = None) -> dict:
             "scored_at": reply.authenticity_scored_at.isoformat()
             if reply.authenticity_scored_at else None,
         } if scored else None,
+        # Part 1 Feature 1. Always present (never None), because "not
+        # classified" is a state the inbox has to be able to show.
+        "intent": reply_intent.intent_out(reply),
     }
 
 
@@ -1205,6 +1324,31 @@ def rescore_reply_authenticity(reply_id: uuid.UUID, db: Session = Depends(get_db
     reply_authenticity.apply(db, reply)
     db.commit()
     return _authenticity_out(reply, lead)
+
+
+@router.get("/replies/{reply_id}/intent")
+def get_reply_intent(reply_id: uuid.UUID, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user)) -> dict:
+    """Part 1 Feature 1: was this reply positive, and how sure are we?"""
+    reply, _lead = _owned_reply(db, reply_id, current_user)
+    return reply_intent.intent_out(reply)
+
+
+@router.post("/replies/{reply_id}/intent/reclassify")
+def reclassify_reply_intent(reply_id: uuid.UUID, db: Session = Depends(get_db),
+                            current_user: User = Depends(get_current_user)) -> dict:
+    """Re-run the intent classifier over one reply.
+
+    For replies stored before this feature, and for the case a person
+    disagrees with the label. Costs one model call unless the rules decide
+    it, so it is rate limited with the other write paths."""
+    enforce_rate_limit(str(current_user.id), "crm_write", _WRITE_LIMIT)
+    reply, _lead = _owned_reply(db, reply_id, current_user)
+    outcome = reply_intent.classify_and_apply(db, reply, force=True)
+    if outcome["status"] == "failed":
+        raise HTTPException(status_code=503,
+                            detail="the classifier could not be reached — the reply is unchanged")
+    return reply_intent.intent_out(reply)
 
 
 @router.get("/replies/{reply_id}/intelligence", response_model=ReplyIntelligenceOut)

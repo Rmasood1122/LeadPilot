@@ -713,6 +713,13 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - CAN-SPAM footer + RFC 8058 one-click unsubscribe on every email
 - Reply classification and routing; **no auto-reply to humans**
 - Automated follow-up with per-step delay and enable/disable
+- Opt-in post-sequence re-engagement: one email per completed, neutral
+  enrollment, per-campaign toggle (off by default), own daily/weekly caps under
+  admin ceilings, re-gated at send time
+- Configurable compliance rules: send window, weekend skipping, daily cap,
+  consent requirement and bounce-pause threshold per workspace, recipient
+  region and channel. Resolved at send time, and fail-closed: an empty table is
+  the old baseline, and an invalid or unreadable rule only ever tightens
 </details>
 
 <details open>
@@ -727,6 +734,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Meeting room: live notes, timer, platform launcher
 - Google Meet / Zoom / Teams / any URL
 - Transcript ingestion (HMAC-signed; closed by default)
+- Recall.ai recording bots: transcript pulled in on `transcript.done` and the
+  summary upgraded from notes to transcript + notes. The summary never waits
+  for it: a missing transcript times out and leaves the notes-only summary
 - AI summary: summary, key points, action items, next steps, sentiment
 - Searchable transcript viewer with TXT and PDF export
 - Action-item checkboxes that survive regeneration
@@ -743,6 +753,8 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Four dashboards (pipeline, leads, campaigns, activity)
 - Real-time SSE stream with a polling fallback and a kill switch
 - `followup_status` badge per lead
+- Lead assignment to workspace members: per-lead picker, bulk assign, and
+  least-loaded round-robin across SDRs (idempotent — only unassigned leads move)
 - CSV export (one-way, by design)
 </details>
 
@@ -757,6 +769,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Subject-line pattern extraction
 - Send-time optimisation
 - Personalisation-depth scoring with reply correlation
+- Anonymised benchmarks: nightly per-account reply / meeting / bounce rate
+  percentiles by industry and channel, published only above a minimum account
+  count, shown next to the user's own numbers
 </details>
 
 <details open>
@@ -1013,30 +1028,111 @@ page, not a document.
   writes the answer.
 - **LinkedIn is not implemented.** The API rejects it explicitly rather than
   half-supporting it.
-- **No team accounts.** Ownership is single-user; the CRM's owner field is
-  binary (mine / unassigned) because a user picker would imply a capability
-  that does not exist.
+- **Data ownership is still one account per workspace.** Workspaces
+  (`docs/features/workspaces.md`) let members act on the owner's records with
+  roles, and leads can now be **assigned** to members (see below), but leads,
+  strategies and campaigns were deliberately NOT migrated to an
+  `organization_id`. Every tenant-scoped query still scopes by the owner's
+  `user_id`, which is the property the cross-tenant fixes in 4.4 rely on.
 - **Cold WhatsApp requires an approved Meta template and a recorded opt-in.**
   There is no free-form cold path, by design.
-- **Completed sequences are not auto-followed-up.** That would be an unbounded
-  mass-send with no user-facing cap; it needs its own opt-in and its own
-  compliance story before it ships.
+- **Completed sequences are re-engaged only on request, once, and capped.**
+  Opt-in re-engagement (`docs/features/reengagement.md`) is off per campaign
+  until an owner or manager turns it on. It has its own daily and weekly caps
+  under admin ceilings, reaches only leads whose last outcome was neutral, sends
+  at most one email per enrollment (enforced by a UNIQUE constraint), and runs
+  every send through the same Stage 6 gauntlet. Nothing sweeps completed
+  sequences otherwise.
 - **CSV export is one-way.** See Stage 11.
 
 **Known gaps, with the reason**
 
-- **Google Meet and Zoom have never been called against the live APIs** — no
-  credentials exist yet. Both adapters are written against the documented APIs
-  and carry `# TODO: verify against current docs` markers, matching the
-  convention the Calendly and WhatsApp adapters use. `platform=custom` is the
-  fully working path, and a platform failure returns a created meeting rather
-  than an error.
-- **The `calendar.events` Google scope is new**, so accounts connected before
-  it shipped will be asked to reconnect the first time they choose Meet.
-- **Nothing calls the transcript endpoint yet.** The endpoint, its HMAC scheme
-  and its size cap are implemented and tested; the browser extension or
-  recording-provider webhook that feeds it is the next piece. Until then the AI
-  summary works from the user's live notes alone.
+- **Compliance rules govern the send moment, not every surface.**
+  (`docs/features/compliance-rules.md`)
+  - **Scheduling:** it still places messages with the baseline window, and the
+    send-time check reschedules anything a rule forbids. The smart-send-time
+    heatmap's "schedulable" shading is the same baseline.
+  - **Caps:** rule caps apply to Gmail and WhatsApp. LinkedIn and phone keep
+    their own per-account limits in System Settings.
+  - **Dashboards:** the campaign overview and the CRM campaigns dashboard still
+    display the baseline bounce threshold, not a workspace's lower one. The
+    pause itself uses the rule.
+  - **Consent:** a consent rule on email or LinkedIn stops those sends, because
+    LeadPilot records no consent for either channel.
+  - **Region:** it is only as good as the lead's enrichment country or timezone.
+    Leads with neither fall under `unknown`, which only `*` or `unknown` rules
+    match.
+- **Re-engagement is email-only, and the conversion gate will hold many of its
+  leads.** WhatsApp needs an approved template no step names. LinkedIn's `auto`
+  action would send a second connection request. An unprompted AI call is a
+  TCPA question. Every re-engagement send also passes the live
+  conversion-probability gate. A lead who finished a sequence with
+  `conversion_min_unanswered_sends` or more unanswered touches is often judged
+  cold, and the send is held (`held_cooling` / `held_archived`), not sent. That
+  is the gate working, not a bypass to add. The "would qualify" count in the
+  panel is computed before that gate runs, so it is an upper bound. A message
+  deferred by the cap and later sent by the dispatcher leaves its attempt row
+  at `held` with the first result. The message row is the record of what
+  actually went out.
+- **Lead assignment is who works a lead, not who sends.** Outreach still goes
+  out from the workspace owner's connected Gmail / LinkedIn accounts and voice
+  profile. An assignee gets no notification when a lead is handed to them, the
+  grid cannot yet filter by assignee, and a member removed from the workspace
+  keeps their assignments (shown as "Former member") until a manager
+  reassigns them. Round-robin in the UI works on the grid selection; the
+  whole-campaign form (`strategy_id`) is API-only and capped at 500 leads per
+  call, with `more_remaining` in the response.
+
+- **OPEN — Google Meet and Zoom are still NOT verified against the live APIs.**
+  No credentials exist yet. Built without them (Feature 7):
+  - **Adapters checked against current docs (2026-09-13):**
+    - Google: `conferenceDataVersion=1`, the `hangoutsMeet` type, the Meet link
+      read from `hangoutLink` or `conferenceData.entryPoints`, and one re-read
+      when conference creation is `pending`.
+    - Zoom: the server-to-server token request.
+  - **Fixed:** the Google health check used `calendarList`, which needs a scope
+    the app never requests, so it reported every connected account unhealthy.
+  - **Cleanup:** both adapters can delete what they create. The shared plumbing
+    now accepts an empty 204 body.
+  - **Zoom credentials:** move to Admin › Integrations, with the old `ZOOM_*`
+    environment variables as fallback. The host is configurable (`host_user`),
+    because Zoom's docs do not say whether `me` works for a server-to-server
+    app.
+  - **Reconnect flow:** the stored Google grant is checked before any call. An
+    account without `calendar.events` gets `platform_action: reconnect_google`
+    on meeting create and a "Reconnect for Calendar" prompt in Settings. The
+    auth URL now sends `include_granted_scopes=true`, so the reconnect keeps
+    Gmail access.
+
+  Still unverified, pending credentials:
+  - The Zoom create-meeting path, body fields and `users/me` for a
+    server-to-server app (`# TODO: verify`).
+  - That both providers accept these requests at all.
+
+  To close this item: `scripts/verify_meeting_platforms.py --google
+  --user-email … --execute` and `--zoom --execute`, or
+  `tests/test_meeting_platforms_live.py` with the `LEADPILOT_LIVE_*` variables.
+  Until one of them passes, `platform=custom` is the only verified path. A
+  platform failure still returns a created meeting, not an error.
+- **The `calendar.events` Google scope is newer than some connections.**
+  Accounts connected before it shipped are told to reconnect: in Settings, and
+  when they choose Meet. An account whose grant was stored without any scopes
+  (`calendar_access: unknown`) is not blocked; Google decides, and a 403 maps
+  to the same reconnect error.
+- **Recall.ai transcripts are built and tested with mocks, never called live.**
+  A host can send a Recall.ai bot to a call. Its `transcript.done` webhook
+  (Svix-signed, de-duplicated, matched to the meeting only by the stored bot
+  id) pulls the transcript in and upgrades the summary
+  (`docs/features/meeting-transcripts.md`). No Recall credentials exist in any
+  environment. The signing scheme, event payload and transcript format were
+  checked against docs.recall.ai on 2026-09-13; the auth header and endpoint
+  paths carry `# TODO: verify`, because Recall's quickstart and API reference
+  disagree on `Token` vs `Bearer`. The docs name no webhook replay tolerance,
+  so five minutes (the Svix default) is a choice, not a documented value.
+- **LeadPilot does not collect consent to record.** Sending a bot records
+  everyone on the call. Some US states, and GDPR for EU/UK participants,
+  require every party's consent. The meeting room tells the host to announce
+  it; nothing enforces that.
 - **`/book/:slug` needs a hosting rewrite.** `frontend/vercel.json` ships it
   for the documented target; on another host, links use `/book/?slug=…` until
   an equivalent rewrite exists. This is a consequence of `output: 'export'`,
@@ -1048,7 +1144,17 @@ page, not a document.
   and `app/integrations/zoom.py` is the module that would change.
 - **No public benchmark numbers.** Reply rates, booking rates and deliverability
   depend on the sender, the list and the offer. This document makes
-  architectural claims, not performance claims.
+  architectural claims, not performance claims. The in-app benchmark panel
+  (`docs/features/benchmarks.md`) is not an exception. It shows the spread
+  across *this deployment's* accounts, labelled as exactly that, and publishes
+  nothing for a bucket with fewer than 10 accounts (never fewer than 5, whatever
+  the setting says).
+- **Benchmark anonymity has a limit.** Only rounded percentiles across accounts
+  are stored, and an account needs 30 sends to count. But in a small bucket a
+  percentile is, by construction, one account's rounded rate, and an operator
+  who controls several accounts could stack a bucket. Industry comes from the
+  strategy's ICP: a strategy targeting several industries lands in `multiple`,
+  not in each of them.
 
 ---
 

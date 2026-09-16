@@ -157,6 +157,26 @@ class FakeClaude:
         self.reply_intelligence_response: object | None = None
         self.reply_intelligence_prompts: list[str] = []
         self.reply_intelligence_systems: list[str] = []
+        # Part 1 Feature 1 (reply_intent). Same contract: a dict is returned
+        # verbatim, a list is a script (one per call, last repeats), an
+        # Exception is raised.
+        self.reply_intent_response: object | None = None
+        self.reply_intent_prompts: list[str] = []
+        # Part 1 Feature 2 (fpta_scoring). Default: echo each prospect's
+        # baselines back unchanged with a canned reason, so a test that does
+        # not care about the model still exercises the real merge path.
+        self.fpta_response: object | None = None
+        self.fpta_prompts: list[str] = []
+        # Part 1 Feature 7 (reengagement_memory). Same contract as the rest.
+        self.not_now_response: object | None = None
+        self.not_now_prompts: list[str] = []
+        # Part 2 (roleplay). `roleplay_reply_response` is what the PROSPECT
+        # says (a plain string, or an Exception to raise);
+        # `roleplay_feedback_response` is the coach's JSON.
+        self.roleplay_reply_response: object | None = None
+        self.roleplay_prompts: list[str] = []
+        self.roleplay_feedback_response: object | None = None
+        self.roleplay_feedback_prompts: list[str] = []
         # Feature 3 (founder voice cloning). Same contract.
         self.voice_profile_response: object | None = None
         self.voice_profile_prompts: list[str] = []
@@ -191,6 +211,17 @@ class FakeClaude:
         if self.fail_after is not None and self.completions >= self.fail_after:
             raise RuntimeError("simulated crash: model call failed")
         self.completions += 1
+        if "ROLEPLAYING A SALES PROSPECT" in system:  # Part 2
+            self.roleplay_prompts.append(prompt)
+            if isinstance(self.roleplay_reply_response, Exception):
+                raise self.roleplay_reply_response
+            if self.roleplay_reply_response is not None:
+                if isinstance(self.roleplay_reply_response, list):
+                    index = min(len(self.roleplay_prompts) - 1,
+                                len(self.roleplay_reply_response) - 1)
+                    return self.roleplay_reply_response[index]
+                return self.roleplay_reply_response
+            return "Honestly, we looked at something like this last year and parked it."
         if "strategy editor" in system:  # FIXER_SYSTEM
             match = re.search(r"criterion #(\d+)", prompt)
             if match:
@@ -281,6 +312,50 @@ class FakeClaude:
                 {"topic": "Tone", "a_position": "Formal",
                  "b_position": "Casual", "severity": "low"},
             ], "agreement_summary": "Agree on the ICP."}
+        if "sales coach reviewing a transcript" in system:  # Part 2
+            self.roleplay_feedback_prompts.append(prompt)
+            if isinstance(self.roleplay_feedback_response, Exception):
+                raise self.roleplay_feedback_response
+            if self.roleplay_feedback_response is not None:
+                return self.roleplay_feedback_response
+            return {
+                "scores": {"overall": 72, "discovery": 80, "objections": 55,
+                           "tone": 78, "close": 60},
+                "went_well": ['You opened without pitching: "what made you take '
+                              'the call?"'],
+                "improve": ["You moved on after their price objection instead of "
+                            "answering it."],
+                "tone_notes": "Warm, slightly fast in the first minute.",
+                "pacing_notes": "Three questions in a row at 02:10 — let one land.",
+                "objections_missed": [{"objection": "We parked this last year",
+                                       "why": "You changed the subject to features."}],
+                "one_thing": "Answer the first objection before asking anything else.",
+            }
+        if "said about coming back" in system:  # Part 1 Feature 7
+            self.not_now_prompts.append(prompt)
+            if isinstance(self.not_now_response, Exception):
+                raise self.not_now_response
+            if self.not_now_response is not None:
+                return self.not_now_response
+            return {"reason_kind": "budget",
+                    "reason_text": "no budget until the new fiscal year",
+                    "return_on": None, "confidence": 0.8}
+        if "F-P-T-A prospect analyst" in system:  # Part 1 Feature 2
+            self.fpta_prompts.append(prompt)
+            if isinstance(self.fpta_response, Exception):
+                raise self.fpta_response
+            if self.fpta_response is not None:
+                return self.fpta_response
+            import json as _json
+            body = prompt.split("PROSPECTS:", 1)[1]
+            prospects = _json.loads(body.rsplit("Return the JSON", 1)[0].strip())
+            return {"prospects": [
+                {"lead_id": p["lead_id"], **{
+                    dim: {"score": p["baselines"][dim],
+                          "reason": f"{dim} reason for {p.get('company') or 'them'}"}
+                    for dim in ("fit", "problem", "timing", "access")}}
+                for p in prospects
+            ]}
         if "lead scoring analyst" in system:  # Feature Group 1
             self.lead_score_prompts.append(prompt)
             if isinstance(self.lead_score_response, Exception):
@@ -438,6 +513,18 @@ class FakeClaude:
             if self.automated_reply_response is not None:
                 return self.automated_reply_response
             return {"automated": False, "reason": "reads like a person"}
+        if "reply-quality classifier" in system:  # Part 1 Feature 1
+            self.reply_intent_prompts.append(prompt)
+            if isinstance(self.reply_intent_response, Exception):
+                raise self.reply_intent_response
+            if self.reply_intent_response is not None:
+                if isinstance(self.reply_intent_response, list):
+                    index = min(len(self.reply_intent_prompts) - 1,
+                                len(self.reply_intent_response) - 1)
+                    return self.reply_intent_response[index]
+                return self.reply_intent_response
+            return {"label": "interested", "confidence": 0.9,
+                    "reason": "Asked to book a call on Thursday."}
         if "reply classifier" in system:  # M3 inbound classification
             body_part = prompt.split("BODY:", 1)[-1]
             for needle, cls in self.reply_verdicts.items():
@@ -476,6 +563,11 @@ def fake_claude(monkeypatch):
         "app.services.meeting_ai.get_client",
         "app.services.reply_classification.get_client",
         "app.services.reply_intelligence.get_client",   # Feature 2
+        "app.services.reply_intent.get_client",         # Part 1 Feature 1
+        # Part 2 (roleplay) reaches it as
+        # `from app.services.anthropic_client import get_client` INSIDE the
+        # call, so the module attribute patched below is what takes effect --
+        # there is no module-level binding here to patch.
         "app.services.displacement_monitor.get_client",  # Feature 4
         # Feature 3 (voice_profiler) and style_profile both reach it as
         # anthropic_client.get_client() at call time, so the module
@@ -628,6 +720,28 @@ def no_real_anthropic(monkeypatch):
 # row's owner, so a client authenticated as a DIFFERENT user than the one the
 # object fixtures build data under gets 404 instead. Both clients and every
 # object builder therefore share ONE canonical user.
+
+
+@pytest.fixture(autouse=True)
+def send_review_off(monkeypatch):
+    """Part 1 Feature 5's review queue is OFF for every suite that does not
+    test it.
+
+    WHY. The shared `verified_leads` fixture gives every lead the title
+    "Owner", which is a VIP title, so with the gate on every existing engine
+    test would return "held_for_review" instead of "sent" -- and those tests
+    are about the send path, not about the review queue. Rather than rewriting
+    120 assertions around a feature they are not testing, the gate is disabled
+    here and turned back ON explicitly by tests/test_send_review.py (its
+    `review_on` fixture), which is the only module that should exercise it.
+
+    This is also the honest default for the product: whether the VIP trigger
+    helps depends on the ICP, which is exactly why it is an admin setting.
+    """
+    from app.services import send_review
+
+    monkeypatch.setattr(send_review, "enabled",
+                        lambda db, code=None: False)
 
 
 @pytest.fixture()

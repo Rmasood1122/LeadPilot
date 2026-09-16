@@ -510,3 +510,19 @@ def update_followup_settings(
         "followup_enabled": step.followup_enabled,
         "followup_delay_hours": step.followup_delay_hours,
     }
+
+
+@router.get("/sequences/{sequence_id}/completion")
+def sequence_completion_metrics(
+    sequence_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Part 1 Feature 3: completion for ONE sequence.
+
+    The strategy-level number averages sequences together; this is where a
+    single sequence quietly dropping half its prospects becomes visible."""
+    from app.services import sequence_completion  # noqa: PLC0415
+
+    _owned_sequence(db, sequence_id, current_user)
+    return sequence_completion.sequence_metrics(db, sequence_id)

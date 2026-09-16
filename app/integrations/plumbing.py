@@ -243,7 +243,12 @@ class BaseHttpAdapter:
             self.breaker.record_success()
             self._log(endpoint, method, resp.status_code, latency_ms,
                       cost_units, cached=False, attempt=attempt)
-            data = resp.json()
+            # 204 No Content (e.g. a DELETE on Google Calendar or Zoom) has no
+            # body to parse; treating it as a JSON error would turn a
+            # successful delete into a retried, then failed, call. Decided by
+            # status code, not by inspecting the body: callers and test fakes
+            # are only guaranteed status_code and json().
+            data = {} if resp.status_code == 204 else resp.json()
             if cache_ttl:
                 self.cache.set(endpoint, cache_payload, data, cache_ttl)
             return data

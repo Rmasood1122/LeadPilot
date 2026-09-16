@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { login } from "@/lib/api/auth";
-import { ApiError } from "@/lib/api/client";
+import { isUnverifiedError, login, me } from "@/lib/api/auth";
+import { ApiError, restoreSession } from "@/lib/api/client";
+import { isPhoneDeferred } from "@/lib/identity";
+import { postLoginDestination } from "@/lib/post-login";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -14,9 +16,13 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // True until we know there is no session to restore. The form is not shown
+  // meanwhile, so a signed-in user never sees it flash before being sent on.
+  const [checkingSession, setCheckingSession] = useState(true);
 
   // GET /auth/verify 302s back here with one of these flags. Read from
   // window.location rather than useSearchParams() because this is a static
@@ -40,25 +46,53 @@ export default function LoginPage() {
     }
   }, []);
 
+  // Persistent sign-in: a returning visitor with a live session is signed
+  // straight back in and routed exactly as an explicit sign-in would be.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!(await restoreSession())) return;
+        const user = await me();
+        if (mounted) router.replace(postLoginDestination(user, { phoneDeferred: isPhoneDeferred() }));
+      } catch (err) {
+        if (mounted && isUnverifiedError(err)) router.replace("/check-email");
+        // Anything else (API unreachable): fall through to the form.
+      } finally {
+        if (mounted) setCheckingSession(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const user = await login(email, password);
+      const user = await login(email, password, rememberMe);
       // Login SUCCEEDS for an unverified account on purpose -- otherwise there
       // is no signed-in state from which to ask for a new link. The routing
-      // decision is made here instead.
-      if (user.email_verified === false) {
-        router.replace(`/check-email?email=${encodeURIComponent(email)}`);
-        return;
-      }
-      router.replace("/pipeline");
+      // decision (verify email / verify identity / choose a plan / dashboard)
+      // is made from the response, which the server computes fresh. This is the
+      // ONE place the plan check runs (afterLogin); session restores skip it.
+      router.replace(postLoginDestination(user, { phoneDeferred: isPhoneDeferred(), afterLogin: true }));
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Could not sign in");
-    } finally {
       setBusy(false);
     }
+  }
+
+  if (checkingSession) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center p-4">
+        <p role="status" className="text-sm text-muted-foreground">
+          Checking your session…
+        </p>
+      </main>
+    );
   }
 
   return (
@@ -74,14 +108,20 @@ export default function LoginPage() {
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-1">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" required value={email}
+              <Input id="email" type="email" autoComplete="email" required value={email}
                      onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password}
-                     onChange={(e) => setPassword(e.target.value)} />
+              <Input id="password" type="password" autoComplete="current-password" required
+                     value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
+            <label htmlFor="remember-me" className="flex items-center gap-2 text-sm">
+              <input id="remember-me" type="checkbox" checked={rememberMe}
+                     onChange={(e) => setRememberMe(e.target.checked)}
+                     className="h-4 w-4 rounded border-border" />
+              Keep me signed in
+            </label>
             {notice && (
               <p role="status" className="text-sm text-[rgb(var(--primary))]">
                 {notice}

@@ -69,7 +69,6 @@ export function usePushNotifications() {
     let tokenRefreshListener: { remove(): void } | null = null;
     void tokenRefreshListener;  // suppress TS2454 never-assigned warning
     // typed as any: @capacitor/push-notifications types require the package in tsc env
-    // eslint-disable-next-line no-var-requires
     let notificationListener: any = null;
 
     async function init() {

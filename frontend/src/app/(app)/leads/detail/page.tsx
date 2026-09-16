@@ -40,6 +40,11 @@ import { LeadCalls } from "@/components/calls/CallHistory";
 import { ClaimChecksPanel } from "@/components/leads/ClaimChecksPanel";
 import { ConversationThread } from "@/components/leads/ConversationThread";
 import { ConversionCard } from "@/components/leads/ConversionCard";
+import { FptaBadges } from "@/components/leads/FptaBadges";
+import { WhyThisProspectPanel } from "@/components/leads/WhyThisProspectPanel";
+import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPanel";
+import { ConsentPanel } from "@/components/leads/ConsentPanel";
+import { ProvenancePanel } from "@/components/leads/ProvenancePanel";
 
 const TABS = [
   { value: "overview", label: "Overview" },
@@ -106,6 +111,8 @@ export default function LeadDetailPage() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <ScoreBadge score={lead.ai_booking_likelihood} reason={lead.ai_score_reason} />
+                {/* Part 1 Feature 2: the four sub-scores, beside the single number. */}
+                <FptaBadges lead={lead} />
                 <Badge tone={statusTone(lead.status)}>{lead.status.replace(/_/g, " ")}</Badge>
                 <Button onClick={() => setLogOpen(true)}>
                   <ClipboardCheck size={16} aria-hidden="true" /> Log Meeting Outcome
@@ -210,9 +217,17 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
   );
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {/* Part 1 Feature 12: the explanation, built from Feature 2's signals. */}
+      <WhyThisProspectPanel leadId={lead.id} />
       <LeadScoreCard lead={lead} />
       {/* Feature A5: the live number the send gate acts on. */}
       <ConversionCard leadId={lead.id} />
+      {/* Part 1 Feature 7: the dates this prospect's "not now" replies set. */}
+      <ReengagementMemoryPanel leadId={lead.id} />
+      {/* Part 1 Feature 9: which channels are open, and why the others are not. */}
+      <ConsentPanel leadId={lead.id} />
+      {/* Part 1 Feature 10: where each enriched field came from, and how old. */}
+      <ProvenancePanel leadId={lead.id} />
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent>

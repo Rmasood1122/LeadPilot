@@ -230,7 +230,10 @@ class TestTask:
 
         result = reply_tasks.process_inbound_reply_impl(db_session, replied["reply"].id)
 
-        assert result == {"status": "classified", "category": "NOT_NOW"}
+        # Part 1 Feature 1 added `intent` to the task's result; the FG1 half
+        # of the contract is unchanged.
+        assert result["status"] == "classified"
+        assert result["category"] == "NOT_NOW"
         reply = replied["reply"]
         db_session.refresh(reply)
         assert reply.reply_category == "NOT_NOW"

@@ -24,6 +24,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, StickyNote } from "lucide-react";
 import { ScoreBadge } from "@/components/leads/ScoreBadge";
+import { FptaBadges } from "@/components/leads/FptaBadges";
 
 import type {
   CrmGridRow,
@@ -44,6 +45,7 @@ import {
   visibleColumns,
 } from "@/lib/crm/grid-state";
 import { useVirtualRows } from "@/lib/crm/useVirtualRows";
+import { ownerChoices, ownerLabel, type TeamContext } from "@/lib/crm/assignment";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -62,7 +64,12 @@ export interface DataGridProps {
   onEdit: (leadId: string, patch: Record<string, unknown>) => void;
   onOpenNotes: (leadId: string) => void;
   isFetching: boolean;
+  /** Workspace members, the signed-in person and their role — drives the
+   *  Owner column's picker. Omitted: the column is read-only. */
+  team?: TeamContext;
 }
+
+const NO_TEAM: TeamContext = { members: [], meId: null, role: undefined };
 
 export function DataGrid({
   rows,
@@ -73,6 +80,7 @@ export function DataGrid({
   onEdit,
   onOpenNotes,
   isFetching,
+  team = NO_TEAM,
 }: DataGridProps) {
   const columns = useMemo(() => visibleColumns(state), [state]);
   const [cursor, setCursor] = useState<CellCursor>({ row: 0, col: 0 });
@@ -214,6 +222,7 @@ export function DataGrid({
                     setEditing={setEditing}
                     commit={commit}
                     onOpenNotes={onOpenNotes}
+                    team={team}
                   />
                 );
               })}
@@ -386,6 +395,7 @@ function GridRow({
   setEditing,
   commit,
   onOpenNotes,
+  team,
 }: {
   row: CrmGridRow;
   rowIndex: number;
@@ -399,6 +409,7 @@ function GridRow({
   setEditing: (cursor: CellCursor | null) => void;
   commit: (row: CrmGridRow, key: string, value: unknown) => void;
   onOpenNotes: (leadId: string) => void;
+  team: TeamContext;
 }) {
   const selected = state.selected.has(row.id);
 
@@ -460,6 +471,7 @@ function GridRow({
               onCancel={() => setEditing(null)}
               onCommit={(value) => commit(row, column.key, value)}
               onOpenNotes={onOpenNotes}
+              team={team}
             />
           </div>
         );
@@ -477,6 +489,7 @@ function GridCell({
   onCancel,
   onCommit,
   onOpenNotes,
+  team,
 }: {
   row: CrmGridRow;
   columnKey: string;
@@ -486,6 +499,7 @@ function GridCell({
   onCancel: () => void;
   onCommit: (value: unknown) => void;
   onOpenNotes: (leadId: string) => void;
+  team: TeamContext;
 }) {
   if (columnKey === "status") {
     if (isEditing) {
@@ -521,6 +535,10 @@ function GridCell({
     return <ScoreBadge score={row.ai_booking_likelihood} reason={row.ai_score_reason} compact />;
   }
 
+  if (columnKey === "fpta_overall") {
+    return <FptaBadges lead={row} compact />;
+  }
+
   if (columnKey === "note_count") {
     return (
       <button
@@ -547,16 +565,47 @@ function GridCell({
   }
 
   if (columnKey === "owner_user_id") {
-    // Team accounts are not built, so ownership is binary: mine or unassigned.
-    // A user picker here would imply a capability that does not exist.
+    // The assignee within the workspace. The choices mirror the server's role
+    // rule (lib/crm/assignment.ts); an empty list makes the cell read-only.
+    const choices = ownerChoices(team, row.owner_user_id);
+    const label = ownerLabel(row.owner_user_id, team);
+    if (isEditing && choices.length > 0) {
+      return (
+        <select
+          autoFocus
+          defaultValue={row.owner_user_id ?? ""}
+          onChange={(event) => onCommit(event.target.value || null)}
+          onBlur={onCancel}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") onCancel();
+          }}
+          aria-label="Assign lead"
+          className="h-7 w-full rounded border border-border bg-card px-1 text-xs"
+        >
+          {choices.map((choice) => (
+            <option key={choice.value ?? "unassigned"} value={choice.value ?? ""}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+      );
+    }
+    if (choices.length === 0) {
+      return (
+        <span className="truncate text-sm text-muted-foreground" title={label}>
+          {label}
+        </span>
+      );
+    }
     return (
       <button
         type="button"
         onClick={onStartEdit}
         className="truncate text-sm text-muted-foreground hover:text-foreground"
-        aria-label={row.owner_user_id ? "Owned by you. Click to unassign." : "Unassigned. Click to claim."}
+        title={label}
+        aria-label={`Assigned to ${label === "—" ? "nobody" : label}. Click to change.`}
       >
-        {row.owner_user_id ? "You" : "—"}
+        {label}
       </button>
     );
   }

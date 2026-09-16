@@ -25,6 +25,7 @@ import { CrmCards } from "@/components/settings/CrmCards";
 import { ApiKeysCard, WebhooksCard } from "@/components/settings/WebhooksCard";
 import { oauthResultMessage } from "@/lib/api/ecosystem";
 import { ComplianceAuditCard, DeliverabilityCard } from "@/components/settings/DeliverabilityCard";
+import { MailboxHealthCard } from "@/components/settings/MailboxHealthCard";
 import { AuditTrailCard } from "@/components/settings/AuditTrailCard";
 import { ShareLinksCard } from "@/components/settings/ShareLinksCard";
 import { cn } from "@/lib/utils";
@@ -302,6 +303,12 @@ function IntegrationsSettings() {
                     ? `Connected: ${data.gmail.email}`
                     : "Not connected"}
                 </p>
+                {data.gmail.connected && data.gmail.calendar_access === "missing" && (
+                  <p role="status" className="mt-1 text-xs text-[rgb(var(--warning))]">
+                    Calendar access missing — reconnect to create Google Meet links.
+                    Your Gmail access is kept.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 {data.gmail.connected && (
@@ -311,7 +318,11 @@ function IntegrationsSettings() {
                   </Button>
                 )}
                 <Button size="sm" onClick={connectGmail}>
-                  {data.gmail.connected ? "Reconnect" : "Connect"}
+                  {!data.gmail.connected
+                    ? "Connect"
+                    : data.gmail.calendar_access === "missing"
+                      ? "Reconnect for Calendar"
+                      : "Reconnect"}
                 </Button>
               </div>
             </CardContent>
@@ -514,6 +525,9 @@ export default function SettingsPage() {
       {/* Feature Group 9: email health + the compliance audit log. */}
       {tab === "deliverability" && (
         <div className="space-y-3">
+          {/* Part 1 Feature 4: per-MAILBOX health and the auto-throttle,
+              above the per-domain card because it is the one that acts. */}
+          <MailboxHealthCard />
           <DeliverabilityCard />
           <ComplianceAuditCard />
           {/* Feature A2: the hash-chained activity trail + signed export. */}

@@ -72,14 +72,23 @@ def lead_timezone(lead: Lead) -> str:
     return settings.send_window_timezone
 
 
-def next_window_slot(dt: datetime, tz_name: str) -> datetime:
-    """Earliest instant >= dt inside the send window (returned in UTC)."""
+def next_window_slot(dt: datetime, tz_name: str,
+                     window: tuple[int, int, bool] | None = None) -> datetime:
+    """Earliest instant >= dt inside the send window (returned in UTC).
+
+    `window` is (start_hour, end_hour, skip_weekends) from a resolved
+    compliance rule (Feature 8); None is the deployment baseline. The caller
+    must not pass an empty window -- compliance_rules.Effective.window_empty.
+    """
     tz = ZoneInfo(tz_name)
     local = dt.astimezone(tz)
-    start_h, end_h = settings.send_window_start_hour, settings.send_window_end_hour
+    if window is None:
+        window = (settings.send_window_start_hour, settings.send_window_end_hour,
+                  settings.send_window_skip_weekends)
+    start_h, end_h, skip_weekends = window
 
     for _ in range(14):  # never loops more than two weeks
-        is_weekend = local.weekday() >= 5 and settings.send_window_skip_weekends
+        is_weekend = local.weekday() >= 5 and skip_weekends
         if not is_weekend:
             if local.time() < time(start_h):
                 local = local.replace(hour=start_h, minute=0, second=0, microsecond=0)
@@ -93,8 +102,9 @@ def next_window_slot(dt: datetime, tz_name: str) -> datetime:
     raise RuntimeError("could not find a send window slot within 14 days")
 
 
-def in_send_window(dt: datetime, tz_name: str) -> bool:
-    return next_window_slot(dt, tz_name) <= dt
+def in_send_window(dt: datetime, tz_name: str,
+                   window: tuple[int, int, bool] | None = None) -> bool:
+    return next_window_slot(dt, tz_name, window) <= dt
 
 
 # --------------------------------------------------------------------------
@@ -102,13 +112,15 @@ def in_send_window(dt: datetime, tz_name: str) -> bool:
 # --------------------------------------------------------------------------
 
 
-def daily_allowance(account: GmailAccount, on_date: date) -> int:
+def daily_allowance(account: GmailAccount, on_date: date, cap: int | None = None) -> int:
     """Warm-up ramp: start low, add the increment each day, cap at the
-    configured daily cap. Day 0 = the day the account was connected."""
+    configured daily cap. Day 0 = the day the account was connected.
+    `cap` (Feature 8 compliance rule) can only lower the ceiling."""
     connected = account.created_at.date() if account.created_at else on_date
     age_days = max(0, (on_date - connected).days)
     ramped = settings.gmail_warmup_start_sends + settings.gmail_warmup_daily_increment * age_days
-    return min(settings.gmail_daily_cap, ramped)
+    ceiling = settings.gmail_daily_cap if cap is None else min(cap, settings.gmail_daily_cap)
+    return min(ceiling, ramped)
 
 
 def sends_today(session: Session, sender_ref: str, now: datetime) -> int:
@@ -122,8 +134,9 @@ def sends_today(session: Session, sender_ref: str, now: datetime) -> int:
     ).scalar_one()
 
 
-def allowance_left(session: Session, account: GmailAccount, now: datetime) -> int:
-    return daily_allowance(account, now.astimezone(timezone.utc).date()) - sends_today(
+def allowance_left(session: Session, account: GmailAccount, now: datetime,
+                   cap: int | None = None) -> int:
+    return daily_allowance(account, now.astimezone(timezone.utc).date(), cap) - sends_today(
         session, str(account.id), now
     )
 
@@ -145,7 +158,7 @@ def whatsapp_sends_today(session: Session, now: datetime) -> int:
     ).scalar_one()
 
 
-def whatsapp_daily_allowance(session: Session, on_date: date) -> int:
+def whatsapp_daily_allowance(session: Session, on_date: date, cap: int | None = None) -> int:
     """Warm-up ramp for the WhatsApp number, anchored to the date of the
     FIRST WhatsApp message ever sent (there is no per-user account row
     like Gmail's — one business number per deployment)."""
@@ -155,18 +168,20 @@ def whatsapp_daily_allowance(session: Session, on_date: date) -> int:
             Message.status == MessageStatus.SENT,
         )
     ).scalar_one()
+    ceiling = (settings.whatsapp_daily_cap if cap is None
+               else min(cap, settings.whatsapp_daily_cap))
     if first_sent is None:
-        return settings.whatsapp_warmup_start_sends
+        return min(ceiling, settings.whatsapp_warmup_start_sends)
     first_date = first_sent.date() if isinstance(first_sent, datetime) else on_date
     age_days = max(0, (on_date - first_date).days)
     ramped = (settings.whatsapp_warmup_start_sends
               + settings.whatsapp_warmup_daily_increment * age_days)
-    return min(settings.whatsapp_daily_cap, ramped)
+    return min(ceiling, ramped)
 
 
-def whatsapp_allowance_left(session: Session, now: datetime) -> int:
+def whatsapp_allowance_left(session: Session, now: datetime, cap: int | None = None) -> int:
     return whatsapp_daily_allowance(
-        session, now.astimezone(timezone.utc).date()
+        session, now.astimezone(timezone.utc).date(), cap
     ) - whatsapp_sends_today(session, now)
 
 
@@ -202,6 +217,7 @@ def enroll_leads(
     ).scalars().all()
 
     enrolled = 0
+    enrolled_ids: list = []
     existing = {
         e.lead_id for e in session.execute(
             select(SequenceEnrollment).where(SequenceEnrollment.sequence_id == sequence.id)
@@ -211,20 +227,45 @@ def enroll_leads(
         if lead.id in existing or is_suppressed(session, lead.email, lead.phone,
                                                 linkedin=lead.linkedin_url):
             continue
-        enrollment = SequenceEnrollment(sequence_id=sequence.id, lead_id=lead.id)
+        # Part 1 Feature 3: the plan this prospect was enrolled INTO, frozen
+        # here. Editing the sequence later must not retroactively turn a
+        # completed enrollment into an incomplete one.
+        enrollment = SequenceEnrollment(sequence_id=sequence.id, lead_id=lead.id,
+                                        planned_steps=len(steps))
         session.add(enrollment)
         session.flush()
         _schedule_step_message(session, sequence, enrollment, lead, steps[0], base_time=now)
         enrolled += 1
+        enrolled_ids.append(lead.id)
     session.commit()
+
+    # Part 1 Feature 2: F-P-T-A is scored AT ENROLLMENT, because that is the
+    # moment the four questions become actionable -- and it runs AFTER the
+    # commit above, so a scoring failure can never undo an enrollment that
+    # already succeeded. Leads already carrying a score are left alone.
+    from app.services import fpta_scoring  # noqa: PLC0415
+
+    fpta_scoring.score_for_enrollment(session, enrolled_ids, now=now)
     return enrolled
 
 
-def stop_enrollment(session: Session, enrollment: SequenceEnrollment, reason: str) -> None:
+def stop_enrollment(session: Session, enrollment: SequenceEnrollment, reason: str,
+                    now: datetime | None = None) -> None:
     """HARD STOP. Cancels every pending message. Irreversible by design —
-    a stopped enrollment can never send again."""
+    a stopped enrollment can never send again.
+
+    Part 1 Feature 3: also records WHEN it stopped and WHAT KIND of stop it
+    was. The category is decided here, at write time, so a call site that
+    invents a new reason lands in `other` and is logged — rather than
+    silently widening the "dropped without a decision" bucket that the
+    completion metric reports.
+    """
+    from app.services import sequence_completion  # noqa: PLC0415
+
     enrollment.status = EnrollmentStatus.STOPPED
     enrollment.stop_reason = reason
+    enrollment.stopped_at = now or _now()
+    enrollment.stop_category = sequence_completion.categorize(reason)
     pending = session.execute(
         select(Message).where(
             Message.sequence_id == enrollment.sequence_id,
@@ -308,15 +349,25 @@ def _schedule_step_message(
     return msg
 
 
-def schedule_next_step(session: Session, message: Message, now: datetime) -> Message | None:
+def schedule_next_step(session: Session, message: Message, now: datetime,
+                       counts_as_sent: bool = True) -> Message | None:
     """After a successful send: schedule the following step, or complete
-    the enrollment when there is none."""
+    the enrollment when there is none.
+
+    `counts_as_sent=False` is the SKIP path (app/services/sequence_engine
+    ::skip_message): the sequence advances, but the prospect did not receive
+    that step, so it must not count towards Feature 3's completion.
+    """
     enrollment = session.execute(
         select(SequenceEnrollment).where(
             SequenceEnrollment.sequence_id == message.sequence_id,
             SequenceEnrollment.lead_id == message.lead_id,
         )
     ).scalar_one()
+    # Only ADVANCING counts: a transient failure that re-sends the same step
+    # arrives here once, when the step finally lands.
+    if counts_as_sent and message.step_no > enrollment.current_step:
+        enrollment.steps_sent = (enrollment.steps_sent or 0) + 1
     enrollment.current_step = message.step_no
 
     sequence = session.get(Sequence, message.sequence_id)
@@ -326,6 +377,7 @@ def schedule_next_step(session: Session, message: Message, now: datetime) -> Mes
         return None
     if not next_steps:
         enrollment.status = EnrollmentStatus.COMPLETED
+        enrollment.completed_at = now
         _flag_if_all_skipped(session, enrollment)
         session.commit()
         return None
@@ -345,7 +397,9 @@ def skip_message(session: Session, message: Message,
     session.commit()
     logger.info("message %s skipped: %s (lead %s)",
                 message.id, reason, message.lead_id)
-    return schedule_next_step(session, message, now=now)
+    # Part 1 Feature 3: a skipped step advances the sequence but was never
+    # received, so it does not count towards completion.
+    return schedule_next_step(session, message, now=now, counts_as_sent=False)
 
 
 def _flag_if_all_skipped(session: Session, enrollment: SequenceEnrollment) -> None:
@@ -360,7 +414,10 @@ def _flag_if_all_skipped(session: Session, enrollment: SequenceEnrollment) -> No
         )
     ).scalars().all()
     if statuses and all(st is MessageStatus.SKIPPED for st in statuses):
+        from app.services import sequence_completion  # noqa: PLC0415
+
         enrollment.stop_reason = "completed_all_skipped_needs_attention"
+        enrollment.stop_category = sequence_completion.ALL_STEPS_SKIPPED
 
 
 # --------------------------------------------------------------------------
@@ -428,22 +485,20 @@ def unsubscribe_lead(session: Session, lead: Lead, source: str,
                      message_id: uuid.UUID | None = None,
                      channel: str = "email") -> None:
     """One action for BOTH the unsubscribe click and an
-    unsubscribe_request reply: instant suppression + hard stop."""
-    if lead.email and not is_suppressed(session, email=lead.email):
-        session.add(SuppressionEntry(email=lead.email.lower().strip(),
-                                     reason=f"unsubscribed_{source}"))
-    if lead.phone and not is_suppressed(session, phone=lead.phone):
-        session.add(SuppressionEntry(phone=lead.phone.strip(),
-                                     reason=f"unsubscribed_{source}"))
-    # Feature Group 5: an opt-out on any channel covers LinkedIn too.
-    if lead.linkedin_url and not is_suppressed(session, linkedin=lead.linkedin_url):
-        from app.db.models import LinkedInSuppression  # noqa: PLC0415
-        from app.services.linkedin_outreach import normalize_profile  # noqa: PLC0415
+    unsubscribe_request reply: instant suppression + hard stop.
 
-        profile = normalize_profile(lead.linkedin_url)
-        if profile:
-            session.add(LinkedInSuppression(profile=profile,
-                                            reason=f"unsubscribed_{source}"))
+    Part 1 Feature 9: the per-channel suppression that used to live here is
+    now `consent.suppress_everywhere`, for two reasons. It also revokes
+    WHATSAPP -- which this function did not, so an unsubscribe by email left
+    `whatsapp_opted_in` True and the next WhatsApp step went out anyway. And
+    it writes the consent ledger, so "when did they tell you to stop, and
+    what did you do about it?" has an answer that outlives the lead row.
+    """
+    from app.services import consent  # noqa: PLC0415
+
+    consent.suppress_everywhere(session, lead, source=source,
+                                reason=f"unsubscribed_{source}",
+                                detail=f"unsubscribed via {source} on {channel}")
     _outcome(session, lead, OutcomeEvent.UNSUBSCRIBED, message_id,
              {"source": source}, channel=channel)
     session.commit()
@@ -486,10 +541,15 @@ def check_bounce_rate(session: Session, strategy: Strategy) -> bool:
         .where(Lead.strategy_id == strategy.id, Outcome.event == OutcomeEvent.BOUNCED)
     ).scalar_one()
     rate = bounced / sent
-    if rate > settings.bounce_rate_pause_threshold and strategy.campaign_state == CAMPAIGN_ACTIVE:
+    # Feature 8: the workspace's compliance rule may lower the threshold,
+    # never raise it past the deployment baseline.
+    from app.services import compliance_rules  # noqa: PLC0415
+
+    threshold = compliance_rules.bounce_threshold(session, strategy)
+    if rate > threshold and strategy.campaign_state == CAMPAIGN_ACTIVE:
         strategy.campaign_state = CAMPAIGN_PAUSED_BOUNCE
         strategy.campaign_pause_reason = (
-            f"bounce rate {rate:.1%} exceeded {settings.bounce_rate_pause_threshold:.0%} "
+            f"bounce rate {rate:.1%} exceeded {threshold:.1%} "
             f"({bounced}/{sent}) — human review required"
         )
         session.commit()

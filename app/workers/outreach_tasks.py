@@ -49,6 +49,7 @@ from app.services.message_personalization import (
     render_whatsapp_variables,
 )
 from app.services.reply_classification import classify_reply
+from app.services import compliance_rules, reengagement
 from app.services import whatsapp_optin as optin_svc
 from app.services.whatsapp_window import window_state_for_lead
 from app.workers.celery_app import celery_app
@@ -194,6 +195,16 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             engine.stop_enrollment(session, enrollment, reason="suppressed")
         return "cancelled_suppressed"
 
+    # ---- Feature 5: opt-in re-engagement's own switch and cap -------------
+    # IN ADDITION to every gate here, never instead of one. A campaign whose
+    # re-engagement was switched off since scheduling cancels; an exhausted
+    # re-engagement cap defers to tomorrow. The channel daily cap below still
+    # applies on top.
+    if message.origin == reengagement.ORIGIN:
+        held = reengagement.send_time_hold(session, strategy, lead, message, now)
+        if held is not None:
+            return held
+
     # ---- Feature A5: live conversion probability / kill signals -----------
     # A lead that has gone cold is not sent to: the gate pauses (cooling) or
     # stops (archived) its sequence and the send ends here. Probability alone
@@ -243,10 +254,28 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 session.commit()
                 return "needs_template_not_approved"
 
+    # ---- Feature 8: the resolved compliance rule for THIS lead + channel ----
+    # Workspace / region / channel overrides of the baseline, resolved now.
+    # Fails closed -- see app/services/compliance_rules.py.
+    rules = compliance_rules.resolve(session, lead, message.channel.value, strategy)
+    if rules.consent_required and not compliance_rules.has_consent(
+            session, lead, message.channel):
+        # Skipped, not failed: the sequence continues on its other steps, the
+        # same way a WhatsApp step without opt-in is skipped.
+        engine.skip_message(session, message, reason="skipped_consent_required", now=now)
+        return "skipped_consent_required"
+
     # ---- send window --------------------------------------------------------
     tz = engine.lead_timezone(lead)
-    if not engine.in_send_window(now, tz):
-        message.scheduled_at = engine.next_window_slot(now, tz)
+    if rules.window_empty:
+        # Conflicting (or invalid) rules leave no permitted hour. Closed:
+        # nothing transmits, and the message is looked at again tomorrow.
+        message.scheduled_at = now + timedelta(days=1)
+        message.error = "no permitted send window under the current compliance rules"
+        session.commit()
+        return "deferred_no_send_window"
+    if not engine.in_send_window(now, tz, rules.window):
+        message.scheduled_at = engine.next_window_slot(now, tz, rules.window)
         session.commit()
         return "deferred_window"
 
@@ -270,20 +299,55 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             return stopped
     elif is_whatsapp:
         account = None
-        if engine.whatsapp_allowance_left(session, now) <= 0:
+        if engine.whatsapp_allowance_left(session, now, rules.daily_cap) <= 0:
             tomorrow = now.astimezone(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
-            message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+            message.scheduled_at = engine.next_window_slot(tomorrow, tz, rules.window)
             session.commit()
             return "deferred_cap"
     else:
         account = _account_for_strategy(session, strategy)
-        if engine.allowance_left(session, account, now) <= 0:
+        # Part 1 Feature 4: per-mailbox deliverability health. A PAUSED mailbox
+        # defers the message to tomorrow's window -- deferred, never dropped,
+        # the same rule the daily cap has always followed -- and a THROTTLED
+        # one lowers the ceiling for today. Neither can ever RAISE the cap: the
+        # throttle is combined with the compliance rule's cap by taking the
+        # smaller of the two.
+        from app.services import mailbox_health  # noqa: PLC0415
+
+        # Part 1 Feature 11: a client's prospects must never see another
+        # client's sending domain. Checked HERE, in the send path, not only
+        # rendered in a settings page -- an isolation rule that lives in a
+        # form is an isolation rule that leaks. An empty pool means no
+        # restriction, so nothing changes for an account without clients.
+        from app.services import client_workspaces  # noqa: PLC0415
+
+        wrong_pool = client_workspaces.domain_allowed(session, strategy,
+                                                      account.email_address)
+        if wrong_pool is not None:
+            message.status = MessageStatus.FAILED
+            message.error = f"sending domain not in the client's pool: {wrong_pool}"
+            session.commit()
+            return "blocked_client_domain"
+
+        health = mailbox_health.gate(session, account.user_id, str(account.id))
+        effective_cap = rules.daily_cap
+        if health["cap"] is not None:
+            effective_cap = (health["cap"] if effective_cap is None
+                             else min(effective_cap, health["cap"]))
+        if (health["state"] == mailbox_health.PAUSED
+                or engine.allowance_left(session, account, now, effective_cap) <= 0):
             tomorrow = now.astimezone(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
-            message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+            message.scheduled_at = engine.next_window_slot(tomorrow, tz, rules.window)
+            if health["state"] == mailbox_health.PAUSED:
+                # The reason travels with the message, so the lead timeline
+                # can say WHY this step has not gone out.
+                message.error = f"mailbox paused: {health['reason'] or 'deliverability health'}"
+                session.commit()
+                return "deferred_mailbox_paused"
             session.commit()
             return "deferred_cap"
 
@@ -315,6 +379,37 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             outbound = _render_email_outbound(session, strategy, lead,
                                               sequence, message)
         session.commit()  # rendered content persisted before the send
+
+        # ---- Part 1 Feature 5: the human review queue ---------------------
+        # AFTER rendering, because three of the four triggers are facts about
+        # the prospect right now and the fourth is about the copy that was
+        # actually written. A held message is QUEUED, not lost: it sits in
+        # AWAITING_REVIEW until a person approves it, and approving returns it
+        # to SCHEDULED. Phone is excluded -- a live call is not a message a
+        # reviewer can read and approve after the fact.
+        if not is_phone:
+            from app.services import send_review  # noqa: PLC0415
+
+            decision = send_review.gate(session, lead, message,
+                                        outbound.subject, outbound.body, now=now)
+            if decision["action"] == "hold":
+                message.status = MessageStatus.AWAITING_REVIEW
+                message.error = None
+                session.commit()
+                return "held_for_review"
+            if decision["action"] == "cancel":
+                message.status = MessageStatus.CANCELLED
+                message.error = f"rejected in review: {decision['reason']}"
+                session.commit()
+                return "rejected_in_review"
+            # A reviewer may have EDITED the copy. Their words are what sends,
+            # and they are persisted so the sent row matches what went out.
+            if (decision["subject"], decision["body"]) != (outbound.subject, outbound.body):
+                outbound.subject = decision["subject"]
+                outbound.body = decision["body"]
+                message.subject = decision["subject"]
+                message.body = decision["body"]
+                session.commit()
 
         if channel is None:
             if is_linkedin:
@@ -1457,6 +1552,113 @@ def send_followup_task(self, enrollment_id: str, step_no: int) -> str:
         session.rollback()
         logger.exception("auto follow-up failed for enrollment %s step %s — "
                          "retrying", enrollment_id, step_no)
+        raise self.retry(exc=exc, countdown=300)
+    finally:
+        session.close()
+
+
+# --------------------------------------------------------------------------
+# Feature 5 — opt-in post-sequence re-engagement
+# --------------------------------------------------------------------------
+#
+# The sweep only ENQUEUES, and never more per campaign than the campaign's
+# remaining re-engagement allowance. The send claims a reengagement_attempts
+# row (UNIQUE per enrollment) BEFORE creating a message, then hands the message
+# to send_message_impl like any other send. See app/services/reengagement.py.
+
+
+def check_reengagement_due_impl(session: Session, now: datetime | None = None,
+                                enqueue=None) -> list[str]:
+    now = now or _now()
+    enqueue = enqueue or (lambda eid: send_reengagement_task.delay(eid))
+    if not reengagement.allowed(session):
+        return []
+
+    strategies = session.execute(
+        select(Strategy).where(Strategy.reengagement_enabled.is_(True),
+                               Strategy.campaign_state == engine.CAMPAIGN_ACTIVE)
+    ).scalars().all()
+
+    due: list[str] = []
+    for strategy in strategies:
+        left = reengagement.allowance_left(session, strategy, now)
+        for enrollment in reengagement.candidates(session, strategy, now, left):
+            enqueue(str(enrollment.id))
+            due.append(str(enrollment.id))
+    return due
+
+
+def send_reengagement_impl(session: Session, enrollment_id: uuid.UUID,
+                           now: datetime | None = None) -> str:
+    """Send one re-engagement. Idempotent: a second call for the same
+    enrollment returns skipped_already_attempted and creates nothing."""
+    now = now or _now()
+    enrollment = session.get(SequenceEnrollment, enrollment_id)
+    if enrollment is None:
+        return "missing"
+    reason = reengagement.ineligibility(session, enrollment, now)
+    if reason is not None:
+        return f"skipped_{reason}"
+
+    lead = session.get(Lead, enrollment.lead_id)
+    strategy = session.get(Strategy, lead.strategy_id)
+    # Checked before claiming: an over-cap enrollment stays unclaimed, so a
+    # later sweep can still re-engage it once allowance frees up.
+    if reengagement.allowance_left(session, strategy, now) <= 0:
+        return "deferred_reengagement_cap"
+
+    last = reengagement._last_sent(session, enrollment)  # noqa: SLF001
+    attempt = reengagement.claim(session, enrollment, lead, strategy)
+    if attempt is None:
+        return "skipped_already_attempted"
+
+    template = personalization.build_reengagement_brief(
+        session, strategy, lead, channel=last.channel.value)
+    message = Message(
+        sequence_id=enrollment.sequence_id,
+        lead_id=lead.id,
+        channel=last.channel,
+        step_no=last.step_no + 1,
+        template=template,
+        variant=last.variant,
+        origin=reengagement.ORIGIN,
+        status=MessageStatus.SCHEDULED,
+        # Same reason as the follow-up: keeps the beat dispatcher off the row
+        # for the moment it takes to send it here, so the outcome keeps its tag.
+        scheduled_at=now + _FOLLOWUP_DISPATCH_GUARD,
+    )
+    session.add(message)
+    session.flush()
+    attempt.message_id = message.id
+    attempt.status = "scheduled"
+    session.commit()
+
+    result = send_message_impl(session, message.id, now=now,
+                               outcome_source=reengagement.OUTCOME_SOURCE)
+    attempt.status = "sent" if result == "sent" else "held"
+    attempt.detail = result[:200]
+    session.commit()
+    logger.info("re-engagement for enrollment %s: %s", enrollment_id, result)
+    return result
+
+
+@celery_app.task(name="leadpilot.outreach.check_reengagement_due")
+def check_reengagement_due() -> int:
+    session = SessionLocal()
+    try:
+        return len(check_reengagement_due_impl(session))
+    finally:
+        session.close()
+
+
+@celery_app.task(name="leadpilot.outreach.send_reengagement", bind=True, max_retries=3)
+def send_reengagement_task(self, enrollment_id: str) -> str:
+    session = SessionLocal()
+    try:
+        return send_reengagement_impl(session, uuid.UUID(enrollment_id))
+    except Exception as exc:
+        session.rollback()
+        logger.exception("re-engagement failed for enrollment %s — retrying", enrollment_id)
         raise self.retry(exc=exc, countdown=300)
     finally:
         session.close()

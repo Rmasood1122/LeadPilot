@@ -49,6 +49,10 @@ from app.api.personalization import router as personalization_router   # FG2
 from app.api.linkedin import router as linkedin_router                 # FG5
 from app.api.calls import router as calls_router                       # FG6
 from app.api.revenue_analytics import router as revenue_analytics_router  # FG3
+from app.api.reengagement import router as reengagement_router  # Feature 5
+from app.api.recording import router as recording_router  # Feature 3 (transcripts)
+from app.api.benchmarks import router as benchmarks_router  # Feature 6
+from app.api.compliance_rules import router as compliance_rules_router  # Feature 8
 from app.api.tracking import router as tracking_router                 # FG3
 from app.api.api_keys import router as api_keys_router                 # FG4
 from app.api.crm_integrations import router as crm_integrations_router # FG4
@@ -64,6 +68,12 @@ from app.api.conversations import router as conversations_router       # Feature
 from app.api.conversion import router as conversion_router             # Feature A5
 from app.api.share_links import router as share_links_router           # Feature A6
 from app.api.sequence_reviews import router as sequence_reviews_router # Feature A7
+from app.api.send_reviews import router as send_reviews_router       # Part 1 Feature 5
+from app.api.inbox import router as inbox_router                      # Part 1 Feature 6
+from app.api.attribution import router as attribution_router          # Part 1 Feature 8
+from app.api.consent import router as consent_router                  # Part 1 Feature 9
+from app.api.client_workspaces import router as clients_router        # Part 1 Feature 11
+from app.api.practice import router as practice_router                # Part 2
 
 # M7
 from app.api.devices import router as devices_router
@@ -266,6 +276,32 @@ app.include_router(share_links_router)           # /share-links, /public/roi/{to
 # Feature A7. /sequences/{id}/review* are new sub-paths under sequences.py's
 # /sequences/{id} (GET) -- a longer literal path, so no collision.
 app.include_router(sequence_reviews_router)      # pre-send adversarial review
+# Part 1 Feature 5. /send-reviews is a new prefix -- it does not collide with
+# sequence_reviews.py's /sequences/{id}/review*, which reviews a sequence's
+# CONTENT before launch rather than one MESSAGE at send time.
+app.include_router(send_reviews_router)          # human review queue
+# Part 1 Feature 6. /inbox is a new prefix; it does not collide with
+# /crm/replies (Feature A3), which lists replies by REPLY with their
+# authenticity rather than threading them by prospect.
+app.include_router(inbox_router)                 # unified cross-channel inbox
+# Part 1 Feature 8. /attribution is a new prefix and
+# /leads/{id}/attribution a new sub-path. Nothing here writes an outcome; it
+# only explains the ones that already happened.
+app.include_router(attribution_router)           # transparent attribution ledger
+# Part 1 Feature 9. /compliance/consent and /compliance/requirements are new
+# sub-paths under trust.py's /compliance/audit; /leads/{id}/consent* are new.
+app.include_router(consent_router)               # consent ledger + cross-channel withdrawal
+# Part 1 Feature 11. /clients is a new prefix; /strategies/{id}/client is a new
+# sub-path under strategies.py's /strategies/{id}.
+app.include_router(clients_router)               # per-client agency workspaces
+# Part 2. /practice is a new prefix; the /meeting-prep/{id}/script,
+# /readiness and /practice-required paths are longer literals under
+# meeting_prep.py's /meeting-prep/{brief_id}, so there is no collision.
+app.include_router(practice_router)              # call script + roleplay practice
+app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/reengagement
+app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
+app.include_router(benchmarks_router)            # Feature 6: /benchmarks
+app.include_router(compliance_rules_router)      # Feature 8: /admin/compliance-rules
 
 
 # ---------------------------------------------------------------------------

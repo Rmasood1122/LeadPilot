@@ -1,13 +1,16 @@
-"""Strategies — creation (enqueues the pipeline) and status/progress."""
+"""Strategies — creation (enqueues the pipeline), status/progress, and
+password-confirmed deletion."""
 
+import logging
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.rate_limiting import enforce_rate_limit
+from app.core.rate_limiting import AUTH_WINDOW_SECONDS, enforce_rate_limit
 from app.api.schemas import (
     PhaseProgress,
     PipelineProgress,
@@ -24,12 +27,26 @@ from app.db.models import (
     Outcome, OutcomeEvent, PastClient, Product, ResearchStep, Strategy,
     StrategyStatus, User,
 )
+from app.services import auth as auth_svc
+from app.services import security_audit
 from app.services import sequence_engine as engine
 from app.pipeline.engine import pipelines_for_flow
 from app.pipeline.registry import phase_title
 from app.workers import tasks as worker_tasks
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["strategies"])
+
+# The exact detail a wrong confirmation password carries. The frontend matches
+# on it (a contract, like EMAIL_NOT_VERIFIED). 403, never 401: a 401 would send
+# the client into refresh-then-retry and, failing that, sign the user out for
+# mistyping a password.
+INVALID_PASSWORD = "INVALID_PASSWORD"
+
+
+class StrategyDeleteIn(BaseModel):
+    password: str = Field(min_length=1, max_length=200)
 
 
 def _owned_strategy(db: Session, strategy_id: uuid.UUID, current_user: User) -> Strategy:
@@ -192,6 +209,79 @@ def resume_strategy(
 
     worker_tasks.run_pipeline.delay(str(strategy.id))
     return strategy
+
+
+@router.delete("/strategies/{strategy_id}")
+def delete_strategy(
+    strategy_id: uuid.UUID,
+    body: StrategyDeleteIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """Permanently delete a strategy, after re-checking the account password.
+
+    WHOSE PASSWORD. The person who is signed in (request.state.actor). In a
+    workspace, current_user is the OWNER whose data this is, and a manager
+    must confirm with their own password, not know the owner's. SDRs and
+    viewers never get here: app/services/rbac.py refuses DELETE for both.
+
+    ORDER. Rate limit (well-formed requests only), then ownership (404 -- an id
+    from another account is not confirmed to exist, and no password is tested
+    against it), then the live-campaign guard, then the password. The limit
+    shares RATE_LIMIT_AUTH and its window with login but has its OWN bucket, so
+    mistyping here cannot lock anyone out of signing in, while a stolen access
+    token still cannot be used to brute-force the password.
+
+    WHAT GOES. Everything that hangs off the strategy -- research steps, leads,
+    batches, sequences, messages, analytics -- through the database's ON DELETE
+    CASCADE / SET NULL rules. Deleted with a Core DELETE rather than
+    session.delete(): the ORM relationships have no passive_deletes, so the ORM
+    would first try to NULL every child's NOT NULL strategy_id. The
+    tamper-evident activity trail keeps its rows (opaque refs, no FK) by design.
+
+    AUDIT. The deletion and its security_audit_events row commit together; a
+    refused attempt is recorded and committed on its own.
+    """
+    actor: User = getattr(request.state, "actor", None) or current_user
+    enforce_rate_limit(f"acct:{actor.id}", "password_confirm", "RATE_LIMIT_AUTH",
+                       AUTH_WINDOW_SECONDS)
+
+    strategy = _owned_strategy(db, strategy_id, current_user)
+
+    if strategy.status is StrategyStatus.EXECUTING and strategy.campaign_state == "active":
+        raise HTTPException(
+            status_code=409,
+            detail="This strategy's campaign is still sending. Pause the campaign "
+                   "before deleting the strategy.",
+        )
+
+    if not auth_svc.verify_password(body.password, actor.password_hash):
+        security_audit.record(
+            db, action=security_audit.STRATEGY_DELETE_DENIED, request=request,
+            user_id=actor.id, owner_user_id=current_user.id,
+            target_type="strategy", target_id=strategy.id,
+            details={"reason": "invalid_password"})
+        db.commit()
+        raise HTTPException(status_code=403, detail=INVALID_PASSWORD)
+
+    deleted_at = datetime.now(timezone.utc)
+    security_audit.record(
+        db, action=security_audit.STRATEGY_DELETED, request=request,
+        user_id=actor.id, owner_user_id=current_user.id,
+        target_type="strategy", target_id=strategy.id,
+        details={"product_id": str(strategy.product_id),
+                 "status": strategy.status.value,
+                 "flow_type": strategy.flow_type.value,
+                 "deleted_at": deleted_at.isoformat()})
+    db.flush()
+    db.expunge(strategy)
+    db.execute(delete(Strategy).where(Strategy.id == strategy_id)
+               .execution_options(synchronize_session=False))
+    db.commit()
+    logger.info("strategy %s deleted by user %s (owner %s)", strategy_id, actor.id,
+                current_user.id)
+    return {"deleted": True, "id": str(strategy_id), "deleted_at": deleted_at.isoformat()}
 
 
 @router.get("/strategies/{strategy_id}/campaign")

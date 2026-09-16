@@ -11,6 +11,10 @@ import {
   Legend, ResponsiveContainer,
 } from "recharts";
 import { AsyncState } from "@/components/ui/skeleton";
+import { BenchmarkPanel } from "@/components/analytics/BenchmarkPanel";
+import { ReplyQualityPanel } from "@/components/analytics/ReplyQualityPanel";
+import { CompletionPanel } from "@/components/analytics/CompletionPanel";
+import { AttributionPanel } from "@/components/analytics/AttributionPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
@@ -79,6 +83,15 @@ export default function AnalyticsPage() {
                   empty={!data || data.series.length === 0}
                   emptyLabel="No outcome data yet — send your first campaign.">
 
+        {/* Part 1 Feature 1: positive reply rate beside the raw reply rate. */}
+        <ReplyQualityPanel strategyId={effectiveId || undefined} />
+
+        {/* Part 1 Feature 3: did enrolled prospects get the whole sequence? */}
+        <CompletionPanel strategyId={effectiveId || undefined} />
+
+        {/* Part 1 Feature 8: which touch earned each outcome, and how sure. */}
+        <AttributionPanel strategyId={effectiveId || undefined} />
+
         <Card aria-label="Volume over time">
           <CardHeader><CardTitle className="text-sm">Messages sent over time</CardTitle></CardHeader>
           <CardContent>
@@ -145,6 +158,9 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* Feature 6: anonymised benchmarks across LeadPilot accounts. */}
+        <BenchmarkPanel strategyId={effectiveId || undefined} />
 
         {/* M8 learning insights placeholder */}
         <Card className="border-dashed">

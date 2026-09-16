@@ -13,7 +13,7 @@ import { PRESETS } from "./presets";
 import { applyTheme, themeToCssVars } from "./apply";
 import { relativeLuminance } from "./contrast";
 import { getTheme } from "@/lib/api/themes";
-import { hasSession } from "@/lib/api/client";
+import { restoreSession } from "@/lib/api/client";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -84,8 +84,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     applyTheme(theme);
-    if (!hasSession()) return;
-    getTheme()
+    restoreSession()
+      .then((signedIn) => (signedIn ? getTheme() : null))
       .then((saved) => {
         if (saved && Object.keys(saved).length > 0) {
           const preset = saved.preset && PRESETS[saved.preset];

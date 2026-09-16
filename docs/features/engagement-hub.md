@@ -305,30 +305,30 @@ change needed.
 
 ## Outstanding
 
-1. **Google Calendar and Zoom have never been called for real.** Both adapters
-   are written against the documented APIs and carry `# TODO: verify against
-   current docs` markers on every endpoint and field name, matching the
-   convention the Calendly and WhatsApp adapters use. Nothing in the product
-   breaks without them — `platform=custom` is the fully working path, and a
-   platform failure returns a created meeting with `platform_error` — but the
-   Meet and Zoom link creation should be exercised once against real
-   credentials before it is advertised.
+1. **Google Calendar and Zoom have still never been called for real (OPEN).**
+   Feature 7 re-checked both adapters against current docs, fixed the Google
+   health check, added delete for cleanup and moved Zoom credentials to Admin ›
+   Integrations. A live check is ready for whoever holds credentials:
+   `scripts/verify_meeting_platforms.py` and
+   `tests/test_meeting_platforms_live.py`. Until one passes, `platform=custom`
+   is the only verified path, and a platform failure still returns a created
+   meeting with `platform_error` (plus `platform_action`).
 
-2. **The Google `calendar.events` scope is new.** It was added to
-   `GMAIL_SCOPES`, so accounts connecting from now on grant it. An account
-   connected *before* this shipped does not gain it retroactively: Google
-   answers 403 and `GoogleCalendarNotAuthorized` tells the user to reconnect at
-   `/integrations/gmail/auth-url`. Existing users will hit this the first time
-   they pick Google Meet.
+2. **The Google `calendar.events` scope and the reconnect flow.** The stored
+   grant is checked before any call. Accounts connected before the scope
+   shipped see "Reconnect for Calendar" in Settings and get
+   `platform_action: reconnect_google` when they pick Meet. The auth URL sends
+   `include_granted_scopes=true`, so reconnecting keeps their Gmail access.
 
 3. **`/book/:slug` needs the hosting rewrite.** `frontend/vercel.json` ships it
    for the documented target (Vercel). On any other host, links must use
    `/book/?slug=…` until an equivalent rewrite is added.
 
-4. **Transcript ingestion has no client yet.** The endpoint, its HMAC scheme
-   and its cap are implemented and tested; nothing calls it. A browser
-   extension or a Recall.ai webhook is the next piece, and until one exists the
-   AI summary works from the user's live notes alone.
+4. **Transcript ingestion now has a client: Recall.ai** (see
+   [`meeting-transcripts.md`](meeting-transcripts.md)). It has not been
+   exercised against the live service: no Recall credentials exist yet. The
+   HMAC chunk endpoint above is unchanged and remains the generic path for any
+   other provider.
 
 5. **Meetings are hosted by one Zoom account.** Zoom server-to-server OAuth
    means the LeadPilot operator authorises once and every meeting is created

@@ -13,10 +13,13 @@ import * as campaigns from "./campaigns";
 import * as integrations from "./integrations";
 import type { LeadStatus } from "./types";
 
-export function useStrategy(id: string) {
+export function useStrategy(id: string, enabled = true) {
   return useQuery({
     queryKey: ["strategy", id],
     queryFn: () => strategies.getStrategy(id),
+    // Turned off once the strategy is deleted, so the polling below does not
+    // fetch a 404 in the moment before the page navigates away.
+    enabled: enabled && !!id,
     // live pipeline progress: poll while researching/verifying
     refetchInterval: (query) =>
       query.state.data &&
@@ -30,6 +33,19 @@ export function useStrategies() {
   return useQuery({
     queryKey: ["strategies"],
     queryFn: strategies.listStrategies,
+  });
+}
+
+export function useDeleteStrategy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      strategies.deleteStrategy(id, password),
+    onSuccess: (_result, { id }) => {
+      queryClient.removeQueries({ queryKey: ["strategy-document", id] });
+      queryClient.removeQueries({ queryKey: ["analytics", id] });
+      return queryClient.invalidateQueries({ queryKey: ["strategies"] });
+    },
   });
 }
 

@@ -17,14 +17,23 @@ export interface UserOut {
   identity_required?: boolean;
   identity_complete?: boolean;
   phone_verified?: boolean;
+  /** Whether the account has a purchased (or trialing) plan, read from the
+   *  database on every sign-in, refresh and /auth/me. False routes the user
+   *  to /pricing. Optional for the same backward-compat reason as
+   *  email_verified: absent means "unknown", which never gates anyone. */
+  has_active_plan?: boolean;
+  subscription_status?: string | null;
 }
 
 export interface TokenBundle {
   user: UserOut;
   access_token: string;
-  refresh_token: string;
+  /** Native / SDK clients only. The web app receives it as an HttpOnly cookie
+   *  and never sees it; a grace-window refresh omits it for everyone. */
+  refresh_token?: string;
   token_type: string;
   expires_in: number;
+  session_persistent?: boolean;
   /** Present on the /auth/signup response only. */
   email_verification_required?: boolean;
   /** False when the account was created but the mail transport was down —
@@ -310,6 +319,17 @@ export interface LeadOut {
   phone_consent_at?: string | null;
   phone_consent_source?: string | null;
   last_call_outcome?: string | null;
+  /** Part 1 Feature 2 — F-P-T-A. On list rows AND detail; null = never scored. */
+  fpta_overall?: number | null;
+  fpta_fit?: number | null;
+  fpta_problem?: number | null;
+  fpta_timing?: number | null;
+  fpta_access?: number | null;
+  fpta_scored_at?: string | null;
+  /** Detail view only. */
+  fpta_reasons_json?: Record<string, { score: number; reason: string; signals: string[];
+                                       baseline: number }> | null;
+  fpta_method?: "model" | "heuristic" | "mixed" | null;
 }
 
 export interface LeadScoreFactors {
@@ -597,6 +617,12 @@ export interface CrmGridRow {
   /** Feature Group 1 — sortable server-side; null = never scored. */
   ai_booking_likelihood?: number | null;
   ai_score_reason?: string | null;
+  /** Part 1 Feature 2 — F-P-T-A; `fpta_overall` is sortable server-side. */
+  fpta_overall?: number | null;
+  fpta_fit?: number | null;
+  fpta_problem?: number | null;
+  fpta_timing?: number | null;
+  fpta_access?: number | null;
 }
 
 /** "due" is the one that matters: contacted, past its step's follow-up
