@@ -68,6 +68,7 @@ from app.api.conversations import router as conversations_router       # Feature
 from app.api.conversion import router as conversion_router             # Feature A5
 from app.api.share_links import router as share_links_router           # Feature A6
 from app.api.sequence_reviews import router as sequence_reviews_router # Feature A7
+from app.api.send_reviews import router as send_reviews_router       # Part 1 Feature 5
 
 # M7
 from app.api.devices import router as devices_router
@@ -270,6 +271,10 @@ app.include_router(share_links_router)           # /share-links, /public/roi/{to
 # Feature A7. /sequences/{id}/review* are new sub-paths under sequences.py's
 # /sequences/{id} (GET) -- a longer literal path, so no collision.
 app.include_router(sequence_reviews_router)      # pre-send adversarial review
+# Part 1 Feature 5. /send-reviews is a new prefix -- it does not collide with
+# sequence_reviews.py's /sequences/{id}/review*, which reviews a sequence's
+# CONTENT before launch rather than one MESSAGE at send time.
+app.include_router(send_reviews_router)          # human review queue
 app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/reengagement
 app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
 app.include_router(benchmarks_router)            # Feature 6: /benchmarks

@@ -18,7 +18,7 @@ Each feature below moves through: **migration → service → API → frontend �
 | 2 | F-P-T-A Scoring Engine | **done** (0054) |
 | 3 | Sequence Completion Guarantee + metric | **done** (0055) |
 | 4 | Deliverability Health Score (per mailbox) | **done** (0056) |
-| 5 | Human Review Queue for high-risk sends | not started |
+| 5 | Human Review Queue for high-risk sends | **done** (0057) |
 | 6 | Unified Cross-Channel Inbox | not started |
 | 7 | Re-engagement Memory ("not now" ≠ "never") | not started |
 | 8 | Transparent Attribution Ledger | not started |
@@ -88,6 +88,27 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 — Feature 5 done.** Migration `0057_send_reviews` (new
+  `send_reviews` table; `MessageStatus.AWAITING_REVIEW` needed no column
+  change because that enum is VARCHAR-backed),
+  `app/services/send_review.py`, the gate inside
+  `outreach_tasks.send_message_impl` after rendering,
+  `app/api/send_reviews.py`, five new `system_settings` keys, and a new
+  "Review" tab on the Campaigns page. Tests:
+  `tests/test_send_review.py` (55), `tests/test_send_reviews_migration.py`
+  (6), `frontend/src/tests/sendReview.test.ts` (18). Regression: 139 tests
+  across engine/CRM/LinkedIn/phone suites still green; `tsc --noEmit` clean.
+  Decisions: the approved SNAPSHOT is authoritative -- an approved review
+  sends the words the reviewer read, discarding the next render, because
+  rendering is a model call that never repeats itself and comparing would
+  re-queue the message forever; rejecting cancels the MESSAGE but leaves the
+  ENROLLMENT running, since one badly-timed email should not end the
+  relationship; the gate fails OPEN, because a broken review system must not
+  silently stop outreach; `tone_flag` reuses
+  `adversarial_review._text_findings` verbatim so the pre-launch gate and this
+  one cannot disagree. Docs: `docs/features/send-review-queue.md`.
+  **Needs a decision from Rehan** -- see Known issues.
 
 - **2026-09-16 — Feature 4 done.** Migration `0056_mailbox_health` (new
   `mailbox_health` table, one upserted row per mailbox),
@@ -177,6 +198,17 @@ with later.)
   run (`pytest tests/test_compliance_rules.py` → 31 passed). Wrote this file.
 
 ## Known issues / left for Rehan
+
+- **Feature 5: decide whether the VIP-title trigger should be ON for your
+  ICP.** LeadPilot sells to boutique agency OWNERS, and "owner"/"founder" is a
+  VIP title — so with `send_review_vip_titles` on (the current default), every
+  message to your core persona lands in the review queue. That is correct
+  behaviour for someone selling into enterprises and wrong for you. Turn it
+  off in `/admin/settings` (`send_review_vip_titles = false`) unless you
+  genuinely want to hand-approve every send. The other three triggers
+  (objection, stalled deal, tone) are exceptional by nature and are fine on.
+  This is also why the test suite disables the whole gate by default — see the
+  note at the end of `docs/features/send-review-queue.md`.
 
 - **Feature 4 complaint rate is a proxy.** No FBL / Google Postmaster feed is
   connected, so the spam-complaint rate is approximated from unsubscribes plus

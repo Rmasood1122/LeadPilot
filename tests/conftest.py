@@ -669,6 +669,28 @@ def no_real_anthropic(monkeypatch):
 # object builder therefore share ONE canonical user.
 
 
+@pytest.fixture(autouse=True)
+def send_review_off(monkeypatch):
+    """Part 1 Feature 5's review queue is OFF for every suite that does not
+    test it.
+
+    WHY. The shared `verified_leads` fixture gives every lead the title
+    "Owner", which is a VIP title, so with the gate on every existing engine
+    test would return "held_for_review" instead of "sent" -- and those tests
+    are about the send path, not about the review queue. Rather than rewriting
+    120 assertions around a feature they are not testing, the gate is disabled
+    here and turned back ON explicitly by tests/test_send_review.py (its
+    `review_on` fixture), which is the only module that should exercise it.
+
+    This is also the honest default for the product: whether the VIP trigger
+    helps depends on the ICP, which is exactly why it is an admin setting.
+    """
+    from app.services import send_review
+
+    monkeypatch.setattr(send_review, "enabled",
+                        lambda db, code=None: False)
+
+
 @pytest.fixture()
 def test_user(db_session):
     """The canonical established user every object fixture builds data under.

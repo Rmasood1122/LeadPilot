@@ -105,6 +105,23 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "reply_fraud_detection_enabled": (True, "Second-pass check that drops "
                                       "automated replies (OOO, bots, spam "
                                       "traps) from engagement metrics."),
+    # Part 1 Feature 5 -- the human review queue for high-risk sends.
+    # Each trigger is separately switchable because which ones are useful
+    # depends entirely on the ICP. In particular: if the people you sell to
+    # ARE founders and owners (LeadPilot's own ICP is boutique agency
+    # owners), leaving the VIP trigger on puts every message in the queue and
+    # a queue nobody can finish is a queue nobody reads. Turn it off there.
+    "send_review_enabled": (True, "Hold high-risk messages for explicit human "
+                            "approval before sending."),
+    "send_review_prior_objection": (True, "Hold a send to a prospect whose "
+                                    "last reply was an objection."),
+    "send_review_stalled_deal": (True, "Hold a send to a prospect with an "
+                                 "open deal past its close date."),
+    "send_review_vip_titles": (True, "Hold a send to a founder, C-level, VP "
+                               "or board member. Turn OFF if your ICP IS "
+                               "executives -- otherwise every message queues."),
+    "send_review_tone": (True, "Hold a send whose rendered copy trips the "
+                         "tone/spam rules."),
     # Feature Group 8 -- white label
     "white_label_allowed": (True, "Allow workspace owners to enable "
                             "white-label mode."),

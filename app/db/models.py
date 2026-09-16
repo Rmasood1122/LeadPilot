@@ -158,6 +158,11 @@ class MessageStatus(str, enum.Enum):
     NEEDS_TEMPLATE = "needs_template"  # free-form send failed closed (24h
                                    # window expired) or template no longer
                                    # approved — needs user attention"
+    # Part 1 Feature 5: rendered, held for explicit human approval, NOT sent.
+    # VARCHAR-backed like every enum here (models._enum), so adding it touches
+    # no column. A message in this state is queued, never lost: approving it
+    # returns it to SCHEDULED and the next dispatch tick sends it.
+    AWAITING_REVIEW = "awaiting_review"
 
 
 class EnrollmentStatus(str, enum.Enum):
@@ -4068,6 +4073,60 @@ class SequenceReview(TimestampMixin, Base):
 # --------------------------------------------------------------------------
 # Feature 5 — opt-in post-sequence re-engagement (migration 0048)
 # --------------------------------------------------------------------------
+
+
+class SendReview(TimestampMixin, Base):
+    """Part 1 Feature 5 -- one message held for explicit human approval.
+
+    SequenceReview (0047) reviews a sequence's CONTENT before launch, once per
+    sequence. This is a different thing: one row per MESSAGE, created at send
+    time, because the triggers are facts about the prospect at that moment
+    (they objected last week, their deal stalled, they are a VP) that no
+    pre-launch review of a template could know.
+
+    The copy is SNAPSHOTTED here rather than read back from `messages`: the
+    reviewer is approving specific words, and a later re-render must not
+    change what was approved. `content_hash` is what the send path checks
+    before transmitting.
+    """
+
+    __tablename__ = "send_reviews"
+    __table_args__ = (
+        UniqueConstraint("message_id", name="send_review_message"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE")
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # pending | approved | rejected
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default=text("'pending'"),
+        nullable=False, index=True
+    )
+    # [{code, label, detail}] -- why this message needs a person.
+    triggers_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    subject_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    body_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # A reviewer may fix the copy instead of rejecting it. When set, THIS is
+    # what gets sent -- the whole point of a human gate is that the human can
+    # improve the message, not only veto it.
+    edited_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    edited_body: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ReengagementAttempt(TimestampMixin, Base):

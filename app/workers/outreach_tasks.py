@@ -365,6 +365,37 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                                               sequence, message)
         session.commit()  # rendered content persisted before the send
 
+        # ---- Part 1 Feature 5: the human review queue ---------------------
+        # AFTER rendering, because three of the four triggers are facts about
+        # the prospect right now and the fourth is about the copy that was
+        # actually written. A held message is QUEUED, not lost: it sits in
+        # AWAITING_REVIEW until a person approves it, and approving returns it
+        # to SCHEDULED. Phone is excluded -- a live call is not a message a
+        # reviewer can read and approve after the fact.
+        if not is_phone:
+            from app.services import send_review  # noqa: PLC0415
+
+            decision = send_review.gate(session, lead, message,
+                                        outbound.subject, outbound.body, now=now)
+            if decision["action"] == "hold":
+                message.status = MessageStatus.AWAITING_REVIEW
+                message.error = None
+                session.commit()
+                return "held_for_review"
+            if decision["action"] == "cancel":
+                message.status = MessageStatus.CANCELLED
+                message.error = f"rejected in review: {decision['reason']}"
+                session.commit()
+                return "rejected_in_review"
+            # A reviewer may have EDITED the copy. Their words are what sends,
+            # and they are persisted so the sent row matches what went out.
+            if (decision["subject"], decision["body"]) != (outbound.subject, outbound.body):
+                outbound.subject = decision["subject"]
+                outbound.body = decision["body"]
+                message.subject = decision["subject"]
+                message.body = decision["body"]
+                session.commit()
+
         if channel is None:
             if is_linkedin:
                 channel = _get_linkedin_channel(session, strategy)
