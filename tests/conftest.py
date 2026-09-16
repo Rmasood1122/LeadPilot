@@ -170,6 +170,13 @@ class FakeClaude:
         # Part 1 Feature 7 (reengagement_memory). Same contract as the rest.
         self.not_now_response: object | None = None
         self.not_now_prompts: list[str] = []
+        # Part 2 (roleplay). `roleplay_reply_response` is what the PROSPECT
+        # says (a plain string, or an Exception to raise);
+        # `roleplay_feedback_response` is the coach's JSON.
+        self.roleplay_reply_response: object | None = None
+        self.roleplay_prompts: list[str] = []
+        self.roleplay_feedback_response: object | None = None
+        self.roleplay_feedback_prompts: list[str] = []
         # Feature 3 (founder voice cloning). Same contract.
         self.voice_profile_response: object | None = None
         self.voice_profile_prompts: list[str] = []
@@ -204,6 +211,17 @@ class FakeClaude:
         if self.fail_after is not None and self.completions >= self.fail_after:
             raise RuntimeError("simulated crash: model call failed")
         self.completions += 1
+        if "ROLEPLAYING A SALES PROSPECT" in system:  # Part 2
+            self.roleplay_prompts.append(prompt)
+            if isinstance(self.roleplay_reply_response, Exception):
+                raise self.roleplay_reply_response
+            if self.roleplay_reply_response is not None:
+                if isinstance(self.roleplay_reply_response, list):
+                    index = min(len(self.roleplay_prompts) - 1,
+                                len(self.roleplay_reply_response) - 1)
+                    return self.roleplay_reply_response[index]
+                return self.roleplay_reply_response
+            return "Honestly, we looked at something like this last year and parked it."
         if "strategy editor" in system:  # FIXER_SYSTEM
             match = re.search(r"criterion #(\d+)", prompt)
             if match:
@@ -294,6 +312,25 @@ class FakeClaude:
                 {"topic": "Tone", "a_position": "Formal",
                  "b_position": "Casual", "severity": "low"},
             ], "agreement_summary": "Agree on the ICP."}
+        if "sales coach reviewing a transcript" in system:  # Part 2
+            self.roleplay_feedback_prompts.append(prompt)
+            if isinstance(self.roleplay_feedback_response, Exception):
+                raise self.roleplay_feedback_response
+            if self.roleplay_feedback_response is not None:
+                return self.roleplay_feedback_response
+            return {
+                "scores": {"overall": 72, "discovery": 80, "objections": 55,
+                           "tone": 78, "close": 60},
+                "went_well": ['You opened without pitching: "what made you take '
+                              'the call?"'],
+                "improve": ["You moved on after their price objection instead of "
+                            "answering it."],
+                "tone_notes": "Warm, slightly fast in the first minute.",
+                "pacing_notes": "Three questions in a row at 02:10 — let one land.",
+                "objections_missed": [{"objection": "We parked this last year",
+                                       "why": "You changed the subject to features."}],
+                "one_thing": "Answer the first objection before asking anything else.",
+            }
         if "said about coming back" in system:  # Part 1 Feature 7
             self.not_now_prompts.append(prompt)
             if isinstance(self.not_now_response, Exception):
@@ -527,6 +564,10 @@ def fake_claude(monkeypatch):
         "app.services.reply_classification.get_client",
         "app.services.reply_intelligence.get_client",   # Feature 2
         "app.services.reply_intent.get_client",         # Part 1 Feature 1
+        # Part 2 (roleplay) reaches it as
+        # `from app.services.anthropic_client import get_client` INSIDE the
+        # call, so the module attribute patched below is what takes effect --
+        # there is no module-level binding here to patch.
         "app.services.displacement_monitor.get_client",  # Feature 4
         # Feature 3 (voice_profiler) and style_profile both reach it as
         # anthropic_client.get_client() at call time, so the module

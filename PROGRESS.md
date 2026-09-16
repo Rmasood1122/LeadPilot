@@ -31,9 +31,9 @@ Each feature below moves through: **migration → service → API → frontend �
 
 | # | Piece | Status |
 |---|-------|--------|
-| P2.1 | Auto-generated meeting brief + script | not started |
-| P2.2 | Mock interview / roleplay mode + feedback | not started |
-| P2.3 | Standalone practice + pre-meeting checklist | not started |
+| P2.1 | Auto-generated meeting brief + script | **done** (0064) |
+| P2.2 | Mock interview / roleplay mode + feedback | **done** (0064) |
+| P2.3 | Standalone practice + pre-meeting checklist | **done** |
 
 ---
 
@@ -88,6 +88,40 @@ with later.)
 ---
 
 ## Log
+
+- **2026-09-16 -- Part 2 done (all three pieces).** Migration
+  `0064_meeting_practice` (script columns on `meeting_prep_briefs`, new
+  `roleplay_sessions` and `roleplay_turns`), `app/services/roleplay.py`,
+  `app/services/meeting_practice.py`, `app/api/practice.py`, F-P-T-A signals
+  added to the existing FG7 prep prompt, and `CallScriptPanel` +
+  `RoleplayPanel` on the lead page's Meeting Prep tab. Tests:
+  `tests/test_practice.py` (51), `tests/test_practice_migration.py` (10),
+  `frontend/src/tests/practice.test.ts` (27). Regression: 131 tests across the
+  meeting suites green after one fix (below); `tsc --noEmit` clean.
+  Decisions: the script is its OWN column, not another key in `sections_json`,
+  because that blob is model output rewritten on every regenerate and an edit
+  a regeneration overwrites is an edit nobody makes twice -- `ensure_script`
+  seeds only while empty and never overwrites; seeding is NOT a second model
+  call, since asking again would produce a script that disagrees with the
+  brief above it; the checklist is DERIVED every time, because a stored
+  checklist goes stale and then lies; practice blocks only when
+  `practice_required` is set per meeting, since requiring a rehearsal for
+  every call turns the checklist into something people click through; the
+  roleplay prospect NEVER breaks character to coach (the prompt forbids it and
+  `_clean_reply` strips it anyway) because a prospect nicer than the real one
+  teaches the wrong lesson; a failed model turn keeps the seller's line; a
+  session with fewer than two seller lines is recorded but NOT scored, so the
+  improvement chart is not polluted; turns are ROWS with a UNIQUE
+  (session, turn_no) rather than a JSON array, because a live UI appending one
+  line at a time loses a line to read-modify-write whenever two requests
+  overlap; scores are COLUMNS so the trend can be charted without
+  backend-specific JSON extraction. Docs:
+  `docs/features/meeting-practice.md`.
+  Also fixed `tests/test_meeting_prep_migration.py`: it compared migration
+  0023's output against the CURRENT models, so the four columns 0064 adds to
+  `meeting_prep_briefs` read as columns 0023 had forgotten. It now excludes
+  later-added columns by name, which keeps the test able to catch a change to
+  0023 while making the dependency visible.
 
 - **2026-09-16 -- Feature 11 done.** Migration `0063_client_workspaces` (new
   `client_workspaces` and `client_sending_domains` tables, plus

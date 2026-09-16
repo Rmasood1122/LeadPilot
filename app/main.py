@@ -73,6 +73,7 @@ from app.api.inbox import router as inbox_router                      # Part 1 F
 from app.api.attribution import router as attribution_router          # Part 1 Feature 8
 from app.api.consent import router as consent_router                  # Part 1 Feature 9
 from app.api.client_workspaces import router as clients_router        # Part 1 Feature 11
+from app.api.practice import router as practice_router                # Part 2
 
 # M7
 from app.api.devices import router as devices_router
@@ -293,6 +294,10 @@ app.include_router(consent_router)               # consent ledger + cross-channe
 # Part 1 Feature 11. /clients is a new prefix; /strategies/{id}/client is a new
 # sub-path under strategies.py's /strategies/{id}.
 app.include_router(clients_router)               # per-client agency workspaces
+# Part 2. /practice is a new prefix; the /meeting-prep/{id}/script,
+# /readiness and /practice-required paths are longer literals under
+# meeting_prep.py's /meeting-prep/{brief_id}, so there is no collision.
+app.include_router(practice_router)              # call script + roleplay practice
 app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/reengagement
 app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
 app.include_router(benchmarks_router)            # Feature 6: /benchmarks

@@ -25,6 +25,37 @@ from app.db.base import Base
 
 NEW_TABLES = ["system_settings", "deals", "meeting_prep_briefs", "meeting_outcomes"]
 
+# Columns LATER revisions added to a table 0023 created. This test compares
+# 0023's output against the models, so anything added afterwards would look
+# like a column 0023 forgot. Naming them here keeps the test meaningful -- it
+# still fails if 0023 itself changes -- and makes the dependency visible
+# instead of silently loosening the comparison.
+#
+#   0064_meeting_practice (Part 2): the editable call script and the
+#   per-meeting practice requirement.
+_ADDED_LATER = {
+    "meeting_prep_briefs": {
+        "script_json", "script_edited_at", "script_edited_by_user_id",
+        "practice_required",
+    },
+}
+
+
+def _without_later_columns(described: dict, table: str) -> dict:
+    """The model's description of `table` as it stood after 0023."""
+    later = _ADDED_LATER.get(table, set())
+    if not later:
+        return described
+    return {
+        **described,
+        "columns": {name: value for name, value in described["columns"].items()
+                    if name not in later},
+        "fks": {fk for fk in described["fks"]
+                if not (set(fk[0]) & later)},
+        "indexes": {name: value for name, value in described["indexes"].items()
+                    if not (set(value["columns"]) & later)},
+    }
+
 _PREREQ_TABLES = [
     "users", "products", "strategies", "lead_batches", "leads",
     "calendar_booking_pages", "calendar_bookings", "meetings",
@@ -114,13 +145,13 @@ def test_every_table_is_created(from_migration):
 @pytest.mark.parametrize("table", NEW_TABLES)
 def test_columns_match(table, from_models, from_migration):
     assert (_describe(from_migration, table)["columns"]
-            == _describe(from_models, table)["columns"])
+            == _without_later_columns(_describe(from_models, table), table)["columns"])
 
 
 @pytest.mark.parametrize("table", NEW_TABLES)
 def test_indexes_match(table, from_models, from_migration):
     assert (_describe(from_migration, table)["indexes"]
-            == _describe(from_models, table)["indexes"])
+            == _without_later_columns(_describe(from_models, table), table)["indexes"])
 
 
 @pytest.mark.parametrize("table", NEW_TABLES)
@@ -128,13 +159,13 @@ def test_unique_constraints_match(table, from_models, from_migration):
     """meeting_prep_brief_source_ref is what stops a Calendly retry from
     producing a second brief and a second set of reminders."""
     assert (_describe(from_migration, table)["uniques"]
-            == _describe(from_models, table)["uniques"])
+            == _without_later_columns(_describe(from_models, table), table)["uniques"])
 
 
 @pytest.mark.parametrize("table", NEW_TABLES)
 def test_foreign_keys_match(table, from_models, from_migration):
     assert (_describe(from_migration, table)["fks"]
-            == _describe(from_models, table)["fks"])
+            == _without_later_columns(_describe(from_models, table), table)["fks"])
 
 
 def test_integration_tokens_user_id_becomes_nullable(from_migration, from_models):

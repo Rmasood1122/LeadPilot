@@ -2773,8 +2773,115 @@ class MeetingPrepBrief(TimestampMixin, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Part 2 (migration 0064): the call script the SELLER owns -----------
+    # {opening, discovery: [...], objections: [{objection, response}],
+    #  close, notes}. Its own column rather than another key in
+    # `sections_json` because that blob is MODEL OUTPUT, rewritten whenever
+    # "Regenerate" is pressed -- and an edit a regeneration silently
+    # overwrites is an edit nobody makes twice. This one is written by a
+    # person, or seeded once while it is still empty.
+    script_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    script_edited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    script_edited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # Part 2.3: this meeting has practice as a required pre-meeting step. Off
+    # by default -- making every call require a rehearsal is how a checklist
+    # becomes something people click through without reading.
+    practice_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
 
     lead: Mapped["Lead"] = relationship()
+
+
+class RoleplaySession(TimestampMixin, Base):
+    """Part 2 -- one practice run against a prospect's brief.
+
+    WHY THE SCORES ARE COLUMNS AND THE FEEDBACK IS JSON. The five scores are
+    what "am I getting better?" is measured on, so they are queried and
+    charted across sessions; the prose feedback is read once, for one session.
+    Putting the scores in the JSON would mean extracting them differently on
+    SQLite and PostgreSQL to draw one line on a chart.
+
+    `lead_id` and `brief_id` are SET NULL: a practice history is about the
+    SELLER, and losing the prospect it was practised against must not erase
+    the evidence that they improved.
+    """
+
+    __tablename__ = "roleplay_sessions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    brief_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting_prep_briefs.id", ondelete="SET NULL"), nullable=True
+    )
+    # active | completed | abandoned
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'"),
+        nullable=False, index=True
+    )
+    # easy | realistic | hostile
+    difficulty: Mapped[str] = mapped_column(
+        String(20), default="realistic", server_default=text("'realistic'"),
+        nullable=False
+    )
+    persona_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    objectives_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    turn_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    feedback_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    score_overall: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_discovery: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_objections: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_tone: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_close: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RoleplayTurn(Base):
+    """One line of a practice conversation.
+
+    ROWS, NOT A JSON ARRAY on the session. A roleplay is appended to one line
+    at a time by a live UI; a JSON array means read-modify-write on every
+    turn, which loses a line whenever two requests overlap. UNIQUE
+    (session_id, turn_no) turns a duplicated submit into a conflict rather
+    than a duplicated line.
+
+    No updated_at: what was said was said.
+    """
+
+    __tablename__ = "roleplay_turns"
+    __table_args__ = (
+        UniqueConstraint("session_id", "turn_no", name="roleplay_turn_order"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("roleplay_sessions.id", ondelete="CASCADE"), index=True
+    )
+    turn_no: Mapped[int] = mapped_column(Integer)
+    # seller | prospect
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class MeetingOutcome(TimestampMixin, Base):
