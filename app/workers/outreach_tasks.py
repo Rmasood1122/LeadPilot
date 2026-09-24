@@ -14,7 +14,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -352,6 +352,39 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             return "deferred_cap"
 
     # ---- claim (scheduled -> sending), render, persist BEFORE transmit ----
+    # The claim is a CONDITIONAL UPDATE, never an ORM attribute write: the
+    # status guards at the top of this function are reads, not locks, so two
+    # workers can both hold this message as SCHEDULED in memory and both
+    # reach this line. The WHERE clause makes the database arbitrate — only
+    # the worker whose UPDATE actually moved the row out of SCHEDULED may
+    # transmit; the other matches 0 rows and walks away. Same at-most-once
+    # pattern as meeting_prep_tasks._claim.
+    claimed = session.execute(
+        update(Message)
+        .where(Message.id == message.id,
+               Message.status == MessageStatus.SCHEDULED)
+        .values(status=MessageStatus.SENDING)
+        .execution_options(synchronize_session=False)
+    )
+    if claimed.rowcount != 1:
+        session.rollback()
+        # Give back what THIS worker reserved in its prepare step. The
+        # message row itself belongs to the winner now — nothing on it may
+        # be touched here (which is why this is not _phone_send_failed).
+        if li_account is not None:
+            from app.services import linkedin_limits  # noqa: PLC0415
+
+            linkedin_limits.release(li_account, li_action, now=now)
+        if is_phone:
+            from app.services import notifications, phone_calls  # noqa: PLC0415
+
+            phone_calls.release_call_slot(
+                notifications.owner_of_strategy(session, strategy), now=now)
+        logger.info("message %s already claimed by another worker", message_id)
+        return "lost_claim_race"
+    # Keep the in-memory row honest (expire_on_commit=False + the Core
+    # UPDATE above bypassing the identity map would otherwise leave it
+    # saying SCHEDULED for the rest of this function).
     message.status = MessageStatus.SENDING
     if is_linkedin:
         message.sender_ref = f"linkedin:{li_account.id}"
