@@ -200,6 +200,12 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         user = db.get(User, user_id)
         if user is None:
             raise HTTPException(status_code=401, detail="user not found")
+    # Suspension is enforced HERE, at the chokepoint, not only in
+    # require_admin: otherwise a suspended account keeps every non-admin
+    # route. 403 for the same reason as the verification gate below -- the
+    # credentials are valid. Same detail string require_admin uses.
+    if user.is_suspended:
+        raise HTTPException(status_code=403, detail="account suspended")
     if settings.require_email_verification and not user.email_verified:
         raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED)
     return _workspace_principal(request, db, user)
