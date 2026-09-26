@@ -11,12 +11,13 @@ All others from M8-C3 unchanged.
 """
 from __future__ import annotations
 
+import uuid
 from typing import Any, Optional
 from datetime import datetime, timezone as datetime_timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
@@ -272,44 +273,45 @@ async def reset_circuit_breaker(provider: str, admin=Depends(require_admin)) -> 
 
 @router.get("/playbook/scores")
 async def list_playbook_scores(
-    user_id: Optional[str] = Query(None),
+    user_id: Optional[uuid.UUID] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=500),
     degrading_only: bool = Query(False, description="Show only patterns where effective_n < min_sample"),
     db: Session = Depends(get_db),
     _admin=Depends(require_admin),
 ) -> dict:
-    """Returns all playbook scores, including decay metadata. Supports degrading_only filter."""
+    """Returns all playbook scores, including decay metadata. Supports degrading_only filter.
+
+    playbook_scores has no owner column: rows are keyed on (pattern_key,
+    variant) and reach a user only through strategies.pattern_key ->
+    products.user_id, so ?user_id= means "rows for the pattern keys of this
+    user's strategies". A DB error propagates as a 500 -- an empty list here
+    must mean "no data", never "the query failed".
+    """
     from app.core.config import settings
-    from sqlalchemy import text
+    from app.db.models import PlaybookScore, Product, Strategy
 
-    offset = (page - 1) * page_size
-    where_clauses = []
-    params: dict = {"limit": page_size, "offset": offset, "min_sample": settings.PLAYBOOK_MIN_SAMPLE}
-
+    ps = PlaybookScore
+    min_sample = settings.PLAYBOOK_MIN_SAMPLE
+    stmt = select(
+        ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
+        ps.sample_size, ps.effective_sample_size, ps.is_reliable,
+        ps.decay_half_life_days, ps.oldest_outcome_ts, ps.trend,
+        ps.last_aggregated_at,
+    )
     if user_id:
-        where_clauses.append("ps.user_id = :user_id")
-        params["user_id"] = user_id
+        stmt = stmt.where(ps.pattern_key.in_(
+            select(Strategy.pattern_key)
+            .join(Product, Product.id == Strategy.product_id)
+            .where(Product.user_id == user_id, Strategy.pattern_key.isnot(None))
+        ))
     if degrading_only:
-        where_clauses.append("ps.effective_sample_size < :min_sample AND ps.sample_size >= :min_sample")
+        stmt = stmt.where(ps.effective_sample_size < min_sample, ps.sample_size >= min_sample)
+    stmt = (stmt.order_by(ps.last_aggregated_at.desc().nulls_last())
+            .limit(page_size).offset((page - 1) * page_size))
 
-    where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-
-    try:
-        rows = db.execute(text(f"""
-            SELECT ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
-                   ps.sample_size, ps.effective_sample_size, ps.is_reliable,
-                   ps.decay_half_life_days, ps.oldest_outcome_ts, ps.trend,
-                   ps.last_aggregated_at
-            FROM playbook_scores ps
-            {where}
-            ORDER BY ps.last_aggregated_at DESC NULLS LAST
-            LIMIT :limit OFFSET :offset
-        """), params).mappings().all()
-        return {"scores": [dict(r) for r in rows]}
-    except Exception as e:
-        logger.error("admin.playbook_scores_failed", error=str(e))
-        return {"scores": []}
+    rows = db.execute(stmt).mappings().all()
+    return {"scores": [dict(r) for r in rows]}
 
 
 @router.post("/playbook/recompute")
