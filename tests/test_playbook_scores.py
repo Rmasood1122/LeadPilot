@@ -57,17 +57,31 @@ def seeded(db_session, paid_user):
     return paid_user
 
 
-def test_returns_only_the_callers_rows(client, seeded, db_session):
-    if db_session.bind.dialect.name == "sqlite":
-        # The handler binds str(current_user.id) (dashed) into raw SQL, but
-        # SQLAlchemy's Uuid type stores 32 undashed hex digits on SQLite, so
-        # `p.user_id = :user_id` matches nothing here. On PostgreSQL the
-        # literal is cast to uuid and matches. Not changed in this commit.
-        pytest.xfail("raw-SQL UUID bind does not match SQLite's undashed storage")
+def test_returns_only_the_callers_rows(client, seeded):
+    # Must hold on SQLite AND Postgres. The raw-SQL version bound
+    # str(current_user.id) (dashed), which matched nothing on SQLite, where
+    # Uuid is stored as 32 undashed hex digits.
     resp = client.get("/playbook/scores")
     assert resp.status_code == 200, resp.text
     assert sorted((r["pattern_key"], r["variant"]) for r in resp.json()) == [
         ("pk-mine", "A"), ("pk-mine", "B")]
+
+
+def test_strategy_filter(client, seeded, db_session):
+    other = m.Strategy(product_id=db_session.query(m.Product.id)
+                       .filter(m.Product.user_id == seeded.id).scalar(),
+                       flow_type=m.FlowType.NO_CLIENTS, pattern_key="pk-mine-2")
+    db_session.add(other)
+    _score(db_session, "pk-mine-2", "A", 0.30)
+    db_session.commit()
+    resp = client.get(f"/playbook/scores?strategy_id={other.id}")
+    assert resp.status_code == 200, resp.text
+    assert [(r["pattern_key"], r["strategy_id"]) for r in resp.json()] == [
+        ("pk-mine-2", str(other.id))]
+
+
+def test_malformed_strategy_id_is_422(client, seeded):
+    assert client.get("/playbook/scores?strategy_id=not-a-uuid").status_code == 422
 
 
 def test_free_plan_is_refused(client, db_session, test_user):
