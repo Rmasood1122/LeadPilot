@@ -83,8 +83,14 @@ change.
   dropped table got 200 instead of 500.
 - **Green:** 7/7. The sweep covered the 9 modules that hit /admin/ plus
   the new module and the P0-2/3/4 modules: 440 passed.
-- **Not run:** Postgres itself was not exercised. The integration harness
-  (tests/integration/) was not run.
+- **PostgreSQL (2026-09-27):** tests/test_admin_playbook_scores.py passed
+  7/7 against local PostgreSQL 16 (the docker-compose `db` service on
+  localhost:5433), never against the .env database. The schema came from
+  `alembic upgrade head` (0064_meeting_practice) into a fresh database, and
+  each test got a new copy of it. A throwaway pytest plugin, not committed,
+  pointed the root conftest's `db_session` engine at that copy. The UUID
+  bind and the IN subquery both behave on Postgres as they do on SQLite.
+- **Not run:** the integration harness (tests/integration/).
 
 ## Follow-ups logged (not fixed here)
 - **update_user_plan** (app/api/admin.py) uses raw SQL with `NOW()`
