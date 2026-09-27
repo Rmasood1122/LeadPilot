@@ -20,6 +20,18 @@ import re
 os.environ["APP_ENV"] = "test"
 os.environ["ANTHROPIC_API_KEY"] = "test-key-never-used"
 os.environ["DATABASE_URL"] = "sqlite://"
+# Hard-assigned like DATABASE_URL, never setdefault: settings read .env for any
+# key missing from os.environ, and .env points REDIS_URL / CELERY_* at the
+# PRODUCTION Upstash instance. The limiter is faked below, but the response
+# cache and circuit breaker (app/integrations/plumbing.py), get_redis() and
+# Celery all build clients from these URLs. db 14 of the local compose Redis
+# (docker-compose.yml, port 6380); if it is not running, those paths see a
+# refused connection, never a remote host. tests/integration/conftest.py
+# re-targets db 15 for its own run.
+_TEST_REDIS_URL = "redis://localhost:6380/14"
+os.environ["REDIS_URL"] = _TEST_REDIS_URL
+os.environ["CELERY_BROKER_URL"] = _TEST_REDIS_URL
+os.environ["CELERY_RESULT_BACKEND"] = _TEST_REDIS_URL
 from cryptography.fernet import Fernet as _Fernet
 os.environ.setdefault("TOKEN_ENCRYPTION_KEY", _Fernet.generate_key().decode())
 # M4: WhatsApp config — fake values; no test ever reaches the real Graph API.
@@ -73,6 +85,35 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base, get_db
 from app.db import models as m  # noqa: F401  (registers tables)
+
+
+def _assert_local_redis_only() -> None:
+    """Fail the whole run, before any test, if a Redis URL resolves off-host.
+
+    Checks the values the app actually uses, not the env vars: a settings
+    object built before the overrides above, or a new key read from .env,
+    would otherwise slip through silently.
+    """
+    from urllib.parse import urlparse
+
+    from app.config import settings as legacy
+    from app.core.config import settings as m8
+    from app.workers.celery_app import celery_app
+
+    resolved = {
+        "app.config.settings.redis_url": legacy.redis_url,
+        "app.config.settings.broker_url": legacy.broker_url,
+        "app.config.settings.result_backend": legacy.result_backend,
+        "app.core.config.settings.REDIS_URL": m8.REDIS_URL,
+        "celery_app.conf.broker_url": celery_app.conf.broker_url,
+        "celery_app.conf.result_backend": celery_app.conf.result_backend,
+    }
+    remote = {k: urlparse(v).hostname for k, v in resolved.items()
+              if urlparse(v).hostname not in ("localhost", "127.0.0.1")}
+    assert not remote, f"test run would reach a non-local Redis: {remote}"
+
+
+_assert_local_redis_only()
 
 
 # --------------------------------------------------------------------------
