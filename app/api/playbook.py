@@ -107,7 +107,11 @@ async def get_playbook_scores(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> list[dict]:
-    """User's playbook scores. Includes decay metadata (effective_n, trend)."""
+    """User's playbook scores. Includes decay metadata (effective_n, trend).
+
+    A DB error propagates as a 500 -- an empty list here must mean "no data",
+    never "the query failed".
+    """
     try:
         check_feature(current_user, "playbook_access")
     except PlanLimitExceeded as e:
@@ -120,24 +124,20 @@ async def get_playbook_scores(
         where_extra = "AND s.id = :sid"
         params["sid"] = strategy_id
 
-    try:
-        rows = db.execute(text(f"""
-            SELECT DISTINCT ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
-                   ps.sample_size, ps.effective_sample_size, ps.is_reliable,
-                   ps.decay_half_life_days, ps.trend, ps.last_aggregated_at,
-                   s.id AS strategy_id
-            FROM playbook_scores ps
-            JOIN strategies s ON s.pattern_key = ps.pattern_key
-            JOIN products p ON p.id = s.product_id
-            WHERE p.user_id = :user_id
-              {where_extra}
-            ORDER BY ps.reply_rate DESC NULLS LAST
-            LIMIT 200
-        """), params).mappings().all()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        logger.error("playbook.scores_failed", error=str(e))
-        return []
+    rows = db.execute(text(f"""
+        SELECT DISTINCT ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
+               ps.sample_size, ps.effective_sample_size, ps.is_reliable,
+               ps.decay_half_life_days, ps.trend, ps.last_aggregated_at,
+               s.id AS strategy_id
+        FROM playbook_scores ps
+        JOIN strategies s ON s.pattern_key = ps.pattern_key
+        JOIN products p ON p.id = s.product_id
+        WHERE p.user_id = :user_id
+          {where_extra}
+        ORDER BY ps.reply_rate DESC NULLS LAST
+        LIMIT 200
+    """), params).mappings().all()
+    return [dict(r) for r in rows]
 
 
 # ---------------------------------------------------------------------------

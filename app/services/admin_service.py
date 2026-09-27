@@ -262,34 +262,3 @@ class AdminService:
         row.resolution_note = note
         db.commit()
         return True
-
-    # ---------------------------------------------------------------------------
-    # Playbook scores
-    # ---------------------------------------------------------------------------
-
-    @staticmethod
-    def list_playbook_scores(
-        db: Session,
-        user_id: Optional[str] = None,
-        page: int = 1,
-        page_size: int = 100,
-    ) -> list[Any]:
-        from app.models.playbook_score import PlaybookScore
-
-        offset = (page - 1) * page_size
-        q = db.query(PlaybookScore).order_by(desc(PlaybookScore.last_updated))
-        if user_id:
-            q = q.filter_by(user_id=user_id)
-        scores = q.offset(offset).limit(page_size).all()
-        return [
-            {
-                "strategy_id": str(s.strategy_id) if s.strategy_id else None,
-                "pattern_key": s.pattern_key,
-                "variant": s.variant,
-                "reply_rate": s.reply_rate,
-                "booking_rate": s.booking_rate,
-                "sample_size": s.sample_size,
-                "last_updated": s.last_updated,
-            }
-            for s in scores
-        ]
