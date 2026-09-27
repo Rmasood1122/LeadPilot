@@ -16,7 +16,7 @@ from typing import Any, Optional
 from datetime import datetime, timezone as datetime_timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -49,8 +49,7 @@ class UserSummary(BaseModel):
     strategy_count: int
     active_campaign_count: int
     last_active_at: Optional[datetime]
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SuspendRequest(BaseModel):
@@ -68,8 +67,7 @@ class TaskErrorSummary(BaseModel):
     resolved_at: Optional[datetime]
     resolved_by: Optional[str]
     resolution_note: Optional[str]
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TaskErrorResolveRequest(BaseModel):

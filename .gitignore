@@ -25,3 +25,7 @@ build/
 # Local run logs from `run my full system` sessions (API, workers, beat,
 # frontend, pytest output). Scratch only — never commit.
 .runlogs/
+
+# Local scratch files in the repo root — kept on disk, never committed.
+/c.txt
+/tech.py

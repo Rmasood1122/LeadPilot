@@ -125,13 +125,13 @@ class AdminService:
 
     @staticmethod
     def suspend_user(db: Session, user_id: str, reason: str, suspended_by: str) -> bool:
-        from app.models.user import User
+        from app.db.models import User
 
         user = db.query(User).filter_by(id=user_id).first()
         if not user:
             return False
         user.is_suspended = True
-        user.suspended_at = datetime.datetime.utcnow()
+        user.suspended_at = datetime.datetime.now(datetime.timezone.utc)
         user.suspended_reason = reason
         # Pause all active campaigns (Strategy.campaign_state — see helpers above)
         _set_campaign_state(db, user_id, "active", "paused_admin",
@@ -141,7 +141,7 @@ class AdminService:
 
     @staticmethod
     def unsuspend_user(db: Session, user_id: str, resumed_by: str) -> bool:
-        from app.models.user import User
+        from app.db.models import User
 
         user = db.query(User).filter_by(id=user_id).first()
         if not user:
