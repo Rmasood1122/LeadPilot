@@ -1,0 +1,54 @@
+# ============================================================
+# METRIC REGISTRY — LeadPilot release gate (eval-conductor consumer-3).
+# Adapter: evals/run_evals.py. Before this gate LeadPilot had NO test CI:
+# 1,985 offline tests existed and never ran on push. The gate runs them
+# and adds what a bare pytest step cannot: a sealed compliance test set
+# that blocks on deletion, and a test-count floor that blocks mass removal.
+# Rule: never edit a threshold to turn a red gate green — that decision
+# belongs in a reviewed PR with a written justification. The sealed
+# compliance file list (evals/compliance_testset.yaml) is under the same rule.
+# ============================================================
+
+- name: compliance_suite_pass_rate  # SEALED legal/safety guard files: send-time
+  level: L5                         # suppression, unsubscribe, per-region rules,
+  pillar: safety                    # claim verification, opt-in audit, guards.
+  method: programmatic              # A failing test OR a missing/emptied sealed
+  detects: [FM-COMPLIANCE-RED, FM-GUARD-DELETED]  # file both block.
+  direction: higher_better
+  threshold: 1.0
+  noise_band: 0.0
+  blocking: hard
+  online: false
+
+- name: full_suite_pass_rate        # whole offline suite (SQLite + FakeClaude,
+  level: L1                         # zero network); skips out of the denominator
+  pillar: quality
+  method: programmatic
+  detects: [FM-SUITE-RED]
+  direction: higher_better
+  threshold: 1.0
+  noise_band: 0.0
+  blocking: hard
+  online: false
+
+- name: offline_test_count          # executed tests; floor blocks mass deletion
+  level: L1                         # current ~1990 -> floor 1900 leaves review
+  pillar: quality                   # headroom for legitimate refactors
+  method: programmatic
+  detects: [FM-TEST-MASS-DELETION]
+  direction: higher_better
+  threshold: 1900
+  noise_band: 0.0
+  blocking: hard
+  online: false
+
+- name: suite_runtime_s             # junit-reported suite time; budget from
+  level: L5                         # first measurement 2026-09-29 (~208s local),
+  pillar: ops                       # CI runners slower -> 900s soft budget
+  method: programmatic
+  detects: [FM-LATENCY]
+  direction: lower_better
+  threshold: 900.0
+  noise_band: 120.0
+  blocking: soft
+  online: false

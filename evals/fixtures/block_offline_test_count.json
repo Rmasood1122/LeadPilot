@@ -1,0 +1,13 @@
+{
+  "manifest": {
+    "schema": "candidate/v2",
+    "registry_hash": "dde412345cbf382af015398df3e20c315927ebb0335efeace3fdb5b4e2ed604a",
+    "dataset_hash": "8f74422b5a09e0b3aa4539d09e01bfe168093e176f2ab18450a17025771b9855"
+  },
+  "scores": {
+    "compliance_suite_pass_rate": 1.0,
+    "full_suite_pass_rate": 1.0,
+    "offline_test_count": 116.0,
+    "suite_runtime_s": 198.353
+  }
+}
