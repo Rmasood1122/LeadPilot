@@ -1,0 +1,19 @@
+# SEALED compliance-critical test set — LeadPilot release gate.
+# Sealed 2026-09-29 at commit 847e103. These are the legal/safety guards
+# ("the tests that must never go red"): send-time suppression, unsubscribe,
+# per-region compliance, fabricated-claim verification, opt-in audit,
+# channel guards, production guard.
+#
+# The gate (evals/run_evals.py, compliance_suite_pass_rate) fails closed on
+# this list in BOTH directions:
+#   - any test in these files failing            -> BLOCK
+#   - any of these files missing / collecting
+#     ZERO tests (the deleted-test-file attack)  -> BLOCK
+# Adding a new legal guard file? Add it here in the same reviewed commit.
+# Removing one is a threshold edit — reviewed PR with written justification.
+files:
+  - tests/test_compliance.py
+  - tests/test_claim_verification.py
+  - tests/test_whatsapp_optin_audit.py
+  - tests/test_whatsapp_guard.py
+  - tests/test_production_guard.py
