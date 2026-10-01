@@ -18,16 +18,14 @@
 .phasec/
 .pytest_cache/
 .runlogs/
-<<<<<<< HEAD
+
 
 # Local scratch files in the repo root — kept on disk, never committed.
 /c.txt
 /tech.py
-=======
 .venv/
 __pycache__/
 build/
 dist/
 evals/candidate.json
 out_evals/
->>>>>>> origin/master
