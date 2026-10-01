@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
 from app.db.models import User
@@ -58,8 +58,18 @@ def attribution_summary(
     return attribution.summary(db, current_user.id, strategy_id=strategy_id)
 
 
+def _is_admin(request: Request, current_user: User) -> bool:
+    """The same test the admin routes apply, as a yes/no."""
+    try:
+        require_admin(request, current_user)
+    except HTTPException:
+        return False
+    return True
+
+
 @router.post("/attribution/recompute")
 def recompute_attribution(
+    request: Request,
     limit: int = Query(default=500, ge=1, le=2000),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -67,9 +77,16 @@ def recompute_attribution(
     """Run the sweep now instead of waiting for the quarter-hourly one.
 
     Idempotent: UNIQUE (outcome_kind, outcome_id) means it can never
-    double-credit, so this is safe to press repeatedly."""
+    double-credit, so this is safe to press repeatedly.
+
+    Scoped to the caller's own outcomes (NEW-02). Only an admin gets the
+    deployment-wide sweep the scheduler runs; before this, any account could
+    trigger it, writing other accounts' ledgers and reading their volume back
+    in the counts."""
     enforce_rate_limit(str(current_user.id), "attribution_recompute", "RATE_LIMIT_AI_ACTION")
-    return attribution.run_sweep(db, limit=limit)
+    if _is_admin(request, current_user):
+        return attribution.run_sweep(db, limit=limit)
+    return attribution.run_sweep(db, limit=limit, user_id=current_user.id)
 
 
 @router.get("/leads/{lead_id}/attribution")

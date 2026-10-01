@@ -258,23 +258,34 @@ def _is_positive_reply(db: Session, outcome: Outcome) -> bool:
     return any(r.intent_label == "interested" for r in replies)
 
 
-def run_sweep(db: Session, now: datetime | None = None, limit: int = 500) -> dict:
+def run_sweep(db: Session, now: datetime | None = None, limit: int = 500, *,
+              user_id=None) -> dict:
     """Credit every outcome that has no ledger entry yet.
 
     Covers every path that can create an outcome -- the Calendly webhook, our
     own booking page, the reply router, meeting outcomes, the CRM deal sync --
     past and future, and back-fills history for free.
+
+    `user_id` restricts the sweep to outcomes on leads that account owns.
+    None means deployment-wide, which is what the scheduled sweep wants and
+    what a tenant-triggered one must never get (NEW-02): the counts returned
+    here describe whatever was scanned.
     """
     now = now or _now()
     credited = {str(row.outcome_id) for row in db.execute(
         select(AttributionEntry.outcome_id)).all() if row.outcome_id}
     counts = {"checked": 0, "recorded": 0, "skipped": 0, "failed": 0}
 
+    query = select(Outcome).where(Outcome.event.in_(list(CREDITED_EVENTS)),
+                                  Outcome.lead_id.isnot(None))
+    if user_id is not None:
+        query = query.where(Outcome.lead_id.in_(
+            select(Lead.id)
+            .join(Strategy, Strategy.id == Lead.strategy_id)
+            .join(Product, Product.id == Strategy.product_id)
+            .where(Product.user_id == user_id)))
     outcomes = db.execute(
-        select(Outcome)
-        .where(Outcome.event.in_(list(CREDITED_EVENTS)), Outcome.lead_id.isnot(None))
-        .order_by(Outcome.ts.desc())
-        .limit(limit)
+        query.order_by(Outcome.ts.desc()).limit(limit)
     ).scalars().all()
 
     for outcome in outcomes:
