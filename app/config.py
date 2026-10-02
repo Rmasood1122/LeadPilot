@@ -465,6 +465,18 @@ class Settings(BaseSettings):
         return self.app_env == "test"
 
     @property
+    def debug_routes_allowed(self) -> bool:
+        """May the test-only /debug router exist in this process?
+
+        F9: an ALLOWLIST. The dedicated flag must be on AND the environment
+        must be development, local or test. It used to be "anything except
+        production/prod/live", which let staging -- or a misspelt environment
+        name -- serve routes that fabricate leads and mint unsubscribe tokens.
+        """
+        env = (self.app_env or "").strip().lower()
+        return bool(self.enable_debug_routes) and env in DEBUG_ROUTE_ENVS
+
+    @property
     def refresh_cookie_samesite(self) -> str:
         value = (self.auth_refresh_cookie_samesite or "").strip().lower()
         return value if value in {"lax", "strict", "none"} else "lax"
@@ -478,6 +490,10 @@ class Settings(BaseSettings):
         if self.auth_refresh_cookie_secure is not None:
             return bool(self.auth_refresh_cookie_secure)
         return (self.app_env or "").strip().lower() in {"production", "prod", "live"}
+
+
+#: The only environments in which app/api/debug.py may be mounted (F9).
+DEBUG_ROUTE_ENVS = frozenset({"development", "dev", "local", "test", "testing"})
 
 
 @lru_cache

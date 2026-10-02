@@ -311,15 +311,13 @@ app.include_router(compliance_rules_router)      # Feature 8: /admin/compliance-
 # controls nothing else, so no unrelated config change can enable it as a side
 # effect — notably NOT app_env/is_test/log_level. The import lives INSIDE the
 # conditional: when the flag is off, app.api.debug is never imported, so its
-# routes cannot exist on this ASGI app under any code path. The extra app_env
-# check is defence in depth for an operator who wrongly sets the flag in prod
-# (app/api/debug.py also raises at import time in that case).
+# routes cannot exist on this ASGI app under any code path. The flag alone is
+# not enough: Settings.debug_routes_allowed also requires app_env to be a
+# development, local or test environment (F9 -- an allowlist, so staging is
+# refused as well as production), and app/api/debug.py raises at import time
+# anywhere else.
 _debug_settings = get_settings()
-if (
-    _debug_settings.enable_debug_routes
-    and (_debug_settings.app_env or "").strip().lower()
-    not in {"production", "prod", "live"}
-):
+if _debug_settings.debug_routes_allowed:
     from app.api.debug import router as debug_router
 
     app.include_router(debug_router)
