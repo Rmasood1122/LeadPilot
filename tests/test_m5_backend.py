@@ -223,7 +223,12 @@ class TestUiSupport:
         assert data["apollo"]["key_set"] is True
         assert "supersecret" not in (data["apollo"]["masked"] or "")
 
-    def test_suppression_viewer_and_manual_add(self, leads_client, db_session):
+    def test_suppression_viewer_and_manual_add(self, leads_client, db_session,
+                                               test_user):
+        # Setup changed for F-SEC-04: the suppression endpoints are admin-only,
+        # so the client's user is made an admin. No assertion changed.
+        test_user.is_admin = True
+        db_session.commit()
         r = leads_client.post("/suppression",
                               json={"email": "gone@x.com", "reason": "spam"})
         assert r.status_code == 201

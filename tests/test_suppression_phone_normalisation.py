@@ -136,7 +136,11 @@ class TestWritesAreCanonical:
         assert response.status_code == 204
         assert _phones(db_session) == ["923001112233"]
 
-    def test_the_manual_add_endpoint_stores_the_canonical_form(self, client, db_session):
+    def test_the_manual_add_endpoint_stores_the_canonical_form(self, client, db_session,
+                                                               test_user):
+        # Setup changed for F-SEC-04: the endpoint is admin-only.
+        test_user.is_admin = True
+        db_session.commit()
         response = client.post("/suppression",
                                json={"phone": "+92 300-111 2233", "reason": "asked"})
         assert response.status_code == 201

@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.config import settings
 from app.db.base import get_db
 from app.db.models import (
@@ -268,12 +268,14 @@ class SuppressionIn(BaseModel):
 
 # Suppression list is intentionally GLOBAL, not per-user - a person who
 # unsubscribed or was GDPR-deleted must never be re-contactable by ANY
-# account on this deployment. No owner check here by design (unlike
-# everything else in this file).
+# account on this deployment. So there is no owner to check -- and for the
+# same reason reading or editing it is an operator action (F-SEC-04): the
+# list holds every tenant's opt-outs, and a row added here blocks every
+# tenant's sends. Enforcement (is_suppressed) is unaffected and stays global.
 @router.get("/suppression")
 def list_suppression(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ) -> dict:
     rows = db.execute(
         select(SuppressionEntry).order_by(SuppressionEntry.ts.desc())
@@ -289,7 +291,7 @@ def list_suppression(
 def add_suppression(
     body: SuppressionIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ) -> dict:
     from app.workers.lead_tasks import suppression_phone  # noqa: PLC0415
 
