@@ -11,6 +11,7 @@ signing key>". # TODO: verify exact header name/scheme against current docs.
 import hashlib
 import hmac
 import logging
+import time
 
 from app.config import settings
 from app.integrations.plumbing import BaseHttpAdapter
@@ -19,6 +20,13 @@ logger = logging.getLogger(__name__)
 
 CALENDLY_API_BASE = "https://api.calendly.com"  # TODO: verify against current Calendly docs
 SIGNATURE_HEADER = "Calendly-Webhook-Signature"  # TODO: verify against current Calendly docs
+#: How far AHEAD of our clock a delivery's timestamp may be (clock drift).
+FUTURE_SKEW_SECONDS = 300
+
+
+def _now() -> float:
+    """Current Unix time. A function of its own so tests can pin the clock."""
+    return time.time()
 
 
 class CalendlyAdapter(BaseHttpAdapter):
@@ -64,8 +72,18 @@ class CalendlyAdapter(BaseHttpAdapter):
 
 
 def verify_webhook_signature(raw_body: bytes, signature_header: str | None,
-                             signing_key: str | None = None) -> bool:
-    """Constant-time verification of Calendly's t=...,v1=... signature."""
+                             signing_key: str | None = None, *,
+                             now: float | None = None,
+                             tolerance_seconds: int | None = None) -> bool:
+    """Constant-time verification of Calendly's t=...,v1=... signature, AND
+    of the freshness of `t`.
+
+    F-OPS-02: the signature covers "<t>.<body>" but `t` itself was never
+    checked, so a captured delivery stayed valid for ever. A timestamp older
+    than the tolerance (settings.calendly_webhook_tolerance_seconds) or more
+    than FUTURE_SKEW_SECONDS ahead of our clock is refused. `now` and
+    `tolerance_seconds` are injectable for tests.
+    """
     signing_key = signing_key if signing_key is not None else settings.calendly_webhook_signing_key
     if not signing_key or not signature_header:
         return False
@@ -79,7 +97,25 @@ def verify_webhook_signature(raw_body: bytes, signature_header: str | None,
         f"{timestamp}.{raw_body.decode()}".encode(),
         hashlib.sha256,
     ).hexdigest()
-    return hmac.compare_digest(expected, given)
+    if not hmac.compare_digest(expected, given):
+        return False
+
+    try:
+        sent_at = int(timestamp)
+    except (TypeError, ValueError):
+        return False
+    current = _now() if now is None else now
+    tolerance = (settings.calendly_webhook_tolerance_seconds
+                 if tolerance_seconds is None else tolerance_seconds)
+    if current - sent_at > tolerance:
+        logger.warning("calendly webhook refused: timestamp %ss old (tolerance %ss)",
+                       int(current - sent_at), tolerance)
+        return False
+    if sent_at - current > FUTURE_SKEW_SECONDS:
+        logger.warning("calendly webhook refused: timestamp %ss in the future",
+                       int(sent_at - current))
+        return False
+    return True
 
 
 def extract_event_id(payload: dict, raw_body: bytes) -> str:

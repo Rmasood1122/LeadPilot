@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     # field looked for a different name, CALENDLY_WEBHOOK_SIGNING_KEY, which
     # silently left it empty and made every Calendly webhook 401.)
     calendly_webhook_signing_key: str = Field(default="", alias="CALENDLY_WEBHOOK_SECRET")
+    # F-OPS-02: how old a signed Calendly delivery's timestamp may be before
+    # it is refused as a replay. Env: CALENDLY_WEBHOOK_TOLERANCE_SECONDS.
+    calendly_webhook_tolerance_seconds: int = 1800
 
     # --- WhatsApp Business Cloud API (M4) -------------------------------------
     whatsapp_access_token: str = ""
