@@ -14,6 +14,7 @@ LeadPilot does NOT auto-reply to humans in M3.
 
 import logging
 
+from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,11 @@ _SYSTEM = (
     "helpdesk tickets, no-reply bots -- are automated_response."
 )
 
-_PROMPT = """FROM: {from_address}
+# F-AI-02: the sender, subject and body are written by whoever sent the email.
+# They go in as delimited, escaped data, under an explicit notice.
+_PROMPT = """{notice}
+
+FROM: {from_address}
 SUBJECT: {subject}
 
 BODY:
@@ -76,9 +81,10 @@ def _classify(from_address: str, subject: str | None, body: str) -> str:
         data = get_client().complete_json(
             system=_SYSTEM,
             prompt=_PROMPT.format(
-                from_address=from_address,
-                subject=subject or "(none)",
-                body=body[:4000],
+                notice=prompt_safety.NOTICE,
+                from_address=prompt_safety.inline(from_address),
+                subject=prompt_safety.inline(subject or "(none)"),
+                body=prompt_safety.block((body or "")[:4000]),
             ),
         )
         cls = str(data.get("classification", "")).strip().lower()

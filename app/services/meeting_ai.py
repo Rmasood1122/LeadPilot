@@ -29,6 +29,7 @@ import logging
 from typing import Any
 
 from app.config import settings
+from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,13 @@ _SYSTEM = (
     "state a fact, name, number or date that is not in the material given."
 )
 
-_PROMPT = """MEETING
+# F-AI-02: the transcript is what the PROSPECT (and anyone else on the call)
+# said, and the prospect's name, company and title come from enrichment --
+# outside text, delimited and escaped. The seller's own notes and the product
+# brief are ours and stay as plain context.
+_PROMPT = """{notice}
+
+MEETING
 - Title: {title}
 - Platform: {platform}
 - Scheduled duration: {scheduled_minutes} minutes
@@ -173,13 +180,15 @@ def generate_meeting_summary(
         scheduled_minutes=context.get("scheduled_minutes") or "unknown",
         actual_minutes=(f"{actual} minutes" if actual is not None
                         else "not recorded"),
-        lead_name=context.get("lead_name") or "unknown",
-        lead_company=context.get("lead_company") or "unknown",
-        lead_title=context.get("lead_title") or "unknown",
+        notice=prompt_safety.NOTICE,
+        lead_name=prompt_safety.inline(context.get("lead_name") or "unknown"),
+        lead_company=prompt_safety.inline(context.get("lead_company") or "unknown"),
+        lead_title=prompt_safety.inline(context.get("lead_title") or "unknown"),
         lead_status=context.get("lead_status") or "unknown",
         product=context.get("product") or "(no product brief on file)",
         raw_notes=(raw_notes or "(none)")[:8000],
-        transcript=(transcript or "(no transcript captured)")[:60_000],
+        transcript=prompt_safety.block(
+            (transcript or "(no transcript captured)")[:60_000]),
     )
 
     try:

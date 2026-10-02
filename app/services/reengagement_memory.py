@@ -38,6 +38,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.services import prompt_safety
+
 from app.db.models import (
     InboundReply,
     Lead,
@@ -114,7 +116,10 @@ _SYSTEM = (
     "null."
 )
 
-_PROMPT = """TODAY: {today}
+# F-AI-02: sender, subject and body are written by the prospect.
+_PROMPT = """{notice}
+
+TODAY: {today}
 
 THE REPLY
 From: {from_address}
@@ -236,10 +241,12 @@ def extract(db: Session, reply: InboundReply, today: date | None = None) -> dict
     try:
         answer = get_client().complete_json(
             system=_SYSTEM,
-            prompt=_PROMPT.format(today=today.isoformat(),
-                                  from_address=reply.from_address or "(unknown)",
-                                  subject=reply.subject or "(none)",
-                                  body=body[:4000]),
+            prompt=_PROMPT.format(
+                notice=prompt_safety.NOTICE,
+                today=today.isoformat(),
+                from_address=prompt_safety.inline(reply.from_address or "(unknown)"),
+                subject=prompt_safety.inline(reply.subject or "(none)"),
+                body=prompt_safety.block(body[:4000])),
             max_tokens=400,
         )
         return _clean_extraction(answer, body, today)

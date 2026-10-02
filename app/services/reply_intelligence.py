@@ -42,6 +42,7 @@ from app.db.models import (
     Sequence,
     SequenceEnrollment,
 )
+from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -117,7 +118,12 @@ _SYSTEM = (
     "NEVER use any of these words: " + ", ".join(BANNED_WORDS) + "."
 )
 
-_PROMPT = """THE REPLY WE RECEIVED:
+# F-AI-02: the reply is written by the prospect, and the lead's name, company
+# and title come from scraped enrichment -- all outside text, so all delimited
+# and escaped. The message WE sent stays as plain context.
+_PROMPT = """{notice}
+
+THE REPLY WE RECEIVED:
 {reply_body}
 
 WHO SENT IT:
@@ -203,10 +209,11 @@ def _generate(db: Session, reply: InboundReply) -> dict:
     lead = db.get(Lead, reply.lead_id) if reply.lead_id else None
     original, step_no = _original_message(db, reply)
     prompt = _PROMPT.format(
-        reply_body=(reply.body or "")[:6000],
-        lead_name=(getattr(lead, "full_name", None) or "unknown"),
-        company=(getattr(lead, "company", None) or "unknown"),
-        title=(getattr(lead, "title", None) or "unknown"),
+        notice=prompt_safety.NOTICE,
+        reply_body=prompt_safety.block((reply.body or "")[:6000]),
+        lead_name=prompt_safety.inline(getattr(lead, "full_name", None) or "unknown"),
+        company=prompt_safety.inline(getattr(lead, "company", None) or "unknown"),
+        title=prompt_safety.inline(getattr(lead, "title", None) or "unknown"),
         step_no=step_no if step_no is not None else "unknown",
         original_message=original,
     )

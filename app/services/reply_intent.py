@@ -45,6 +45,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import InboundReply, Lead, Message, MessageStatus
+from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -92,7 +93,12 @@ _SYSTEM = (
     "`reason` quotes or paraphrases the reply -- never invent detail."
 )
 
-_PROMPT = """THE REPLY
+# F-AI-02: the reply (sender, subject, body) is written by the prospect and
+# goes in as delimited, escaped data. What they were replying to is OUR message
+# and is deliberately left as plain context.
+_PROMPT = """{notice}
+
+THE REPLY
 From: {from_address}
 Subject: {subject}
 
@@ -188,9 +194,10 @@ def classify(db: Session, reply_id) -> dict:
             answer = get_client().complete_json(
                 system=_SYSTEM,
                 prompt=_PROMPT.format(
-                    from_address=reply.from_address or "(unknown)",
-                    subject=reply.subject or "(none)",
-                    body=(reply.body or "")[:MAX_BODY],
+                    notice=prompt_safety.NOTICE,
+                    from_address=prompt_safety.inline(reply.from_address or "(unknown)"),
+                    subject=prompt_safety.inline(reply.subject or "(none)"),
+                    body=prompt_safety.block((reply.body or "")[:MAX_BODY]),
                     step_no=step_no if step_no is not None else "unknown",
                     original=original,
                 ),

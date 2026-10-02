@@ -131,12 +131,17 @@ def is_automated(from_address: str | None, subject: str | None, body: str | None
         return True, "; ".join(found)
     if found and use_model:
         try:
+            from app.services import prompt_safety  # noqa: PLC0415
             from app.services.anthropic_client import get_client  # noqa: PLC0415
 
+            # F-AI-02: all three fields are written by the sender.
             data = get_client().complete_json(
                 system=DETECTOR_SYSTEM, max_tokens=200,
-                prompt=(f"FROM: {from_address}\nSUBJECT: {subject or '(none)'}\n\n"
-                        f"BODY:\n{(body or '')[:3000]}\n\nAutomated or human?"))
+                prompt=(f"{prompt_safety.NOTICE}\n\n"
+                        f"FROM: {prompt_safety.inline(from_address)}\n"
+                        f"SUBJECT: {prompt_safety.inline(subject or '(none)')}\n\n"
+                        f"BODY:\n{prompt_safety.block((body or '')[:3000])}\n\n"
+                        "Automated or human?"))
             if bool(data.get("automated")):
                 return True, str(data.get("reason") or found[0])[:200]
         except Exception:  # noqa: BLE001 -- when unsure, it is a human reply
