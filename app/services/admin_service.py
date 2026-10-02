@@ -204,15 +204,17 @@ class AdminService:
         added_by: str,
     ) -> None:
         from app.models.suppression import SuppressionList
+        from app.workers.lead_tasks import is_suppressed, suppression_phone
 
         # Check for existing
-        query = db.query(SuppressionList)
         if email:
-            query = query.filter_by(email=email)
+            if db.query(SuppressionList).filter_by(email=email).first():
+                return  # already suppressed
         elif phone:
-            query = query.filter_by(phone=phone)
-        if query.first():
-            return  # already suppressed
+            # NEW-04: the same number in another format is already suppressed.
+            if is_suppressed(db, phone=phone):
+                return
+        phone = suppression_phone(phone)
 
         # Only these four are real columns; source/user_id/created_at are not
         # on the model and would raise "invalid keyword argument", so adding a

@@ -281,12 +281,12 @@ def gdpr_delete_lead(
             ).scalar_one_or_none()
             if not exists:
                 db.add(SuppressionEntry(email=email.lower().strip(), reason="gdpr_delete"))
-        if phone:
-            exists = db.execute(
-                select(SuppressionEntry.id).where(SuppressionEntry.phone == phone.strip())
-            ).scalar_one_or_none()
-            if not exists:
-                db.add(SuppressionEntry(phone=phone.strip(), reason="gdpr_delete"))
+        if phone and phone.strip():
+            # NEW-04: compared normalised and written canonical, so the same
+            # number in another format is neither missed nor duplicated.
+            if not lead_tasks.is_suppressed(db, phone=phone):
+                db.add(SuppressionEntry(phone=lead_tasks.suppression_phone(phone),
+                                        reason="gdpr_delete"))
 
     # Part 1 Feature 9: the erasure event is written BEFORE the data goes,
     # with the identifier and owner denormalized onto the row, so the proof

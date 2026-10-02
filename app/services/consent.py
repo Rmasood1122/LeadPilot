@@ -228,7 +228,7 @@ def suppress_everywhere(db: Session, lead: Lead, *, source: str, reason: str,
     RETURNS {channel: "suppressed" | "already" | "no_identifier"} plus the
     events written. Idempotent: suppressing twice adds no duplicate rows.
     """
-    from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
+    from app.workers.lead_tasks import is_suppressed, suppression_phone  # noqa: PLC0415
 
     result: dict = {}
     events: list[ConsentEvent] = []
@@ -251,7 +251,7 @@ def suppress_everywhere(db: Session, lead: Lead, *, source: str, reason: str,
         if is_suppressed(db, phone=lead.phone):
             result[PHONE] = "already"
         else:
-            db.add(SuppressionEntry(phone=lead.phone.strip(), reason=reason))
+            db.add(SuppressionEntry(phone=suppression_phone(lead.phone), reason=reason))
             events.append(record(db, lead=lead, kind=SUPPRESSED, channel=PHONE,
                                  source=source, identifier=lead.phone, detail=detail,
                                  actor=actor, commit=False))

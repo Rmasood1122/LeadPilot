@@ -291,12 +291,15 @@ def add_suppression(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
+    from app.workers.lead_tasks import suppression_phone  # noqa: PLC0415
+
     if not body.email and not body.phone:
         raise HTTPException(status_code=422,
                             detail="email or phone is required")
     entry = SuppressionEntry(
         email=body.email.lower().strip() if body.email else None,
-        phone=body.phone.strip() if body.phone else None,
+        # NEW-04: one canonical form, so the check matches any format.
+        phone=suppression_phone(body.phone) if body.phone else None,
         reason=f"manual_{body.reason}"[:200],
     )
     db.add(entry)
