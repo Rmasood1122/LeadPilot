@@ -28,13 +28,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.base import get_db
 from app.db.models import (
+    ChannelType,
     InboundReply,
     Lead,
     LeadStatus,
@@ -43,6 +44,7 @@ from app.db.models import (
     Outcome,
     OutcomeEvent,
     ProcessedWebhook,
+    SuppressionEntry,
 )
 from app.integrations.whatsapp import META_STATUS_MAP, normalize_phone
 from app.services import sequence_engine as engine
@@ -297,6 +299,66 @@ def _inbound_text(msg: dict) -> str:
     return f"[{msg_type or 'unknown'} message]"
 
 
+def _lead_for_inbound(db: Session, from_phone: str) -> Lead | None:
+    """Whose prospect sent this?
+
+    F-SEC-02: this used to scan every lead with a phone and take the FIRST
+    match. Two tenants can hold the same number, so a reply -- or a STOP --
+    could land on a tenant that had never messaged that person.
+
+    Among the leads whose normalised phone equals the sender's (stored phones
+    may contain '+', spaces or dashes, so both sides are normalised):
+
+      (a) if any of them has been SENT a WhatsApp message, the lead of the
+          most recent outbound WhatsApp message wins;
+      (b) else, if exactly one lead holds the number, it is that lead -- a
+          prospect who messages us first is still recognised;
+      (c) else it is ambiguous (several leads, none messaged) and nobody
+          gets it.
+    """
+    if not from_phone:
+        return None
+    holders = [lead_id for lead_id, phone in db.execute(
+        select(Lead.id, Lead.phone).where(Lead.phone.isnot(None))).all()
+        if normalize_phone(phone or "") == from_phone]
+    if not holders:
+        return None
+
+    messaged = db.execute(
+        select(Message.lead_id, func.max(Message.sent_at))
+        .where(Message.lead_id.in_(holders),
+               Message.channel == ChannelType.WHATSAPP,
+               Message.sent_at.isnot(None))
+        .group_by(Message.lead_id)
+    ).all()
+    if messaged:
+        lead_id, _ = max(messaged, key=lambda row: row[1])
+        return db.get(Lead, lead_id)
+    if len(holders) == 1:
+        return db.get(Lead, holders[0])
+    return None
+
+
+def _suppress_unmatched_phone(db: Session, from_phone: str) -> None:
+    """A STOP that could not be attached to a lead: one GLOBAL phone
+    suppression row, in the '+<digits>' form a WhatsApp recipient's phone is
+    stored and compared in at send time. Idempotent."""
+    from app.workers.lead_tasks import is_suppressed
+
+    if not from_phone:
+        return
+    phone = f"+{from_phone}"
+    if is_suppressed(db, phone=phone):
+        return
+    db.add(SuppressionEntry(phone=phone, reason="whatsapp_stop_unmatched"))
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent delivery wrote the same row first: already suppressed.
+        db.rollback()
+    logger.info("whatsapp opt-out from an unmatched number — phone suppressed")
+
+
 def _handle_inbound(db: Session, msg: dict, phone_number_id: str | None) -> None:
     from_phone = normalize_phone(msg.get("from") or "")
     body = _inbound_text(msg)
@@ -310,19 +372,19 @@ def _handle_inbound(db: Session, msg: dict, phone_number_id: str | None) -> None
             received_at = None
     received_at = received_at or datetime.now(timezone.utc)
 
-    # Match lead by phone (normalized digits vs stored value — stored
-    # phones may contain '+'/spaces from enrichment).
-    lead = None
-    if from_phone:
-        candidates = db.execute(
-            select(Lead).where(Lead.phone.isnot(None))
-        ).scalars().all()
-        # NOTE: linear scan is acceptable at Chunk-1 scale; Chunk 3 adds a
-        # normalized-phone column/index when window lookups make this hot.
-        for c in candidates:
-            if normalize_phone(c.phone or "") == from_phone:
-                lead = c
-                break
+    lead = _lead_for_inbound(db, from_phone)
+
+    if lead is None:
+        # No lead holds this number, or several do and none was messaged:
+        # there is no tenant to attach the message to, so nothing is stored.
+        # The one thing that must still happen is an opt-out -- "stop" is an
+        # instruction about a person and is honoured without knowing whose
+        # prospect they are.
+        if _is_opt_out(body):
+            _suppress_unmatched_phone(db, from_phone)
+        logger.info("whatsapp inbound could not be attributed to one lead — "
+                    "not attached")
+        return
 
     reply_row = InboundReply(
         lead_id=lead.id if lead else None,
