@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.plans import PlanLimitExceeded, check_plan_limit, plan_limit_response
 from app.core.rate_limiting import AUTH_WINDOW_SECONDS, enforce_rate_limit
 from app.api.schemas import (
     PhaseProgress,
@@ -89,6 +90,19 @@ def create_strategy(
     product = db.get(Product, product_id)
     if product is None or product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="product not found")
+
+    # F-AI-01: the plan's max_strategies. Counted over the caller's OWN
+    # strategies, across all their products -- never another account's. After
+    # the ownership check, so a foreign product id is 404 whatever the count.
+    owned_strategies = db.execute(
+        select(func.count(Strategy.id))
+        .join(Product, Product.id == Strategy.product_id)
+        .where(Product.user_id == current_user.id)
+    ).scalar_one()
+    try:
+        check_plan_limit(current_user, "max_strategies", owned_strategies)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(status_code=402, detail=plan_limit_response(exc))
 
     has_clients = (
         db.execute(
