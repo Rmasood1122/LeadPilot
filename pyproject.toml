@@ -8,18 +8,29 @@ version = "0.1.0"
 description = "LeadPilot - self-learning client acquisition system (backend core)"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.30",
-    "pydantic[email]>=2.7",
-    "pydantic-settings>=2.3",
-    "sqlalchemy>=2.0",
+    # THE BOUNDS BELOW MUST MATCH requirements.txt (tests/test_dependency_pins.py
+    # enforces it). The Dockerfile installs from THIS file; CI and local runs
+    # install requirements.txt. When the two drifted, the image resolved
+    # SQLAlchemy 2.1 -- where a plain postgresql:// URL selects psycopg (v3),
+    # which is not installed -- and every worker deploy died at import with
+    # "No module named 'psycopg'", while every test passed on 2.0.x.
+    #
+    # fastapi: requirements.txt said >=0.111,<0.112 and this file said >=0.115,
+    # which no version satisfies. The code is written against and tested on
+    # 0.111 (app/main.py's lifespan note; the whole suite runs on 0.111.x) and
+    # uses nothing introduced later, so 0.111.x is the range in both files.
+    "fastapi>=0.111.0,<0.112",
+    "uvicorn[standard]>=0.30.0,<0.31",
+    "pydantic[email]>=2.7.0,<3.0",
+    "pydantic-settings>=2.3.0",
+    "sqlalchemy>=2.0.30,<2.1",
     "psycopg2-binary>=2.9",
-    "alembic>=1.13",
-    "celery[redis]>=5.4",
-    "redis>=5.0",
-    "anthropic>=0.40",
-    "httpx>=0.27",
-    "tenacity>=8.3",
+    "alembic>=1.13.0,<1.14",
+    "celery[redis]>=5.4.0,<5.5",
+    "redis>=5.0.0,<6.0",
+    "anthropic>=0.28.0",
+    "httpx>=0.27.0",
+    "tenacity>=8.4.1",
     "cryptography>=42.0",
     "python-multipart>=0.0.9",
     "pyjwt>=2.8",
