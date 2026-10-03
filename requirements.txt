@@ -69,6 +69,7 @@ pytest>=8.2.0
 pytest-asyncio>=0.23.0
 httpx                  # already listed above — also used by pytest test client
 respx>=0.21.0          # httpx mock transport — imported by tests/conftest.py
+fakeredis>=2.23        # in-process Redis — imported by tests/conftest.py
 faker>=25.0.0          # test data generation
 
 # ── Combined-build additions (verified against actual imports) ───────────────

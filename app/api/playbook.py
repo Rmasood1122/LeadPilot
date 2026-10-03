@@ -11,9 +11,11 @@ New endpoints (C4):
 """
 from __future__ import annotations
 
+import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin
@@ -103,41 +105,44 @@ async def get_subject_patterns(
 
 @router.get("/scores")
 async def get_playbook_scores(
-    strategy_id: Optional[str] = Query(None),
+    strategy_id: Optional[uuid.UUID] = Query(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> list[dict]:
-    """User's playbook scores. Includes decay metadata (effective_n, trend)."""
+    """User's playbook scores. Includes decay metadata (effective_n, trend).
+
+    Written in SQLAlchemy Core so the ids bind through the Uuid type: the
+    raw-SQL version bound str(current_user.id), which matched nothing on
+    SQLite (Uuid is stored there as 32 undashed hex digits). A malformed
+    strategy_id is a 422. A DB error propagates as a 500 -- an empty list
+    here must mean "no data", never "the query failed".
+    """
     try:
         check_feature(current_user, "playbook_access")
     except PlanLimitExceeded as e:
         raise HTTPException(status_code=402, detail=plan_limit_response(e))
 
-    from sqlalchemy import text
-    params: dict = {"user_id": str(current_user.id)}
-    where_extra = ""
-    if strategy_id:
-        where_extra = "AND s.id = :sid"
-        params["sid"] = strategy_id
+    from app.db.models import PlaybookScore, Product, Strategy
 
-    try:
-        rows = db.execute(text(f"""
-            SELECT DISTINCT ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
-                   ps.sample_size, ps.effective_sample_size, ps.is_reliable,
-                   ps.decay_half_life_days, ps.trend, ps.last_aggregated_at,
-                   s.id AS strategy_id
-            FROM playbook_scores ps
-            JOIN strategies s ON s.pattern_key = ps.pattern_key
-            JOIN products p ON p.id = s.product_id
-            WHERE p.user_id = :user_id
-              {where_extra}
-            ORDER BY ps.reply_rate DESC NULLS LAST
-            LIMIT 200
-        """), params).mappings().all()
-        return [dict(r) for r in rows]
-    except Exception as e:
-        logger.error("playbook.scores_failed", error=str(e))
-        return []
+    ps = PlaybookScore
+    stmt = (
+        select(
+            ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
+            ps.sample_size, ps.effective_sample_size, ps.is_reliable,
+            ps.decay_half_life_days, ps.trend, ps.last_aggregated_at,
+            Strategy.id.label("strategy_id"),
+        )
+        .distinct()
+        .join(Strategy, Strategy.pattern_key == ps.pattern_key)
+        .join(Product, Product.id == Strategy.product_id)
+        .where(Product.user_id == current_user.id)
+    )
+    if strategy_id:
+        stmt = stmt.where(Strategy.id == strategy_id)
+    stmt = stmt.order_by(ps.reply_rate.desc().nulls_last()).limit(200)
+
+    rows = db.execute(stmt).mappings().all()
+    return [dict(r) for r in rows]
 
 
 # ---------------------------------------------------------------------------

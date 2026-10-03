@@ -197,6 +197,7 @@ export function useCrmBulkPatch() {
       status?: LeadStatus;
       add_tag_ids?: string[];
       remove_tag_ids?: string[];
+      owner_user_id?: string | null;
     }) => crm.bulkPatchLeads(body),
     // NOT optimistic. A bulk status change is partially applied by design —
     // rows whose current status makes the move illegal are skipped — so the
@@ -205,6 +206,20 @@ export function useCrmBulkPatch() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["crm-grid"] });
       void queryClient.invalidateQueries({ queryKey: ["crm-pipeline"] });
+      void queryClient.invalidateQueries({ queryKey: ["crm-activity"] });
+    },
+  });
+}
+
+/** Team round-robin. Not optimistic for the same reason as bulk: which member
+ *  receives which lead is decided by the server's load count. */
+export function useCrmRoundRobin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { lead_ids?: string[]; strategy_id?: string; roles?: string[] }) =>
+      crm.assignRoundRobin(body),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["crm-grid"] });
       void queryClient.invalidateQueries({ queryKey: ["crm-activity"] });
     },
   });

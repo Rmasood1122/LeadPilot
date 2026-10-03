@@ -18,9 +18,11 @@ import { Modal } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { StrategyCalls } from "@/components/calls/CallHistory";
 import { FunnelHeatmap } from "@/components/campaigns/FunnelHeatmap";
+import { ReengagementPanel } from "@/components/campaigns/ReengagementPanel";
 import { SendTimePanel } from "@/components/campaigns/SendTimePanel";
 import { SentimentTrend } from "@/components/campaigns/SentimentTrend";
 import { SequenceReviewPanel } from "@/components/campaigns/SequenceReviewPanel";
+import { ReviewQueuePanel } from "@/components/campaigns/ReviewQueuePanel";
 import { pct } from "@/lib/utils";
 
 // --------------------------------------------------------------------------
@@ -415,7 +417,11 @@ function SequencesPanel({ strategyId }: { strategyId: string }) {
 // --------------------------------------------------------------------------
 // Main page
 // --------------------------------------------------------------------------
-const TABS = ["overview", "sequences", "templates", "funnel", "sentiment", "calls"] as const;
+// "review" is Part 1 Feature 5: messages held for explicit human approval.
+// It sits beside the campaign tabs rather than inside a strategy, because a
+// held message belongs to the person who has to approve it, not to one
+// campaign's dashboard.
+const TABS = ["overview", "sequences", "templates", "review", "funnel", "sentiment", "calls"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function CampaignsPage() {
@@ -537,6 +543,9 @@ export default function CampaignsPage() {
 
               {/* Feature Group 3: per-campaign smart send time. */}
               <SendTimePanel strategyId={effectiveStratId} />
+
+              {/* Feature 5: opt-in post-sequence re-engagement. */}
+              <ReengagementPanel strategyId={effectiveStratId} />
             </div>
           )}
         </AsyncState>
@@ -548,6 +557,9 @@ export default function CampaignsPage() {
       {tab === "templates" && effectiveStratId && (
         <TemplatesPanel strategyId={effectiveStratId} />
       )}
+      {/* Part 1 Feature 5: the human review queue. Not scoped to a strategy —
+          it is everything waiting on THIS user. */}
+      {tab === "review" && <ReviewQueuePanel />}
       {/* Feature Group 6: AI call history for every lead in the campaign. */}
       {tab === "calls" && effectiveStratId && (
         <StrategyCalls strategyId={effectiveStratId} />

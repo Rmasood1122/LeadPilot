@@ -1,6 +1,8 @@
 /** Feature A3 — reply authenticity, shaped for the inbox. Pure; tested in
  *  src/tests/authenticity.test.ts. */
 
+import type { ReplyIntent } from "./replyIntent";
+
 export type AuthenticityKind = "genuine" | "out_of_office" | "auto_responder" | "bot" | "bounce";
 
 export interface Authenticity {
@@ -23,6 +25,8 @@ export interface InboxReply {
   reply_category: string | null;
   received_at: string | null;
   authenticity: Authenticity | null;
+  /** Part 1 Feature 1. Always present; `label: null` means not classified. */
+  intent: ReplyIntent;
 }
 
 const KIND_LABELS: Record<AuthenticityKind, string> = {

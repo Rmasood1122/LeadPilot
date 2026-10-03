@@ -32,6 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import DisplacementAlert, Lead, LeadStatus, Strategy
+from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 from app.services.reply_intelligence import BANNED_WORDS, find_banned_words
 
@@ -87,7 +88,11 @@ _DM_SYSTEM = (
     "NEVER use any of these words: " + ", ".join(BANNED_WORDS) + "."
 )
 
-_DM_PROMPT = """WHAT THEY POSTED:
+# F-AI-02: the post is scraped from LinkedIn and the name, title and company
+# come from enrichment -- outside text, delimited and escaped.
+_DM_PROMPT = """{notice}
+
+WHAT THEY POSTED:
 {post_excerpt}
 
 WHAT FIRED THE ALERT (the words that matched): {matched}
@@ -181,11 +186,12 @@ def generate_displacement_dm(lead: Lead, post_excerpt: str,
     keeps going -- one un-drafted alert must not cost the other forty.
     """
     prompt = _DM_PROMPT.format(
-        post_excerpt=post_excerpt,
+        notice=prompt_safety.NOTICE,
+        post_excerpt=prompt_safety.block(post_excerpt),
         matched=", ".join(matched_keywords) or "(none)",
-        full_name=getattr(lead, "full_name", None) or "there",
-        title=getattr(lead, "title", None) or "unknown",
-        company=getattr(lead, "company", None) or "their company",
+        full_name=prompt_safety.inline(getattr(lead, "full_name", None) or "there"),
+        title=prompt_safety.inline(getattr(lead, "title", None) or "unknown"),
+        company=prompt_safety.inline(getattr(lead, "company", None) or "their company"),
     )
     system = _DM_SYSTEM
     try:

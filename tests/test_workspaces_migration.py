@@ -20,7 +20,15 @@ ADDED = {"sequences": ["approval_requested_by_user_id", "approval_requested_at",
                        "approved_by_user_id", "approved_at", "approval_note",
                        "approval_payload_json"]}
 NEW_TABLES = ["workspaces", "workspace_members", "workspace_invitations"]
+# `workspaces` is NOT a prerequisite here -- this is the migration that
+# creates it. `strategies.client_workspace_id` (migration 0063, thirty
+# revisions later) is therefore stripped from the copied metadata below
+# instead: at this point in history neither that column nor the table it
+# points at existed.
 _PREREQ = ["users", "products", "strategies", "sequences"]
+#: Columns that post-date this migration and must come off the pre-migration
+#: copy of the table that carries them.
+_FUTURE_COLUMNS = {"strategies": ["client_workspace_id"]}
 
 
 def _load(name):
@@ -36,7 +44,7 @@ def _build_prereqs(engine):
     meta = sa.MetaData(naming_convention=Base.metadata.naming_convention)
     for table in Base.metadata.sorted_tables:
         table.to_metadata(meta)
-    for table_name, cols in ADDED.items():
+    for table_name, cols in {**ADDED, **_FUTURE_COLUMNS}.items():
         table = meta.tables[table_name]
         for index in list(table.indexes):
             if any(c.name in cols for c in index.columns):

@@ -158,6 +158,11 @@ class MessageStatus(str, enum.Enum):
     NEEDS_TEMPLATE = "needs_template"  # free-form send failed closed (24h
                                    # window expired) or template no longer
                                    # approved — needs user attention"
+    # Part 1 Feature 5: rendered, held for explicit human approval, NOT sent.
+    # VARCHAR-backed like every enum here (models._enum), so adding it touches
+    # no column. A message in this state is queued, never lost: approving it
+    # returns it to SCHEDULED and the next dispatch tick sends it.
+    AWAITING_REVIEW = "awaiting_review"
 
 
 class EnrollmentStatus(str, enum.Enum):
@@ -893,6 +898,15 @@ class Strategy(TimestampMixin, Base):
     # not deterministic across runs, and would silently re-bucket a strategy
     # that never changed). See icp_extraction.canonical_pattern_payload.
     pattern_inputs_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # --- Part 1 Feature 11 (migration 0063) -------------------------------
+    # WHICH CLIENT this campaign is run for, when the account is an agency.
+    # NULL = the agency's own work, which is what every existing strategy is
+    # -- not a client that does not exist. An account that never creates a
+    # client workspace behaves exactly as it does today.
+    client_workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("client_workspaces.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
     # M8-C2: winning variant set by auto-promotion. Affects FUTURE message
     # rendering only — in-flight rows (sent_at IS NOT NULL) are never touched.
     default_variant: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -943,6 +957,22 @@ class Strategy(TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
     health_message: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # --- Feature 5 (migration 0048): opt-in post-sequence re-engagement ----
+    # OFF by default and per campaign. Its caps are separate from the channel
+    # daily cap -- a re-engagement send counts against BOTH -- and are clamped
+    # to the admin ceilings in system_settings. See app/services/reengagement.py.
+    reengagement_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    reengagement_delay_days: Mapped[int] = mapped_column(
+        Integer, default=30, server_default=text("30"), nullable=False
+    )
+    reengagement_daily_cap: Mapped[int] = mapped_column(
+        Integer, default=10, server_default=text("10"), nullable=False
+    )
+    reengagement_weekly_cap: Mapped[int] = mapped_column(
+        Integer, default=25, server_default=text("25"), nullable=False
+    )
 
     product: Mapped["Product"] = relationship(back_populates="strategies")
     research_steps: Mapped[list["ResearchStep"]] = relationship(
@@ -1148,6 +1178,42 @@ class Lead(TimestampMixin, Base):
     kill_signal: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # The factors the estimate was built from, so it can always be explained.
     conversion_factors_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # --- Part 1 Feature 2 (migration 0054): F-P-T-A -----------------------
+    # Four 0-100 sub-scores and a weighted overall, each with its own reason
+    # and the evidence behind it. Deliberately NOT folded into
+    # ai_booking_likelihood: a lead can be a perfect fit with no timing, or
+    # desperate with no way to reach them, and one number erases that.
+    # NULL = never scored, which sorts last rather than reading as zero.
+    fpta_fit: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_problem: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_timing: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_access: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fpta_overall: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    # {dimension: {score, reason, signals: [...], baseline}} -- so a score can
+    # always be explained and re-derived without the model.
+    fpta_reasons_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    fpta_method: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    fpta_scored_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # --- Part 1 Feature 10 (migration 0062): where each field came from ----
+    # {field: {source, confidence, observed_at, detail, value}}.
+    #
+    # A JSON column rather than the EAV table this schema uses for CUSTOM
+    # FIELDS, and for the opposite reason: custom field values are sorted and
+    # filtered server-side across thousands of rows, where JSON extraction
+    # differs between SQLite and PostgreSQL. Provenance is never sorted,
+    # filtered or aggregated -- it is read once, for one prospect, when a
+    # person hovers a field and asks where it came from. One column read with
+    # the lead it describes is the cheapest possible answer.
+    #
+    # NULL = no provenance recorded, which is NOT the same as "unknown
+    # source": the service reports the difference rather than inventing a
+    # source for history.
+    provenance_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    provenance_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     strategy: Mapped["Strategy"] = relationship(back_populates="leads")
     batch: Mapped["LeadBatch | None"] = relationship(back_populates="leads")
@@ -1386,6 +1452,30 @@ class SequenceEnrollment(TimestampMixin, Base):
     stop_reason: Mapped[str | None] = mapped_column(String(100), nullable=True)
     paused_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     current_step: Mapped[int] = mapped_column(Integer, default=0)
+    # --- Part 1 Feature 3 (migration 0055): completion guarantee ----------
+    # The number of steps this prospect was enrolled INTO, frozen at
+    # enrollment. Editing the sequence later must not retroactively turn a
+    # completed enrollment into an incomplete one. NULL = enrolled before
+    # this feature.
+    planned_steps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Incremented once per send that advances the sequence -- not by a skip,
+    # and not again when a transient failure is retried.
+    steps_sent: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    stopped_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # The fixed vocabulary behind the free-text `stop_reason`, decided at
+    # WRITE time (app/services/sequence_completion.categorize) so an
+    # unrecognised reason lands in "other" and is logged, rather than
+    # quietly disappearing into a breakdown nobody reads.
+    stop_category: Mapped[str | None] = mapped_column(
+        String(30), nullable=True, index=True
+    )
 
     sequence: Mapped["Sequence"] = relationship(back_populates="enrollments")
     lead: Mapped["Lead"] = relationship()
@@ -1452,6 +1542,13 @@ class Message(TimestampMixin, Base):
     open_count: Mapped[int] = mapped_column(
         Integer, default=0, server_default=text("0"), nullable=False
     )
+    # --- Feature 5 (migration 0048) -----------------------------------------
+    # WHY this message exists when it is not an ordinary sequence step. NULL for
+    # every scheduled step (their rows are unchanged); "reengagement" for the
+    # opt-in post-sequence touch. A real indexed column, not outcome meta_json,
+    # because the re-engagement cap counts these rows at send time and a JSON
+    # predicate is spelled differently on SQLite and PostgreSQL.
+    origin: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
 
     sequence: Mapped["Sequence"] = relationship(back_populates="messages")
     lead: Mapped["Lead"] = relationship(back_populates="messages")
@@ -1629,6 +1726,34 @@ class InboundReply(TimestampMixin, Base):
     authenticity_signals_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
     authenticity_scored_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    # --- Part 1 Feature 1 (migration 0053): positive reply classification ---
+    # A FOURTH question, and the only one the reply-rate metric cares about:
+    # was this reply POSITIVE? interested | neutral | objection | not_now |
+    # unsubscribe, with the model's own confidence and a one-line reason.
+    # NULL = never classified (not the same as "classified as neutral").
+    # `intent_source` is "model" or "rules" -- machine mail and explicit
+    # unsubscribes are decided deterministically and never cost a model call.
+    intent_label: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    intent_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    intent_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    intent_source: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    intent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # --- Part 1 Feature 6 (migration 0058): the unified inbox ---------------
+    # "Handled" is per REPLY, not per prospect: someone who replies twice in a
+    # week has one thread and two things to answer, and a per-prospect flag
+    # would let the second be cleared by a decision made about the first.
+    # It exists at all because the two cases that matter most -- a reply
+    # answered OUTSIDE LeadPilot, and a reply that needs no answer -- produce
+    # no outbound row, so "latest inbound is newer than latest outbound"
+    # alone would show them as outstanding forever.
+    handled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    handled_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
 
@@ -2420,6 +2545,19 @@ class Meeting(TimestampMixin, Base):
     key_points: Mapped[list | None] = mapped_column(JSON, nullable=True)
     next_steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
     sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # --- Feature 3 (migration 0049): recording-provider transcripts ---------
+    # recording_bot_id is the ONLY key a recording webhook is matched to a
+    # meeting by (unique), never an id carried in the payload. transcript_status
+    # is requesting | pending | received | failed | timed_out; summary_source is
+    # notes | transcript. See app/services/meeting_recording.py.
+    recording_bot_id: Mapped[str | None] = mapped_column(
+        String(100), nullable=True, unique=True, index=True
+    )
+    transcript_status: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    transcript_deadline_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    summary_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     booking: Mapped["CalendarBooking | None"] = relationship()
     lead: Mapped["Lead | None"] = relationship()
@@ -2635,8 +2773,115 @@ class MeetingPrepBrief(TimestampMixin, Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Part 2 (migration 0064): the call script the SELLER owns -----------
+    # {opening, discovery: [...], objections: [{objection, response}],
+    #  close, notes}. Its own column rather than another key in
+    # `sections_json` because that blob is MODEL OUTPUT, rewritten whenever
+    # "Regenerate" is pressed -- and an edit a regeneration silently
+    # overwrites is an edit nobody makes twice. This one is written by a
+    # person, or seeded once while it is still empty.
+    script_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    script_edited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    script_edited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    # Part 2.3: this meeting has practice as a required pre-meeting step. Off
+    # by default -- making every call require a rehearsal is how a checklist
+    # becomes something people click through without reading.
+    practice_required: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
 
     lead: Mapped["Lead"] = relationship()
+
+
+class RoleplaySession(TimestampMixin, Base):
+    """Part 2 -- one practice run against a prospect's brief.
+
+    WHY THE SCORES ARE COLUMNS AND THE FEEDBACK IS JSON. The five scores are
+    what "am I getting better?" is measured on, so they are queried and
+    charted across sessions; the prose feedback is read once, for one session.
+    Putting the scores in the JSON would mean extracting them differently on
+    SQLite and PostgreSQL to draw one line on a chart.
+
+    `lead_id` and `brief_id` are SET NULL: a practice history is about the
+    SELLER, and losing the prospect it was practised against must not erase
+    the evidence that they improved.
+    """
+
+    __tablename__ = "roleplay_sessions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    brief_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("meeting_prep_briefs.id", ondelete="SET NULL"), nullable=True
+    )
+    # active | completed | abandoned
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'"),
+        nullable=False, index=True
+    )
+    # easy | realistic | hostile
+    difficulty: Mapped[str] = mapped_column(
+        String(20), default="realistic", server_default=text("'realistic'"),
+        nullable=False
+    )
+    persona_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    objectives_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    turn_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    feedback_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    score_overall: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_discovery: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_objections: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_tone: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    score_close: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    model: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RoleplayTurn(Base):
+    """One line of a practice conversation.
+
+    ROWS, NOT A JSON ARRAY on the session. A roleplay is appended to one line
+    at a time by a live UI; a JSON array means read-modify-write on every
+    turn, which loses a line whenever two requests overlap. UNIQUE
+    (session_id, turn_no) turns a duplicated submit into a conflict rather
+    than a duplicated line.
+
+    No updated_at: what was said was said.
+    """
+
+    __tablename__ = "roleplay_turns"
+    __table_args__ = (
+        UniqueConstraint("session_id", "turn_no", name="roleplay_turn_order"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("roleplay_sessions.id", ondelete="CASCADE"), index=True
+    )
+    turn_no: Mapped[int] = mapped_column(Integer)
+    # seller | prospect
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class MeetingOutcome(TimestampMixin, Base):
@@ -3222,6 +3467,81 @@ class Workspace(TimestampMixin, Base):
     )
 
 
+class ClientWorkspace(TimestampMixin, Base):
+    """Part 1 Feature 11 -- one CLIENT an agency runs outreach for.
+
+    WHY NOT `Workspace`. That is a TEAM around one owner: `owner_user_id` is
+    UNIQUE and its docstring says "the workspace's data is its owner's data".
+    An agency's SDRs are shared across every client; the clients are separate
+    books of business. Conflating them would mean either a login per client
+    (and re-inviting the same three SDRs to each) or breaking the unique
+    constraint thirteen modules' ownership resolution rests on.
+
+    So a client hangs OFF the team workspace rather than replacing it, and
+    isolation is achieved by scoping -- reporting, the sending-domain pool and
+    the billing view all filter by this row.
+    """
+
+    __tablename__ = "client_workspaces"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "slug", name="client_workspace_slug"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(200))
+    slug: Mapped[str] = mapped_column(String(60))
+    # active | paused | archived
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'"), nullable=False
+    )
+    contact_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    contact_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    billing_email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    billing_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # MONEY IS INTEGER CENTS, for the reason Deal.value_cents gives: a float
+    # column cannot represent 0.10 exactly, and these are summed per client.
+    monthly_fee_cents: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    per_meeting_fee_cents: Mapped[int] = mapped_column(
+        BigInteger, default=0, server_default=text("0"), nullable=False
+    )
+    currency: Mapped[str] = mapped_column(
+        String(3), default="USD", server_default="USD", nullable=False
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class ClientSendingDomain(TimestampMixin, Base):
+    """Part 1 Feature 11 -- a domain reserved for one client's outreach.
+
+    The pool is defined over DOMAINS rather than mailbox rows because that is
+    what the isolation is actually about: a client's prospects must never see
+    another client's sending domain, whichever mailbox on it happens to send.
+
+    AN EMPTY POOL MEANS NO RESTRICTION. An agency that has not set pools up
+    sends exactly as it does today; the pool only ever narrows.
+    """
+
+    __tablename__ = "client_sending_domains"
+    __table_args__ = (
+        UniqueConstraint("client_workspace_id", "domain", name="client_sending_domain_once"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    client_workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("client_workspaces.id", ondelete="CASCADE"), index=True
+    )
+    domain: Mapped[str] = mapped_column(String(253), index=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
 class WorkspaceMember(Base):
     """A user's role in a workspace: owner | manager | sdr | viewer."""
 
@@ -3296,6 +3616,69 @@ class DeliverabilityCheck(Base):
     checked_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class MailboxHealth(TimestampMixin, Base):
+    """Part 1 Feature 4 -- CURRENT reputation state of one sending mailbox.
+
+    `deliverability_checks` (FG9) stays what it is: an append-only log of
+    DOMAIN checks. The domain is the wrong grain for throttling -- two
+    mailboxes on one domain can have very different reputations, and only one
+    of them should be slowed down. This table is one upserted row per mailbox,
+    read by the send gate on every send.
+
+    `mailbox_ref` is EXACTLY the value the send path writes to
+    `messages.sender_ref` (a Gmail account id, "linkedin:<id>",
+    "whatsapp:<phone id>"), which is what makes volume and complaints
+    countable per mailbox. It is a string, not a foreign key, because not
+    every sending identity lives in one table.
+    """
+
+    __tablename__ = "mailbox_health"
+    __table_args__ = (
+        UniqueConstraint("user_id", "mailbox_ref", name="mailbox_health_ref"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    mailbox_ref: Mapped[str] = mapped_column(String(64), index=True)
+    channel: Mapped[str] = mapped_column(String(20))
+    address: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # healthy | throttled | paused. Indexed because the send gate and the
+    # settings page both filter on it.
+    state: Mapped[str] = mapped_column(
+        String(20), default="healthy", server_default=text("'healthy'"),
+        nullable=False, index=True
+    )
+    # The reduced daily allowance while throttled. NULL = no reduction.
+    throttle_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    reasons_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    spf_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    dkim_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    dmarc_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    dmarc_policy: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    complaint_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bounce_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sends_today: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    sends_7d: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    daily_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Resuming after a reputation pause is a HUMAN decision, same rule as the
+    # bounce pause and the blacklist pause -- so who did it is recorded.
+    resumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resumed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ComplianceAuditLog(Base):
@@ -3908,3 +4291,426 @@ class SequenceReview(TimestampMixin, Base):
     )
     override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     overridden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Feature 5 — opt-in post-sequence re-engagement (migration 0048)
+# --------------------------------------------------------------------------
+
+
+class SendReview(TimestampMixin, Base):
+    """Part 1 Feature 5 -- one message held for explicit human approval.
+
+    SequenceReview (0047) reviews a sequence's CONTENT before launch, once per
+    sequence. This is a different thing: one row per MESSAGE, created at send
+    time, because the triggers are facts about the prospect at that moment
+    (they objected last week, their deal stalled, they are a VP) that no
+    pre-launch review of a template could know.
+
+    The copy is SNAPSHOTTED here rather than read back from `messages`: the
+    reviewer is approving specific words, and a later re-render must not
+    change what was approved. `content_hash` is what the send path checks
+    before transmitting.
+    """
+
+    __tablename__ = "send_reviews"
+    __table_args__ = (
+        UniqueConstraint("message_id", name="send_review_message"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE")
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # pending | approved | rejected
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default=text("'pending'"),
+        nullable=False, index=True
+    )
+    # [{code, label, detail}] -- why this message needs a person.
+    triggers_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    subject_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    body_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    decision_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # A reviewer may fix the copy instead of rejecting it. When set, THIS is
+    # what gets sent -- the whole point of a human gate is that the human can
+    # improve the message, not only veto it.
+    edited_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    edited_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ReengagementAttempt(TimestampMixin, Base):
+    """The claim that makes re-engagement once-per-enrollment, structurally.
+
+    UNIQUE (enrollment_id) is the whole idempotency story, in the same spirit
+    as research_steps' (strategy_id, pipeline, step_no): a retried task, two
+    overlapping sweeps, or a worker killed after the insert can never produce a
+    second re-engagement for the same enrollment, because the second INSERT
+    fails. The row is written BEFORE any message exists.
+
+    It is the claim, not the record of what was sent -- the message row is
+    that. `status` is claimed | scheduled | sent | held, and `detail` carries
+    send_message_impl's result (e.g. deferred_window) for the audit trail.
+    """
+
+    __tablename__ = "reengagement_attempts"
+    __table_args__ = (
+        UniqueConstraint("enrollment_id", name="reengagement_enrollment"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    enrollment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sequence_enrollments.id", ondelete="CASCADE")
+    )
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(20))
+    detail: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class ConsentEvent(Base):
+    """Part 1 Feature 9 -- append-only record of every change of consent.
+
+    WHY THIS IS NOT ComplianceAuditLog. That table answers "on what basis did
+    you SEND this message?", one row per send decision. This answers the
+    question a regulator or a prospect actually asks: "when did they tell you
+    to stop, and what did you do about it?" Different lifetime, different
+    retention, different cardinality.
+
+    WHY lead_id IS SET NULL. The point of the erasure event is that it
+    survives the erasure. A ledger that deletes itself with the prospect
+    record cannot prove the request was honoured -- the one moment it exists
+    for. `identifier` is stored on the row for the same reason: after the lead
+    is gone, the suppression still has to be matchable.
+
+    No updated_at: append-only, like `outcomes`.
+    """
+
+    __tablename__ = "consent_events"
+    __table_args__ = (
+        Index("ix_consent_events_user_ts", "user_id", "ts"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # granted | withdrawn | suppressed | erased
+    kind: Mapped[str] = mapped_column(String(30))
+    # email | phone | linkedin | whatsapp | all
+    channel: Mapped[str] = mapped_column(String(20))
+    identifier: Mapped[str | None] = mapped_column(String(320), nullable=True, index=True)
+    region: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    regime: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    basis: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # unsubscribe_link | reply | whatsapp_stop | manual | gdpr_request |
+    # bounce | import | webhook
+    source: Mapped[str] = mapped_column(String(40))
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    meta_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ts: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AttributionEntry(TimestampMixin, Base):
+    """Part 1 Feature 8 -- which touch earned this outcome, and how sure we are.
+
+    WHY NOT A COLUMN ON `outcomes`. That table is the immutable event log the
+    learning loop reads. Its `message_id` is the message that CAUSED the event
+    only for events the send path writes itself (sent, opened, clicked); a
+    booking arriving by webhook three days later has no message_id and no way
+    to get one at write time. Attribution is a separate, LATER, re-computable
+    judgement -- and one that has to record its own uncertainty, which an
+    immutable log row cannot.
+
+    THE METHOD AND CONFIDENCE ARE THE POINT. "This meeting came from step 2 on
+    LinkedIn" is worth very different amounts depending on whether the prospect
+    literally replied to that message or whether it was simply the last thing
+    sent before they booked. A ledger that hides which of those happened will
+    eventually be believed when it should not be.
+    """
+
+    __tablename__ = "attribution_entries"
+    __table_args__ = (
+        UniqueConstraint("outcome_kind", "outcome_id", name="attribution_outcome"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # meeting_booked | positive_reply | won
+    outcome_kind: Mapped[str] = mapped_column(String(30))
+    outcome_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    outcome_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # The credited touch. NULL with method="none" is an honest answer: an
+    # inbound booking from someone we never messaged has no touch to credit.
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    channel: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    step_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    message_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    hours_to_outcome: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # direct_reply | thread_match | last_touch | none
+    method: Mapped[str] = mapped_column(String(20))
+    confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    evidence_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # The copy as it went out, kept so "which message earned this?" can be
+    # answered by SHOWING it -- the message row can be re-rendered or deleted.
+    subject_snapshot: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    body_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class ReengagementPlan(TimestampMixin, Base):
+    """Part 1 Feature 7 -- a "not now" turned into a dated return visit.
+
+    WHY NOT `reengagement_attempts` (0048). That table is the
+    once-per-enrollment CLAIM for the opt-in post-sequence sweep; its whole
+    purpose is the UNIQUE(enrollment_id) that stops a retry sending twice, and
+    it carries no reason and no future date. This object has a different
+    lifetime: it is created by a REPLY, it outlives the enrollment and even
+    the sequence that produced it, a person can move or cancel it, and it is
+    where the prospect's own words live.
+
+    THE REASON IS STORED TWICE ON PURPOSE. `reason_kind` is what the UI groups
+    and filters by; `reason_text` is what the follow-up message quotes. A hook
+    built on their sentence survives being read back to them nine months
+    later. A paraphrase does not.
+
+    UNIQUE (source_reply_id): a webhook retry, a re-classification or two
+    overlapping sweeps cannot produce two plans for one reply.
+    """
+
+    __tablename__ = "reengagement_plans"
+    __table_args__ = (
+        UniqueConstraint("source_reply_id", name="reengagement_plan_reply"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    source_reply_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("inbound_replies.id", ondelete="SET NULL"), nullable=True
+    )
+    # budget | contract | timing | project | headcount | priority | unspecified
+    reason_kind: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    reason_text: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # A date the PROSPECT named ("after Q2", "in January"). NULL = they gave
+    # no date, and the default interval was used instead -- two different
+    # facts, and the UI says which.
+    stated_return_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    interval_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # scheduled | due | sent | cancelled
+    status: Mapped[str] = mapped_column(
+        String(20), default="scheduled", server_default=text("'scheduled'"),
+        nullable=False, index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    outcome: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    cancelled_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# Feature 6 — anonymised benchmarks (migration 0050)
+# --------------------------------------------------------------------------
+
+
+class BenchmarkBucket(Base):
+    """One published benchmark: a metric's spread across ACCOUNTS for one
+    (industry, channel) in the trailing window.
+
+    Rows exist ONLY for buckets that cleared the minimum-accounts threshold.
+    A suppressed bucket is never written, so nothing downstream -- API, admin
+    query, export -- can read a number built from too few accounts. The nightly
+    job replaces the whole table in one transaction.
+
+    No user id, strategy id or raw count lives here: percentiles (rounded) and
+    an account count only. See app/services/benchmarks.py.
+    """
+
+    __tablename__ = "benchmark_buckets"
+    __table_args__ = (
+        UniqueConstraint("industry", "channel", "metric", name="benchmark_bucket"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    industry: Mapped[str] = mapped_column(String(120))   # "*" = all industries
+    channel: Mapped[str] = mapped_column(String(20))
+    metric: Mapped[str] = mapped_column(String(20))      # reply_rate | meeting_rate | bounce_rate
+    account_count: Mapped[int] = mapped_column(Integer)
+    p25: Mapped[float] = mapped_column(Float)
+    p50: Mapped[float] = mapped_column(Float)
+    p75: Mapped[float] = mapped_column(Float)
+    window_days: Mapped[int] = mapped_column(Integer)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+# --------------------------------------------------------------------------
+# Feature 8 — configurable compliance rules (migration 0051)
+# --------------------------------------------------------------------------
+
+
+class ComplianceRule(TimestampMixin, Base):
+    """One override of the send-time compliance baseline.
+
+    `scope` is "global" or a workspace id (as a string), so UNIQUE (scope,
+    region, channel) holds for global rows too -- a nullable workspace_id in
+    the key would let two "global" rows for the same region coexist, because
+    NULLs never collide. workspace_id is kept alongside for the cascade.
+
+    Every rule field is NULLABLE = "not set here, inherit". The resolution,
+    the hard bounds and the fail-closed rules live in
+    app/services/compliance_rules.py -- this table only stores intent.
+    """
+
+    __tablename__ = "compliance_rules"
+    __table_args__ = (
+        UniqueConstraint("scope", "region", "channel", name="compliance_rule_scope"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    scope: Mapped[str] = mapped_column(String(40))
+    workspace_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    region: Mapped[str] = mapped_column(String(10))     # us|ca|eu|uk|sg|au|nz|other|unknown|*
+    channel: Mapped[str] = mapped_column(String(20))    # email|whatsapp|linkedin|phone|*
+    send_start_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    send_end_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    skip_weekends: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    daily_cap: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    consent_required: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    bounce_pause_threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+# --------------------------------------------------------------------------
+# Persistent sign-in sessions + security audit log (migration 0052)
+# --------------------------------------------------------------------------
+
+
+class AuthSession(Base):
+    """One refresh token, as the server remembers it.
+
+    The row id IS the refresh JWT's `jti`, so a token can be revoked (logout)
+    and a replayed one recognised. Every refresh ROTATES: this row is marked
+    revoked_reason="rotated" and a new row in the same `family_id` replaces
+    it. Presenting a rotated token again after the grace window is the
+    signature of a stolen token, and revokes the whole family -- the thief and
+    the victim are both signed out, and the victim signs back in.
+
+    The raw token is never stored: it is a signed JWT whose only secret part is
+    the signature, and the jti alone cannot be turned back into one.
+    """
+
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    family_id: Mapped[uuid.UUID] = mapped_column(Uuid, index=True, nullable=False)
+    # False = "keep me signed in" was unticked (short server-side lifetime and
+    # a browser-session cookie).
+    persistent: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    replaced_by_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # rotated | logout | reuse_detected
+    revoked_reason: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SecurityAuditEvent(Base):
+    """Security-relevant account actions: destructive deletes, denied password
+    confirmations, refresh-token reuse, sign-outs.
+
+    Distinct from ActivityAuditEvent (the hash-chained send/reply trail a buyer
+    verifies) -- this one answers "who did what to this account, and when".
+    NO FOREIGN KEYS, on purpose: the record of a deletion must outlive both the
+    deleted row and, if it comes to that, the account that deleted it.
+
+    user_id is the person who signed in (the ACTOR); owner_user_id is whose
+    data it was, which differs when a workspace member acts on the owner's
+    records (app/services/auth.py::_workspace_principal).
+    """
+
+    __tablename__ = "security_audit_events"
+    __table_args__ = (
+        Index("ix_security_audit_events_user_created", "user_id", "created_at"),
+        Index("ix_security_audit_events_target", "target_type", "target_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    # strategy.deleted | strategy.delete_denied | auth.logout | auth.refresh_reuse_detected
+    action: Mapped[str] = mapped_column(String(60), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    target_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    details_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

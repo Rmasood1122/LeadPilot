@@ -16,6 +16,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Flame, RefreshCw } from "lucide-react";
 
 import { listReplies, rescoreReply, type InboxQuery } from "@/lib/api/replies";
+import { reclassifyReplyIntent } from "@/lib/api/replyIntent";
+import { intentExplanation, intentLabel, intentTone } from "@/lib/replyIntent";
 import {
   explainSignals,
   intentBand,
@@ -86,6 +88,10 @@ function ReplyRow({ reply }: { reply: InboxReply }) {
     mutationFn: () => rescoreReply(reply.reply_id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["crm-replies"] }),
   });
+  const reclassify = useMutation({
+    mutationFn: () => reclassifyReplyIntent(reply.reply_id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crm-replies"] }),
+  });
   const a = reply.authenticity;
   const band = intentBand(a);
   const reasons = a ? explainSignals(a.signals).slice(0, 4) : [];
@@ -110,6 +116,11 @@ function ReplyRow({ reply }: { reply: InboxReply }) {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {/* Part 1 Feature 1: was this reply positive? */}
+              <Badge tone={intentTone(reply.intent?.label)}
+                     title={intentExplanation(reply.intent)}>
+                {intentLabel(reply.intent?.label)}
+              </Badge>
               <Badge tone={kindTone(a?.kind)} title={a ? `Confidence ${percent(a.confidence)}` : undefined}>
                 {kindLabel(a?.kind)}{a ? ` · ${percent(a.confidence)}` : ""}
               </Badge>
@@ -124,10 +135,19 @@ function ReplyRow({ reply }: { reply: InboxReply }) {
                   <RefreshCw size={14} aria-hidden="true" /> Score
                 </Button>
               )}
+              {!reply.intent?.label && (
+                <Button size="sm" variant="ghost" disabled={reclassify.isPending}
+                        onClick={() => reclassify.mutate()}>
+                  <RefreshCw size={14} aria-hidden="true" /> Classify
+                </Button>
+              )}
             </div>
           </div>
           {reply.subject && <p className="text-sm font-medium">{reply.subject}</p>}
           <p className="whitespace-pre-line text-sm text-muted-foreground">{reply.body_preview}</p>
+          {reply.intent?.reason && (
+            <p className="text-xs text-muted-foreground">{intentExplanation(reply.intent)}</p>
+          )}
           {reasons.length > 0 && (
             <p className="text-xs text-muted-foreground">Why: {reasons.join(" · ")}</p>
           )}

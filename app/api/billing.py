@@ -31,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_admin
 from app.config import settings
-from app.core import billing_catalog
+from app.core import billing_catalog, production_guard
 from app.db.base import get_db
 from app.db.models import BillableMeeting, ProcessedWebhook, User
 from app.integrations import stripe_billing
@@ -75,6 +75,13 @@ def get_billing(db: Session = Depends(get_db),
 def checkout(body: CheckoutIn, db: Session = Depends(get_db),
              current_user: User = Depends(get_current_user)) -> dict:
     identity_svc.require_verified_phone(current_user)
+    # Stub mode activates the plan locally without payment. That is for
+    # development and test only: in production it would hand out any tier
+    # for free, so with no Stripe key checkout fails closed before anything
+    # is written.
+    if settings.billing_stub_mode and production_guard.is_production(settings.app_env):
+        raise HTTPException(status_code=503,
+                            detail="payments are not configured; plans cannot be changed right now")
     try:
         return billing.start_checkout(db, current_user, billing_model=body.billing_model,
                                       tier=body.tier)

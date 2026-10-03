@@ -140,6 +140,15 @@ class LeadOut(BaseModel):
     # client of the published SDK) is unaffected.
     ai_booking_likelihood: int | None = None
     ai_score_reason: str | None = None
+    # Part 1 Feature 2. The four sub-scores travel with every list row so the
+    # list can show WHY a prospect ranks where it does, not just that it does.
+    # Defaults keep an older row (and the published SDK) unaffected.
+    fpta_overall: int | None = None
+    fpta_fit: int | None = None
+    fpta_problem: int | None = None
+    fpta_timing: int | None = None
+    fpta_access: int | None = None
+    fpta_scored_at: datetime | None = None
 
 
 class LeadDetailOut(LeadOut):
@@ -155,6 +164,9 @@ class LeadDetailOut(LeadOut):
     phone_consent_source: str | None = None
     last_call_at: datetime | None = None
     last_call_outcome: str | None = None
+    # Part 1 Feature 2: the reasons and the evidence behind each sub-score.
+    fpta_reasons_json: dict | None = None
+    fpta_method: str | None = None
 
 
 class LeadListOut(BaseModel):

@@ -16,7 +16,11 @@ from app.db.base import Base
 
 MIGRATION = "0046_share_links.py"
 TABLE = "share_links"
-_PREREQ = ["users", "products", "strategies"]
+# `workspaces` and `client_workspaces` are prerequisites because
+# `strategies` gained a foreign key to the latter in migration 0063
+# (Part 1 Feature 11). Without them the pre-migration `strategies`
+# table references a table that does not exist, which SQLite refuses.
+_PREREQ = ["users", "products", "workspaces", "client_workspaces", "strategies"]
 
 
 def _load(name):

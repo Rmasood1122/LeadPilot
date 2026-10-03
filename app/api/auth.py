@@ -4,8 +4,21 @@ POST /auth/signup   — create account (or claim a pre-auth row with no
                       password yet), returns access+refresh tokens AND sends
                       a verification email (Feature 1)
 POST /auth/login    — email+password -> tokens
-POST /auth/refresh  — refresh token -> new token pair
+POST /auth/refresh  — refresh token -> new token pair (rotating; see below)
+POST /auth/logout   — revoke the refresh token's session and clear its cookie
 GET  /auth/me       — the authenticated user
+
+PERSISTENT SIGN-IN (app/services/auth_sessions.py). A client that sends
+`X-Auth-Transport: cookie` (the web app) receives its refresh token ONLY as an
+HttpOnly cookie scoped to AUTH_REFRESH_COOKIE_PATH, never in a response body
+where script could read it, and /auth/refresh and /auth/logout read it from
+there. Every other client (native app, SDK, CLI) keeps the body transport it
+always had. The cookie is never read without the header -- that header is what
+makes the cookie routes CSRF-proof (a cross-origin page cannot send it past
+CORS).
+
+`user.has_active_plan` on every sign-in, refresh and /auth/me response is what
+the frontend routes on: false -> /pricing, true -> the dashboard.
 GET  /auth/verify   — target of the emailed link; marks the account verified
                       and 302s to the frontend login page (Feature 1)
 POST /auth/resend-verification — send a fresh link; always 202, never reveals
@@ -26,8 +39,8 @@ import re
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, UploadFile
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -41,6 +54,8 @@ from app.core.rate_limiting import (
 from app.db.base import get_db
 from app.db.models import User
 from app.services import auth as auth_svc
+from app.services import auth_sessions
+from app.services import billing as billing_svc
 from app.services import email_verification as verify_svc
 from app.services import identity as identity_svc
 from app.services import network_guard
@@ -62,8 +77,15 @@ class Credentials(BaseModel):
     password: str = Field(min_length=8, max_length=200)
 
 
+class LoginIn(Credentials):
+    # "Keep me signed in". Default true: staying signed in is the product's
+    # promise; unticking it opts into a browser-session cookie instead.
+    remember_me: bool = True
+
+
 class RefreshIn(BaseModel):
-    refresh_token: str
+    # Optional: a cookie-transport client sends no body at all.
+    refresh_token: str | None = None
 
 
 class ResendIn(BaseModel):
@@ -92,11 +114,54 @@ class ThemeIn(BaseModel):
         return self.model_dump()
 
 
-def _user_out(user: User) -> dict:
+def _wants_cookie(request: Request) -> bool:
+    value = request.headers.get(auth_sessions.TRANSPORT_HEADER) or ""
+    return value.strip().lower() == auth_sessions.COOKIE_TRANSPORT
+
+
+def _set_refresh_cookie(response: Response, token: str, persistent: bool) -> None:
+    max_age = auth_sessions.ttl_seconds(True) if persistent else None
+    response.set_cookie(
+        key=settings.auth_refresh_cookie_name, value=token,
+        max_age=max_age, expires=max_age,
+        path=settings.auth_refresh_cookie_path or "/",
+        domain=settings.auth_refresh_cookie_domain or None,
+        secure=settings.refresh_cookie_secure, httponly=True,
+        samesite=settings.refresh_cookie_samesite,
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.auth_refresh_cookie_name,
+        path=settings.auth_refresh_cookie_path or "/",
+        domain=settings.auth_refresh_cookie_domain or None,
+        secure=settings.refresh_cookie_secure, httponly=True,
+        samesite=settings.refresh_cookie_samesite,
+    )
+
+
+def _deliver(request: Request, response: Response,
+             tokens: auth_sessions.IssuedTokens) -> dict:
+    """The token bundle for the response, with the refresh token moved into
+    the cookie for a cookie-transport client."""
+    bundle = tokens.bundle()
+    if _wants_cookie(request):
+        refresh = bundle.pop("refresh_token", None)
+        if refresh is not None:
+            _set_refresh_cookie(response, refresh, tokens.persistent)
+    return bundle
+
+
+def _user_out(user: User, db: Session) -> dict:
     return {
         "id": str(user.id),
         "email": user.email,
         "plan": user.plan.value,
+        # has_active_plan + subscription_status. Recomputed from the database
+        # on every response so a purchase (or a cancellation) takes effect on
+        # the very next sign-in or page load. See billing.plan_access.
+        **billing_svc.plan_access(db, user),
         # M8-C3 admin UI reads this to gate the /admin route group.
         "is_admin": bool(getattr(user, "is_admin", False)),
         # Feature 1: the frontend routes an unverified user to the
@@ -138,7 +203,7 @@ def _deliver_verification(db: Session, user: User) -> bool:
 
 
 @router.post("/auth/signup", status_code=201)
-def signup(request: Request, body: Credentials,
+def signup(request: Request, response: Response, body: Credentials,
            db: Session = Depends(get_db)) -> dict:
     """Create an account (or claim a pre-auth row that has no password yet).
 
@@ -186,9 +251,10 @@ def signup(request: Request, body: Credentials,
     # signed in the instant the link is clicked, with no second login, and the
     # check-your-email screen has a session to resend from.
     sent = _deliver_verification(db, user)
+    tokens = auth_sessions.issue_session_tokens(db, user, persistent=True, request=request)
     return {
-        "user": _user_out(user),
-        **auth_svc.issue_tokens(user.id),
+        "user": _user_out(user, db),
+        **_deliver(request, response, tokens),
         "email_verification_required": True,
         "verification_email_sent": sent,
     }
@@ -263,7 +329,7 @@ def resend_verification(request: Request, body: ResendIn,
 
 
 @router.post("/auth/login")
-def login(request: Request, body: Credentials,
+def login(request: Request, response: Response, body: LoginIn,
           db: Session = Depends(get_db)) -> dict:
     """Email + password -> tokens.
 
@@ -305,21 +371,65 @@ def login(request: Request, body: Credentials,
                                                     user.password_hash):
         # one message for both cases: no account enumeration
         raise HTTPException(status_code=401, detail="invalid email or password")
-    return {"user": _user_out(user), **auth_svc.issue_tokens(user.id)}
+    tokens = auth_sessions.issue_session_tokens(db, user, persistent=body.remember_me,
+                                                request=request)
+    return {"user": _user_out(user, db), **_deliver(request, response, tokens)}
+
+
+def _presented_refresh_token(request: Request, body: RefreshIn | None) -> str | None:
+    if body is not None and body.refresh_token:
+        return body.refresh_token
+    if _wants_cookie(request):
+        return request.cookies.get(settings.auth_refresh_cookie_name) or None
+    return None
 
 
 @router.post("/auth/refresh")
-def refresh(body: RefreshIn, db: Session = Depends(get_db)) -> dict:
-    user_id = auth_svc.decode_token(body.refresh_token, "refresh")
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=401, detail="user not found")
-    return {"user": _user_out(user), **auth_svc.issue_tokens(user.id)}
+def refresh(request: Request, response: Response,
+            body: RefreshIn | None = Body(default=None),
+            db: Session = Depends(get_db)):
+    """Rotate a refresh token. Called silently on app load (session restore)
+    and whenever an access token expires.
+
+    Deliberately NOT rate limited -- see login() and
+    tests/test_rate_limit_auth.py::test_refresh_is_deliberately_not_limited.
+
+    A cookie-transport failure CLEARS the cookie in the same 401, so a dead
+    session does not get re-presented on every page load.
+    """
+    token = _presented_refresh_token(request, body)
+    try:
+        if not token:
+            raise HTTPException(status_code=401, detail="missing refresh token")
+        tokens = auth_sessions.rotate(db, token, request=request)
+    except HTTPException as exc:
+        if exc.status_code != 401 or not _wants_cookie(request):
+            raise
+        failed = JSONResponse(status_code=401, content={"detail": exc.detail})
+        _clear_refresh_cookie(failed)
+        return failed
+    return {"user": _user_out(tokens.user, db), **_deliver(request, response, tokens)}
+
+
+@router.post("/auth/logout", status_code=204)
+def logout(request: Request, body: RefreshIn | None = Body(default=None),
+           db: Session = Depends(get_db)) -> Response:
+    """Sign out: revoke the session (and every token rotated from it) and
+    clear the cookie. Unauthenticated on purpose -- the access token may have
+    expired, and signing out must still work. Always 204."""
+    token = _presented_refresh_token(request, body)
+    if token:
+        auth_sessions.revoke(db, token, request=request)
+    response = Response(status_code=204)
+    if _wants_cookie(request):
+        _clear_refresh_cookie(response)
+    return response
 
 
 @router.get("/auth/me")
-def me(user: User = Depends(auth_svc.get_current_user)) -> dict:
-    return _user_out(user)
+def me(user: User = Depends(auth_svc.get_current_user),
+       db: Session = Depends(get_db)) -> dict:
+    return _user_out(user, db)
 
 
 # --------------------------------------------------------------------------

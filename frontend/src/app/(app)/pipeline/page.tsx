@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDialog, Modal } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { ScoreBadge } from "@/components/leads/ScoreBadge";
+import { FptaBadges } from "@/components/leads/FptaBadges";
 import { cn } from "@/lib/utils";
 
 const COLUMNS: { status: LeadStatus; label: string }[] = [
@@ -170,6 +171,8 @@ function LeadCard({
           <ScoreBadge score={lead.ai_booking_likelihood} reason={lead.ai_score_reason} compact />
         </div>
         <p className="truncate text-xs text-muted-foreground">{lead.company}</p>
+        {/* Part 1 Feature 2: which of the four is weak, on the card itself. */}
+        <div className="mt-1"><FptaBadges lead={lead} compact /></div>
       </CardContent>
     </Card>
   );

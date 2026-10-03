@@ -1,7 +1,9 @@
 import {
   BarChart3,
+  Building2,
   CalendarDays,
   GraduationCap,
+  Inbox,
   KanbanSquare,
   LayoutGrid,
   Megaphone,
@@ -21,6 +23,12 @@ export interface NavItem {
 /** Nav sections per project knowledge section H. */
 export const NAV: NavItem[] = [
   { href: "/pipeline", label: "Pipeline", icon: KanbanSquare },
+  // Part 1 Feature 6: every reply on every channel, threaded by person.
+  // Second, next to Pipeline, because those are the two screens opened every
+  // morning -- one is "who should I contact", the other is "who is waiting on
+  // me". The mobile bar scrolls horizontally, so an eleventh entry costs a
+  // swipe rather than a hidden destination.
+  { href: "/inbox", label: "Inbox", icon: Inbox },
   // M9. Sits next to Pipeline because they are the same data seen two
   // ways -- the kanban for working a handful of leads by hand, the CRM
   // for the dashboard view and for editing hundreds at a time. Pipeline
@@ -43,5 +51,9 @@ export const NAV: NavItem[] = [
   { href: "/learn", label: "Learn", icon: GraduationCap },
   // Feature Group 8: members, approvals, white label.
   { href: "/team", label: "Team", icon: Users },
+  // Part 1 Feature 11: the agency's clients -- separate reporting, separate
+  // sending-domain pools, separate invoices. Next to Team because both are
+  // "who is this account for", not "what is it doing today".
+  { href: "/clients", label: "Clients", icon: Building2 },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

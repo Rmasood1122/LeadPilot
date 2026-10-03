@@ -21,10 +21,11 @@ Guard mechanism (three independent layers, all must hold):
   2. `app/main.py` imports this module *inside* the conditional. When the
      flag is off the module is never even imported, so the routes cannot
      exist on the ASGI app under any code path.
-  3. The import-time `_refuse_in_production()` call below raises outright if
-     `app_env` is production, so even an operator who wrongly sets
-     ENABLE_DEBUG_ROUTES=true in a production environment gets a loud
-     startup failure rather than a live debug surface.
+  3. The import-time `_refuse_outside_dev_and_test()` call below raises
+     outright unless `app_env` is a development, local or test environment
+     (app.config.DEBUG_ROUTE_ENVS), so even an operator who wrongly sets
+     ENABLE_DEBUG_ROUTES=true in staging or production gets a loud startup
+     failure rather than a live debug surface.
 
 If you add a route here, it inherits all three. Do not add debug routes to
 any production router instead - that would bypass every layer.
@@ -39,7 +40,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.config import get_settings
+from app.config import DEBUG_ROUTE_ENVS, get_settings
 from app.core.exceptions import ComplianceError, ResourceNotFoundError
 from app.db.base import get_db
 from app.db.models import (
@@ -70,21 +71,22 @@ from app.services import sequence_engine as engine
 from app.services.auth import get_current_user
 from sqlalchemy.orm import Session
 
-_PRODUCTION_ENVS = {"production", "prod", "live"}
+def _refuse_outside_dev_and_test() -> None:
+    """Layer 3: refuse to even define this router outside dev/local/test.
 
-
-def _refuse_in_production() -> None:
-    """Layer 3: refuse to even define this router in a production env."""
+    F9: an allowlist (app.config.DEBUG_ROUTE_ENVS), not a list of production
+    names -- staging, or an environment name nobody anticipated, is refused
+    too."""
     env = (get_settings().app_env or "").strip().lower()
-    if env in _PRODUCTION_ENVS:
+    if env not in DEBUG_ROUTE_ENVS:
         raise RuntimeError(
             "app.api.debug was imported with app_env=%r. This router is "
-            "test-only and must never be mounted in production. Unset "
-            "ENABLE_DEBUG_ROUTES." % env
+            "test-only and may only exist in a development, local or test "
+            "environment. Unset ENABLE_DEBUG_ROUTES." % env
         )
 
 
-_refuse_in_production()
+_refuse_outside_dev_and_test()
 
 router = APIRouter(prefix="/debug", tags=["debug (test-only)"])
 

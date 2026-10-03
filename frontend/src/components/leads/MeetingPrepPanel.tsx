@@ -20,6 +20,8 @@ import {
   type MeetingPrepBrief,
 } from "@/lib/api/meetingPrep";
 import { isBriefInFlight, meetingWhen, profileRows } from "@/lib/meeting-prep";
+import { CallScriptPanel } from "@/components/leads/CallScriptPanel";
+import { RoleplayPanel } from "@/components/leads/RoleplayPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,17 +78,31 @@ export function MeetingPrepPanel({ leadId }: { leadId: string }) {
           <Button className="mt-4" disabled={request.isPending} onClick={() => request.mutate()}>
             {request.isPending ? "Starting…" : "Generate prep brief"}
           </Button>
+          {/* Part 2: practice does NOT need a brief. Rehearsing a prospect you
+              have not booked yet is a legitimate thing to want, and gating it
+              behind a booking would make the standalone tool unreachable from
+              the one screen people look for it on. */}
+          <div className="mt-6 text-left">
+            <RoleplayPanel leadId={leadId} />
+          </div>
         </div>
       ) : (
-        <BriefView
-          brief={brief}
-          busy={regenerate.isPending}
-          onRegenerate={() => regenerate.mutate(brief.id)}
-          onCopy={() => {
-            void navigator.clipboard?.writeText(brief.content_md ?? "");
-            toast("Brief copied as Markdown", "success");
-          }}
-        />
+        <div className="space-y-4">
+          <BriefView
+            brief={brief}
+            busy={regenerate.isPending}
+            onRegenerate={() => regenerate.mutate(brief.id)}
+            onCopy={() => {
+              void navigator.clipboard?.writeText(brief.content_md ?? "");
+              toast("Brief copied as Markdown", "success");
+            }}
+          />
+          {/* Part 2: the editable script + the pre-meeting checklist, then the
+              rehearsal. In that order because that is the order the work
+              happens in -- read, make it yours, practise it. */}
+          <CallScriptPanel briefId={brief.id} />
+          <RoleplayPanel leadId={leadId} briefId={brief.id} />
+        </div>
       )}
     </AsyncState>
   );

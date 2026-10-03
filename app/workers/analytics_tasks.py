@@ -99,3 +99,21 @@ def enqueue_send_windows(strategy_id) -> bool:
     except Exception:
         logger.exception("send windows: could not enqueue strategy %s", strategy_id)
         return False
+
+
+@celery_app.task(name="app.workers.analytics_tasks.run_attribution_sweep")
+def run_attribution_sweep() -> dict:
+    """Part 1 Feature 8: credit every outcome that has no ledger entry yet.
+
+    Quarter-hourly rather than nightly, because the question this answers --
+    "which message earned that meeting?" -- is asked the moment the meeting
+    lands, not the next morning. Idempotent by construction (UNIQUE on
+    outcome_kind + outcome_id), so the cadence costs nothing but the scan.
+    """
+    from app.services import attribution  # noqa: PLC0415
+
+    session = SessionLocal()
+    try:
+        return attribution.run_sweep(session)
+    finally:
+        session.close()

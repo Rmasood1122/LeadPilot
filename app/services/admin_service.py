@@ -125,13 +125,13 @@ class AdminService:
 
     @staticmethod
     def suspend_user(db: Session, user_id: str, reason: str, suspended_by: str) -> bool:
-        from app.models.user import User
+        from app.db.models import User
 
         user = db.query(User).filter_by(id=user_id).first()
         if not user:
             return False
         user.is_suspended = True
-        user.suspended_at = datetime.datetime.utcnow()
+        user.suspended_at = datetime.datetime.now(datetime.timezone.utc)
         user.suspended_reason = reason
         # Pause all active campaigns (Strategy.campaign_state — see helpers above)
         _set_campaign_state(db, user_id, "active", "paused_admin",
@@ -141,7 +141,7 @@ class AdminService:
 
     @staticmethod
     def unsuspend_user(db: Session, user_id: str, resumed_by: str) -> bool:
-        from app.models.user import User
+        from app.db.models import User
 
         user = db.query(User).filter_by(id=user_id).first()
         if not user:
@@ -204,15 +204,17 @@ class AdminService:
         added_by: str,
     ) -> None:
         from app.models.suppression import SuppressionList
+        from app.workers.lead_tasks import is_suppressed, suppression_phone
 
         # Check for existing
-        query = db.query(SuppressionList)
         if email:
-            query = query.filter_by(email=email)
+            if db.query(SuppressionList).filter_by(email=email).first():
+                return  # already suppressed
         elif phone:
-            query = query.filter_by(phone=phone)
-        if query.first():
-            return  # already suppressed
+            # NEW-04: the same number in another format is already suppressed.
+            if is_suppressed(db, phone=phone):
+                return
+        phone = suppression_phone(phone)
 
         # Only these four are real columns; source/user_id/created_at are not
         # on the model and would raise "invalid keyword argument", so adding a
@@ -262,34 +264,3 @@ class AdminService:
         row.resolution_note = note
         db.commit()
         return True
-
-    # ---------------------------------------------------------------------------
-    # Playbook scores
-    # ---------------------------------------------------------------------------
-
-    @staticmethod
-    def list_playbook_scores(
-        db: Session,
-        user_id: Optional[str] = None,
-        page: int = 1,
-        page_size: int = 100,
-    ) -> list[Any]:
-        from app.models.playbook_score import PlaybookScore
-
-        offset = (page - 1) * page_size
-        q = db.query(PlaybookScore).order_by(desc(PlaybookScore.last_updated))
-        if user_id:
-            q = q.filter_by(user_id=user_id)
-        scores = q.offset(offset).limit(page_size).all()
-        return [
-            {
-                "strategy_id": str(s.strategy_id) if s.strategy_id else None,
-                "pattern_key": s.pattern_key,
-                "variant": s.variant,
-                "reply_rate": s.reply_rate,
-                "booking_rate": s.booking_rate,
-                "sample_size": s.sample_size,
-                "last_updated": s.last_updated,
-            }
-            for s in scores
-        ]

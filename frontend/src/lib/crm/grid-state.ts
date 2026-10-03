@@ -50,6 +50,9 @@ export const GRID_COLUMNS: GridColumnDef[] = [
   // filterable (the server's filters are text/`in`), never editable -- the
   // score is the model's and the data's, and Rescore is how to change it.
   { key: "ai_booking_likelihood", label: "AI score", sortable: true, filterable: false, editable: false, defaultWidth: 100, numeric: true },
+  // Part 1 Feature 2: the four sub-scores render together in one cell; the
+  // column sorts on the overall.
+  { key: "fpta_overall", label: "F-P-T-A", sortable: true, filterable: false, editable: false, defaultWidth: 200, numeric: true },
   { key: "tags", label: "Tags", sortable: false, filterable: false, editable: true, defaultWidth: 200 },
   { key: "priority", label: "Priority", sortable: false, filterable: false, editable: true, defaultWidth: 120 },
   { key: "owner_user_id", label: "Owner", sortable: false, filterable: false, editable: true, defaultWidth: 140 },

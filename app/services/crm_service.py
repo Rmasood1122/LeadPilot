@@ -875,6 +875,8 @@ GRID_COLUMNS: dict[str, Any] = {
     "strategy_id": Lead.strategy_id,
     # Feature Group 1: sortable so the grid can rank by booking likelihood.
     "ai_booking_likelihood": Lead.ai_booking_likelihood,
+    # Part 1 Feature 2: sortable so the grid can rank by F-P-T-A instead.
+    "fpta_overall": Lead.fpta_overall,
 }
 
 _TEXT_COLUMNS = {"full_name", "title", "company", "email", "phone", "source"}
@@ -1024,6 +1026,14 @@ def grid_page(db: Session, current_user: User, *,
             "followup_status": followups.get(lead.id, FOLLOWUP_NONE),
             "ai_booking_likelihood": lead.ai_booking_likelihood,
             "ai_score_reason": lead.ai_score_reason,
+            # Part 1 Feature 2. Four numbers, not one: "82 fit / 20 problem"
+            # and "50 across the board" average the same and want opposite
+            # actions, so the grid carries the sub-scores too.
+            "fpta_overall": lead.fpta_overall,
+            "fpta_fit": lead.fpta_fit,
+            "fpta_problem": lead.fpta_problem,
+            "fpta_timing": lead.fpta_timing,
+            "fpta_access": lead.fpta_access,
         })
 
     return {"items": items, "total": total, "limit": limit, "offset": offset,

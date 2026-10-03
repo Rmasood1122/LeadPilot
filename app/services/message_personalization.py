@@ -412,3 +412,94 @@ def build_followup_brief(
         brief = ""
 
     return brief[:2000] or FALLBACK_FOLLOWUP_BRIEF
+
+
+# --------------------------------------------------------------------------
+# Feature 5 — the re-engagement brief
+# --------------------------------------------------------------------------
+# Same inputs and the same no-invention rules as the follow-up brief. The
+# difference is the situation: the lead finished a whole sequence weeks ago
+# without replying, so the touch is ONE light message that makes "not now" or
+# "no" as easy to send as "yes" -- not another push.
+
+_REENGAGEMENT_SYSTEM = (
+    "You are LeadPilot's re-engagement brief writer. A prospect received a "
+    "complete outreach sequence some weeks ago and did not reply. You write the "
+    "BRIEF for one final, low-pressure message -- instructions to the message "
+    "writer, not the message itself. Respond with ONLY a JSON object: "
+    '{"brief": "..."} -- no prose, no markdown fences.\n'
+    "RULES. The brief is 1-3 sentences. It must name one angle grounded ONLY in "
+    "the history and product brief given, and tell the writer to make it easy "
+    "for the prospect to say 'not now' or 'no'. Never invent a trigger event, "
+    "a mutual connection, a statistic, a deadline, a discount or a name. Never "
+    "suggest guilt, urgency, a 'last chance', 'closing your file', or any "
+    "reference to the prospect not having replied."
+)
+
+FALLBACK_REENGAGEMENT_BRIEF = (
+    "One short, low-pressure note. Offer the single most relevant benefit for "
+    "this company in one line, and ask whether it is worth a conversation now "
+    "or better left for later -- make 'not now' an easy answer. No reference "
+    "to earlier messages going unanswered."
+)
+
+
+def build_reengagement_brief(
+    session: Session,
+    strategy: Strategy,
+    lead: Lead,
+    *,
+    channel: str = "email",
+    max_history: int = 3,
+) -> str:
+    """The brief for a Feature 5 re-engagement message. Never raises: a failed
+    model call falls back to FALLBACK_REENGAGEMENT_BRIEF, which the ordinary
+    render path still personalizes against the lead's real data."""
+    from app.db.models import Message, Outcome, Product  # noqa: PLC0415
+
+    sent = session.execute(
+        select(Message)
+        .where(Message.lead_id == lead.id, Message.body.isnot(None))
+        .order_by(Message.step_no)
+    ).scalars().all()[-max_history:]
+    history = "\n\n".join(
+        f"[step {m.step_no}, {m.channel.value if m.channel else '?'}] "
+        f"{(m.subject or '').strip()}\n{(m.body or '').strip()[:600]}"
+        for m in sent
+    ) or "(nothing on file)"
+    events = session.execute(
+        select(Outcome).where(Outcome.lead_id == lead.id).order_by(Outcome.ts)
+    ).scalars().all()[-12:]
+    outcomes = ", ".join(
+        f"{o.event.value if o.event else '?'}"
+        f"({o.channel}{', ' + o.ts.date().isoformat() if o.ts else ''})"
+        for o in events
+    ) or "(no recorded activity)"
+    product = session.get(Product, strategy.product_id)
+    product_brief = (
+        f"{product.name} — {product.description or ''}".strip(" —")
+        if product is not None else "(no product on file)"
+    )
+
+    try:
+        data = get_client().complete_json(
+            system=_REENGAGEMENT_SYSTEM,
+            prompt=_FOLLOWUP_PROMPT.format(
+                history=history[:6000],
+                outcomes=outcomes,
+                product=product_brief[:1000],
+                playbook=_playbook(session, strategy)[:4000],
+                full_name=lead.full_name or "there",
+                title=lead.title or "unknown",
+                company=lead.company or "their company",
+                channel=channel,
+            ).replace("Write the brief for the next touch now.",
+                      "Write the brief for the re-engagement message now."),
+        )
+        brief = str((data or {}).get("brief") or "").strip()
+    except Exception as exc:  # noqa: BLE001 — see the docstring
+        logger.warning("re-engagement brief generation failed for lead %s: %s: %s",
+                       lead.id, type(exc).__name__, exc)
+        brief = ""
+
+    return brief[:2000] or FALLBACK_REENGAGEMENT_BRIEF

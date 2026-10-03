@@ -1,7 +1,14 @@
 import { api } from "./client";
 
 export interface IntegrationStatus {
-  gmail: { connected: boolean; email: string | null; healthy: boolean | null };
+  gmail: {
+    connected: boolean;
+    email: string | null;
+    healthy: boolean | null;
+    /** Feature 7: whether the stored grant includes calendar.events (needed
+     *  for Google Meet links). "unknown" = no scopes recorded. */
+    calendar_access?: "granted" | "missing" | "unknown" | "not_connected";
+  };
   whatsapp: {
     configured: boolean;
     phone_number_id: string | null;

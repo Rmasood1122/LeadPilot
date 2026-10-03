@@ -70,7 +70,7 @@ from app.db.models import (
     SequenceEnrollment,
     Strategy,
 )
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -318,6 +318,14 @@ def _stamp_lead(lead: Lead | None, call: Call) -> None:
     lead.last_call_outcome = call.outcome.value
 
 
+def analysis_prompt(call: Call) -> str:
+    """The transcript, as data. F-AI-02: it is whatever the person on the
+    other end of the call said, so it is delimited, escaped and labelled."""
+    return (f"{prompt_safety.NOTICE}\n\n"
+            f"TRANSCRIPT:\n{prompt_safety.block((call.transcript or '')[:60_000])}\n\n"
+            "Return the JSON object now.")
+
+
 def analyze(session: Session, call: Call) -> dict:
     """Classify a conversation with Claude and route the lead. Commits."""
     from app.services import crm_events, event_bus  # noqa: PLC0415
@@ -325,7 +333,7 @@ def analyze(session: Session, call: Call) -> dict:
 
     data = anthropic_client.get_client().complete_json(
         system=ANALYSIS_SYSTEM,
-        prompt=f"TRANSCRIPT:\n{(call.transcript or '')[:60_000]}\n\nReturn the JSON object now.",
+        prompt=analysis_prompt(call),
         max_tokens=1500)
     data = data if isinstance(data, dict) else {}
     outcome = str(data.get("outcome") or "answered").lower()

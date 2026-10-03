@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { api, hasSession } from "@/lib/api/client";
+import { api, restoreSession } from "@/lib/api/client";
 
 export interface AuthUser {
   id: string;
@@ -32,9 +32,9 @@ let inflight: Promise<AuthUser | null> | null = null;
 
 async function fetchUser(): Promise<AuthUser | null> {
   if (cached) return cached;
-  if (!hasSession()) return null;
   if (!inflight) {
-    inflight = api<AuthUser>("/auth/me")
+    inflight = restoreSession()
+      .then((signedIn) => (signedIn ? api<AuthUser>("/auth/me") : null))
       .then((u) => {
         cached = u;
         return u;

@@ -25,12 +25,14 @@ import { CrmCards } from "@/components/settings/CrmCards";
 import { ApiKeysCard, WebhooksCard } from "@/components/settings/WebhooksCard";
 import { oauthResultMessage } from "@/lib/api/ecosystem";
 import { ComplianceAuditCard, DeliverabilityCard } from "@/components/settings/DeliverabilityCard";
+import { MailboxHealthCard } from "@/components/settings/MailboxHealthCard";
 import { AuditTrailCard } from "@/components/settings/AuditTrailCard";
 import { ShareLinksCard } from "@/components/settings/ShareLinksCard";
 import { cn } from "@/lib/utils";
-
-type SettingsTab = "appearance" | "voice" | "integrations" | "deliverability" | "sharing"
-  | "suppression";
+import { useAuthStore } from "@/lib/stores/authStore";
+import {
+  SETTINGS_TABS, resolveSettingsTab, visibleSettingsTabs, type SettingsTab,
+} from "@/lib/settings-tabs";
 
 // ------------------------------------------------------------------ Theme --
 
@@ -302,6 +304,12 @@ function IntegrationsSettings() {
                     ? `Connected: ${data.gmail.email}`
                     : "Not connected"}
                 </p>
+                {data.gmail.connected && data.gmail.calendar_access === "missing" && (
+                  <p role="status" className="mt-1 text-xs text-[rgb(var(--warning))]">
+                    Calendar access missing — reconnect to create Google Meet links.
+                    Your Gmail access is kept.
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 {data.gmail.connected && (
@@ -311,7 +319,11 @@ function IntegrationsSettings() {
                   </Button>
                 )}
                 <Button size="sm" onClick={connectGmail}>
-                  {data.gmail.connected ? "Reconnect" : "Connect"}
+                  {!data.gmail.connected
+                    ? "Connect"
+                    : data.gmail.calendar_access === "missing"
+                      ? "Reconnect for Calendar"
+                      : "Reconnect"}
                 </Button>
               </div>
             </CardContent>
@@ -474,18 +486,23 @@ function SuppressionViewer() {
 
 // -------------------------------------------------------------------  Main
 
-const SETTINGS_TABS: SettingsTab[] = ["appearance", "voice", "integrations", "deliverability",
-                                      "sharing", "suppression"];
-
 export default function SettingsPage() {
   // Feature Group 4: the Slack / HubSpot / Salesforce OAuth callbacks land on
   // /settings?tab=integrations&<provider>=connected|error.
   const params = useSearchParams();
   const toast = useToast();
   const requested = params.get("tab") as SettingsTab | null;
-  const [tab, setTab] = useState<SettingsTab>(
+  const [selected, setTab] = useState<SettingsTab>(
     requested && SETTINGS_TABS.includes(requested) ? requested : "appearance",
   );
+  // F-SEC-04: GET/POST /suppression are admin-only on the server, so the
+  // Suppression tab is hidden from everyone else (same check the admin
+  // layout uses). `tab` is what is actually shown: a non-admin who follows
+  // ?tab=suppression lands on the default tab, and SuppressionViewer -- and
+  // the request it makes -- never mounts for them.
+  const { user } = useAuthStore();
+  const tabs = visibleSettingsTabs(user?.is_admin);
+  const tab = resolveSettingsTab(selected, user?.is_admin);
   useEffect(() => {
     const result = oauthResultMessage(params);
     if (result) toast(result.text, result.ok ? "success" : "error");
@@ -496,7 +513,7 @@ export default function SettingsPage() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Settings</h1>
       <div className="flex gap-2 border-b border-border">
-        {SETTINGS_TABS.map(t => (
+        {tabs.map(t => (
           <button key={t} onClick={() => setTab(t)}
                   className={`pb-2 text-sm font-medium capitalize transition-colors border-b-2 ${
                     tab === t
@@ -514,6 +531,9 @@ export default function SettingsPage() {
       {/* Feature Group 9: email health + the compliance audit log. */}
       {tab === "deliverability" && (
         <div className="space-y-3">
+          {/* Part 1 Feature 4: per-MAILBOX health and the auto-throttle,
+              above the per-domain card because it is the one that acts. */}
+          <MailboxHealthCard />
           <DeliverabilityCard />
           <ComplianceAuditCard />
           {/* Feature A2: the hash-chained activity trail + signed export. */}

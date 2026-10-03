@@ -83,11 +83,14 @@ def gmail_status(
     account = db.execute(
         select(GmailAccount).where(GmailAccount.user_id == current_user.id)
     ).scalar_one_or_none()
+    from app.integrations.google_meet import calendar_scope_state  # noqa: PLC0415
+
     if account is None:
-        return {"connected": False}
+        return {"connected": False, "calendar_access": "not_connected"}
     return {
         "connected": True,
         "email_address": account.email_address,
         "scopes": account.scopes,
         "token_expires_at": account.token_expires_at,
+        "calendar_access": calendar_scope_state(account),
     }

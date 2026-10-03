@@ -63,6 +63,53 @@ def _get_verifier(batch: LeadBatch) -> EmailVerifier:
 # --------------------------------------------------------------------------
 
 
+def suppression_phone(phone: str | None) -> str | None:
+    """The ONE form a phone is written to suppression_list in: '+<digits>'.
+
+    A value with no digits at all is kept as given (stripped) -- there is
+    nothing to normalise, and the row must still be writable.
+    """
+    from app.integrations.whatsapp import normalize_phone  # noqa: PLC0415
+
+    raw = (phone or "").strip()
+    if not raw:
+        return None
+    digits = normalize_phone(raw)
+    return f"+{digits}" if digits else raw
+
+
+def _phone_suppressed(session: Session, phone: str) -> bool:
+    """Is this number suppressed, in WHATEVER format either side is written?
+
+    NEW-04: this was an exact string comparison, so a STOP recorded as
+    '+923001112233' did not block a lead stored as '+92 300-111 2233'.
+
+    Rows written since then are canonical (suppression_phone), so the indexed
+    lookup below finds them. Rows written before may be in any format, and
+    there is no normalised column to index, so a miss falls back to
+    normalising every remaining stored phone. That is a table scan per
+    not-suppressed number; it goes away with a normalised column.
+    """
+    from app.integrations.whatsapp import normalize_phone  # noqa: PLC0415
+
+    raw = phone.strip()
+    digits = normalize_phone(raw)
+    known_forms = {raw, digits, f"+{digits}"} if digits else {raw}
+    if session.execute(
+        select(SuppressionEntry.id)
+        .where(SuppressionEntry.phone.in_(known_forms)).limit(1)
+    ).scalar_one_or_none() is not None:
+        return True
+    if not digits:
+        return False
+    stored_phones = session.execute(
+        select(SuppressionEntry.phone)
+        .where(SuppressionEntry.phone.isnot(None),
+               SuppressionEntry.phone.notin_(known_forms))
+    ).scalars()
+    return any(normalize_phone(stored) == digits for stored in stored_phones)
+
+
 def is_suppressed(session: Session, email: str | None = None, phone: str | None = None,
                   linkedin: str | None = None) -> bool:
     """True if ANY of the contact's identifiers is suppressed.
@@ -70,18 +117,19 @@ def is_suppressed(session: Session, email: str | None = None, phone: str | None 
     Feature Group 5 added `linkedin` (a profile URL or slug), checked against
     linkedin_suppressions. Every send path passes all three, so a person who
     opted out on one channel is never reached on another.
+
+    Phones are compared normalised (see _phone_suppressed); emails exactly,
+    lower-cased, as before.
     """
-    if email or phone:
-        conditions = []
-        if email:
-            conditions.append(SuppressionEntry.email == email.lower().strip())
-        if phone:
-            conditions.append(SuppressionEntry.phone == phone.strip())
+    if email:
         row = session.execute(
-            select(SuppressionEntry.id).where(or_(*conditions)).limit(1)
+            select(SuppressionEntry.id)
+            .where(SuppressionEntry.email == email.lower().strip()).limit(1)
         ).scalar_one_or_none()
         if row is not None:
             return True
+    if phone and phone.strip() and _phone_suppressed(session, phone):
+        return True
     if linkedin:
         from app.db.models import LinkedInSuppression  # noqa: PLC0415
         from app.services.linkedin_outreach import normalize_profile  # noqa: PLC0415
@@ -212,6 +260,13 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
                 "enrichment": enriched.enrichment,
             }
             lead.status = LeadStatus.ENRICHED
+            # Part 1 Feature 10: tag every field this stage actually filled,
+            # with the provider that filled it. Never raises -- enrichment has
+            # already succeeded and losing a tag must not lose the lead.
+            from app.services import provenance  # noqa: PLC0415
+
+            provenance.record_enrichment(session, lead, lead.source or provenance.APOLLO,
+                                         commit=False)
         try:
             session.commit()  # per-lead: resume continues from here
         except IntegrityError:
@@ -258,6 +313,14 @@ def find_missing_emails_impl(
 
         lead.email = email
         lead.status = LeadStatus.EMAIL_FOUND
+        # Part 1 Feature 10: an address BUILT from a name and a domain is not
+        # the same claim as one a provider confirmed. Verification overwrites
+        # this tag a stage later if the mailbox turns out to accept mail.
+        from app.services import provenance  # noqa: PLC0415
+
+        provenance.record(session, lead, "email", provenance.HUNTER_PATTERN,
+                          detail=f"found from the domain {domain}", value=email,
+                          commit=False)
         try:
             session.commit()
             found += 1
@@ -291,6 +354,13 @@ def verify_emails_impl(
             **(lead.enrichment_json or {}),
             "verification": {"status": result.status.value, "score": result.score},
         }
+        # Part 1 Feature 10: the verifier's three verdicts are three different
+        # SOURCES, not one source with three scores -- deliverable is a checked
+        # fact, risky is a warning, unknown was never checked at all.
+        from app.services import provenance  # noqa: PLC0415
+
+        provenance.record_email_verification(session, lead, result.status.value,
+                                             result.score, commit=False)
         session.commit()  # per-lead: resume-safe
         if lead.status is LeadStatus.VERIFIED:
             counts["verified"] += 1

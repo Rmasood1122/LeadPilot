@@ -273,7 +273,8 @@ class TestSendFollowup:
         rather than disabling the check."""
         from app.services import sequence_engine as engine
 
-        monkeypatch.setattr(engine, "in_send_window", lambda dt, tz: True)
+        # `window` is the resolved compliance rule's window (Feature 8).
+        monkeypatch.setattr(engine, "in_send_window", lambda dt, tz, window=None: True)
 
     def test_it_sends_the_next_sequence_step(
         self, db_session, sequence, lead, enrollment, channel, fake_claude

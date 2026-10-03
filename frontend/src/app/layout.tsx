@@ -11,6 +11,7 @@
 
 import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 // M5 providers
@@ -89,6 +90,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NetworkProvider>
               <NativeProvider />
               <OfflineBanner />
+              {/* sonner's toast() is called from a dozen pages but nothing
+                  rendered a Toaster, so every toast was silently dropped. */}
+              <Toaster position="top-center" richColors closeButton />
               {children}
             </NetworkProvider>
           </ThemeProvider>

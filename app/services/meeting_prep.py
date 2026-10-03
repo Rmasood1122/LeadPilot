@@ -86,7 +86,8 @@ SYSTEM = (
     "funding.') instead of filling it. `why_they_booked` must point at the "
     "specific message or reply that converted them and quote their own words "
     "when a reply exists. `pain_points` are hypotheses: each one must say what "
-    "it is inferred from (the ICP, the strategy, a post, their reply). "
+    "it is inferred from (the F-P-T-A problem evidence when there is any, "
+    "otherwise the ICP, the strategy, a post, their reply). "
     "`likely_objections` pairs each objection with a short, honest response. "
     "`discovery_questions` are open questions specific to THIS prospect, at "
     "most eight. `deal_structure` suggests how to package and price the "
@@ -205,6 +206,26 @@ def _company_news(lead: Lead) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+def _fpta_block(lead: Lead) -> dict:
+    """The four sub-scores with their reasons and the evidence behind each.
+
+    Returns {} when the prospect was never scored -- which the prompt renders
+    as "(none on record)" rather than as a zero, because "not scored" and
+    "scored badly" are different facts and the brief must not confuse them.
+    """
+    reasons = lead.fpta_reasons_json if isinstance(lead.fpta_reasons_json, dict) else {}
+    if not reasons:
+        return {}
+    return {
+        "overall": lead.fpta_overall,
+        "dimensions": {
+            name: {"score": entry.get("score"), "reason": entry.get("reason"),
+                   "evidence": entry.get("signals") or []}
+            for name, entry in reasons.items() if isinstance(entry, dict)
+        },
+    }
+
+
 def collect_context(db: Session, lead: Lead, brief: MeetingPrepBrief | None) -> dict:
     """Everything the prompt may use, as plain data (JSON-safe)."""
     strategy = db.get(Strategy, lead.strategy_id)
@@ -266,6 +287,12 @@ def collect_context(db: Session, lead: Lead, brief: MeetingPrepBrief | None) -> 
         "product": ({"name": product.name, "description": product.description}
                     if product else None),
         "icp": (strategy.pattern_inputs_json if strategy else None) or {},
+        # Part 2: the F-P-T-A signals (Part 1 Feature 2). The pains the seller
+        # should probe for are exactly the evidence the problem sub-score was
+        # built from, and the timing sub-score says whether this is urgent for
+        # them -- so the brief reads the same signals the prospect was ranked
+        # on rather than re-deriving a second, conflicting opinion.
+        "fpta": _fpta_block(lead),
         "strategy_document": ((strategy.strategy_document or "")[:12_000]
                               if strategy else ""),
         "competitor_research": [
@@ -301,6 +328,8 @@ def build_prompt(ctx: dict) -> str:
         _block("EARLIER MEETINGS WITH THEM", ctx["past_meetings"]),
         _block("WHAT THE SELLER SELLS", ctx["product"]),
         _block("IDEAL CUSTOMER PROFILE", ctx["icp"]),
+        _block("F-P-T-A SIGNALS (fit / problem / timing / access, with the "
+               "evidence each score was built from)", ctx.get("fpta")),
         _block("STRATEGY DOCUMENT (truncated)", ctx["strategy_document"]),
         _block("COMPETITOR RESEARCH", ctx["competitor_research"]),
         "Return the JSON object now.",
@@ -563,6 +592,13 @@ def generate_brief(db: Session, brief_id: uuid.UUID, *, notify: bool = True,
     brief.status = MeetingPrepStatus.READY
     brief.generated_at = now
     brief.model = settings.anthropic_model
+    # Part 2: seed the editable call script from the sections just written --
+    # and ONLY if the seller has not already written one. `ensure_script`
+    # never overwrites, which is the rule the whole feature rests on: an edit
+    # a regeneration silently discards is an edit nobody makes twice.
+    from app.services import meeting_practice  # noqa: PLC0415
+
+    meeting_practice.ensure_script(db, brief, commit=False)
     crm_events.record_activity(
         db, lead.id, CrmActivityKind.MEETING_PREP_READY,
         meta={"brief_id": str(brief.id), "source": brief.source,

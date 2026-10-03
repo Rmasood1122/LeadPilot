@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 
+import pytest
 from sqlalchemy import select
 
 from app.config import settings
@@ -12,6 +13,14 @@ from app.workers.outreach_tasks import send_message_impl
 from tests.conftest import NOW
 
 SIGNING_KEY = "test-signing-key"
+
+
+@pytest.fixture(autouse=True)
+def pinned_calendly_clock(monkeypatch):
+    """Setup added for F-OPS-02: signed_post signs with the fixed timestamp
+    below, and the webhook now refuses stale timestamps, so the webhook's
+    clock is pinned to the same instant. No assertion in this file changed."""
+    monkeypatch.setattr("app.integrations.calendly._now", lambda: 1723300000.0)
 
 
 def signed_post(client, payload: dict, key: str = SIGNING_KEY):

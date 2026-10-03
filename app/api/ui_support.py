@@ -26,7 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.config import settings
 from app.db.base import get_db
 from app.db.models import (
@@ -209,11 +209,16 @@ def integrations_status(
     account = db.execute(
         select(GmailAccount).where(GmailAccount.user_id == current_user.id)
     ).scalars().first()
+    from app.integrations.google_meet import calendar_scope_state  # noqa: PLC0415
+
     return {
         "gmail": {
             "connected": account is not None,
             "email": account.email_address if account else None,
             "healthy": None,  # populated by POST /integrations/gmail/test
+            # Feature 7: "missing" = connected before calendar.events was
+            # requested; Settings offers a reconnect for Google Meet links.
+            "calendar_access": calendar_scope_state(account),
         },
         "whatsapp": {
             "configured": bool(settings.whatsapp_access_token
@@ -263,12 +268,14 @@ class SuppressionIn(BaseModel):
 
 # Suppression list is intentionally GLOBAL, not per-user - a person who
 # unsubscribed or was GDPR-deleted must never be re-contactable by ANY
-# account on this deployment. No owner check here by design (unlike
-# everything else in this file).
+# account on this deployment. So there is no owner to check -- and for the
+# same reason reading or editing it is an operator action (F-SEC-04): the
+# list holds every tenant's opt-outs, and a row added here blocks every
+# tenant's sends. Enforcement (is_suppressed) is unaffected and stays global.
 @router.get("/suppression")
 def list_suppression(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ) -> dict:
     rows = db.execute(
         select(SuppressionEntry).order_by(SuppressionEntry.ts.desc())
@@ -284,14 +291,17 @@ def list_suppression(
 def add_suppression(
     body: SuppressionIn,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _admin: User = Depends(require_admin),
 ) -> dict:
+    from app.workers.lead_tasks import suppression_phone  # noqa: PLC0415
+
     if not body.email and not body.phone:
         raise HTTPException(status_code=422,
                             detail="email or phone is required")
     entry = SuppressionEntry(
         email=body.email.lower().strip() if body.email else None,
-        phone=body.phone.strip() if body.phone else None,
+        # NEW-04: one canonical form, so the check matches any format.
+        phone=suppression_phone(body.phone) if body.phone else None,
         reason=f"manual_{body.reason}"[:200],
     )
     db.add(entry)

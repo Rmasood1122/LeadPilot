@@ -48,7 +48,11 @@ NEW_TABLES = ["voice_profiles", "displacement_alerts", "roi_snapshots"]
 # whatsapp_templates is here because `messages` references it: the downgrade
 # runs batch_alter_table, which reflects related tables, and an unreflectable
 # FK target fails the copy-and-move.
-_PREREQ = ["users", "products", "strategies", "lead_batches", "linkedin_accounts",
+# `workspaces` and `client_workspaces` are prerequisites because
+# `strategies` gained a foreign key to the latter in migration 0063
+# (Part 1 Feature 11). Without them the pre-migration `strategies`
+# table references a table that does not exist, which SQLite refuses.
+_PREREQ = ["users", "products", "workspaces", "client_workspaces", "strategies", "lead_batches", "linkedin_accounts",
            "leads", "whatsapp_templates", "sequences", "messages",
            "inbound_replies"]
 

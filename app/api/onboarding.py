@@ -22,13 +22,14 @@ The onboarding state is additive — steps never go backward.
 from __future__ import annotations
 
 import datetime
+import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.core.database import get_db
 from app.core.logging import get_logger
 
@@ -112,9 +113,19 @@ class CompleteStepRequest(BaseModel):
     user_id: Optional[str] = None  # for internal service calls; auth user if None
 
 
+def _is_own_id(user_id: str, current_user) -> bool:
+    """True only if `user_id` parses to the caller's own id. Anything that is
+    not a UUID is someone else's as far as authorization is concerned."""
+    try:
+        return uuid.UUID(user_id) == current_user.id
+    except (ValueError, AttributeError, TypeError):
+        return False
+
+
 @router.post("/complete-step")
 async def complete_step(
     body: CompleteStepRequest,
+    request: Request,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
@@ -123,6 +134,12 @@ async def complete_step(
     not by the user directly. The endpoint is auth-protected so only the
     server (using the user's service token) or the user themselves can call it.
     """
+    # F-SEC-03: body.user_id used to be trusted, so any account could write
+    # another account's onboarding state. Naming someone else is an admin
+    # action; refused here, before anything below touches the database.
+    if body.user_id and not _is_own_id(body.user_id, current_user):
+        require_admin(request, current_user)
+
     target_user_id = body.user_id or str(current_user.id)
     step = body.step
 

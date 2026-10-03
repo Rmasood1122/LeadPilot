@@ -91,6 +91,16 @@ def ensure_fresh(session: Session, lead: Lead, *, owner_id=None, force: bool = F
                 lead.linkedin_posts_json = posts
                 lead.linkedin_posts_fetched_at = now
                 result["posts"] = f"fetched:{source}:{len(posts)}"
+                # Part 1 Feature 10: an intent signal read from the prospect's
+                # own posts is a very different claim from one inferred, and
+                # the hook built on it should say which.
+                if posts:
+                    from app.services import provenance  # noqa: PLC0415
+
+                    provenance.record(session, lead, "intent_signal",
+                                      provenance.LINKEDIN,
+                                      detail=f"{len(posts)} recent post(s) via {source}",
+                                      observed_at=now, commit=False)
             except linkedin_posts.LinkedInPostsUnavailable as exc:
                 result["posts"] = f"unavailable: {exc}"[:200]
 
@@ -102,6 +112,13 @@ def ensure_fresh(session: Session, lead: Lead, *, owner_id=None, force: bool = F
                 lead.company_news_json = news
                 lead.company_news_fetched_at = now
                 result["news"] = f"fetched:{len(news)}"
+                if news:
+                    from app.services import provenance  # noqa: PLC0415
+
+                    provenance.record(session, lead, "intent_signal",
+                                      provenance.COMPANY_NEWS,
+                                      detail=f"{len(news)} article(s) in the last 30 days",
+                                      observed_at=now, commit=False)
             except Exception as exc:  # noqa: BLE001
                 result["news"] = f"unavailable: {exc}"[:200]
         session.commit()

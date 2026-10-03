@@ -9,16 +9,21 @@
  */
 
 import { useCallback, useMemo, useReducer, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
+import { me } from "@/lib/api/auth";
 import {
   useCrmBulkPatch,
   useCrmGrid,
   useCrmPatchLead,
+  useCrmRoundRobin,
   useCrmTags,
   useCrmViews,
   useDeleteView,
   useSaveView,
 } from "@/lib/api/crm-hooks";
+import { getCurrentWorkspace, listMembers } from "@/lib/api/workspaces";
+import { bulkOwnerChoices, canDistribute, type TeamContext } from "@/lib/crm/assignment";
 import { StrategyScope } from "@/components/crm/CrmChrome";
 import { DataGrid } from "@/components/crm/grid/DataGrid";
 import { BulkActionBar, GridToolbar } from "@/components/crm/grid/GridToolbar";
@@ -57,8 +62,26 @@ export default function CrmTablePage() {
   const { data: tagsData } = useCrmTags();
   const patchLead = useCrmPatchLead();
   const bulkPatch = useCrmBulkPatch();
+  const roundRobin = useCrmRoundRobin();
   const saveView = useSaveView("grid");
   const deleteView = useDeleteView("grid");
+
+  // Team context for assignment. Members and role follow the selected
+  // workspace (the X-Workspace-Id header); `me` is the person signed in.
+  const { data: membersData } = useQuery({ queryKey: ["members"], queryFn: listMembers });
+  const { data: workspaceData } = useQuery({
+    queryKey: ["workspace-current"],
+    queryFn: getCurrentWorkspace,
+  });
+  const { data: meData } = useQuery({ queryKey: ["me"], queryFn: me, staleTime: 5 * 60_000 });
+  const team = useMemo<TeamContext>(
+    () => ({
+      members: membersData ?? [],
+      meId: meData?.id ?? null,
+      role: workspaceData?.role,
+    }),
+    [membersData, meData, workspaceData],
+  );
 
   const rows = useMemo(() => data?.items ?? [], [data]);
   const views = viewsData?.items ?? [];
@@ -91,6 +114,7 @@ export default function CrmTablePage() {
       status?: LeadStatus;
       add_tag_ids?: string[];
       remove_tag_ids?: string[];
+      owner_user_id?: string | null;
     }) => {
       bulkPatch.mutate(
         { lead_ids: selectedIds, ...body },
@@ -116,6 +140,27 @@ export default function CrmTablePage() {
     },
     [bulkPatch, selectedIds, toast],
   );
+
+  const runRoundRobin = useCallback(() => {
+    roundRobin.mutate(
+      { lead_ids: selectedIds },
+      {
+        onSuccess: (result) => {
+          // Already-assigned rows are skipped by design (the endpoint only
+          // distributes unassigned leads), so report them rather than hide them.
+          toast(
+            result.skipped_count > 0
+              ? `${result.assigned_count} distributed, ${result.skipped_count} already had an owner`
+              : `${result.assigned_count} lead(s) distributed`,
+            "success",
+          );
+          dispatch({ type: "clearSelection" });
+        },
+        onError: (mutationError) =>
+          toast((mutationError as Error).message ?? "Could not distribute leads", "error"),
+      },
+    );
+  }, [roundRobin, selectedIds, toast]);
 
   /** CSV download. ONE WAY — there is no import counterpart, by design. */
   const exportCsv = useCallback(
@@ -226,6 +271,7 @@ export default function CrmTablePage() {
           onEdit={onEdit}
           onOpenNotes={setNotesLeadId}
           isFetching={isFetching}
+          team={team}
         />
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -260,10 +306,13 @@ export default function CrmTablePage() {
       <BulkActionBar
         count={selectedIds.length}
         tags={tags}
-        busy={bulkPatch.isPending}
+        busy={bulkPatch.isPending || roundRobin.isPending}
         onStatus={(status) => runBulk({ status })}
         onAddTag={(tagId) => runBulk({ add_tag_ids: [tagId] })}
         onRemoveTag={(tagId) => runBulk({ remove_tag_ids: [tagId] })}
+        assignees={bulkOwnerChoices(team)}
+        onAssign={(ownerId) => runBulk({ owner_user_id: ownerId })}
+        onRoundRobin={canDistribute(team.role) ? runRoundRobin : undefined}
         onExport={() => exportCsv(true)}
         onClear={() => dispatch({ type: "clearSelection" })}
       />

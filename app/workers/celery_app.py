@@ -70,6 +70,8 @@ celery_app = Celery(
         "app.workers.channel_tasks",
         # Feature A5: hourly conversion-probability rescore.
         "app.workers.conversion_tasks",
+        # Feature 6: nightly anonymised benchmark snapshot.
+        "app.workers.benchmark_tasks",
     ],
 )
 
@@ -168,6 +170,8 @@ celery_app.conf.task_routes = {
     "app.workers.channel_tasks.*": {"queue": "outreach"},
     # Feature A5: scoring over outcomes, like the other learning sweeps.
     "app.workers.conversion_tasks.*": {"queue": "learning"},
+    # Feature 6: read-only aggregation over outcomes, with the nightly jobs.
+    "app.workers.benchmark_tasks.*": {"queue": "learning"},
 }
 
 celery_app.conf.update(
@@ -241,6 +245,13 @@ celery_app.conf.beat_schedule = {
         "task": "leadpilot.outreach.check_followup_due",
         "schedule": float(settings.followup_sweep_interval_seconds),
     },
+    # Feature 5: opt-in post-sequence re-engagement. Hourly: its delays are
+    # measured in weeks. Enqueues at most each campaign's remaining
+    # re-engagement allowance; every send is re-gated in send_message_impl.
+    "check-reengagement-due": {
+        "task": "leadpilot.outreach.check_reengagement_due",
+        "schedule": 3600.0,
+    },
     # Engagement Hub, Feature 3: close meetings nobody pressed End on. Hourly
     # rather than on a schedule tied to meeting times, because the thing being
     # cleaned up is precisely the case where nobody was watching. A meeting
@@ -249,6 +260,12 @@ celery_app.conf.beat_schedule = {
     "close-stale-meetings": {
         "task": "app.workers.calendar_tasks.close_stale_meetings",
         "schedule": 3600.0,
+    },
+    # Feature 3: mark recording-provider transcripts that never arrived as
+    # timed out. The notes-only summary already exists; this only ends the wait.
+    "expire-transcript-waits": {
+        "task": "app.workers.calendar_tasks.expire_transcript_waits",
+        "schedule": 600.0,
     },
     # Feature Group 7: 24h and 1h pre-meeting reminders. Every five minutes;
     # each reminder is claimed with a conditional UPDATE, so overlapping
@@ -263,6 +280,12 @@ celery_app.conf.beat_schedule = {
     "check-idle-campaigns": {
         "task": "app.workers.intelligence_tasks.check_idle_campaigns",
         "schedule": crontab(hour=_aggregation_hour(), minute=50),
+    },
+    # Feature 6: anonymised benchmarks, after the aggregation (:05) and
+    # promotion (:35) so they read the same night's outcomes.
+    "compute-benchmarks": {
+        "task": "app.workers.benchmark_tasks.compute_benchmarks",
+        "schedule": crontab(hour=_aggregation_hour(), minute=40),
     },
     # Feature Group 3: recompute every campaign's smart-send windows after
     # the aggregation, and roll up last week's reply sentiment (Mondays) --
@@ -283,9 +306,33 @@ celery_app.conf.beat_schedule = {
     },
     # Feature Group 9: daily blacklist + health check of every sending
     # domain. A new listing pauses the user's campaigns immediately.
+    # Part 1 Feature 7: dated return visits from "not now" replies. Daily at
+    # 05:50 -- the unit of this feature is a DAY ("come back in March"), and a
+    # plan coming due today should be in the user's list before they start
+    # work. :50 keeps it clear of the 06:10 domain sweep on the same queue.
+    "reengagement-memory-due": {
+        "task": "app.workers.reply_tasks.run_reengagement_memory",
+        "schedule": crontab(hour=5, minute=50),
+    },
+    # Part 1 Feature 8: which touch earned each booking. Quarter-hourly at
+    # :35 (clear of the learning-loop jobs at :05/:15/:25/:50) because the
+    # question is asked the moment the meeting lands, not the next morning.
+    "attribution-sweep": {
+        "task": "app.workers.analytics_tasks.run_attribution_sweep",
+        "schedule": crontab(minute="5,20,35,50"),
+    },
     "deliverability-checks": {
         "task": "app.workers.deliverability_tasks.run_daily_checks",
         "schedule": crontab(hour=6, minute=10),
+    },
+    # Part 1 Feature 4: per-MAILBOX health. Every four hours at :05, because
+    # the two signals it exists to catch -- a complaint spike and a volume
+    # spike -- do their damage inside a day, which a daily sweep would only
+    # notice the morning after. Offset from the domain sweep above so the two
+    # never run in the same minute on the shared `default` queue.
+    "refresh-mailbox-health": {
+        "task": "app.workers.deliverability_tasks.refresh_mailbox_health",
+        "schedule": crontab(hour="*/4", minute=5),
     },
     # Feature 1: recompute every campaign's pipeline health score. Every six
     # hours, at :40 past the hour, so it never starts in the same minute as

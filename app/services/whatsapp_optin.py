@@ -35,7 +35,6 @@ from app.db.models import (
     OutcomeEvent,
     Sequence,
     SequenceEnrollment,
-    SuppressionEntry,
     WhatsAppOptIn,
 )
 from app.services import crypto
@@ -161,6 +160,14 @@ def record_opt_in(
     # uses one format.
     lead.phone = normalized
     _sync_lead_cache(lead, row)
+    # Part 1 Feature 9: both halves of consent go in the ledger. A ledger that
+    # only holds withdrawals cannot show that the contact was lawful to begin
+    # with, which is the half a dispute usually turns on.
+    from app.services import consent  # noqa: PLC0415
+
+    consent.record_grant(session, lead, channel=consent.WHATSAPP,
+                         source=f"whatsapp_{source.value}",
+                         detail=(evidence or consent_text or "")[:300] or None)
     session.commit()
     logger.info("whatsapp opt-in recorded lead=%s source=%s", lead.id, source.value)
     return row
@@ -195,12 +202,23 @@ def revoke_opt_in(
     session.add(row)
     _sync_lead_cache(lead, row)
 
-    if lead.phone and not is_suppressed(session, phone=lead.phone.strip()):
-        session.add(SuppressionEntry(phone=lead.phone.strip(),
-                                     reason="whatsapp_optout"))
     session.add(Outcome(lead_id=lead.id, event=OutcomeEvent.UNSUBSCRIBED,
                         channel="whatsapp",
                         meta_json={"channel": "whatsapp", "source": source.value}))
+    # Part 1 Feature 9: a WhatsApp STOP is an instruction about the PERSON,
+    # not about one channel. suppress_everywhere applies it to phone, email
+    # and LinkedIn and writes the consent ledger.
+    #
+    # It is the ONLY writer of the phone suppression row. This function used
+    # to add that row itself as well; SessionLocal is autoflush=False, so
+    # neither guard's SELECT saw the other's pending row and the commit
+    # violated the unique index on suppression_list.phone (NEW-01: a signed
+    # STOP answered HTTP 500 and suppressed nothing).
+    from app.services import consent  # noqa: PLC0415
+
+    consent.suppress_everywhere(session, lead, source=f"whatsapp_{source.value}",
+                                reason="whatsapp_optout",
+                                detail="STOP received on WhatsApp")
     session.commit()
 
     stopped = 0

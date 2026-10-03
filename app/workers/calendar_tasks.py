@@ -355,6 +355,9 @@ def generate_summary_impl(session: Session, meeting_id: uuid.UUID) -> str:
     meeting.action_items = _merge_action_items(meeting.action_items,
                                                result["action_items"])
     meeting.ai_notes = _as_notes(result)
+    # Feature 3: what this summary was built from, so the panel can say
+    # "from your notes -- the transcript is still coming" and upgrade it later.
+    meeting.summary_source = "transcript" if (meeting.transcript or "").strip() else "notes"
     session.commit()
 
     if meeting.lead_id:
@@ -519,5 +522,35 @@ def close_stale_meetings() -> int:
     session = SessionLocal()
     try:
         return close_stale_meetings_impl(session)
+    finally:
+        session.close()
+
+
+# Feature 3 -- recording-provider transcripts. See app/services/meeting_recording.py.
+
+
+@celery_app.task(name="app.workers.calendar_tasks.fetch_meeting_transcript",
+                 bind=True, max_retries=3)
+def fetch_meeting_transcript(self, meeting_id: str, transcript_id: str | None = None) -> str:
+    from app.services import meeting_recording  # noqa: PLC0415
+
+    session = SessionLocal()
+    try:
+        return meeting_recording.fetch_transcript(session, uuid.UUID(meeting_id), transcript_id)
+    except Exception as exc:
+        session.rollback()
+        logger.exception("transcript fetch failed for meeting %s — retrying", meeting_id)
+        raise self.retry(exc=exc, countdown=120)
+    finally:
+        session.close()
+
+
+@celery_app.task(name="app.workers.calendar_tasks.expire_transcript_waits")
+def expire_transcript_waits() -> int:
+    from app.services import meeting_recording  # noqa: PLC0415
+
+    session = SessionLocal()
+    try:
+        return meeting_recording.expire_waits(session)
     finally:
         session.close()

@@ -105,6 +105,36 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "reply_fraud_detection_enabled": (True, "Second-pass check that drops "
                                       "automated replies (OOO, bots, spam "
                                       "traps) from engagement metrics."),
+    # Part 1 Feature 5 -- the human review queue for high-risk sends.
+    # Each trigger is separately switchable because which ones are useful
+    # depends entirely on the ICP. In particular: if the people you sell to
+    # ARE founders and owners (LeadPilot's own ICP is boutique agency
+    # owners), leaving the VIP trigger on puts every message in the queue and
+    # a queue nobody can finish is a queue nobody reads. Turn it off there.
+    "send_review_enabled": (True, "Hold high-risk messages for explicit human "
+                            "approval before sending."),
+    "send_review_prior_objection": (True, "Hold a send to a prospect whose "
+                                    "last reply was an objection."),
+    "send_review_stalled_deal": (True, "Hold a send to a prospect with an "
+                                 "open deal past its close date."),
+    "send_review_vip_titles": (True, "Hold a send to a founder, C-level, VP "
+                               "or board member. Turn OFF if your ICP IS "
+                               "executives -- otherwise every message queues."),
+    "send_review_tone": (True, "Hold a send whose rendered copy trips the "
+                         "tone/spam rules."),
+    # Part 1 Feature 7 -- re-engagement memory ("not now" is not "never").
+    "reengagement_memory_enabled": (True, "Turn every 'not now' reply into a "
+                                    "dated return visit, with the reason the "
+                                    "prospect gave."),
+    "reengagement_memory_days": (90, "Days to wait when the prospect named no "
+                                 "date and gave no reason. A named date always "
+                                 "wins; a known reason uses its own interval."),
+    "reengagement_memory_auto_send": (False, "When a plan comes due, also "
+                                      "SCHEDULE the return message (it still "
+                                      "goes through suppression, compliance and "
+                                      "the review queue). Off by default: most "
+                                      "people want to read a nine-month-old "
+                                      "promise before acting on it."),
     # Feature Group 8 -- white label
     "white_label_allowed": (True, "Allow workspace owners to enable "
                             "white-label mode."),
@@ -163,6 +193,36 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                "Off by default: rewritten links are a spam-filter "
                                "signal. Never applied where open tracking is off "
                                "(EU/EEA/UK leads)."),
+    # Feature 5 -- opt-in post-sequence re-engagement. Each campaign is still
+    # OFF until its owner or a manager turns it on; these bound what they may
+    # choose. A missing or mistyped row returns the default below.
+    "reengagement_allowed": (True, "Allow campaigns to turn on post-sequence "
+                             "re-engagement. Off stops every pending "
+                             "re-engagement send at its next send-time check."),
+    "reengagement_daily_cap_ceiling": (25, "Highest re-engagement sends per "
+                                       "campaign per day. Campaign caps above "
+                                       "it are clamped."),
+    "reengagement_weekly_cap_ceiling": (100, "Highest re-engagement sends per "
+                                        "campaign per rolling 7 days."),
+    "reengagement_min_delay_days": (14, "Shortest wait after a lead's last "
+                                    "sequence send before re-engagement may "
+                                    "contact them."),
+    # Feature 3 -- recording-provider transcripts
+    "meeting_transcript_wait_minutes": (60, "After a recorded meeting ends, how "
+                                        "long the panel waits for the "
+                                        "provider's transcript before marking "
+                                        "it timed out. The notes-only summary "
+                                        "is generated immediately either way, "
+                                        "and a late transcript still upgrades "
+                                        "it."),
+    # Feature 6 -- anonymised benchmarks. benchmarks.HARD_MIN_ACCOUNTS is a
+    # floor no value here can lower.
+    "benchmark_min_accounts": (10, "Distinct accounts a benchmark bucket needs "
+                               "before it is published. Never below 5."),
+    "benchmark_min_account_sends": (30, "Sends an account needs in a bucket "
+                                    "before its rates count toward it."),
+    "benchmark_window_days": (90, "Trailing window, in days, benchmarks are "
+                              "computed over (7-365)."),
 }
 
 
