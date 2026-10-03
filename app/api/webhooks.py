@@ -39,6 +39,7 @@ from app.integrations.calendly import (
 )
 from app.services import notifications
 from app.services import sequence_engine as engine
+from app.services import webhook_claims
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,28 @@ async def calendly_webhook(request: Request, db: Session = Depends(get_db)) -> d
         db.rollback()
         return {"ok": True, "duplicate": True}
 
+    # NEW-03: if processing raises, the claim above is RELEASED before the
+    # error propagates. It used to stay, so Calendly's retry of a delivery
+    # that had answered 500 was skipped as a duplicate and the booking was
+    # never recorded.
+    try:
+        return _process_calendly_event(db, payload, event_id)
+    except Exception:
+        webhook_claims.release(db, "calendly", event_id)
+        raise
+
+
+def _already_recorded(db: Session, lead: Lead, event: OutcomeEvent, event_id: str) -> bool:
+    """True if this lead already has this outcome for this Calendly event --
+    a retry of a delivery that failed after the outcome was committed."""
+    outcomes = db.execute(
+        select(Outcome).where(Outcome.lead_id == lead.id, Outcome.event == event,
+                              Outcome.channel == "calendly")
+    ).scalars().all()
+    return any((o.meta_json or {}).get("calendly_event") == event_id for o in outcomes)
+
+
+def _process_calendly_event(db: Session, payload: dict, event_id: str) -> dict:
     event_type = payload.get("event")  # TODO: verify against current Calendly docs
     invitee = payload.get("payload") or {}
     email = (invitee.get("email") or "").lower().strip()
@@ -129,9 +152,10 @@ async def calendly_webhook(request: Request, db: Session = Depends(get_db)) -> d
 
     if event_type == "invitee.created":
         lead.status = LeadStatus.MEETING_BOOKED
-        db.add(Outcome(lead_id=lead.id, event=OutcomeEvent.BOOKED,
-                       channel="calendly",
-                       meta_json={"calendly_event": event_id}))
+        if not _already_recorded(db, lead, OutcomeEvent.BOOKED, event_id):
+            db.add(Outcome(lead_id=lead.id, event=OutcomeEvent.BOOKED,
+                           channel="calendly",
+                           meta_json={"calendly_event": event_id}))
         db.commit()
         enrollments = db.execute(
             select(SequenceEnrollment).where(SequenceEnrollment.lead_id == lead.id)
@@ -185,9 +209,10 @@ async def calendly_webhook(request: Request, db: Session = Depends(get_db)) -> d
 
     if event_type == "invitee.canceled":
         lead.status = LeadStatus.REPLIED
-        db.add(Outcome(lead_id=lead.id, event=OutcomeEvent.REPLIED,
-                       channel="calendly",
-                       meta_json={"calendly_event": event_id, "canceled": True}))
+        if not _already_recorded(db, lead, OutcomeEvent.REPLIED, event_id):
+            db.add(Outcome(lead_id=lead.id, event=OutcomeEvent.REPLIED,
+                           channel="calendly",
+                           meta_json={"calendly_event": event_id, "canceled": True}))
         # Stop the brief's reminders: nobody wants a "meeting in 1 hour" push
         # for a call that was cancelled yesterday.
         from app.services.meeting_prep import SOURCE_CALENDLY, cancel_briefs  # noqa: PLC0415
