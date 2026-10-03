@@ -30,6 +30,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.db.models import Lead
+from app.services import prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,9 @@ def prompt_block(lead: Lead, now: datetime | None = None) -> tuple[str, dict]:
                  "post, and do not quote more than a few words:"]
         for i, post in enumerate(posts, 1):
             date = f"({str(post.get('posted_at'))[:10]}) " if post.get("posted_at") else ""
-            lines.append(f'{i}. {date}"{post["text"][:700]}"')
+            # F-AI-02: the post body is written by the prospect. Delimited and
+            # escaped so it cannot close its own block and continue as prompt.
+            lines.append(f"{i}. {date}{prompt_safety.block(post['text'][:700])}")
         parts.append("\n".join(lines))
         used["linkedin_post_url"] = posts[0].get("url") or "unknown"
 
@@ -169,9 +172,20 @@ def prompt_block(lead: Lead, now: datetime | None = None) -> tuple[str, dict]:
                  "lead's company -- a same-name company is possible, so skip it "
                  "if it does not fit. Congratulate only on clearly good news:"]
         for item in news:
-            src = f" ({item.get('source')}, {str(item.get('published_at'))[:10]})"
-            lines.append(f"- {item['headline']} — {item.get('summary') or ''}{src}")
+            # F-AI-02: headline, summary and source name all come from the feed,
+            # which is outside this system. Folded onto one line each so a
+            # newline inside them cannot start a new 'section' of the prompt.
+            src = (f" ({prompt_safety.inline(item.get('source'))}, "
+                   f"{str(item.get('published_at'))[:10]})")
+            lines.append(f"- {prompt_safety.inline(item['headline'])} — "
+                         f"{prompt_safety.inline(item.get('summary') or '')}{src}")
         parts.append("\n".join(lines))
         used["news_url"] = news[0].get("url") or "unknown"
 
-    return "\n\n".join(parts), used
+    if not parts:
+        return "", used
+
+    # One notice for the whole block, ahead of everything it governs. Our own
+    # instructions above are deliberately NOT wrapped -- wrapping trusted text
+    # would tell the model to disregard it.
+    return f"{prompt_safety.NOTICE}\n\n" + "\n\n".join(parts), used
