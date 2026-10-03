@@ -46,7 +46,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import InboundReply, Lead, Message, MessageStatus
 from app.services import prompt_safety
-from app.services.anthropic_client import get_client
+from app.services.anthropic_client import JUDGE_TEMPERATURE, get_client
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +192,7 @@ def classify(db: Session, reply_id) -> dict:
         if result is None:
             original, step_no = _original(db, reply)
             answer = get_client().complete_json(
+                temperature=JUDGE_TEMPERATURE,
                 system=_SYSTEM,
                 prompt=_PROMPT.format(
                     notice=prompt_safety.NOTICE,

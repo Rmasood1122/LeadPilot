@@ -35,7 +35,8 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import settings
 from app.db.models import FlowType, PastClient, ResearchStep, Strategy, StrategyStatus
-from app.services.anthropic_client import TruncatedResponseError, get_client
+from app.services.anthropic_client import (JUDGE_TEMPERATURE, TruncatedResponseError,
+                                            get_client)
 from app.services import notifications
 from app.verification.passes import (
     FIXER_PROMPT,
@@ -131,6 +132,7 @@ def _log_attempt(strategy: Strategy, spec: VerificationPassSpec, attempt: int,
 
 def _judge(spec: VerificationPassSpec, strategy: Strategy, support: str) -> tuple[bool, str | None]:
     data = get_client().complete_json(
+        temperature=JUDGE_TEMPERATURE,
         system=JUDGE_SYSTEM,
         prompt=JUDGE_PROMPT.format(
             pass_no=spec.pass_no,

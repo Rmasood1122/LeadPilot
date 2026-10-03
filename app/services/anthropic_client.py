@@ -89,6 +89,20 @@ def is_permanent_error(exc: BaseException) -> bool:
 # non-streaming path; only the fixer's doubled retry crosses into streaming.
 _NON_STREAMING_MAX_TOKENS = 20_000
 
+# F-AI-03. A call that returns a VERDICT runs at this temperature.
+#
+# Verification pass #4 is "Legal & compliance", a documented hard ship-blocker.
+# At the API default (~1.0) the same document could be judged PASS on one run
+# and FAIL on the next, which makes the blocker advisory rather than binding —
+# and the reply classifiers have the same property, while their output drives
+# suppression and stop logic.
+#
+# Deliberately NOT applied to generation. Outreach copy, document rewrites and
+# A/B variants are produced through the same two methods, and forcing 0 there
+# would make every lead receive byte-identical text and collapse variant
+# generation. Temperature is therefore chosen per call site, never globally.
+JUDGE_TEMPERATURE = 0.0
+
 
 class TruncatedResponseError(ClientHunterError):
     """The model stopped at the max_tokens ceiling instead of finishing.
@@ -123,8 +137,14 @@ class ClaudeClient:
         wait=wait_exponential(multiplier=2, min=2, max=60),
         reraise=True,
     )
-    def complete(self, system: str, prompt: str, max_tokens: int | None = None) -> str:
+    def complete(self, system: str, prompt: str, max_tokens: int | None = None,
+                 temperature: float | None = None) -> str:
         """One text completion. Returns concatenated text blocks.
+
+        `temperature` is omitted from the request when None, which leaves the
+        API default (~1.0) in place — the right choice for generation, where
+        two leads must not receive byte-identical copy. Callers that produce a
+        VERDICT rather than prose pass JUDGE_TEMPERATURE; see F-AI-03.
 
         Raises TruncatedResponseError when the model stopped because it hit
         `max_tokens` rather than finishing. A length cutoff is NOT a shorter
@@ -146,6 +166,10 @@ class ClaudeClient:
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )
+        if temperature is not None:
+            # Only sent when a caller asked for it. Absent, the account/API
+            # default applies, which is what every generation path wants.
+            request["temperature"] = temperature
         if limit > _NON_STREAMING_MAX_TOKENS:
             # The SDK REFUSES a non-streaming request whose max_tokens implies a
             # generation that could exceed 10 minutes — it raises
@@ -188,15 +212,22 @@ class ClaudeClient:
             )
         return text
 
-    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None) -> dict:
+    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None,
+                      temperature: float | None = None) -> dict:
         """Completion that must return a single JSON object.
 
         The system prompt should already demand JSON-only output; this
         method additionally strips markdown fences and grabs the outermost
         object as a safety net, then raises ValueError if parsing fails so
         callers can decide how to degrade.
+
+        Returning JSON does NOT make a call a judgement: this method also
+        produces outreach copy (app/services/message_personalization.py). So
+        `temperature` is per-caller and defaults to the API default, rather
+        than being forced to 0 here.
         """
-        raw = self.complete(system=system, prompt=prompt, max_tokens=max_tokens)
+        raw = self.complete(system=system, prompt=prompt, max_tokens=max_tokens,
+                            temperature=temperature)
         cleaned = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
         try:
             return json.loads(cleaned)

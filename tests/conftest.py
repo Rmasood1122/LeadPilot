@@ -248,7 +248,7 @@ class FakeClaude:
         }
 
     # ---- text completions (pipeline steps + fixes) ----
-    def complete(self, system: str, prompt: str, max_tokens: int | None = None) -> str:
+    def complete(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None) -> str:
         if self.fail_after is not None and self.completions >= self.fail_after:
             raise RuntimeError("simulated crash: model call failed")
         self.completions += 1
@@ -271,7 +271,7 @@ class FakeClaude:
         return f"Mock research output #{self.completions}"
 
     # ---- JSON completions (patterns + verification judge) ----
-    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None) -> dict:
+    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None) -> dict:
         self.completions += 1
         if "LeadPilot in-app support assistant" in system:  # Feature 3
             self.support_prompts.append(prompt)

@@ -43,7 +43,7 @@ from app.db.models import (
     SequenceEnrollment,
 )
 from app.services import prompt_safety
-from app.services.anthropic_client import get_client
+from app.services.anthropic_client import JUDGE_TEMPERATURE, get_client
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +179,8 @@ def _original_message(db: Session, reply: InboundReply) -> tuple[str, int | None
 
 def _ask(system: str, prompt: str) -> dict:
     return get_client().complete_json(system=system, prompt=prompt,
-                                      max_tokens=MAX_TOKENS)
+                                      max_tokens=MAX_TOKENS,
+                                      temperature=JUDGE_TEMPERATURE)
 
 
 def _clean(data: dict, fallback_category: str = "OBJECTION") -> dict:

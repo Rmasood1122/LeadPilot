@@ -379,7 +379,7 @@ class TestBrief:
         systems: list[str] = []
 
         class Capture:
-            def complete_json(self, system, prompt, max_tokens=None):
+            def complete_json(self, system, prompt, max_tokens=None, temperature=None):
                 systems.append(system)
                 return {"brief": "Ask whether inspection scheduling is still worth a look."}
 
@@ -390,7 +390,7 @@ class TestBrief:
 
     def test_a_failed_model_call_falls_back(self, db_session, campaign, lead, monkeypatch):
         class Down:
-            def complete_json(self, system, prompt, max_tokens=None):
+            def complete_json(self, system, prompt, max_tokens=None, temperature=None):
                 raise RuntimeError("anthropic unavailable")
 
         monkeypatch.setattr(personalization, "get_client", lambda: Down())

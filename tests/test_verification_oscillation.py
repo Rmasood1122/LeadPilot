@@ -69,7 +69,7 @@ class OscillatingClaude:
         match = re.search(r"criterion #(\d+)", prompt, re.IGNORECASE)
         return int(match.group(1)) if match else 0
 
-    def complete_json(self, system: str, prompt: str, max_tokens=None) -> dict:
+    def complete_json(self, system: str, prompt: str, max_tokens=None, temperature=None) -> dict:
         pass_no = self._pass_no(prompt)
         self.judge_calls.append(pass_no)
         if pass_no != self.target_pass:
@@ -84,7 +84,7 @@ class OscillatingClaude:
         fix = _FIX_TO_LATE if self.attempts_for_target % 2 == 1 else _FIX_TO_EARLY
         return {"result": "FAIL", "fix_description": fix}
 
-    def complete(self, system: str, prompt: str, max_tokens=None) -> str:
+    def complete(self, system: str, prompt: str, max_tokens=None, temperature=None) -> str:
         pass_no = self._pass_no(prompt)
         self.fix_calls.append(pass_no)
         # The fixer honours whichever value the finding demands -> flip-flop.

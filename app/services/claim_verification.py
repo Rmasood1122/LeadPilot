@@ -403,7 +403,8 @@ def _model_claims(session: Session, texts: list[str]) -> dict[str, str]:
         return {}
     try:
         data = anthropic_client.get_client().complete_json(
-            system=EXTRACTOR_SYSTEM, prompt=f"MESSAGE:\n{joined[:6000]}", max_tokens=800)
+            system=EXTRACTOR_SYSTEM, prompt=f"MESSAGE:\n{joined[:6000]}", max_tokens=800,
+            temperature=anthropic_client.JUDGE_TEMPERATURE)
     except Exception as exc:  # noqa: BLE001 -- rules still run
         logger.info("claim extraction model unavailable (%s); rules only", type(exc).__name__)
         return {}

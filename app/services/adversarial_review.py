@@ -257,7 +257,7 @@ def model_findings(session: Session, sequence: Sequence) -> list[dict]:
     try:
         data = anthropic_client.get_client().complete_json(
             system=RED_TEAM_SYSTEM, prompt=f"SEQUENCE “{sequence.name}”:\n\n{brief[:8000]}",
-            max_tokens=1200)
+            max_tokens=1200, temperature=anthropic_client.JUDGE_TEMPERATURE)
     except Exception as exc:  # noqa: BLE001 -- the rules still stand
         logger.info("red-team model pass unavailable: %s", type(exc).__name__)
         return [_finding("system:model_unavailable", INFO, "system",
