@@ -62,35 +62,105 @@ BEAT_SCHEDULE="${CELERY_BEAT_SCHEDULE:-/tmp/celerybeat-schedule}"
 export WORKER_PID_FILE="${WORKER_PID_FILE:-/tmp/celery-worker.pid}"
 export BEAT_PID_FILE="${BEAT_PID_FILE:-/tmp/celery-beat.pid}"
 
+# Every line a child writes (stdout AND stderr) is prefixed with its name, so
+# Render's single interleaved log stream says who said what. Pure bash, one
+# line at a time, so nothing is held back in a buffer when a child dies.
+prefix_lines() {
+  local tag="$1" line
+  while IFS= read -r line || [[ -n "${line}" ]]; do
+    printf '[%s] %s\n' "${tag}" "${line}"
+  done
+}
+
+# The `> >(prefix_lines …) 2>&1 &` form keeps `$!` as the PID of the child
+# itself (not of the prefixer), which the PID files and the supervision below
+# both depend on.
 echo "[entrypoint] starting Celery worker (queues: pipeline,outreach,learning,default,notifications)"
 celery -A app.workers.celery_app worker \
   -Q pipeline,outreach,learning,default,notifications \
   --concurrency "${CONCURRENCY}" \
-  --loglevel "${LOGLEVEL}" &
+  --loglevel "${LOGLEVEL}" > >(prefix_lines worker) 2>&1 &
 WORKER_PID=$!
 echo "${WORKER_PID}" > "${WORKER_PID_FILE}"
 
 echo "[entrypoint] starting Celery beat"
 celery -A app.workers.celery_app beat \
   --schedule "${BEAT_SCHEDULE}" \
-  --loglevel "${LOGLEVEL}" &
+  --loglevel "${LOGLEVEL}" > >(prefix_lines beat) 2>&1 &
 BEAT_PID=$!
 echo "${BEAT_PID}" > "${BEAT_PID_FILE}"
 
 echo "[entrypoint] starting health server on 0.0.0.0:${PORT} (Render requires a bound port)"
-uvicorn app.worker_health:app --host 0.0.0.0 --port "${PORT}" &
+uvicorn app.worker_health:app --host 0.0.0.0 --port "${PORT}" > >(prefix_lines health) 2>&1 &
 HTTP_PID=$!
+
+child_name() {
+  case "$1" in
+    "${WORKER_PID}") echo "worker" ;;
+    "${BEAT_PID}")   echo "beat" ;;
+    "${HTTP_PID}")   echo "health-server" ;;
+    *)               echo "unknown (pid $1)" ;;
+  esac
+}
 
 shutdown() {
   echo "[entrypoint] shutting down children"
   kill "${WORKER_PID}" "${BEAT_PID}" "${HTTP_PID}" 2>/dev/null || true
   wait || true
 }
-trap shutdown TERM INT
+
+SIGNALLED=""
+on_signal() {
+  SIGNALLED="$1"
+  echo "[entrypoint] received SIG${SIGNALLED}"
+  shutdown
+}
+trap 'on_signal TERM' TERM
+trap 'on_signal INT' INT
 
 # Return as soon as any child exits — see SUPERVISION above.
-wait -n
-EXIT_CODE=$?
-echo "[entrypoint] a child process exited (code ${EXIT_CODE}); stopping the service so Render restarts it"
+#
+# errexit is OFF for this block and only this block. `wait` returns the exit
+# status of the child it reaped, so under `set -e` a child that failed made
+# bash abort on the `wait` line itself: the lines that report the failure and
+# stop the other children never ran, and the deploy died with no word on which
+# process had gone or why.
+EXITED_PID=""
+EXIT_CODE=0
+set +e
+if (( BASH_VERSINFO[0] > 5 || (BASH_VERSINFO[0] == 5 && BASH_VERSINFO[1] >= 1) )) \
+    && [[ -z "${ENTRYPOINT_FORCE_POLL:-}" ]]; then
+  # bash >= 5.1: `-p` stores the PID of the child that `wait -n` reaped.
+  wait -n -p EXITED_PID "${WORKER_PID}" "${BEAT_PID}" "${HTTP_PID}"
+  EXIT_CODE=$?
+else
+  # Older bash has no `wait -n -p`: poll the three PIDs once a second, then
+  # reap the one that has gone to collect its exit status.
+  while [[ -z "${EXITED_PID}" && -z "${SIGNALLED}" ]]; do
+    for pid in "${WORKER_PID}" "${BEAT_PID}" "${HTTP_PID}"; do
+      if ! kill -0 "${pid}" 2>/dev/null; then
+        EXITED_PID="${pid}"
+        wait "${pid}"
+        EXIT_CODE=$?
+        break
+      fi
+    done
+    [[ -z "${EXITED_PID}" ]] && sleep 1
+  done
+fi
+set -e
+
+if [[ -n "${SIGNALLED}" ]]; then
+  # Render stopping the service (a deploy, a restart): not a child failure.
+  echo "[entrypoint] stopped by SIG${SIGNALLED}"
+  exit 143
+fi
+
+echo "[entrypoint] child '$(child_name "${EXITED_PID}")' exited with code ${EXIT_CODE}; stopping the service so Render restarts it"
 shutdown
-exit "${EXIT_CODE:-1}"
+# Always non-zero, so Render restarts the service: a child that exits 0 has
+# still gone, and this service is not doing its job without all three.
+if [[ "${EXIT_CODE}" -eq 0 ]]; then
+  EXIT_CODE=1
+fi
+exit "${EXIT_CODE}"
