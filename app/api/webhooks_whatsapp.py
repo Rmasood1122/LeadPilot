@@ -48,6 +48,7 @@ from app.db.models import (
 )
 from app.integrations.whatsapp import META_STATUS_MAP, normalize_phone
 from app.services import sequence_engine as engine
+from app.services import webhook_claims
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +145,8 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)) -> d
             # message_template_id, message_template_name,
             # message_template_language, reason)
             if field == "message_template_status_update":
-                if _claim_event(db, _template_event_id(value)):
-                    _handle_template_status(db, value)
+                if _process_once(db, _template_event_id(value),
+                                 _handle_template_status, value):
                     processed += 1
                 else:
                     duplicates += 1
@@ -154,15 +155,15 @@ async def whatsapp_webhook(request: Request, db: Session = Depends(get_db)) -> d
             phone_number_id = (value.get("metadata") or {}).get("phone_number_id")
 
             for status_ev in value.get("statuses") or []:
-                if _claim_event(db, _status_event_id(status_ev)):
-                    _handle_status(db, status_ev)
+                if _process_once(db, _status_event_id(status_ev),
+                                 _handle_status, status_ev):
                     processed += 1
                 else:
                     duplicates += 1
 
             for msg in value.get("messages") or []:
-                if _claim_event(db, msg.get("id") or ""):
-                    _handle_inbound(db, msg, phone_number_id)
+                if _process_once(db, msg.get("id") or "",
+                                 _handle_inbound, msg, phone_number_id):
                     processed += 1
                 else:
                     duplicates += 1
@@ -189,6 +190,24 @@ def _claim_event(db: Session, event_id: str) -> bool:
     except IntegrityError:
         db.rollback()
         return False
+
+
+def _process_once(db: Session, event_id: str, handler, *args) -> bool:
+    """Claim the event and run its handler. False = already processed.
+
+    NEW-03: if the handler raises, the claim is RELEASED before the error
+    propagates. It used to stay, so Meta's retry of a delivery that had
+    answered 500 was skipped as a duplicate and the event -- a STOP included
+    -- was never processed.
+    """
+    if not _claim_event(db, event_id):
+        return False
+    try:
+        handler(db, *args)
+    except Exception:
+        webhook_claims.release(db, "whatsapp", event_id)
+        raise
+    return True
 
 
 # --------------------------------------------------------------------------
@@ -386,18 +405,32 @@ def _handle_inbound(db: Session, msg: dict, phone_number_id: str | None) -> None
                     "not attached")
         return
 
-    reply_row = InboundReply(
-        lead_id=lead.id if lead else None,
-        account_ref=phone_number_id,
-        channel="whatsapp",
-        thread_ref=from_phone or None,
-        from_address=from_phone or (msg.get("from") or "unknown"),
-        subject=None,
-        body=body,
-        classification=None,  # set below by the classification flow
-        received_at=received_at,
-    )
-    db.add(reply_row)
+    # A retry of an event that failed part-way (NEW-03) arrives here a second
+    # time with the first attempt's row already committed: reuse it instead
+    # of storing the same message twice.
+    from_address = from_phone or (msg.get("from") or "unknown")
+    reply_row = db.execute(
+        select(InboundReply).where(
+            InboundReply.lead_id == lead.id,
+            InboundReply.channel == "whatsapp",
+            InboundReply.from_address == from_address,
+            InboundReply.received_at == received_at,
+            InboundReply.body == body,
+        ).limit(1)
+    ).scalars().first()
+    if reply_row is None:
+        reply_row = InboundReply(
+            lead_id=lead.id if lead else None,
+            account_ref=phone_number_id,
+            channel="whatsapp",
+            thread_ref=from_phone or None,
+            from_address=from_address,
+            subject=None,
+            body=body,
+            classification=None,  # set below by the classification flow
+            received_at=received_at,
+        )
+        db.add(reply_row)
 
     if lead is not None:
         # THE window anchor — the 24h service-window check reads this live.
