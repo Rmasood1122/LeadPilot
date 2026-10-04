@@ -190,6 +190,13 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_time_limit=settings.pipeline_step_timeout_seconds + 60,
     task_soft_time_limit=settings.pipeline_step_timeout_seconds,
+    # With acks_late, Redis redelivers a task that has been unacked longer than
+    # visibility_timeout (default 3600s) -- while it is STILL RUNNING. The
+    # pipeline tasks may now run up to pipeline_task_timeout_seconds, so keep
+    # the redelivery window past their hard limit or a long run is duplicated.
+    broker_transport_options={
+        "visibility_timeout": settings.pipeline_task_timeout_seconds + 600,
+    },
 )
 
 # Celery Beat schedule — the 24/7 heartbeat of outreach (M3) + learning (M8).

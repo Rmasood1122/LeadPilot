@@ -343,6 +343,11 @@ class Settings(BaseSettings):
 
     # --- Pipeline engine -------------------------------------------------
     pipeline_step_timeout_seconds: int = 300
+    # Budget for ONE run_pipeline / run_verification TASK (up to 144 steps, or
+    # 10 verification passes), not one step. The global Celery limit above is a
+    # per-step figure; applied to the whole task it SIGKILLed every full run at
+    # 360s (seen live 2026-10-05: killed at step 63, status stuck "researching").
+    pipeline_task_timeout_seconds: int = 7200
     # Verification loop: max fix→re-run attempts per pass before the
     # strategy is marked needs_human_review (project knowledge, section D).
     verification_max_retries_per_pass: int = 3
