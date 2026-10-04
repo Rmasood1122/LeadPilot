@@ -23,6 +23,9 @@ import { NetworkProvider } from '@/contexts/NetworkContext';
 import { NativeProvider }  from '@/components/providers/NativeProvider';
 import { OfflineBanner }   from '@/components/ui/OfflineBanner';
 
+// ── Vercel Speed Insights ──────────────────────────────────────────────────
+import { SpeedInsights } from '@vercel/speed-insights/next';
+
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
@@ -94,6 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   rendered a Toaster, so every toast was silently dropped. */}
               <Toaster position="top-center" richColors closeButton />
               {children}
+              <SpeedInsights />
             </NetworkProvider>
           </ThemeProvider>
         </QueryProvider>
