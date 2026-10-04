@@ -4,8 +4,9 @@ notifications.py — ClientHunter Enterprise (M7 Chunk 3)
 Firebase Cloud Messaging notification service.
 
 Design decisions:
-  • Lazy Firebase init: only initialises on first use; raises clear error if
-    FIREBASE_CREDENTIALS_PATH is not set. This lets the backend start normally
+  • Lazy Firebase init: only initialises on first use; raises a clear error if
+    neither FIREBASE_CREDENTIALS_JSON nor FIREBASE_CREDENTIALS_PATH is set
+    (F-OPS-04). This lets the backend start normally
     even if Firebase is not configured (notifications are a feature, not a
     critical-path requirement for existing M1–M6 functionality).
   • Invalid tokens are marked is_valid=False in device_tokens rather than
@@ -48,6 +49,7 @@ Wiring into existing services:
 
 from __future__ import annotations
 
+import json
 import logging
 import uuid
 import os
@@ -78,14 +80,38 @@ def _get_firebase_app():
             "Run: pip install firebase-admin"
         )
 
-    cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
-    if not cred_path:
+    # F-OPS-04. Two names existed for one secret: app/core/config.py declares
+    # FIREBASE_CREDENTIALS_JSON (the service-account JSON inline) while this
+    # function read FIREBASE_CREDENTIALS_PATH (a file on disk). An operator who
+    # set the documented variable got a RuntimeError at the first push, and the
+    # inline form is the one actually configured in the deployments -- a hosted
+    # container has nowhere to put the file.
+    #
+    # Both are accepted. JSON wins when both are set, because it needs no
+    # filesystem. config.py defaults the JSON var to "{}", so an empty object
+    # counts as unset rather than as a credential with no fields.
+    cred_json = (os.getenv("FIREBASE_CREDENTIALS_JSON") or "").strip()
+    cred_path = (os.getenv("FIREBASE_CREDENTIALS_PATH") or "").strip()
+
+    if cred_json and cred_json != "{}":
+        try:
+            cred = credentials.Certificate(json.loads(cred_json))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                "FIREBASE_CREDENTIALS_JSON is set but is not valid JSON "
+                f"({exc}). It must hold the service-account JSON itself, not "
+                "a path -- use FIREBASE_CREDENTIALS_PATH for a file."
+            ) from exc
+    elif cred_path:
+        cred = credentials.Certificate(cred_path)
+    else:
         raise RuntimeError(
-            "FIREBASE_CREDENTIALS_PATH environment variable is not set. "
-            "Download your Firebase service account JSON and set this path."
+            "Firebase credentials are not configured. Set "
+            "FIREBASE_CREDENTIALS_JSON to the service-account JSON itself "
+            "(preferred: it needs no filesystem), or "
+            "FIREBASE_CREDENTIALS_PATH to a file holding it."
         )
 
-    cred = credentials.Certificate(cred_path)
     _firebase_app = firebase_admin.initialize_app(cred)
     log.info("Firebase Admin SDK initialised.")
     return _firebase_app
@@ -138,7 +164,7 @@ async def send_to_device(
     On unregistered-token error: marks the token invalid in DB (if db is provided).
     """
     # Configuration errors are NOT send failures and must not be swallowed:
-    # a missing firebase-admin install or an unset FIREBASE_CREDENTIALS_PATH
+    # a missing firebase-admin install or unconfigured Firebase credentials
     # means push is not set up at all. Caught here it would surface as a
     # per-token WARNING indistinguishable from transient FCM noise, so a
     # deployment with push silently disabled looks exactly like a flaky
