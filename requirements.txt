@@ -24,16 +24,14 @@ pydantic-settings>=2.3.0
 anthropic>=0.28.0
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
-python-jose[cryptography]>=3.3.0   # JWT
 passlib[bcrypt]>=1.7.4             # password hashing
 
 # ── Lead sourcing / enrichment (M2) ───────────────────────────────────────────
 httpx>=0.27.0                       # async HTTP client for Apollo + Hunter APIs
 
 # ── Email (M3) ────────────────────────────────────────────────────────────────
-google-auth>=2.30.0
-google-auth-oauthlib>=1.2.0
-google-api-python-client>=2.133.0
+# Gmail is called over httpx; no Google client library is imported (F-OPS-07).
+# google-auth still arrives transitively via firebase-admin below.
 
 # ── Calendly webhooks (M3) ────────────────────────────────────────────────────
 # No dedicated SDK — uses httpx
@@ -78,6 +76,3 @@ structlog>=24.1.0             # structured JSON logging (app/core/logging.py, M8
 typer>=0.12.0                 # admin CLI (app/cli/create_admin.py, M8-C3)
 rich>=13.7.0                  # admin CLI tables
 cryptography>=42.0            # Fernet token encryption (app/core/crypto.py, M8-C3)
-
-
-pandas
