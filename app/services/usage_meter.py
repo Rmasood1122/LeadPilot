@@ -35,7 +35,33 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ClientHunterError
+
 logger = logging.getLogger(__name__)
+
+# F-AI-01. Only these purposes count toward a strategy's BUDGET: the budget is
+# "what it costs to RUN the pipeline", so outreach copy written later for the
+# same strategy (purpose "send", scoring, briefs...) must not eat it.
+BUDGETED_PURPOSES = ("pipeline", "verification")
+
+# A prompt's size in tokens is not known before the call. English averages
+# about 4 characters per token, so dividing by 3 OVER-estimates the input and
+# makes the gate stop a little early rather than a little late.
+_CHARS_PER_TOKEN_CONSERVATIVE = 3
+
+
+class BudgetExceededError(ClientHunterError):
+    """The next model call could take a strategy past its dollar budget.
+
+    Raised BEFORE the call is made, so nothing is spent on it. Never retried
+    (anthropic_client.is_permanent_error) and never swallowed: the worker tasks
+    turn it into StrategyStatus.BUDGET_EXHAUSTED, which is resumable.
+    """
+
+    def __init__(self, message: str, *, budget_micros: int, spent_micros: int) -> None:
+        super().__init__(message)
+        self.budget_micros = budget_micros
+        self.spent_micros = spent_micros
 
 _PRICE_KEYS = {
     "anthropic": ("claude_input_cost_per_mtok", "claude_output_cost_per_mtok"),
@@ -49,6 +75,11 @@ class _Scope:
     user_id: uuid.UUID | None
     purpose: str
     notes: list[tuple[str, str, int, int]] = field(default_factory=list)
+    # F-AI-01 -- all None/0 unless the scope was opened with a budget.
+    budget_micros: int | None = None
+    prior_micros: int = 0      # already recorded for this strategy before the scope opened
+    spent_micros: int = 0      # spent inside this scope so far (flushed or not)
+    prices: dict = field(default_factory=dict)   # provider -> (micros/token in, out)
 
 
 _current: ContextVar[_Scope | None] = ContextVar("usage_scope", default=None)
@@ -66,8 +97,11 @@ def note(provider: str, model: str, input_tokens: int, output_tokens: int) -> No
     if active is None:
         return
     try:
-        active.notes.append((provider, model or "", int(input_tokens or 0),
-                             int(output_tokens or 0)))
+        tin, tout = int(input_tokens or 0), int(output_tokens or 0)
+        active.notes.append((provider, model or "", tin, tout))
+        if active.budget_micros is not None:
+            price_in, price_out = active.prices.get(provider, (0.0, 0.0))
+            active.spent_micros += int(round(tin * price_in + tout * price_out))
     except (TypeError, ValueError):
         pass
 
@@ -106,13 +140,105 @@ def _flush(session: Session, active: _Scope) -> int:
     return len(grouped)
 
 
+def spent_micros(session: Session, strategy_id) -> int:
+    """What this strategy's pipeline + verification have cost so far, recorded.
+
+    Counts only BUDGETED_PURPOSES, and only what has been flushed to api_usage
+    (see flush_active). Filtered by the strategy's own id, which callers get
+    from a strategy row they have already ownership-checked.
+    """
+    from sqlalchemy import func, select  # noqa: PLC0415
+
+    from app.db.models import ApiUsage  # noqa: PLC0415
+
+    sid = _uuid(strategy_id)
+    if sid is None:
+        return 0
+    return int(session.execute(
+        select(func.coalesce(func.sum(ApiUsage.cost_micros), 0)).where(
+            ApiUsage.strategy_id == sid, ApiUsage.purpose.in_(BUDGETED_PURPOSES)
+        )
+    ).scalar_one() or 0)
+
+
+def _price_table(session: Session) -> dict:
+    from app.services import system_settings  # noqa: PLC0415
+
+    return {
+        provider: (float(system_settings.get(session, keys[0])),
+                   float(system_settings.get(session, keys[1])))
+        for provider, keys in _PRICE_KEYS.items()
+    }
+
+
+def check_budget(*, input_chars: int, max_output_tokens: int,
+                 provider: str = "anthropic") -> None:
+    """Refuse a model call that could take the active scope past its budget.
+
+    A no-op outside a scope and in a scope with no budget. The call is priced
+    at its WORST CASE -- the whole prompt as input, and the model using every
+    one of `max_output_tokens` -- so a call that passes this check cannot, in
+    itself, cross the cap. The price is that the run may stop up to one call's
+    worth early; it is never allowed to run past.
+    """
+    active = _current.get()
+    if active is None or active.budget_micros is None:
+        return
+    price_in, price_out = active.prices.get(provider, (0.0, 0.0))
+    reserve = int(round(
+        (max(int(input_chars), 0) / _CHARS_PER_TOKEN_CONSERVATIVE) * price_in
+        + max(int(max_output_tokens), 0) * price_out
+    ))
+    spent = active.prior_micros + active.spent_micros
+    if spent + reserve > active.budget_micros:
+        raise BudgetExceededError(
+            f"strategy budget of ${active.budget_micros / 1_000_000:.2f} reached "
+            f"(${spent / 1_000_000:.2f} spent; the next model call could cost up to "
+            f"${reserve / 1_000_000:.2f} more). Nothing was spent on that call. "
+            "Raise the budget and resume to continue.",
+            budget_micros=active.budget_micros, spent_micros=spent,
+        )
+
+
+def flush_active(session: Session) -> None:
+    """Write the active scope's pending notes to api_usage NOW and clear them.
+
+    A scope normally records its spend only when it closes. A pipeline run lasts
+    many minutes, and a worker killed partway (a deploy, a free-tier spin-down)
+    never reaches the close, so the spend of every completed step was lost and
+    the budget would restart from zero. Callers that already commit after each
+    unit of work call this at the same point. Never raises.
+    """
+    active = _current.get()
+    if active is None or not active.notes:
+        return
+    try:
+        _flush(session, active)
+        active.notes.clear()
+    except Exception:
+        logger.exception("usage_meter: could not flush %d model calls", len(active.notes))
+        try:
+            session.rollback()
+        except Exception:
+            pass
+
+
 @contextmanager
-def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "other"):
-    """Attribute every model call inside the block. See the module docstring."""
+def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "other",
+          budget_micros: int | None = None):
+    """Attribute every model call inside the block. See the module docstring.
+
+    `budget_micros` (F-AI-01) turns on spend tracking for the scope and arms
+    check_budget(). Only the OUTERMOST scope decides; a nested scope joins it.
+    """
     if _current.get() is not None:
         yield _current.get()
         return
     active = _Scope(strategy_id=_uuid(strategy_id), user_id=_uuid(user_id), purpose=purpose)
+    if budget_micros is not None:
+        active.budget_micros = int(budget_micros)
+        active.prices = _price_table(session)
+        active.prior_micros = spent_micros(session, active.strategy_id)
     token = _current.set(active)
     failed = False
     try:
@@ -221,4 +347,4 @@ def owner_scope(session: Session, strategy, purpose: str):
         except Exception:
             owner = None
     return scope(session, strategy_id=getattr(strategy, "id", None), user_id=owner,
-                 purpose=purpose)
+                 purpose=purpose, budget_micros=getattr(strategy, "budget_micros", None))
