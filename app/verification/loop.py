@@ -37,7 +37,7 @@ from app.config import settings
 from app.db.models import FlowType, PastClient, ResearchStep, Strategy, StrategyStatus
 from app.services.anthropic_client import (JUDGE_TEMPERATURE, TruncatedResponseError,
                                             get_client)
-from app.services import notifications
+from app.services import notifications, usage_meter
 from app.verification.passes import (
     FIXER_PROMPT,
     FIXER_SYSTEM,
@@ -252,6 +252,7 @@ def run_verification_loop(session: Session, strategy: Strategy) -> StrategyStatu
         for attempt in range(1, max_retries + 1):
             support = _support_block(session, strategy)
             passed, fix_description = _judge(spec, strategy, support)
+            usage_meter.flush_active(session)  # F-AI-01: durable spend
 
             if passed:
                 _log_attempt(strategy, spec, attempt, "PASS", None, False)
@@ -269,7 +270,10 @@ def run_verification_loop(session: Session, strategy: Strategy) -> StrategyStatu
 
             logger.info("pass %s failed (attempt %s) — generating fix", spec.key, attempt)
             try:
-                revised = _generate_fix(spec, strategy, fix_description)
+                try:
+                    revised = _generate_fix(spec, strategy, fix_description)
+                finally:
+                    usage_meter.flush_active(session)  # F-AI-01: durable spend
             except TruncatedResponseError as exc:
                 # The rewrite does not fit even at the retried ceiling. Leave
                 # strategy_document EXACTLY as it was and end the pass — the

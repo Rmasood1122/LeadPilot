@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     # Retry behaviour for transient API errors inside pipeline steps
     anthropic_max_retries: int = 3
 
+    # --- F-AI-01: dollar budget for one strategy run ----------------------
+    # A strategy's pipeline (72 or 144 steps) plus its 10-pass verification loop
+    # is the most expensive thing the product does. Every strategy carries a
+    # budget (strategies.budget_micros) and the model gateway refuses a call
+    # that could take the run past it. The caller may pick the budget when
+    # creating the strategy; these two settings bound that choice.
+    #   default  used when the request does not say. Set above a typical full
+    #            run so ordinary use is unaffected while a runaway is not.
+    #   ceiling  the most a request may ask for (422 above it).
+    pipeline_max_usd_default: float = 15.0
+    pipeline_max_usd_ceiling: float = 50.0
+
     # --- External API plumbing (M2+: Apollo, Hunter, ...) ----------------
     external_max_retries: int = 3
     external_backoff_base_seconds: float = 2.0

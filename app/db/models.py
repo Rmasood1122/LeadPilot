@@ -84,6 +84,10 @@ class StrategyStatus(str, enum.Enum):
     NEEDS_HUMAN_REVIEW = "needs_human_review"  # a pass hit its retry cap
     EXECUTING = "executing"                  # M2+: lead sourcing/outreach live
     FAILED = "failed"                        # unrecoverable pipeline error
+    # F-AI-01: the run stopped because the next model call could have taken it
+    # past its dollar budget. Everything already paid for is saved; raising the
+    # budget and resuming continues from the same step.
+    BUDGET_EXHAUSTED = "budget_exhausted"
 
 
 class PipelineKind(str, enum.Enum):
@@ -884,6 +888,11 @@ class Strategy(TimestampMixin, Base):
     # Flow 2 only: assembled GTM document.
     gtm_document: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # F-AI-01 (migration 0066): the most this strategy's pipeline + verification
+    # may spend on model calls, in millionths of a US dollar (the unit
+    # api_usage.cost_micros uses). NULL = no limit, which only legacy rows have;
+    # every new strategy is given one by the API.
+    budget_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     # Outreach campaign state (M3): "active" | "paused_bounce_rate" | "paused_manual"
     campaign_state: Mapped[str] = mapped_column(String(30), default="active")
     campaign_pause_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)

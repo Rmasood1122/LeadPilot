@@ -13,6 +13,7 @@ import uuid as _uuid
 from app.db.base import SessionLocal
 from app.db.models import Strategy, StrategyStatus
 from app.services.anthropic_client import is_permanent_error
+from app.services.usage_meter import BudgetExceededError
 from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -65,6 +66,23 @@ def _fail_strategy(session, strategy_id, exc: BaseException, *, why: str) -> Non
         "strategy %s -> FAILED (%s): %s: %s",
         strategy_id, why, type(exc).__name__, exc,
     )
+
+
+def _stop_for_budget(session, strategy_id: str, exc: BudgetExceededError) -> str:
+    """F-AI-01: a clean, resumable stop -- not a failure.
+
+    Completed steps are already committed (the engine flushes spend and commits
+    per step), so POST /strategies/{id}/resume with a larger budget continues.
+    Returns normally on purpose: no retry, no task_failure alert.
+    """
+    session.rollback()
+    strategy = session.get(Strategy, _pk(strategy_id))
+    if strategy is not None:
+        strategy.status = StrategyStatus.BUDGET_EXHAUSTED
+        strategy.error = str(exc)
+        session.commit()
+    logger.warning("strategy %s -> BUDGET_EXHAUSTED: %s", strategy_id, exc)
+    return f"stopped: budget exhausted ({exc})"
 
 
 @celery_app.task(name="leadpilot.ping")
@@ -123,6 +141,8 @@ def run_pipeline(self, strategy_id: str) -> str:
         session.commit()
         run_verification.delay(strategy_id)
         return f"pipeline complete ({executed} steps executed this run)"
+    except BudgetExceededError as exc:
+        return _stop_for_budget(session, strategy_id, exc)
     except Exception as exc:
         session.rollback()
 
@@ -174,6 +194,8 @@ def run_verification(self, strategy_id: str) -> str:
         with usage_meter.owner_scope(session, strategy, "verification"):
             final = run_verification_loop(session, strategy)
         return f"verification finished: {final.value}"
+    except BudgetExceededError as exc:
+        return _stop_for_budget(session, strategy_id, exc)
     except Exception as exc:
         session.rollback()
 

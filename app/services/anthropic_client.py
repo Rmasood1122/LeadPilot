@@ -72,6 +72,12 @@ def is_permanent_error(exc: BaseException) -> bool:
     # job (app/verification/loop.py::_generate_fix), not a retry's.
     if isinstance(exc, TruncatedResponseError):
         return True
+    # F-AI-01: a spent budget does not refill on retry. (Lazy import: usage_meter
+    # imports app.core.exceptions only, but keep this module import-light.)
+    from app.services.usage_meter import BudgetExceededError  # noqa: PLC0415
+
+    if isinstance(exc, BudgetExceededError):
+        return True
     if isinstance(exc, RETRYABLE_API_ERRORS):
         return False          # explicit: retryable wins over any overlap
     return isinstance(exc, PERMANENT_API_ERRORS)
@@ -160,6 +166,13 @@ class ClaudeClient:
         returned the truncated text exactly like a complete answer.
         """
         limit = max_tokens or settings.anthropic_max_tokens
+        # F-AI-01: refuse BEFORE spending if the worst case would cross the
+        # strategy's budget. No-op outside a budgeted scope.
+        from app.services import usage_meter  # noqa: PLC0415
+
+        usage_meter.check_budget(
+            input_chars=len(system) + len(prompt), max_output_tokens=limit
+        )
         request = dict(
             model=settings.anthropic_model,
             max_tokens=limit,

@@ -64,6 +64,21 @@ class StrategyCreate(BaseModel):
             "past clients is rejected."
         ),
     )
+    max_budget_usd: float | None = Field(
+        default=None, gt=0,
+        description=(
+            "F-AI-01: the most this strategy's pipeline + verification may spend "
+            "on model calls, in US dollars (e.g. 3 or 5). Omit for the server "
+            "default. Bounded by the server's minimum ($0.50) and ceiling."
+        ),
+    )
+
+
+class StrategyResumeIn(BaseModel):
+    max_budget_usd: float | None = Field(
+        default=None, gt=0,
+        description="New total budget in USD. Must exceed what is already spent.",
+    )
 
 
 class StrategyOut(BaseModel):
@@ -73,6 +88,8 @@ class StrategyOut(BaseModel):
     flow_type: FlowType
     status: StrategyStatus
     created_at: datetime
+    budget_usd: float | None = None
+    spent_usd: float | None = None
 
 
 class PhaseProgress(BaseModel):
@@ -98,6 +115,8 @@ class StrategyStatusOut(BaseModel):
     strategy_document_ready: bool
     gtm_document_ready: bool
     error: str | None
+    budget_usd: float | None = None
+    spent_usd: float | None = None
 
 
 # --- Leads (Milestone 2) ----------------------------------------------

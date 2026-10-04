@@ -17,6 +17,7 @@ from app.api.schemas import (
     PipelineProgress,
     StrategyCreate,
     StrategyOut,
+    StrategyResumeIn,
     StrategyStatusOut,
 )
 from app.db.base import get_db
@@ -29,7 +30,7 @@ from app.db.models import (
     StrategyStatus, User,
 )
 from app.services import auth as auth_svc
-from app.services import security_audit
+from app.services import security_audit, usage_meter
 from app.services import sequence_engine as engine
 from app.pipeline.engine import pipelines_for_flow
 from app.pipeline.registry import phase_title
@@ -48,6 +49,29 @@ INVALID_PASSWORD = "INVALID_PASSWORD"
 
 class StrategyDeleteIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
+
+
+MIN_BUDGET_USD = 0.50
+
+
+def _budget_micros(usd: float) -> int:
+    """Validate a requested budget against the server's bounds; return micros."""
+    ceiling = settings.pipeline_max_usd_ceiling
+    if usd < MIN_BUDGET_USD or usd > ceiling:
+        raise HTTPException(
+            status_code=422,
+            detail=f"max_budget_usd must be between ${MIN_BUDGET_USD:.2f} and "
+                   f"${ceiling:.2f} (server ceiling)",
+        )
+    return int(round(usd * 1_000_000))
+
+
+def _strategy_out(db: Session, strategy: Strategy) -> StrategyOut:
+    out = StrategyOut.model_validate(strategy)
+    out.budget_usd = (strategy.budget_micros / 1_000_000
+                      if strategy.budget_micros is not None else None)
+    out.spent_usd = usage_meter.spent_micros(db, strategy.id) / 1_000_000
+    return out
 
 
 def _owned_strategy(db: Session, strategy_id: uuid.UUID, current_user: User) -> Strategy:
@@ -75,7 +99,7 @@ def create_strategy(
     body: StrategyCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Strategy:
+) -> StrategyOut:
     """Create a strategy and enqueue its research pipeline.
 
     flow_type is inferred from whether the product has past clients when
@@ -121,13 +145,18 @@ def create_strategy(
                    "(POST /products/{id}/past-clients first)",
         )
 
-    strategy = Strategy(product_id=product.id, flow_type=flow_type)
+    budget_micros = _budget_micros(
+        body.max_budget_usd if body.max_budget_usd is not None
+        else settings.pipeline_max_usd_default
+    )
+    strategy = Strategy(product_id=product.id, flow_type=flow_type,
+                        budget_micros=budget_micros)
     db.add(strategy)
     db.commit()
     db.refresh(strategy)
 
     worker_tasks.run_pipeline.delay(str(strategy.id))
-    return strategy
+    return _strategy_out(db, strategy)
 
 
 @router.get("/strategies/{strategy_id}", response_model=StrategyStatusOut)
@@ -178,15 +207,19 @@ def get_strategy(
         strategy_document_ready=bool(strategy.strategy_document),
         gtm_document_ready=bool(strategy.gtm_document),
         error=strategy.error,
+        budget_usd=(strategy.budget_micros / 1_000_000
+                    if strategy.budget_micros is not None else None),
+        spent_usd=usage_meter.spent_micros(db, strategy.id) / 1_000_000,
     )
 
 
 @router.post("/strategies/{strategy_id}/resume", response_model=StrategyOut, status_code=202)
 def resume_strategy(
     strategy_id: uuid.UUID,
+    body: StrategyResumeIn | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> Strategy:
+) -> StrategyOut:
     """Re-enqueue the research pipeline for a strategy that stopped early.
 
     `run_pipeline` is resumable by construction: the engine asks for the first
@@ -221,8 +254,25 @@ def resume_strategy(
                    "the pipeline",
         )
 
+    # F-AI-01: a run that stopped on its budget resumes with a larger one.
+    if body is not None and body.max_budget_usd is not None:
+        new_micros = _budget_micros(body.max_budget_usd)
+        spent = usage_meter.spent_micros(db, strategy.id)
+        if new_micros <= spent:
+            raise HTTPException(
+                status_code=422,
+                detail=f"max_budget_usd must exceed the ${spent / 1_000_000:.2f} "
+                       "already spent on this strategy",
+            )
+        strategy.budget_micros = new_micros
+    if strategy.status is StrategyStatus.BUDGET_EXHAUSTED:
+        strategy.status = StrategyStatus.PENDING
+        strategy.error = None
+    db.commit()
+    db.refresh(strategy)
+
     worker_tasks.run_pipeline.delay(str(strategy.id))
-    return strategy
+    return _strategy_out(db, strategy)
 
 
 @router.delete("/strategies/{strategy_id}")

@@ -211,6 +211,11 @@ def run_all_steps(session: Session, strategy: Strategy) -> int:
             strategy.id, spec.pipeline.value, spec.step_no, spec.name,
         )
         run_step(session, strategy, spec)
+        # F-AI-01: make this step's spend durable now, so the budget survives a
+        # killed worker and a resume counts it.
+        from app.services import usage_meter  # noqa: PLC0415
+
+        usage_meter.flush_active(session)
         executed += 1
 
 
