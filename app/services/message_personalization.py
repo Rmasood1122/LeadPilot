@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Lead, PipelineKind, ResearchStep, SequenceStep, Strategy
+from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,9 @@ _SYSTEM = (
     "footer itself)."
 )
 
-_PROMPT = """SEQUENCE STEP #{step_no} BRIEF (variant {variant}):
+_PROMPT = """{notice}
+
+SEQUENCE STEP #{step_no} BRIEF (variant {variant}):
 {template}
 
 MESSAGING PLAYBOOK (from strategy research, phase 6):
@@ -148,15 +151,19 @@ def render_message(
     data = get_client().complete_json(
         system=_SYSTEM + voice,
         prompt=_PROMPT.format(
+            notice=prompt_safety.NOTICE,
             context=f"{context}\n\n" if context else "",
             step_no=step.step_no,
             variant=step.variant,
             template=template,
             playbook=_playbook(session, strategy),
-            full_name=lead.full_name or "there",
-            title=lead.title or "unknown",
-            company=lead.company or "their company",
-            enrichment=str(highlights)[:1500],
+            # F-AI-02: every lead field below is scraped from a profile the
+            # prospect controls, so each is delimited and folded onto one line.
+            # The step brief and playbook are OURS and stay unwrapped.
+            full_name=prompt_safety.inline(lead.full_name or "there"),
+            title=prompt_safety.inline(lead.title or "unknown"),
+            company=prompt_safety.inline(lead.company or "their company"),
+            enrichment=prompt_safety.inline(str(highlights)[:1500]),
             booking_line=booking_line,
         ),
     )
