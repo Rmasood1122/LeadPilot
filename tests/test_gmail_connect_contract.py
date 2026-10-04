@@ -16,10 +16,23 @@ class _FakeOAuth:
 
 
 def test_backend_returns_auth_url_key(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "google_client_id", "id.apps.googleusercontent.com")
+    monkeypatch.setattr(settings, "google_client_secret", "secret")
     monkeypatch.setattr(gmail_mod, "get_oauth", lambda: _FakeOAuth())
     body = client.get("/integrations/gmail/auth-url").json()
     assert body["auth_url"].startswith("https://accounts.google.com/")
     assert "url" not in body
+
+
+def test_missing_google_credentials_is_a_clear_503(client, monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "google_client_id", "")
+    r = client.get("/integrations/gmail/auth-url")
+    assert r.status_code == 503
+    assert "GOOGLE_CLIENT_ID" in r.json()["detail"]
 
 
 def test_frontend_reads_the_same_key():
