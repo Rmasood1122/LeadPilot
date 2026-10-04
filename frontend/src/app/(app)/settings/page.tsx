@@ -283,8 +283,9 @@ function IntegrationsSettings() {
 
   async function connectGmail() {
     try {
-      const { url } = await gmailAuthUrl();
-      window.location.href = url;
+      const { auth_url } = await gmailAuthUrl();
+      if (!auth_url) throw new Error("Gmail connection is not configured on the server");
+      window.location.href = auth_url;
     } catch (err) {
       toast((err as Error).message, "error");
     }

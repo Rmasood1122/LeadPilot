@@ -23,7 +23,9 @@ export function getIntegrations(): Promise<IntegrationStatus> {
   return api("/integrations/status");
 }
 
-export function gmailAuthUrl(): Promise<{ url: string }> {
+// The backend returns { auth_url, state } (app/api/integrations.py). This was
+// typed as { url }, so the Connect Gmail button navigated to "undefined".
+export function gmailAuthUrl(): Promise<{ auth_url: string }> {
   return api("/integrations/gmail/auth-url");
 }
 
