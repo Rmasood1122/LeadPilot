@@ -110,6 +110,48 @@ _NON_STREAMING_MAX_TOKENS = 20_000
 JUDGE_TEMPERATURE = 0.0
 
 
+def _accepts_temperature(sdk_messages) -> bool:
+    """Whether the SDK's create()/stream() take `temperature` as a keyword.
+
+    Current anthropic SDKs dropped it from the method signatures, so passing it
+    raises "Messages.create() got an unexpected keyword argument 'temperature'"
+    (seen live 2026-10-05: every verification pass failed after a full, paid
+    research run). Test doubles take **kwargs and count as accepting.
+    """
+    import inspect  # noqa: PLC0415
+
+    for name in ("create", "stream"):
+        fn = getattr(sdk_messages, name, None)
+        if fn is None:
+            continue
+        try:
+            params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            continue
+        if "temperature" in params or any(
+            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+        ):
+            continue
+        return False
+    return True
+
+
+def _set_temperature(request: dict, temperature: float, sdk_messages) -> None:
+    """Put `temperature` on the request WITHOUT dropping it.
+
+    A judge that silently ran at the API default would make the legal-compliance
+    ship-blocker (verification pass #4) non-deterministic again (F-AI-03), so
+    when the SDK has no keyword for it the value is sent in the request body
+    via `extra_body` instead.
+    """
+    if _accepts_temperature(sdk_messages):
+        request["temperature"] = temperature
+    else:
+        extra = dict(request.get("extra_body") or {})
+        extra["temperature"] = temperature
+        request["extra_body"] = extra
+
+
 class TruncatedResponseError(ClientHunterError):
     """The model stopped at the max_tokens ceiling instead of finishing.
 
@@ -182,7 +224,7 @@ class ClaudeClient:
         if temperature is not None:
             # Only sent when a caller asked for it. Absent, the account/API
             # default applies, which is what every generation path wants.
-            request["temperature"] = temperature
+            _set_temperature(request, temperature, self._client.messages)
         if limit > _NON_STREAMING_MAX_TOKENS:
             # The SDK REFUSES a non-streaming request whose max_tokens implies a
             # generation that could exceed 10 minutes — it raises
