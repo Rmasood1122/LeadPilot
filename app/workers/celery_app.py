@@ -23,7 +23,6 @@ celery_app = Celery(
         "app.workers.outreach_tasks",
         # M8 additions
         "app.workers.learning_tasks",   # nightly aggregation + A/B promotion
-        "app.workers.send_tasks",       # C4 send-time-aware sending
         "app.workers.webhook_tasks",    # C5 reliable outbound webhooks
         "app.workers.beat_heartbeat",   # C3 beat liveness key
         "app.workers.support_tasks",    # Feature 3 chat retention purge
@@ -97,7 +96,6 @@ celery_app.conf.task_routes = {
     "leadpilot.leads.*": {"queue": "pipeline"},
     # Outreach: dispatch, sending, reply polling.
     "leadpilot.outreach.*": {"queue": "outreach"},
-    "app.workers.send_tasks.*": {"queue": "outreach"},
     # Nightly learning loop.
     "app.workers.learning_tasks.*": {"queue": "learning"},
     # Everything else: heartbeat, outbound webhooks, ping.
