@@ -52,7 +52,7 @@ export function statusTone(status: string): keyof typeof tones {
     return "destructive";
   if (["opportunity"].includes(status)) return "primary";
   if (["submitted", "needs_human_review", "flagged", "paused_bounce_rate",
-       "paused_manual", "needs_template", "pending_approval", "paused_blacklist"].includes(status))
+       "paused_manual", "budget_exhausted", "needs_template", "pending_approval", "paused_blacklist"].includes(status))
     return "warning";
   if (["replied", "contacted", "executing"].includes(status)) return "accent";
   return "default";

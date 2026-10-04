@@ -245,12 +245,15 @@ export interface StrategyOut {
     | "verified"
     | "needs_human_review"
     | "executing"
-    | "failed";
+    | "failed"
+    | "budget_exhausted";
   progress: PhaseProgress[];
   verification: VerificationPass[];
   strategy_document_ready: boolean;
   gtm_document_ready: boolean;
   error: string | null;
+  budget_usd?: number | null;
+  spent_usd?: number | null;
 }
 
 /** src/tests/statusTone.test.ts imports the strategy shape as `Strategy`,
