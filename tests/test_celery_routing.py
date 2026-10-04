@@ -27,7 +27,6 @@ import app.workers.calendar_tasks  # noqa: F401  (Engagement Hub)
 import app.workers.lead_tasks  # noqa: F401
 import app.workers.learning_tasks  # noqa: F401
 import app.workers.outreach_tasks  # noqa: F401
-import app.workers.send_tasks  # noqa: F401
 import app.workers.tasks  # noqa: F401
 import app.workers.support_tasks  # noqa: F401  (Feature 3 retention purge)
 import app.workers.webhook_tasks  # noqa: F401
