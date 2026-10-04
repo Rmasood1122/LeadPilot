@@ -59,6 +59,18 @@ class Settings(BaseSettings):
     pipeline_max_usd_default: float = 15.0
     pipeline_max_usd_ceiling: float = 50.0
 
+    # F-AI-01b. How the pipeline fits itself to a budget (app/pipeline/budget_plan.py).
+    # ESTIMATES, not measurements: one pipeline step is priced at this many input
+    # and output tokens at the admin-set model prices. Deliberately on the high
+    # side so a plan errs towards finishing inside the budget; the hard cap from
+    # F-AI-01 remains the safety net if a step costs more.
+    #   verification_reserve  held back for the 10-pass verification loop
+    #   budget_safety         the fraction of the budget the plan may plan to use
+    pipeline_est_step_input_tokens: int = 7000
+    pipeline_est_step_output_tokens: int = 1500
+    pipeline_verification_reserve_usd: float = 1.0
+    pipeline_budget_safety: float = 0.9
+
     # --- External API plumbing (M2+: Apollo, Hunter, ...) ----------------
     external_max_retries: int = 3
     external_backoff_base_seconds: float = 2.0

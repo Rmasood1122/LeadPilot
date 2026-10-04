@@ -90,6 +90,8 @@ class StrategyOut(BaseModel):
     created_at: datetime
     budget_usd: float | None = None
     spent_usd: float | None = None
+    steps_per_phase: int | None = None   # None = the full nine
+    planned_steps: int | None = None
 
 
 class PhaseProgress(BaseModel):
@@ -117,6 +119,8 @@ class StrategyStatusOut(BaseModel):
     error: str | None
     budget_usd: float | None = None
     spent_usd: float | None = None
+    steps_per_phase: int | None = None
+    planned_steps: int | None = None
 
 
 # --- Leads (Milestone 2) ----------------------------------------------

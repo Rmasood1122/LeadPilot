@@ -130,6 +130,17 @@ def _log_attempt(strategy: Strategy, spec: VerificationPassSpec, attempt: int,
     flag_modified(strategy, "verified_passes_json")
 
 
+def max_attempts_for(strategy: Strategy) -> int:
+    """Judge/fix attempts per pass. A budget-fitted (reduced) strategy gets at
+    most two -- one judgement and one fix -- because the fixer rewrites the whole
+    document and is the single most expensive call in the loop. A pass that still
+    fails ends FAIL (needs human review); this never turns a failure into a pass."""
+    attempts = settings.verification_max_retries_per_pass
+    if getattr(strategy, "steps_per_phase", None):
+        attempts = min(attempts, 2)
+    return attempts
+
+
 def _judge(spec: VerificationPassSpec, strategy: Strategy, support: str) -> tuple[bool, str | None]:
     data = get_client().complete_json(
         temperature=JUDGE_TEMPERATURE,
@@ -236,7 +247,7 @@ def run_verification_loop(session: Session, strategy: Strategy) -> StrategyStatu
     strategy.status = StrategyStatus.VERIFYING
     session.commit()
 
-    max_retries = settings.verification_max_retries_per_pass
+    max_retries = max_attempts_for(strategy)
     any_exhausted = False
 
     for spec in build_passes(strategy.flow_type):

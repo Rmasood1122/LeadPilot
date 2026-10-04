@@ -27,6 +27,7 @@ from app.db.models import (
     ResearchStep,
     Strategy,
 )
+from app.pipeline.budget_plan import planned_step_nos
 from app.pipeline.registry import SYSTEM_PROMPT, StepSpec, get_steps
 from app.services.anthropic_client import get_client
 
@@ -55,11 +56,15 @@ def completed_step_nos(session: Session, strategy_id: uuid.UUID, pipeline: Pipel
 
 
 def next_step(session: Session, strategy: Strategy) -> StepSpec | None:
-    """First not-yet-persisted step across the strategy's pipelines."""
+    """First not-yet-persisted PLANNED step across the strategy's pipelines.
+
+    F-AI-01b: a budget-fitted strategy (steps_per_phase set) skips the steps its
+    plan dropped; the phase syntheses are always planned."""
+    planned = planned_step_nos(getattr(strategy, "steps_per_phase", None))
     for pipeline in pipelines_for_flow(strategy.flow_type):
         done = completed_step_nos(session, strategy.id, pipeline)
         for spec in get_steps(pipeline):
-            if spec.step_no not in done:
+            if spec.step_no in planned and spec.step_no not in done:
                 return spec
     return None
 

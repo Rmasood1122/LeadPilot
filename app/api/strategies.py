@@ -29,6 +29,7 @@ from app.db.models import (
     Outcome, OutcomeEvent, PastClient, Product, ResearchStep, Strategy,
     StrategyStatus, User,
 )
+from app.pipeline import budget_plan
 from app.services import auth as auth_svc
 from app.services import security_audit, usage_meter
 from app.services import sequence_engine as engine
@@ -66,8 +67,15 @@ def _budget_micros(usd: float) -> int:
     return int(round(usd * 1_000_000))
 
 
+def _planned_steps(strategy: Strategy) -> int:
+    per_pipeline = len(budget_plan.planned_step_nos(strategy.steps_per_phase))
+    return per_pipeline * len(pipelines_for_flow(strategy.flow_type))
+
+
 def _strategy_out(db: Session, strategy: Strategy) -> StrategyOut:
     out = StrategyOut.model_validate(strategy)
+    out.steps_per_phase = strategy.steps_per_phase
+    out.planned_steps = _planned_steps(strategy)
     out.budget_usd = (strategy.budget_micros / 1_000_000
                       if strategy.budget_micros is not None else None)
     out.spent_usd = usage_meter.spent_micros(db, strategy.id) / 1_000_000
@@ -149,8 +157,20 @@ def create_strategy(
         body.max_budget_usd if body.max_budget_usd is not None
         else settings.pipeline_max_usd_default
     )
+    # F-AI-01b: fit the run to the budget -- fewer steps per phase for a small
+    # one -- rather than letting it stop short. None = the full pipeline.
+    try:
+        steps_per_phase = budget_plan.plan_steps_per_phase(
+            budget_micros, flow_type, usage_meter.price_table(db))
+    except budget_plan.BudgetTooSmall as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"A budget of ${exc.budget_micros / 1_000_000:.2f} cannot run a "
+                   f"complete pipeline; this flow needs at least "
+                   f"${exc.minimum_micros / 1_000_000:.2f}.",
+        )
     strategy = Strategy(product_id=product.id, flow_type=flow_type,
-                        budget_micros=budget_micros)
+                        budget_micros=budget_micros, steps_per_phase=steps_per_phase)
     db.add(strategy)
     db.commit()
     db.refresh(strategy)
@@ -168,6 +188,8 @@ def get_strategy(
     """Overall status + per-phase progress for every pipeline in the flow."""
     strategy = _owned_strategy(db, strategy_id, current_user)
 
+    k = strategy.steps_per_phase or 9
+    planned = budget_plan.planned_step_nos(strategy.steps_per_phase)
     progress: list[PipelineProgress] = []
     for pipeline in pipelines_for_flow(strategy.flow_type):
         counts = dict(
@@ -185,7 +207,7 @@ def get_strategy(
                 phase=p,
                 title=phase_title(pipeline, p),
                 done=counts.get(p, 0),
-                total=9,
+                total=k,
             )
             for p in range(1, 9)
         ]
@@ -193,7 +215,7 @@ def get_strategy(
             PipelineProgress(
                 pipeline=pipeline.value,
                 done=sum(counts.values()),
-                total=72,
+                total=len(planned),
                 phases=phases,
             )
         )
@@ -210,6 +232,8 @@ def get_strategy(
         budget_usd=(strategy.budget_micros / 1_000_000
                     if strategy.budget_micros is not None else None),
         spent_usd=usage_meter.spent_micros(db, strategy.id) / 1_000_000,
+        steps_per_phase=strategy.steps_per_phase,
+        planned_steps=_planned_steps(strategy),
     )
 
 
