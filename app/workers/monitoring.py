@@ -26,14 +26,22 @@ logger = get_logger("workers.monitoring")
 # ---------------------------------------------------------------------------
 
 CRITICAL_TASK_NAMES: frozenset[str] = frozenset({
-    "app.workers.pipeline_tasks.execute_pipeline_step",
-    "app.workers.pipeline_tasks.run_pipeline",
-    "app.workers.pipeline_tasks.run_verification",
-    "app.workers.outreach_tasks.send_sequence_step",
-    "app.workers.outreach_tasks.run_sequence",
+    # F-REL-02: these must be REAL registered task names -- a name that matches
+    # nothing silently disables the alert. tests/test_monitoring_task_names.py
+    # asserts every entry is registered on celery_app.
+    "leadpilot.run_pipeline",
+    "leadpilot.run_verification",
+    # the pipeline steps (source -> enrich -> find_emails -> verify -> finalize)
+    "leadpilot.leads.source",
+    "leadpilot.leads.enrich",
+    "leadpilot.leads.find_emails",
+    "leadpilot.leads.verify",
+    "leadpilot.leads.finalize",
+    # the outbound send path
+    "leadpilot.outreach.dispatch",
+    "leadpilot.outreach.send",
     "app.workers.learning_tasks.run_strategy_aggregation",
     "app.workers.learning_tasks.auto_promote_winners",
-    "app.workers.lead_tasks.source_leads",
 })
 
 
