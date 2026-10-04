@@ -132,11 +132,13 @@ def is_automated(from_address: str | None, subject: str | None, body: str | None
     if found and use_model:
         try:
             from app.services import prompt_safety  # noqa: PLC0415
-            from app.services.anthropic_client import get_client  # noqa: PLC0415
+            from app.services.anthropic_client import (JUDGE_TEMPERATURE,  # noqa: PLC0415
+                                                        get_client)
 
             # F-AI-02: all three fields are written by the sender.
             data = get_client().complete_json(
                 system=DETECTOR_SYSTEM, max_tokens=200,
+                temperature=JUDGE_TEMPERATURE,
                 prompt=(f"{prompt_safety.NOTICE}\n\n"
                         f"FROM: {prompt_safety.inline(from_address)}\n"
                         f"SUBJECT: {prompt_safety.inline(subject or '(none)')}\n\n"

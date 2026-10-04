@@ -130,7 +130,10 @@ def judge(claude, section_title: str, claude_text: str, gpt_text: str) -> list[d
               f"STRATEGIST A:\n{claude_text[:14_000]}\n\n"
               f"STRATEGIST B:\n{gpt_text[:14_000]}\n\n"
               "Return the JSON object now.")
-    data = claude.complete_json(system=JUDGE_SYSTEM, prompt=prompt, max_tokens=2048)
+    from app.services.anthropic_client import JUDGE_TEMPERATURE  # noqa: PLC0415
+
+    data = claude.complete_json(system=JUDGE_SYSTEM, prompt=prompt, max_tokens=2048,
+                                temperature=JUDGE_TEMPERATURE)
     zones = []
     for item in (data or {}).get("disagreements") or []:
         if not isinstance(item, dict):

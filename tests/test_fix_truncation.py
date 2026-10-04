@@ -190,14 +190,14 @@ class TestLoopNeverPersistsTruncation:
         raw = TruncatingRawClient(fits_at=10 ** 9)
 
         class Client:
-            def complete_json(self, system, prompt, max_tokens=None):
+            def complete_json(self, system, prompt, max_tokens=None, temperature=None):
                 import re
                 pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
                 if pass_no == 1:
                     return {"result": "FAIL", "fix_description": "fix the pricing"}
                 return {"result": "PASS"}
 
-            def complete(self, system, prompt, max_tokens=None):
+            def complete(self, system, prompt, max_tokens=None, temperature=None):
                 return _client_with(raw).complete(
                     system=system, prompt=prompt, max_tokens=max_tokens)
 
@@ -217,13 +217,13 @@ class TestLoopNeverPersistsTruncation:
         raw = TruncatingRawClient(fits_at=10 ** 9)
 
         class Client:
-            def complete_json(self, system, prompt, max_tokens=None):
+            def complete_json(self, system, prompt, max_tokens=None, temperature=None):
                 import re
                 pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
                 return ({"result": "FAIL", "fix_description": "fix it"}
                         if pass_no == 1 else {"result": "PASS"})
 
-            def complete(self, system, prompt, max_tokens=None):
+            def complete(self, system, prompt, max_tokens=None, temperature=None):
                 return _client_with(raw).complete(
                     system=system, prompt=prompt, max_tokens=max_tokens)
 
@@ -246,7 +246,7 @@ class TestLoopNeverPersistsTruncation:
         raw = TruncatingRawClient(fits_at=settings.verification_fixer_max_tokens + 1)
 
         class Client:
-            def complete_json(self, system, prompt, max_tokens=None):
+            def complete_json(self, system, prompt, max_tokens=None, temperature=None):
                 import re
                 pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
                 if pass_no == 1 and not getattr(self, "_seen", False):
@@ -254,7 +254,7 @@ class TestLoopNeverPersistsTruncation:
                     return {"result": "FAIL", "fix_description": "fix it"}
                 return {"result": "PASS"}
 
-            def complete(self, system, prompt, max_tokens=None):
+            def complete(self, system, prompt, max_tokens=None, temperature=None):
                 return _client_with(raw).complete(
                     system=system, prompt=prompt, max_tokens=max_tokens)
 

@@ -66,13 +66,13 @@ def prompts(fake_claude, monkeypatch):
     seen: list[tuple[str, str]] = []
     original_json, original_text = fake_claude.complete_json, fake_claude.complete
 
-    def _json(system, prompt, max_tokens=None):
+    def _json(system, prompt, max_tokens=None, temperature=None):
         seen.append((system, prompt))
-        return original_json(system, prompt, max_tokens)
+        return original_json(system, prompt, max_tokens, temperature)
 
-    def _text(system, prompt, max_tokens=None):
+    def _text(system, prompt, max_tokens=None, temperature=None):
         seen.append((system, prompt))
-        return original_text(system, prompt, max_tokens)
+        return original_text(system, prompt, max_tokens, temperature)
 
     monkeypatch.setattr(fake_claude, "complete_json", _json)
     monkeypatch.setattr(fake_claude, "complete", _text)

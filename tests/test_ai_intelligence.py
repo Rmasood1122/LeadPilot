@@ -48,7 +48,7 @@ class FakeOpenAI:
     def __init__(self, text="Lead with LinkedIn, then email.", error=None):
         self.text, self.error, self.calls = text, error, []
 
-    def complete(self, system, prompt, max_tokens=4096):
+    def complete(self, system, prompt, max_tokens=4096, temperature=None):
         self.calls.append(prompt)
         if self.error:
             raise self.error
@@ -386,7 +386,7 @@ class TestMutation:
         prompts: list[str] = []
         real = fake_claude.complete_json
 
-        def _capture(system, prompt, max_tokens=None):
+        def _capture(system, prompt, max_tokens=None, temperature=None):
             if "personalization engine" in system:
                 prompts.append(prompt)
             return real(system, prompt, max_tokens)
