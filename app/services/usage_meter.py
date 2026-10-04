@@ -171,6 +171,12 @@ def _price_table(session: Session) -> dict:
     }
 
 
+def price_table(session: Session) -> dict:
+    """Public name for the admin-set model prices: {provider: (in, out)} in USD
+    per Mtok == micros per token."""
+    return _price_table(session)
+
+
 def check_budget(*, input_chars: int, max_output_tokens: int,
                  provider: str = "anthropic") -> None:
     """Refuse a model call that could take the active scope past its budget.

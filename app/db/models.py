@@ -893,6 +893,10 @@ class Strategy(TimestampMixin, Base):
     # api_usage.cost_micros uses). NULL = no limit, which only legacy rows have;
     # every new strategy is given one by the API.
     budget_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # F-AI-01b: how many of each phase's 9 steps this run executes (2..9). The
+    # phase synthesis (step 9) is always among them. NULL = all nine, which is
+    # what every strategy created before this column did.
+    steps_per_phase: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Outreach campaign state (M3): "active" | "paused_bounce_rate" | "paused_manual"
     campaign_state: Mapped[str] = mapped_column(String(30), default="active")
     campaign_pause_reason: Mapped[str | None] = mapped_column(String(200), nullable=True)
