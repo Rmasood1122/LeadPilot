@@ -10,6 +10,7 @@ assembles the documents and hands off to `run_verification`.
 import logging
 import uuid as _uuid
 
+from app.config import settings
 from app.db.base import SessionLocal
 from app.db.models import Strategy, StrategyStatus
 from app.services.anthropic_client import is_permanent_error
@@ -91,7 +92,9 @@ def ping() -> str:
     return "pong"
 
 
-@celery_app.task(name="leadpilot.run_pipeline", bind=True, max_retries=3)
+@celery_app.task(name="leadpilot.run_pipeline", bind=True, max_retries=3,
+                 soft_time_limit=settings.pipeline_task_timeout_seconds,
+                 time_limit=settings.pipeline_task_timeout_seconds + 60)
 def run_pipeline(self, strategy_id: str) -> str:
     from app.pipeline import engine  # local import keeps worker boot cheap
 
@@ -180,7 +183,9 @@ def run_pipeline(self, strategy_id: str) -> str:
         session.close()
 
 
-@celery_app.task(name="leadpilot.run_verification", bind=True, max_retries=3)
+@celery_app.task(name="leadpilot.run_verification", bind=True, max_retries=3,
+                 soft_time_limit=settings.pipeline_task_timeout_seconds,
+                 time_limit=settings.pipeline_task_timeout_seconds + 60)
 def run_verification(self, strategy_id: str) -> str:
     from app.verification.loop import run_verification_loop
 
