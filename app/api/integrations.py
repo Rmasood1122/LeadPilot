@@ -24,6 +24,16 @@ def gmail_auth_url(
     User row, for ANY email address without proving they owned it) is
     removed.
     """
+    # Without a client id Google answers "Missing required parameter: client_id"
+    # on its own page, which tells the user nothing. Say what is missing here.
+    from app.config import settings  # noqa: PLC0415
+
+    if not settings.google_client_id or not settings.google_client_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Gmail is not configured on the server: set GOOGLE_CLIENT_ID, "
+                   "GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI.",
+        )
     state = make_state(current_user.id)
     return {"auth_url": get_oauth().build_auth_url(state), "state": state}
 
