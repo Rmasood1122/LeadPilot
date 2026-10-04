@@ -1550,6 +1550,12 @@ class Message(TimestampMixin, Base):
     # predicate is spelled differently on SQLite and PostgreSQL.
     origin: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
 
+    # F-DB-03 (migration 0065): the dispatcher's every-tick scan is
+    # WHERE status = 'scheduled' AND scheduled_at <= now ORDER BY scheduled_at.
+    __table_args__ = (
+        Index("ix_messages_status_scheduled_at", "status", "scheduled_at"),
+    )
+
     sequence: Mapped["Sequence"] = relationship(back_populates="messages")
     lead: Mapped["Lead"] = relationship(back_populates="messages")
 
