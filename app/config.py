@@ -101,7 +101,12 @@ class Settings(BaseSettings):
     calendly_webhook_signing_key: str = Field(default="", alias="CALENDLY_WEBHOOK_SECRET")
     # F-OPS-02: how old a signed Calendly delivery's timestamp may be before
     # it is refused as a replay. Env: CALENDLY_WEBHOOK_TOLERANCE_SECONDS.
-    calendly_webhook_tolerance_seconds: int = 1800
+    # F-OPS-02. Calendly's own signature docs demonstrate a 3-minute
+    # tolerance zone; Stripe, HubSpot and Salesforce use 300s. 1800 left a
+    # captured delivery replayable for half an hour, which is ten times the
+    # window the provider itself illustrates. Override per deployment if a
+    # slow queue genuinely needs more.
+    calendly_webhook_tolerance_seconds: int = 180
 
     # --- WhatsApp Business Cloud API (M4) -------------------------------------
     whatsapp_access_token: str = ""

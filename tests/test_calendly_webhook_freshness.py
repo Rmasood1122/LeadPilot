@@ -4,7 +4,8 @@ The signature covers "<t>.<body>", and `t` was never looked at. A delivery
 captured once could be replayed for ever; the only thing standing in the way
 was the event-id dedupe table.
 
-Now: `t` older than CALENDLY_WEBHOOK_TOLERANCE_SECONDS (default 1800) is
+Now: `t` older than CALENDLY_WEBHOOK_TOLERANCE_SECONDS (default 180, the
+tolerance zone Calendly's own signature docs demonstrate) is
 refused, and so is `t` more than 300 seconds in the future. The clock is
 injectable (app.integrations.calendly._now), so nothing here sleeps or reads
 the wall clock.
@@ -58,8 +59,9 @@ def _claimed(db_session) -> list:
 
 
 class TestTheDefault:
-    def test_the_tolerance_defaults_to_thirty_minutes(self):
-        assert settings.calendly_webhook_tolerance_seconds == 1800
+    def test_the_tolerance_defaults_to_three_minutes(self):
+        """The window Calendly's own signature documentation demonstrates."""
+        assert settings.calendly_webhook_tolerance_seconds == 180
 
     def test_the_future_allowance_is_five_minutes(self):
         assert calendly.FUTURE_SKEW_SECONDS == 300
@@ -79,13 +81,13 @@ class TestVerifyFunction:
         assert self._check(NOW - 60) is True
 
     def test_exactly_at_the_tolerance_is_accepted(self):
-        assert self._check(NOW - 1800) is True
+        assert self._check(NOW - 180) is True
 
-    def test_thirty_one_minutes_old_is_rejected(self):
+    def test_comfortably_past_the_tolerance_is_rejected(self):
         assert self._check(NOW - 31 * 60) is False
 
     def test_one_second_past_the_tolerance_is_rejected(self):
-        assert self._check(NOW - 1801) is False
+        assert self._check(NOW - 181) is False
 
     def test_slightly_in_the_future_is_accepted(self):
         """Clocks drift; five minutes is allowed."""
