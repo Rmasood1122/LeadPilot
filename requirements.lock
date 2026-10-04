@@ -1,0 +1,118 @@
+# Python lockfile (F-OPS-06) -- the closure of pyproject.toml's dependencies,
+# resolved with pip-compile on Python 3.11 / Linux (the production image's base).
+#
+# VERIFIED BY: a clean venv built only from this file plus test tooling passed the
+# full offline eval suite (3033 tests, compliance 1.0, full 1.0).
+# NOT YET CONSUMED by the Dockerfile: the image still runs `pip install .`.
+# Switching it needs a real image build, which has not been done (no Docker
+# daemon where this was produced). See the PR description.
+#
+# Regenerate deliberately: rm requirements.lock && pip-compile --strip-extras
+#   --no-header --no-annotate -o requirements.lock pyproject.toml
+# then re-run the full gate and commit the result.
+# tests/test_python_lockfile.py keeps this file consistent with pyproject.toml.
+alembic==1.13.3
+amqp==5.4.0
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anthropic==1.11.0
+anyio==4.15.1
+billiard==4.3.0
+brotli==1.2.0
+cachecontrol==0.14.4
+celery==5.4.0
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.2
+click==8.5.0
+click-didyoumean==0.3.1
+click-plugins==1.1.1.2
+click-repl==0.4.0
+cryptography==50.0.2
+cssselect2==0.10.1
+dnspython==2.8.0
+docstring-parser==0.18.0
+email-validator==2.3.0
+fastapi==0.111.1
+fastapi-cli==0.0.32
+firebase-admin==7.7.0
+fonttools==4.66.1
+google-api-core==2.40.0
+google-auth==2.59.1
+google-cloud-core==2.8.0
+google-cloud-firestore==2.34.0
+google-cloud-storage==3.16.0
+google-crc32c==1.9.0
+google-resumable-media==2.11.0
+googleapis-common-protos==1.75.5
+greenlet==3.5.6
+grpcio==1.84.0
+grpcio-status==1.84.0
+h11==0.16.0
+h2==4.4.1
+hpack==4.2.0
+httpcore==1.0.9
+httpcore2==2.13.1
+httptools==0.8.0
+httpx==0.28.1
+httpx2==2.13.1
+hyperframe==6.1.0
+idna==3.20
+jinja2==3.1.6
+jiter==0.17.0
+kombu==5.6.2
+mako==1.4.3
+markdown-it-py==4.2.0
+markupsafe==3.0.4
+mdurl==0.1.2
+msgpack==1.2.3
+opentelemetry-api==1.45.0
+packaging==26.3
+pillow==12.3.0
+prompt-toolkit==3.0.53
+proto-plus==1.29.0
+protobuf==7.36.2
+psycopg2-binary==2.9.13
+pyasn1==0.6.4
+pyasn1-modules==0.4.2
+pycparser==3.0
+pydantic==2.13.5
+pydantic-core==2.46.5
+pydantic-settings==2.15.0
+pydyf==0.12.1
+pygments==2.21.0
+pyjwt==2.15.1
+pypdfium2==5.13.0
+pyphen==0.18.1
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.4
+python-multipart==0.0.32
+pyyaml==6.0.3
+redis==5.3.1
+requests==2.34.2
+rich==15.0.0
+rich-toolkit==0.20.5
+shellingham==1.5.4
+six==1.17.0
+sniffio==1.3.1
+sqlalchemy==2.0.54
+starlette==0.37.2
+structlog==26.1.0
+tenacity==9.1.4
+tinycss2==1.5.1
+tinyhtml5==2.1.0
+truststore==0.10.4
+typer==0.27.2
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+tzdata==2026.5
+urllib3==2.8.0
+uvicorn==0.30.6
+uvloop==0.23.0
+vine==5.1.0
+watchfiles==1.3.0
+wcwidth==0.9.1
+weasyprint==70.0
+webencodings==0.6.1
+websockets==17.2
+zopfli==0.4.3
