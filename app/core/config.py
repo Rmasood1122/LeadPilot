@@ -449,7 +449,9 @@ class Settings(BaseSettings):
         if not v and os.getenv("TESTING") != "1" and os.getenv("APP_ENV") != "testing":
             import warnings
             warnings.warn(
-                "ENCRYPTION_KEY is not set — integration tokens will NOT be encrypted at rest.",
+                "ENCRYPTION_KEY is not set — storing or reading an integration token "
+                "will FAIL (fail-closed; there is no plaintext fallback). "
+                "Set ENCRYPTION_KEY to a Fernet key.",
                 stacklevel=2,
             )
         return v
