@@ -55,6 +55,30 @@ export async function createStrategy(
   });
 }
 
+/** Re-enqueue a strategy's pipeline. The engine continues from the first step
+ *  with no saved output, so nothing already done is repeated or re-billed.
+ *  Pass `maxBudgetUsd` to raise the cap of a run that stopped on its budget. */
+export function resumeStrategy(
+  id: string,
+  maxBudgetUsd?: number,
+): Promise<StrategyOut> {
+  return api(`/strategies/${id}/resume`, {
+    body: maxBudgetUsd === undefined ? {} : { max_budget_usd: maxBudgetUsd },
+  });
+}
+
+/** The sentence shown when a resume request is refused. */
+export function resumeStrategyErrorMessage(err: unknown): string {
+  if (!(err instanceof ApiError)) {
+    return "Could not resume. Check your connection and try again.";
+  }
+  if (err.status === 409) return err.detail || "This strategy cannot be resumed right now.";
+  if (err.status === 422) return err.detail || "That budget is not valid.";
+  if (err.status === 429) return "Too many requests. Wait a few minutes and try again.";
+  if (err.status === 404) return "This strategy no longer exists.";
+  return err.detail || "Could not resume the strategy.";
+}
+
 export function getStrategy(id: string): Promise<StrategyOut> {
   return api(`/strategies/${id}`);
 }
