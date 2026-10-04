@@ -89,6 +89,14 @@ app = ["templates/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# F-QA-01: a bare `pytest` is the offline suite. tests/integration needs real
+# Postgres/Redis and leaves state that makes offline tests order-dependent. It
+# is still runnable by naming it: `pytest tests/integration`. Setting
+# norecursedirs REPLACES pytest's defaults, so they are restated here.
+norecursedirs = [
+    "tests/integration",
+    "*.egg", ".*", "_darcs", "build", "CVS", "dist", "node_modules", "venv", "{arch}",
+]
 markers = [
     "regression: architecture tripwires -- module layout and public interfaces",
 ]
