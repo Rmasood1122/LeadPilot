@@ -53,7 +53,14 @@ triage, not fixed in passing. Inspect the repository before modifying —
 never assume paths, schemas, or functions.
 
 ## Known stale spots (do not trust these at face value)
-`LAUNCH_CHECKLIST.md` §2 says "11 migrations / head 0011_m8c5" — the chain is
-0001…0047 (49 files). `docs/PRODUCTION_READINESS.md` references a
-`calendarharvest.com` from-address. Correction is tracked as its own task in
-the project register (GAP-106 / GAP-007).
+Corrected under GAP-106: `LAUNCH_CHECKLIST.md` §2 used to claim an 11-migration chain
+with a head near 0011. It no longer hard-codes a count or head; the chain's head is
+whatever `alembic heads` reports (tests/test_docs_migration_claims.py fails if a
+doc names a revision that does not exist).
+
+Still open, and NOT a stale-domain error: `calendarharvest.com` is the live
+production domain and the configured from-address (render.yaml, app/config.py,
+scripts/activate_with_keys.py), so GAP-007's premise that it is wrong does not
+hold. What is unverified is whether it is verified in Resend with SPF/DKIM
+(docs/PRODUCTION_READINESS.md still lists that as NEEDS ACTION). That is a
+founder-side check, tracked under GAP-007.

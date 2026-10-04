@@ -18,7 +18,7 @@ Work through this from top to bottom before going live. Every item has a verific
 
 ## 2. Migrations
 
-- [ ] `alembic upgrade head` runs clean (all 11 migrations pass)
+- [ ] `alembic upgrade head` runs clean (every migration in `alembic/versions/` applies; run `alembic heads` for the expected head)
 - [ ] Confirm `subject_line_patterns` table exists
 - [ ] Confirm `webhook_targets` and `webhook_deliveries` tables exist
 - [ ] Confirm `users.onboarding_state` column exists (JSONB)
@@ -26,7 +26,7 @@ Work through this from top to bottom before going live. Every item has a verific
 - [ ] Confirm `strategies.personalization_correlation` column exists
 - [ ] Confirm `playbook_scores` has `decay_half_life_days`, `effective_sample_size`, `trend` columns
 
-**Verify:** `alembic current` shows `0011_m8c5 (head)`.
+**Verify:** `alembic current` shows the same revision as `alembic heads`, marked `(head)`.
 
 ---
 
