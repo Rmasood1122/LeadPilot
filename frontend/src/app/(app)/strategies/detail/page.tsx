@@ -10,6 +10,7 @@ import { DeleteStrategyDialog } from "@/components/strategy/DeleteStrategyDialog
 import { ResumeStrategyButton } from "@/components/strategy/ResumeStrategyButton";
 import { ReverifyStrategyButton } from "@/components/strategy/ReverifyStrategyButton";
 import { OverridePassesPanel } from "@/components/strategy/OverridePassesPanel";
+import { OutreachPanel } from "@/components/strategy/OutreachPanel";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -156,6 +157,7 @@ export default function StrategyDetailPage() {
               <OverridePassesPanel strategyId={id} status={data.status}
                                    log={data.verification} />
             )}
+            <OutreachPanel strategy={data} />
             {data.error && (
               <div role="alert" className="rounded border border-destructive p-4 text-sm">
                 {data.error}
