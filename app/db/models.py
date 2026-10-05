@@ -4828,3 +4828,26 @@ class LinkedInNetworkMessage(TimestampMixin, Base):
     channel: Mapped[str | None] = mapped_column(String(20), nullable=True)  # copy|unipile|bulk
     error: Mapped[str | None] = mapped_column(String(300), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class VoiceInterview(TimestampMixin, Base):
+    """One monthly style interview. The raw answers exist only until the user
+    applies or discards the proposal; the model sees them as data, and what
+    survives is the (user-edited) style profile on the user row."""
+
+    __tablename__ = "voice_interviews"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    mode: Mapped[str] = mapped_column(String(10))            # text | voice
+    # in_progress -> proposed -> applied | discarded ; snoozed is a bookmark row
+    status: Mapped[str] = mapped_column(String(20), default="in_progress")
+    answers_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    proposed_profile_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    voice_notice_ack_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

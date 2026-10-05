@@ -93,6 +93,14 @@ export default function ProfilePage() {
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>Your voice</CardTitle></CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <p>A short interview, by text or by talking, teaches LeadPilot to write messages the way you do. You review the result before it is used.</p>
+          <Button onClick={() => router.push("/interview")}>Take the voice interview</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>Change password</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div>
