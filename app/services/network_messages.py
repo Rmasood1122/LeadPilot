@@ -136,6 +136,11 @@ def deliver(db: Session, user: User, msg: LinkedInNetworkMessage, channel: str) 
     from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
     from app.integrations.unipile_linkedin import UnipileError  # noqa: PLC0415
 
+    from app.services import messaging_pause  # noqa: PLC0415
+
+    paused = messaging_pause.blocked_reason(db, user=user)
+    if paused is not None:
+        raise MessageError(409, messaging_pause.refusal_text(paused))
     if not ln.is_eligible(user):
         raise MessageError(402, "Your plan does not include the LinkedIn network.")
     if msg.status not in ("approved", "queued"):

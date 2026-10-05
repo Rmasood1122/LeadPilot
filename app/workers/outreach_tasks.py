@@ -170,6 +170,13 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     # ---- hard gates (checked at SEND time, always) -------------------------
     if strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
         return "campaign_paused"
+    # ---- Feature 4: reply kill switch (platform / account / contact) -------
+    # The message stays SCHEDULED: nothing is cancelled, so a resume sends it.
+    from app.services import messaging_pause  # noqa: PLC0415
+
+    paused = messaging_pause.blocked_reason(session, lead=lead)
+    if paused is not None:
+        return "paused_" + paused.removesuffix("_paused")
     if enrollment is None or enrollment.status is EnrollmentStatus.STOPPED:
         message.status = MessageStatus.CANCELLED
         message.error = "enrollment stopped"
