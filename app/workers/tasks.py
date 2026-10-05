@@ -194,6 +194,11 @@ def run_verification(self, strategy_id: str, max_attempts: int | None = None) ->
         strategy = session.get(Strategy, _pk(strategy_id))
         if strategy is None:
             return f"strategy {strategy_id} not found"
+        if getattr(strategy, "status", None) is StrategyStatus.VERIFIED:
+            # A human signed this off (or it already passed). A stale redelivery
+            # of an old task must not re-run the loop, spend money, and flip the
+            # status back.
+            return f"strategy {strategy_id} already verified; skipped"
         from app.services import usage_meter  # noqa: PLC0415
 
         with usage_meter.owner_scope(session, strategy, "verification"):

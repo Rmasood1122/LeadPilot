@@ -49,3 +49,70 @@ export function overrideOffer(log: VerificationPass[]): OverrideOffer {
 export function reasonOk(reason: string): boolean {
   return reason.trim().length >= MIN_REASON_CHARS;
 }
+
+// ---------------------------------------------------------------------------
+// Run-aware review. The log is append-only across verification runs, and a run
+// cut short (budget stop, worker restart) must not overwrite an earlier
+// complete one. Mirrors app/services/verification_override.py.
+// ---------------------------------------------------------------------------
+
+export const VERIFYING_STALE_NOTE =
+  "If a verification is still running, the server will refuse until it has " +
+  "been quiet for 15 minutes.";
+
+/** Statuses from which the server may accept a sign-off. `verifying` is only
+ *  accepted once the run has gone quiet; the server decides that. */
+export const SIGNOFF_STATUSES = ["needs_human_review", "budget_exhausted", "verifying"] as const;
+
+export function splitRuns(log: VerificationPass[]): VerificationPass[][] {
+  const runs: VerificationPass[][] = [];
+  let prev: VerificationPass | undefined;
+  for (const row of log) {
+    if (row.manual_override) continue;
+    const newRun =
+      prev === undefined ||
+      row.pass_no < prev.pass_no ||
+      (row.pass_no === prev.pass_no && (row.attempt ?? 1) <= (prev.attempt ?? 1));
+    if (newRun) runs.push([]);
+    runs[runs.length - 1].push(row);
+    prev = row;
+  }
+  return runs;
+}
+
+/** The most recent run that reached every check, or null. */
+export function latestCompleteRun(
+  log: VerificationPass[],
+  totalPasses = 10,
+): VerificationPass[] | null {
+  let complete: VerificationPass[] | null = null;
+  for (const run of splitRuns(log)) {
+    const seen = new Set(run.map((r) => r.pass_no));
+    let all = true;
+    for (let n = 1; n <= totalPasses; n++) if (!seen.has(n)) all = false;
+    if (all) complete = run;
+  }
+  return complete;
+}
+
+export type RunOverrideOffer =
+  | { kind: "none" }
+  | { kind: "blocked"; reason: string }
+  | { kind: "allowed"; passes: VerificationPass[] };
+
+export function runOverrideOffer(
+  log: VerificationPass[],
+  totalPasses = 10,
+): RunOverrideOffer {
+  const run = latestCompleteRun(log, totalPasses);
+  if (run === null) {
+    return {
+      kind: "blocked",
+      reason:
+        "No verification run has reached all 10 checks, so there is nothing to " +
+        "sign off. Re-verify the strategy instead.",
+    };
+  }
+  const offer = overrideOffer(run);
+  return offer as RunOverrideOffer;
+}
