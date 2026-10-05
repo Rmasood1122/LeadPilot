@@ -50,3 +50,37 @@ describe("reasonOk", () => {
     expect(reasonOk("x".repeat(20))).toBe(true);
   });
 });
+
+import { latestCompleteRun, runOverrideOffer, splitRuns } from "@/lib/verificationReview";
+
+const full = (failed: number[] = [1], keyOf = (n: number) => `k${n}`) =>
+  Array.from({ length: 10 }, (_, i) => i + 1).flatMap((n) =>
+    failed.includes(n)
+      ? [row(n, "FAIL", keyOf(n), { attempt: 1 }), row(n, "FAIL", keyOf(n), { attempt: 2 })]
+      : [row(n, "PASS", keyOf(n), { attempt: 1 })],
+  );
+const partial = (upto: number, failAt?: number, key = (n: number) => `k${n}`) =>
+  Array.from({ length: upto }, (_, i) => i + 1).map((n) =>
+    row(n, n === failAt ? "FAIL" : "PASS", key(n), { attempt: 1 }));
+const keyL = (n: number) => (n === 4 ? "legal_compliance" : `k${n}`);
+
+describe("run-aware review", () => {
+  it("splits when the pass number goes backwards", () => {
+    expect(splitRuns([...full(), ...partial(3), ...partial(4)]).map((r) => r.length))
+      .toEqual([full().length, 3, 4]);
+  });
+  it("ignores partial runs after a complete one", () => {
+    expect(latestCompleteRun([...full(), ...partial(4, 4)])).toEqual(full());
+  });
+  it("offers the sign-off from the complete run even if a later partial run shows legal failing", () => {
+    const log = [...full([1], keyL), ...partial(4, 4, keyL)];
+    const o = runOverrideOffer(log);
+    expect(o.kind).toBe("allowed");
+  });
+  it("blocks when the complete run itself failed legal", () => {
+    expect(runOverrideOffer(full([1, 4], keyL)).kind).toBe("blocked");
+  });
+  it("says so when no run completed", () => {
+    expect(runOverrideOffer(partial(7, 1)).kind).toBe("blocked");
+  });
+});

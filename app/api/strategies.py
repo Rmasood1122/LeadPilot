@@ -358,8 +358,10 @@ def override_failed_passes(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StrategyOut:
-    """Human sign-off on 1-3 failed verification passes of a strategy in
-    `needs_human_review`; moves it to `verified`.
+    """Human sign-off on 1-3 failed verification passes of the latest COMPLETE
+    verification run; moves the strategy to `verified`. Allowed from
+    `needs_human_review`, `budget_exhausted`, or a `verifying` run that has gone
+    quiet (killed worker).
 
     Recorded as a human decision (who, when, why) in the pass log and the
     security audit trail; the judge's original FAIL rows are kept. The Legal &
@@ -367,12 +369,6 @@ def override_failed_passes(
     app/services/verification_override.py for the rules.
     """
     strategy = _owned_strategy(db, strategy_id, current_user)
-    if strategy.status is not StrategyStatus.NEEDS_HUMAN_REVIEW:
-        raise HTTPException(
-            status_code=409,
-            detail=f"strategy status is '{strategy.status.value}' - only a "
-                   "strategy waiting for human review can be signed off",
-        )
     if not body.acknowledge:
         raise HTTPException(
             status_code=422,

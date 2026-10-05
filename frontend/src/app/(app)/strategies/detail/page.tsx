@@ -152,6 +152,10 @@ export default function StrategyDetailPage() {
                 </div>
               </div>
             )}
+            {(data.status === "verifying" || data.status === "budget_exhausted") && (
+              <OverridePassesPanel strategyId={id} status={data.status}
+                                   log={data.verification} />
+            )}
             {data.error && (
               <div role="alert" className="rounded border border-destructive p-4 text-sm">
                 {data.error}

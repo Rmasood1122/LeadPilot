@@ -5,7 +5,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { overrideFailedPasses, resumeStrategyErrorMessage } from "@/lib/api/strategies";
 import { Button } from "@/components/ui/button";
-import { overrideOffer, reasonOk, MIN_REASON_CHARS } from "@/lib/verificationReview";
+import {
+  runOverrideOffer, reasonOk, MIN_REASON_CHARS, SIGNOFF_STATUSES, VERIFYING_STALE_NOTE,
+} from "@/lib/verificationReview";
 import type { StrategyOut, VerificationPass } from "@/lib/api/types";
 
 /** Shown only for needs_human_review. Lets the owner accept 1-3 failed checks
@@ -21,7 +23,7 @@ export function OverridePassesPanel(
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [ack, setAck] = useState(false);
-  const offer = overrideOffer(log);
+  const offer = runOverrideOffer(log);
 
   const run = useMutation({
     mutationFn: (passNos: number[]) => overrideFailedPasses(strategyId, passNos, reason.trim()),
@@ -32,7 +34,9 @@ export function OverridePassesPanel(
     onError: (err) => toast.error(resumeStrategyErrorMessage(err)),
   });
 
-  if (status !== "needs_human_review" || offer.kind === "none") return null;
+  if (!(SIGNOFF_STATUSES as readonly string[]).includes(status) || offer.kind === "none") {
+    return null;
+  }
 
   if (offer.kind === "blocked") {
     return (
@@ -53,6 +57,10 @@ export function OverridePassesPanel(
   return (
     <div role="group" aria-label="Pass failed checks manually"
          className="space-y-3 rounded border border-warning bg-card p-4 text-sm">
+      <p className="text-xs text-muted-foreground">
+        Based on the latest verification run that completed all 10 checks.
+        Later runs that stopped part-way are ignored. {VERIFYING_STALE_NOTE}
+      </p>
       <p className="font-medium">
         You are passing {offer.passes.length === 1 ? "this check" : "these checks"} yourself,
         not the automated judge.
