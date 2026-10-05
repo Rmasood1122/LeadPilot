@@ -48,3 +48,31 @@ export const importConnections = (csvText: string) =>
   api<ImportResult>("/linkedin-network/import", { body: { csv_text: csvText } });
 export const eraseNetwork = () =>
   api<Record<string, number>>("/linkedin-network", { method: "DELETE" });
+
+export interface NetworkMessage {
+  id: string;
+  connection_id: string;
+  product_id: string;
+  text: string;
+  status: "draft" | "approved" | "queued" | "sent" | "failed";
+  channel: "copy" | "unipile" | "bulk" | null;
+  error: string | null;
+  sent_at: string | null;
+}
+
+export const listMessages = () =>
+  api<{ messages: NetworkMessage[] }>("/linkedin-network/messages");
+export const draftMessage = (connectionId: string, productId: string) =>
+  api<NetworkMessage>("/linkedin-network/messages/draft", {
+    body: { connection_id: connectionId, product_id: productId },
+  });
+export const saveMessage = (id: string, text: string) =>
+  api<NetworkMessage>(`/linkedin-network/messages/${id}`, { method: "PUT", body: { text } });
+export const markMessageSent = (id: string) =>
+  api<NetworkMessage>(`/linkedin-network/messages/${id}/mark-sent`, { body: {} });
+export const sendMessageNow = (id: string) =>
+  api<NetworkMessage>(`/linkedin-network/messages/${id}/send`, { body: {} });
+export const bulkSend = (ids: string[]) =>
+  api<{ queued: number; spacing_seconds: number }>("/linkedin-network/messages/bulk-send", {
+    body: { ids },
+  });

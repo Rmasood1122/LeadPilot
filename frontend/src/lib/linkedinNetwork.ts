@@ -1,6 +1,7 @@
 /** Pure rules for the Network page. The server is the real gate (402 on
  *  Free/Starter); these only decide what the screen offers. */
 import { ApiError } from "@/lib/api/client";
+import type { NetworkMessage } from "@/lib/api/network";
 
 export function checkExportFile(
   file: { name: string; size: number },
@@ -43,3 +44,41 @@ export function safeProfileUrl(url: string | null): string | null {
     return null;
   }
 }
+
+// ---- messages ------------------------------------------------------------
+
+export const MESSAGE_MAX = 1500;
+export const BULK_MAX = 25;
+
+export function validateMessage(text: string): string | null {
+  const v = text.trim();
+  if (!v) return "Write a message first.";
+  if (v.length > MESSAGE_MAX) return `Keep it under ${MESSAGE_MAX} characters.`;
+  return null;
+}
+
+/** Only a SAVED message can be copied-as-sent, sent, or queued. */
+export const isSavable = (m: NetworkMessage | undefined): boolean =>
+  !!m && (m.status === "draft" || m.status === "approved" || m.status === "failed");
+export const isReadyToSend = (m: NetworkMessage | undefined): boolean => m?.status === "approved";
+
+/** The ids that may go in a bulk batch: saved, not yet sent, capped. */
+export function bulkCandidates(messages: NetworkMessage[], selected: Set<string>): string[] {
+  return messages.filter((m) => m.status === "approved" && selected.has(m.id))
+    .slice(0, BULK_MAX).map((m) => m.id);
+}
+
+export function messageErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 402) return "Your plan does not include the LinkedIn network. Upgrade to Growth or higher.";
+    if (err.status === 429) return "Daily LinkedIn message limit reached. Try again tomorrow.";
+    if ([409, 422, 502].includes(err.status)) return err.message;
+  }
+  return "Something went wrong. Try again.";
+}
+
+export const statusLabel = (m: NetworkMessage): string =>
+  m.status === "sent" ? (m.channel === "copy" ? "Sent by you" : "Sent")
+    : m.status === "queued" ? "Queued"
+    : m.status === "approved" ? "Saved"
+    : m.status === "failed" ? "Failed" : "Draft";

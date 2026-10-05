@@ -4800,3 +4800,31 @@ class LinkedInConnectionMatch(TimestampMixin, Base):
     segment: Mapped[str] = mapped_column(String(120))
     reasons_json: Mapped[list] = mapped_column(JSON, default=list)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class LinkedInNetworkMessage(TimestampMixin, Base):
+    """One message the user is writing to (or has sent to) one of THEIR OWN
+    LinkedIn connections. The text is whatever the user last saved; nothing
+    is ever sent from a draft. Deleted with the connection / the account."""
+
+    __tablename__ = "linkedin_network_messages"
+    __table_args__ = (
+        UniqueConstraint("user_id", "connection_id", name="uq_linkedin_msg_user_conn"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("linkedin_connections.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    text: Mapped[str] = mapped_column(Text)
+    # draft -> approved -> (queued ->) sent | failed
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    channel: Mapped[str | None] = mapped_column(String(20), nullable=True)  # copy|unipile|bulk
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

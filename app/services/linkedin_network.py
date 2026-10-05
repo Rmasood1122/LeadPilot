@@ -323,6 +323,9 @@ def import_connections(db: Session, user: User, parsed: ParseResult) -> dict:
 
 
 def erase_user_network(db: Session, user: User) -> dict:
+    from app.db.models import LinkedInNetworkMessage  # noqa: PLC0415
+
+    db.execute(delete(LinkedInNetworkMessage).where(LinkedInNetworkMessage.user_id == user.id))
     matches = db.execute(delete(LinkedInConnectionMatch)
                          .where(LinkedInConnectionMatch.user_id == user.id)).rowcount
     conns = db.execute(delete(LinkedInConnection)
