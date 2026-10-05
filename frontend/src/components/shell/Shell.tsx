@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Menu } from "lucide-react";
 import { NAV } from "./nav";
+import { InterviewBanner } from "@/components/interview/InterviewBanner";
 import { cn } from "@/lib/utils";
 import { restoreSession } from "@/lib/api/client";
 import { isUnverifiedError, logout, me } from "@/lib/api/auth";
@@ -157,7 +158,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </span>
           <WorkspaceSwitcher />
         </header>
-        <main className="flex-1 p-gutter pb-20 md:pb-gutter">{children}</main>
+        <main className="flex-1 p-gutter pb-20 md:pb-gutter">
+          <InterviewBanner />
+          {children}
+        </main>
       </div>
 
       {/* AI support chat (Feature 3).
