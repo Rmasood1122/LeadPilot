@@ -4733,3 +4733,67 @@ class SecurityAuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# --------------------------------------------------------------------------
+# Private LinkedIn network (migration 0068)
+# --------------------------------------------------------------------------
+#
+# Each row belongs to the ONE account that uploaded it (user_id) and is only
+# ever read back for that account. There is deliberately no sharing between
+# accounts: the people in a connections export are third parties who have not
+# agreed to be shown to anyone else. Email addresses and phone numbers in the
+# export are never stored. user_id is ON DELETE CASCADE everywhere so erasing an
+# account erases its network.
+
+
+class LinkedInImport(TimestampMixin, Base):
+    __tablename__ = "linkedin_imports"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    rows_in_file: Mapped[int] = mapped_column(Integer, default=0)
+    added: Mapped[int] = mapped_column(Integer, default=0)
+    skipped: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class LinkedInConnection(TimestampMixin, Base):
+    __tablename__ = "linkedin_connections"
+    __table_args__ = (
+        UniqueConstraint("user_id", "dedupe_key", name="uq_linkedin_conn_user_dedupe"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    dedupe_key: Mapped[str] = mapped_column(String(64))
+    full_name: Mapped[str] = mapped_column(String(300))
+    company: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    position: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    profile_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    connected_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class LinkedInConnectionMatch(TimestampMixin, Base):
+    __tablename__ = "linkedin_connection_matches"
+    __table_args__ = (
+        UniqueConstraint("connection_id", "product_id", name="uq_linkedin_match_conn_product"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("linkedin_connections.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    score: Mapped[int] = mapped_column(Integer)
+    segment: Mapped[str] = mapped_column(String(120))
+    reasons_json: Mapped[list] = mapped_column(JSON, default=list)
+    analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

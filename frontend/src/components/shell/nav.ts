@@ -7,6 +7,7 @@ import {
   KanbanSquare,
   LayoutGrid,
   Megaphone,
+  Network,
   Route,
   Settings,
   Users,
@@ -44,6 +45,8 @@ export const NAV: NavItem[] = [
   { href: "/meetings", label: "Meetings", icon: Video },
   { href: "/strategies", label: "Strategies", icon: Route },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  // Private LinkedIn network (Growth+). The page itself explains the upgrade.
+  { href: "/network", label: "Network", icon: Network },
   // Feature 2. Sits before Settings, not after: Settings is the conventional
   // last item, and burying the tutorials below it is the fastest way to make
   // sure nobody finds them. On mobile this is the 6th of 7 bottom tabs --
