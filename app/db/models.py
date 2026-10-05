@@ -445,6 +445,12 @@ class User(TimestampMixin, Base):
     style_profile_updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Feature 4: reply kill switch (migration 0072) ----------------------
+    # Non-NULL = ALL of this account's outbound messaging is paused.
+    messaging_paused_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    messaging_paused_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # --- Identity, location and phone verification (migration 0039) --------
     # identity_required is TRUE only for accounts created after 0039 (signup
     # sets it). Every pre-existing row keeps the server default FALSE, so the
@@ -1116,6 +1122,12 @@ class Lead(TimestampMixin, Base):
     # Captured from Apollo at sourcing (person.linkedin_url); editable by hand.
     # Also the address Feature Group 5's LinkedIn channel sends to.
     linkedin_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Feature 4 (migration 0072): non-NULL = no message of any kind goes to this
+    # contact until the owner resumes it. Checked at SEND time on every path.
+    messaging_paused_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    messaging_paused_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
     # The lead's three most recent posts [{text, posted_at, url}] and when they
     # were fetched (cached 7 days). [] means "fetched, and they post nothing";
     # NULL means "never fetched" -- two different facts.

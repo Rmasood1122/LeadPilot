@@ -156,6 +156,11 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
     from app.integrations.phone_channel import PhoneChannel  # noqa: PLC0415
     from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
 
+    from app.services import messaging_pause  # noqa: PLC0415
+
+    paused = messaging_pause.blocked_reason(db, lead=lead, user=current_user)
+    if paused is not None:
+        raise HTTPException(status_code=409, detail=messaging_pause.refusal_text(paused))
     if not system_settings.get(db, "phone_calling_enabled"):
         raise HTTPException(status_code=409, detail="AI calling is disabled by the administrator")
     if not phone_calls.e164(lead.phone):

@@ -25,6 +25,10 @@ from sqlalchemy.orm import Session
 
 # key -> (default, one-line description shown in the admin panel)
 DEFAULTS: dict[str, tuple[Any, str]] = {
+    # Feature 4 -- platform kill switch
+    "messaging_global_pause": (False, "EMERGENCY: stop every outbound message "
+                               "(email, LinkedIn, WhatsApp, calls, follow-ups) "
+                               "for every account until switched off."),
     # Feature Group 7 -- meeting preparation
     "meeting_prep_enabled": (True, "Generate a meeting prep brief whenever a "
                              "meeting is booked."),

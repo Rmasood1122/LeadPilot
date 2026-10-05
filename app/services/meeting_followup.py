@@ -385,6 +385,11 @@ def send_followup(db: Session, row: MeetingOutcome, *, user: User,
     lead = db.get(Lead, row.lead_id)
     if row.sent_at is not None:
         raise FollowupNotSendable("this follow-up was already sent")
+    from app.services import messaging_pause  # noqa: PLC0415
+
+    paused = messaging_pause.blocked_reason(db, lead=lead, user=user)
+    if paused is not None:
+        raise FollowupNotSendable(messaging_pause.refusal_text(paused))
     if lead.email and is_suppressed(db, lead.email, lead.phone):
         row.draft_status = "suppressed"
         db.commit()
