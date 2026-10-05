@@ -31,6 +31,8 @@ celery_app = Celery(
         # above) because they send outreach messages and belong on the same
         # queue as every other send.
         "app.workers.calendar_tasks",
+        # Private LinkedIn network: weekly re-scoring (Growth plan and up).
+        "app.workers.network_tasks",
         # Feature expansion: the notification hub's queue, and the meeting
         # prep brief + pre-meeting reminders that feed it.
         "app.workers.notification_tasks",
@@ -110,6 +112,9 @@ celery_app.conf.task_routes = {
     # messages under the same caps and windows as any other send.
     "app.workers.calendar_tasks.*": {"queue": "default"},
     "leadpilot.ping": {"queue": "default"},
+    # Weekly LinkedIn-network re-scoring: batched, offline work shaped like the
+    # learning loop, so it runs with it.
+    "leadpilot.network.*": {"queue": "learning"},
     # Feature expansion: the `notifications` queue. Push/Slack/webhook fan-out
     # and the meeting prep brief are user-facing and time-sensitive -- a
     # one-hour reminder that queues behind a 144-step pipeline or the nightly
@@ -213,6 +218,11 @@ def _aggregation_hour() -> int:
 
 
 celery_app.conf.beat_schedule = {
+    # Private LinkedIn network: re-score stored connections every Monday 04:10 UTC.
+    "linkedin-network-weekly-refresh": {
+        "task": "leadpilot.network.weekly_refresh",
+        "schedule": crontab(day_of_week="monday", hour=4, minute=10),
+    },
     "dispatch-due-messages": {
         "task": "leadpilot.outreach.dispatch",
         "schedule": float(settings.dispatch_interval_seconds),

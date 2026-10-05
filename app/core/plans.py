@@ -159,6 +159,14 @@ PLANS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Private LinkedIn network: Growth and every tier above it. `pro` is the legacy
+# unlimited plan and `enterprise` mirrors it, so both sit above Growth.
+# `pay_per_meeting` borrows Growth's channels but is not a higher tier, so it
+# does not get this feature.
+_LINKEDIN_NETWORK_PLANS = frozenset({"growth", "scale", "pro", "enterprise"})
+for _plan_key, _plan in PLANS.items():
+    _plan["linkedin_network"] = _plan_key in _LINKEDIN_NETWORK_PLANS
+
 _PLAN_UPGRADE_PATH = {
     "free": "starter",
     "starter": "growth",
