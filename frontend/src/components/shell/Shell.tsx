@@ -113,7 +113,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {mark}
           {!collapsed && <span className="font-semibold">{brand.brand_name}</span>}
         </div>
-        <nav className="flex-1 space-y-1 px-2">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2">
           {NAV.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
@@ -131,7 +131,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="p-2">
+        <div className="shrink-0 p-2">
           <Button
             variant="ghost"
             className="w-full justify-start gap-3"
