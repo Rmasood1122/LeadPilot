@@ -136,6 +136,18 @@ def revoke_family(db: Session, family_id: uuid.UUID, reason: str,
     return int(result.rowcount or 0)
 
 
+def revoke_all_for_user(db: Session, user_id: uuid.UUID, reason: str,
+                        now: datetime | None = None) -> int:
+    """Revoke every still-live session of ONE user. Does not commit."""
+    result = db.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == user_id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now or _now(), revoked_reason=reason)
+        .execution_options(synchronize_session=False)
+    )
+    return int(result.rowcount or 0)
+
+
 def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
            now: datetime | None = None) -> IssuedTokens:
     """Exchange a refresh token for new tokens, or raise 401. Commits."""

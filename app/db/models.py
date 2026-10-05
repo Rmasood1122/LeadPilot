@@ -403,6 +403,9 @@ class User(TimestampMixin, Base):
     # until their owner sets a password via signup.
     password_hash: Mapped[str | None] = mapped_column(String(300), nullable=True)
     plan: Mapped[PlanTier] = mapped_column(_enum(PlanTier), default=PlanTier.FREE)
+    # Migration 0069: the name the user chose to be shown in the app. Display
+    # only; never used for sending, identity checks or access decisions.
+    full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     theme_json: Mapped[dict] = mapped_column(JSON, default=dict)
     # M8-C3 (migration 0009_m8c3): admin + suspension controls
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
