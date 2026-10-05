@@ -67,6 +67,18 @@ export function resumeStrategy(
   });
 }
 
+/** Run the 10 verification passes again on a strategy waiting for human review.
+ *  Reuses the finished research; only verification is paid for again. */
+export function reverifyStrategy(
+  id: string,
+  opts: { maxBudgetUsd?: number; maxAttempts?: number } = {},
+): Promise<StrategyOut> {
+  const body: Record<string, number> = {};
+  if (opts.maxBudgetUsd !== undefined) body.max_budget_usd = opts.maxBudgetUsd;
+  if (opts.maxAttempts !== undefined) body.max_attempts = opts.maxAttempts;
+  return api(`/strategies/${id}/reverify`, { body });
+}
+
 /** The sentence shown when a resume request is refused. */
 export function resumeStrategyErrorMessage(err: unknown): string {
   if (!(err instanceof ApiError)) {

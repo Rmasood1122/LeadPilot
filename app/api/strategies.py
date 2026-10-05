@@ -18,6 +18,7 @@ from app.api.schemas import (
     StrategyCreate,
     StrategyOut,
     StrategyResumeIn,
+    StrategyReverifyIn,
     StrategyStatusOut,
 )
 from app.db.base import get_db
@@ -296,6 +297,55 @@ def resume_strategy(
     db.refresh(strategy)
 
     worker_tasks.run_pipeline.delay(str(strategy.id))
+    return _strategy_out(db, strategy)
+
+
+@router.post("/strategies/{strategy_id}/reverify", response_model=StrategyOut,
+             status_code=202)
+def reverify_strategy(
+    strategy_id: uuid.UUID,
+    body: StrategyReverifyIn | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StrategyOut:
+    """Run the 10 verification passes again on a strategy that ended in
+    `needs_human_review`, reusing its finished research.
+
+    Before this, that state was a dead end: /resume refuses it and nothing else
+    starts verification, so the only way forward was a brand-new strategy and a
+    second payment for research that already existed. This does NOT mark
+    anything verified -- every pass is judged again from scratch and the status
+    becomes `verified` only if all ten come back PASS.
+
+    Only `needs_human_review` is accepted: the research is complete there by
+    construction (verification only starts after the last step).
+    """
+    strategy = _owned_strategy(db, strategy_id, current_user)
+    if strategy.status is not StrategyStatus.NEEDS_HUMAN_REVIEW:
+        raise HTTPException(
+            status_code=409,
+            detail=f"strategy status is '{strategy.status.value}' - only a "
+                   "strategy waiting for human review can be re-verified",
+        )
+
+    if body is not None and body.max_budget_usd is not None:
+        new_micros = _budget_micros(body.max_budget_usd)
+        spent = usage_meter.spent_micros(db, strategy.id)
+        if new_micros <= spent:
+            raise HTTPException(
+                status_code=422,
+                detail=f"max_budget_usd must exceed the ${spent / 1_000_000:.2f} "
+                       "already spent on this strategy",
+            )
+        strategy.budget_micros = new_micros
+
+    strategy.status = StrategyStatus.VERIFYING
+    strategy.error = None
+    db.commit()
+    db.refresh(strategy)
+
+    worker_tasks.run_verification.delay(
+        str(strategy.id), body.max_attempts if body is not None else None)
     return _strategy_out(db, strategy)
 
 

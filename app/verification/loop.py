@@ -241,13 +241,18 @@ def _reverts_earlier_state(candidate: str, history: list[str]) -> int | None:
     return None
 
 
-def run_verification_loop(session: Session, strategy: Strategy) -> StrategyStatus:
+def run_verification_loop(session: Session, strategy: Strategy,
+                          max_attempts: int | None = None) -> StrategyStatus:
     """Run all 10 passes with fail→fix→re-run. Returns the final status
-    (also written to the strategy row)."""
+    (also written to the strategy row).
+
+    `max_attempts` is an explicit, owner-chosen override of the per-pass attempt
+    count (used by POST /strategies/{id}/reverify). It replaces the reduced-plan
+    cap of two, never the judge: a pass still has to come back PASS to count."""
     strategy.status = StrategyStatus.VERIFYING
     session.commit()
 
-    max_retries = max_attempts_for(strategy)
+    max_retries = max_attempts if max_attempts is not None else max_attempts_for(strategy)
     any_exhausted = False
 
     for spec in build_passes(strategy.flow_type):

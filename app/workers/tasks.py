@@ -186,7 +186,7 @@ def run_pipeline(self, strategy_id: str) -> str:
 @celery_app.task(name="leadpilot.run_verification", bind=True, max_retries=3,
                  soft_time_limit=settings.pipeline_task_timeout_seconds,
                  time_limit=settings.pipeline_task_timeout_seconds + 60)
-def run_verification(self, strategy_id: str) -> str:
+def run_verification(self, strategy_id: str, max_attempts: int | None = None) -> str:
     from app.verification.loop import run_verification_loop
 
     session = SessionLocal()
@@ -197,7 +197,7 @@ def run_verification(self, strategy_id: str) -> str:
         from app.services import usage_meter  # noqa: PLC0415
 
         with usage_meter.owner_scope(session, strategy, "verification"):
-            final = run_verification_loop(session, strategy)
+            final = run_verification_loop(session, strategy, max_attempts=max_attempts)
         return f"verification finished: {final.value}"
     except BudgetExceededError as exc:
         return _stop_for_budget(session, strategy_id, exc)

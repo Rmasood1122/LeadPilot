@@ -81,6 +81,18 @@ class StrategyResumeIn(BaseModel):
     )
 
 
+class StrategyReverifyIn(BaseModel):
+    max_budget_usd: float | None = Field(
+        default=None, gt=0,
+        description="New total budget in USD. Must exceed what is already spent.",
+    )
+    max_attempts: int | None = Field(
+        default=None, ge=1, le=5,
+        description="Judge/fix attempts per verification pass. Omit for the server "
+                    "default (not the reduced-plan cap of 2).",
+    )
+
+
 class StrategyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -8,6 +8,7 @@ import { Trash2 } from "lucide-react";
 import { useStrategy } from "@/lib/api/hooks";
 import { DeleteStrategyDialog } from "@/components/strategy/DeleteStrategyDialog";
 import { ResumeStrategyButton } from "@/components/strategy/ResumeStrategyButton";
+import { ReverifyStrategyButton } from "@/components/strategy/ReverifyStrategyButton";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -114,6 +115,7 @@ export default function StrategyDetailPage() {
               <div className="flex items-center gap-2">
                 <Badge tone={statusTone(data.status)}>{data.status}</Badge>
                 <ResumeStrategyButton strategy={data} />
+                <ReverifyStrategyButton strategy={data} />
                 {(data.strategy_document_ready || data.gtm_document_ready) && (
                   <Button variant="outline" size="sm">
                     <Link href={`/strategies/document?id=${id}`}>View documents</Link>
