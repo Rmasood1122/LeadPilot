@@ -59,6 +59,7 @@ from app.services import billing as billing_svc
 from app.services import email_verification as verify_svc
 from app.services import identity as identity_svc
 from app.services import network_guard
+from app.services import security_audit
 from app.services.email_sender import EmailSendError
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,7 @@ def _user_out(user: User, db: Session) -> dict:
     return {
         "id": str(user.id),
         "email": user.email,
+        "full_name": user.full_name,
         "plan": user.plan.value,
         # has_active_plan + subscription_status. Recomputed from the database
         # on every response so a purchase (or a cancellation) takes effect on
@@ -430,6 +432,59 @@ def logout(request: Request, body: RefreshIn | None = Body(default=None),
 def me(user: User = Depends(auth_svc.get_current_user),
        db: Session = Depends(get_db)) -> dict:
     return _user_out(user, db)
+
+
+class ProfileIn(BaseModel):
+    # Extra keys (plan, is_admin, email ...) are ignored by pydantic, so this
+    # endpoint can only ever write the display name.
+    full_name: str | None = Field(default=None, max_length=200)
+
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+@router.patch("/auth/me")
+def update_profile(body: ProfileIn, user: User = Depends(auth_svc.get_current_user),
+                   db: Session = Depends(get_db)) -> dict:
+    name = (body.full_name or "").strip()
+    if _CONTROL.search(name):
+        raise HTTPException(status_code=422, detail="Name contains invalid characters.")
+    if len(name) > 120:
+        raise HTTPException(status_code=422, detail="Name must be 120 characters or fewer.")
+    user.full_name = name or None
+    db.commit()
+    return _user_out(user, db)
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+@router.post("/auth/change-password")
+def change_password(request: Request, body: ChangePasswordIn,
+                    user: User = Depends(auth_svc.get_current_user),
+                    db: Session = Depends(get_db)) -> dict:
+    """Change the password and sign the account out everywhere.
+
+    400 (not 401) on a wrong current password: the web client treats a 401 as
+    an expired session and tries to refresh or sign out. Rate limited per
+    account so a hijacked session cannot be used to guess the old password.
+    """
+    enforce_rate_limit(f"user:{user.id}", "change_password",
+                       "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+    if not auth_svc.verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect.")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=400,
+                            detail="New password must be different from the current one.")
+    user.password_hash = auth_svc.hash_password(body.new_password)
+    revoked = auth_sessions.revoke_all_for_user(db, user.id, "password_changed")
+    security_audit.record(db, action=security_audit.AUTH_PASSWORD_CHANGED, request=request,
+                          user_id=user.id, target_type="user", target_id=user.id,
+                          details={"sessions_revoked": revoked})
+    db.commit()
+    return {"status": "changed", "signed_out_everywhere": True}
 
 
 # --------------------------------------------------------------------------

@@ -403,6 +403,9 @@ class User(TimestampMixin, Base):
     # until their owner sets a password via signup.
     password_hash: Mapped[str | None] = mapped_column(String(300), nullable=True)
     plan: Mapped[PlanTier] = mapped_column(_enum(PlanTier), default=PlanTier.FREE)
+    # Migration 0069: the name the user chose to be shown in the app. Display
+    # only; never used for sending, identity checks or access decisions.
+    full_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     theme_json: Mapped[dict] = mapped_column(JSON, default=dict)
     # M8-C3 (migration 0009_m8c3): admin + suspension controls
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -4797,3 +4800,31 @@ class LinkedInConnectionMatch(TimestampMixin, Base):
     segment: Mapped[str] = mapped_column(String(120))
     reasons_json: Mapped[list] = mapped_column(JSON, default=list)
     analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class LinkedInNetworkMessage(TimestampMixin, Base):
+    """One message the user is writing to (or has sent to) one of THEIR OWN
+    LinkedIn connections. The text is whatever the user last saved; nothing
+    is ever sent from a draft. Deleted with the connection / the account."""
+
+    __tablename__ = "linkedin_network_messages"
+    __table_args__ = (
+        UniqueConstraint("user_id", "connection_id", name="uq_linkedin_msg_user_conn"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    connection_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("linkedin_connections.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    text: Mapped[str] = mapped_column(Text)
+    # draft -> approved -> (queued ->) sent | failed
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    channel: Mapped[str | None] = mapped_column(String(20), nullable=True)  # copy|unipile|bulk
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -18,9 +18,11 @@ from app.api.deps import get_current_user
 from app.core.plans import PLANS, PlanLimitExceeded, plan_limit_response
 from app.db.base import get_db
 from app.db.models import (
-    LinkedInConnection, LinkedInConnectionMatch, LinkedInImport, Product, User,
+    LinkedInConnection, LinkedInConnectionMatch, LinkedInImport, LinkedInNetworkMessage,
+    Product, User,
 )
 from app.services import linkedin_network as ln
+from app.services import network_messages as nm
 from app.services import security_audit
 
 router = APIRouter(prefix="/linkedin-network", tags=["linkedin-network"])
@@ -140,3 +142,92 @@ def erase(request: Request, db: Session = Depends(get_db),
                           target_type="linkedin_network", details=out)
     db.commit()
     return out
+
+
+# --------------------------------------------------------------------------
+# Messages to your own connections
+# --------------------------------------------------------------------------
+
+
+class DraftIn(BaseModel):
+    connection_id: uuid.UUID
+    product_id: uuid.UUID
+
+
+class SaveIn(BaseModel):
+    text: str = Field(max_length=5000)
+
+
+class BulkIn(BaseModel):
+    ids: list[uuid.UUID] = Field(max_length=nm.BULK_MAX)
+
+
+def _msg_out(m: LinkedInNetworkMessage) -> dict:
+    return {"id": str(m.id), "connection_id": str(m.connection_id),
+            "product_id": str(m.product_id), "text": m.text, "status": m.status,
+            "channel": m.channel, "error": m.error, "sent_at": m.sent_at}
+
+
+def _run(fn, *args):
+    try:
+        return fn(*args)
+    except nm.MessageError as exc:
+        if exc.status == 402:
+            raise HTTPException(status_code=402, detail=plan_limit_response(PlanLimitExceeded(
+                limit_key="linkedin_network", current_plan="free", upgrade_to=UPGRADE_TO,
+                message=exc.detail)))
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
+@router.get("/messages")
+def list_messages(db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)) -> dict:
+    rows = db.execute(select(LinkedInNetworkMessage)
+                      .where(LinkedInNetworkMessage.user_id == current_user.id)
+                      .order_by(LinkedInNetworkMessage.created_at)).scalars().all()
+    return {"messages": [_msg_out(r) for r in rows]}
+
+
+@router.post("/messages/draft")
+def draft_message(body: DraftIn, db: Session = Depends(get_db),
+                  current_user: User = Depends(get_current_user)) -> dict:
+    _require_plan(current_user)
+    return _msg_out(_run(nm.draft, db, current_user, body.connection_id, body.product_id))
+
+
+@router.put("/messages/{message_id}")
+def save_message(message_id: uuid.UUID, body: SaveIn, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)) -> dict:
+    _require_plan(current_user)
+    return _msg_out(_run(nm.save, db, current_user, message_id, body.text))
+
+
+@router.post("/messages/{message_id}/mark-sent")
+def mark_sent(message_id: uuid.UUID, db: Session = Depends(get_db),
+              current_user: User = Depends(get_current_user)) -> dict:
+    _require_plan(current_user)
+    return _msg_out(_run(nm.mark_sent_manually, db, current_user, message_id))
+
+
+@router.post("/messages/{message_id}/send")
+def send_message(message_id: uuid.UUID, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_user)) -> dict:
+    _require_plan(current_user)
+    msg = _run(nm.own_message, db, current_user, message_id)
+    return _msg_out(_run(nm.deliver, db, current_user, msg, "unipile"))
+
+
+@router.post("/messages/bulk-send")
+def bulk_send(body: BulkIn, db: Session = Depends(get_db),
+              current_user: User = Depends(get_current_user)) -> dict:
+    """Queue SAVED messages. They go out one at a time, spaced apart, each one
+    re-checked (plan, suppression, daily cap, still a 1st-degree connection)
+    at the moment it is sent."""
+    _require_plan(current_user)
+    from app.workers import network_tasks  # noqa: PLC0415
+
+    rows = _run(nm.queue_bulk, db, current_user, body.ids)
+    for i, row in enumerate(rows):
+        network_tasks.send_queued.apply_async(
+            args=[str(row.id)], countdown=i * nm.BULK_SPACING_SECONDS)
+    return {"queued": len(rows), "spacing_seconds": nm.BULK_SPACING_SECONDS}

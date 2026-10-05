@@ -30,6 +30,7 @@ STRATEGY_PASSES_OVERRIDE_DENIED = "strategy.passes_override_denied"
 LINKEDIN_NETWORK_IMPORTED = "linkedin_network.imported"
 LINKEDIN_NETWORK_ERASED = "linkedin_network.erased"
 AUTH_LOGOUT = "auth.logout"
+AUTH_PASSWORD_CHANGED = "auth.password_changed"
 AUTH_REFRESH_REUSE = "auth.refresh_reuse_detected"
 
 
