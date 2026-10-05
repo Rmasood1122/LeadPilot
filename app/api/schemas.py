@@ -93,6 +93,17 @@ class StrategyReverifyIn(BaseModel):
     )
 
 
+class StrategyPassOverrideIn(BaseModel):
+    pass_nos: list[int] = Field(
+        min_length=1, max_length=3,
+        description="Exactly the failed passes being signed off.",
+    )
+    reason: str = Field(min_length=1, max_length=2000,
+                        description="Why the failure is acceptable (min 20 chars).")
+    acknowledge: bool = Field(
+        description="Must be true: confirms a human, not the judge, is passing these.")
+
+
 class StrategyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

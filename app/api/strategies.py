@@ -18,6 +18,7 @@ from app.api.schemas import (
     StrategyCreate,
     StrategyOut,
     StrategyResumeIn,
+    StrategyPassOverrideIn,
     StrategyReverifyIn,
     StrategyStatusOut,
 )
@@ -32,7 +33,7 @@ from app.db.models import (
 )
 from app.pipeline import budget_plan
 from app.services import auth as auth_svc
-from app.services import security_audit, usage_meter
+from app.services import security_audit, usage_meter, verification_override
 from app.services import sequence_engine as engine
 from app.pipeline.engine import pipelines_for_flow
 from app.pipeline.registry import phase_title
@@ -346,6 +347,59 @@ def reverify_strategy(
 
     worker_tasks.run_verification.delay(
         str(strategy.id), body.max_attempts if body is not None else None)
+    return _strategy_out(db, strategy)
+
+
+@router.post("/strategies/{strategy_id}/override-passes", response_model=StrategyOut)
+def override_failed_passes(
+    strategy_id: uuid.UUID,
+    body: StrategyPassOverrideIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> StrategyOut:
+    """Human sign-off on 1-3 failed verification passes of a strategy in
+    `needs_human_review`; moves it to `verified`.
+
+    Recorded as a human decision (who, when, why) in the pass log and the
+    security audit trail; the judge's original FAIL rows are kept. The Legal &
+    compliance pass can never be overridden. See
+    app/services/verification_override.py for the rules.
+    """
+    strategy = _owned_strategy(db, strategy_id, current_user)
+    if strategy.status is not StrategyStatus.NEEDS_HUMAN_REVIEW:
+        raise HTTPException(
+            status_code=409,
+            detail=f"strategy status is '{strategy.status.value}' - only a "
+                   "strategy waiting for human review can be signed off",
+        )
+    if not body.acknowledge:
+        raise HTTPException(
+            status_code=422,
+            detail="acknowledge must be true: you are passing these checks "
+                   "yourself, not the automated judge",
+        )
+    try:
+        overridden = verification_override.apply_override(
+            strategy, pass_nos=body.pass_nos, reason=body.reason,
+            user_id=current_user.id, user_email=current_user.email)
+    except verification_override.OverrideRefused as exc:
+        db.rollback()
+        security_audit.record(
+            db, action=security_audit.STRATEGY_PASSES_OVERRIDE_DENIED, request=request,
+            user_id=current_user.id, target_type="strategy", target_id=strategy.id,
+            details={"reason": exc.detail})
+        db.commit()
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+    strategy.status = StrategyStatus.VERIFIED
+    strategy.error = None
+    security_audit.record(
+        db, action=security_audit.STRATEGY_PASSES_OVERRIDDEN, request=request,
+        user_id=current_user.id, target_type="strategy", target_id=strategy.id,
+        details={"passes": overridden, "reason": body.reason.strip()})
+    db.commit()
+    db.refresh(strategy)
     return _strategy_out(db, strategy)
 
 

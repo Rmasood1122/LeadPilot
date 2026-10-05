@@ -1,0 +1,52 @@
+import { describe, it, expect } from "vitest";
+import {
+  failedPasses, latestPerPass, overrideOffer, reasonOk,
+} from "@/lib/verificationReview";
+import type { VerificationPass } from "@/lib/api/types";
+
+const row = (pass_no: number, result: "PASS" | "FAIL", key = `k${pass_no}`,
+             extra: Partial<VerificationPass> = {}): VerificationPass => ({
+  pass_no, name: `P${pass_no}`, result, attempts: 1, key, ...extra,
+});
+
+describe("latestPerPass", () => {
+  it("uses the last attempt of each pass", () => {
+    const log = [row(1, "FAIL"), row(1, "PASS"), row(2, "FAIL"), row(2, "FAIL")];
+    expect(latestPerPass(log).map((p) => [p.pass_no, p.result]))
+      .toEqual([[1, "PASS"], [2, "FAIL"]]);
+    expect(failedPasses(log).map((p) => p.pass_no)).toEqual([2]);
+  });
+});
+
+describe("overrideOffer", () => {
+  it("offers nothing when nothing failed", () => {
+    expect(overrideOffer([row(1, "PASS")]).kind).toBe("none");
+  });
+  it("allows 1 to 3 failed checks", () => {
+    for (const n of [1, 2, 3]) {
+      const log = Array.from({ length: n }, (_, i) => row(i + 1, "FAIL"));
+      expect(overrideOffer(log).kind).toBe("allowed");
+    }
+  });
+  it("blocks 4 or more", () => {
+    const log = [1, 2, 3, 5].map((n) => row(n, "FAIL"));
+    expect(overrideOffer(log).kind).toBe("blocked");
+  });
+  it("never allows Legal & compliance, even alone", () => {
+    const o = overrideOffer([row(4, "FAIL", "legal_compliance")]);
+    expect(o.kind).toBe("blocked");
+  });
+  it("a legal pass that failed then passed does not block", () => {
+    const log = [row(4, "FAIL", "legal_compliance"), row(4, "PASS", "legal_compliance"),
+                 row(1, "FAIL")];
+    expect(overrideOffer(log).kind).toBe("allowed");
+  });
+});
+
+describe("reasonOk", () => {
+  it("needs 20 real characters", () => {
+    expect(reasonOk("short")).toBe(false);
+    expect(reasonOk("   " + "x".repeat(19) + "   ")).toBe(false);
+    expect(reasonOk("x".repeat(20))).toBe(true);
+  });
+});

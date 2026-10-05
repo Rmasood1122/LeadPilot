@@ -79,6 +79,17 @@ export function reverifyStrategy(
   return api(`/strategies/${id}/reverify`, { body });
 }
 
+/** Human sign-off on 1-3 failed verification passes (needs_human_review). */
+export function overrideFailedPasses(
+  id: string,
+  passNos: number[],
+  reason: string,
+): Promise<StrategyOut> {
+  return api(`/strategies/${id}/override-passes`, {
+    body: { pass_nos: passNos, reason, acknowledge: true },
+  });
+}
+
 /** The sentence shown when a resume request is refused. */
 export function resumeStrategyErrorMessage(err: unknown): string {
   if (!(err instanceof ApiError)) {
