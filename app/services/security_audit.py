@@ -25,6 +25,8 @@ logger = logging.getLogger(__name__)
 
 STRATEGY_DELETED = "strategy.deleted"
 STRATEGY_DELETE_DENIED = "strategy.delete_denied"
+STRATEGY_PASSES_OVERRIDDEN = "strategy.passes_overridden"
+STRATEGY_PASSES_OVERRIDE_DENIED = "strategy.passes_override_denied"
 AUTH_LOGOUT = "auth.logout"
 AUTH_REFRESH_REUSE = "auth.refresh_reuse_detected"
 

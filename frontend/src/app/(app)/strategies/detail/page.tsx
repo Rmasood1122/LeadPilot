@@ -9,6 +9,7 @@ import { useStrategy } from "@/lib/api/hooks";
 import { DeleteStrategyDialog } from "@/components/strategy/DeleteStrategyDialog";
 import { ResumeStrategyButton } from "@/components/strategy/ResumeStrategyButton";
 import { ReverifyStrategyButton } from "@/components/strategy/ReverifyStrategyButton";
+import { OverridePassesPanel } from "@/components/strategy/OverridePassesPanel";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -142,8 +143,13 @@ export default function StrategyDetailPage() {
                 <p className="text-muted-foreground">
                   A verification pass kept failing after the maximum fix
                   attempts. See the failing pass below for the reason, adjust
-                  inputs, and re-run.
+                  inputs, and re-run. If only a few failed and you have checked
+                  them yourself, you can pass them manually.
                 </p>
+                <div className="mt-3">
+                  <OverridePassesPanel strategyId={id} status={data.status}
+                                       log={data.verification} />
+                </div>
               </div>
             )}
             {data.error && (
@@ -177,6 +183,11 @@ export default function StrategyDetailPage() {
                             className="flex flex-wrap items-center justify-between gap-2 text-sm">
                           <span>
                             #{pass.pass_no} {pass.name}
+                            {pass.manual_override && (
+                              <span className="block text-xs text-muted-foreground">
+                                passed manually by {pass.overridden_by_email}: {pass.reason}
+                              </span>
+                            )}
                             {pass.fix && (
                               <span className="block text-xs text-muted-foreground">
                                 fix applied: {pass.fix}
@@ -184,7 +195,7 @@ export default function StrategyDetailPage() {
                             )}
                           </span>
                           <Badge tone={pass.result === "PASS" ? "success" : "destructive"}>
-                            {pass.result}
+                            {pass.manual_override ? "PASS (manual)" : pass.result}
                             {pass.attempts > 1 ? ` x${pass.attempts}` : ""}
                           </Badge>
                         </li>

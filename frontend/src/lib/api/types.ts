@@ -281,6 +281,14 @@ export interface VerificationPass {
   result: "PASS" | "FAIL";
   attempts: number;
   fix?: string | null;
+  /** Raw log fields the server sends (one row per attempt). */
+  key?: string;
+  attempt?: number;
+  fix_description?: string | null;
+  /** Set when a person, not the judge, passed it. */
+  manual_override?: boolean;
+  reason?: string;
+  overridden_by_email?: string;
 }
 
 export type LeadStatus =
