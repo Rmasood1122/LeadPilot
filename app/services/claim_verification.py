@@ -18,6 +18,10 @@ THE EVIDENCE LEDGER (build_evidence) is only what is on the lead row:
   post          linkedin_posts_json                  (the lead's own posts)
 Nothing is fetched here. A fact the pipeline did not store is, by definition,
 not a fact the message may state.
+With F02 Signal Radar on (signal_radar_enabled), the ledger also holds the
+lead's stored, unexpired market-intel headlines (lead_signals rows naming the
+lead's company), as `news` evidence keyed `market_intel:<url>`. Off, the
+ledger is exactly the four lead columns above.
 
 HOW A CLAIM IS FOUND
   1. rules -- per-category patterns (CATEGORY_PATTERNS), applied only to
@@ -445,8 +449,20 @@ def _enabled(session: Session) -> bool:
     return bool(system_settings.get(session, "claim_verification_enabled"))
 
 
+def _signal_evidence(session: Session, lead: Lead, strategy: Strategy | None) -> list[Evidence]:
+    """F02 Signal Radar: the lead's stored market-intel headlines, as `news`
+    evidence. Empty unless signal_radar_enabled (so the ledger is unchanged
+    with the flag off). Every other signal source is already in the ledger."""
+    from app.services import signal_radar  # noqa: PLC0415
+
+    if not signal_radar.enabled(session):
+        return []
+    return signal_radar.extra_evidence(session, lead, _owner(session, strategy))
+
+
 def enforce(session: Session, *, strategy: Strategy | None, lead: Lead, message: Message | None,
-            channel: str, fields: dict[str, str | None]) -> dict[str, str | None]:
+            channel: str, fields: dict[str, str | None],
+            decisions_out: list | None = None) -> dict[str, str | None]:
     """Verify every named field ("subject", "body", "first_message", ...) and
     return them with unsupported claims removed. Adds log rows (no commit).
 
@@ -456,11 +472,14 @@ def enforce(session: Session, *, strategy: Strategy | None, lead: Lead, message:
       "item:<name>"      a list entry (a call talking point); an unsupported
                          claim DROPS it -- the returned value is ""
       anything else      prose: unsupported sentences stripped, the opening
-                         hook rewritten"""
+                         hook rewritten
+
+    `decisions_out`, when given, receives every Decision made (F02 Signal
+    Radar ties a cited signal to its stored source through these)."""
     if not _enabled(session):
         return dict(fields)
     try:
-        evidence = build_evidence(lead)
+        evidence = build_evidence(lead) + _signal_evidence(session, lead, strategy)
         sender_vocab = _sender_vocabulary(session, strategy)
         model_claims = _model_claims(session, [v for v in fields.values() if v])
         fail_closed = False
@@ -508,6 +527,8 @@ def enforce(session: Session, *, strategy: Strategy | None, lead: Lead, message:
             d.unsupported = (d.unsupported or []) + ["verifier_error_fail_closed"]
     _record(session, decisions, lead=lead, message=message, channel=channel,
             user_id=_owner(session, strategy))
+    if decisions_out is not None:
+        decisions_out.extend(decisions)
     changed = [d for d in decisions if d.verdict != VERIFIED]
     if changed:
         logger.info("claim engine: %d unsupported claim(s) removed from message %s (lead %s)",

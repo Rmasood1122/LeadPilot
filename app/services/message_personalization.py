@@ -101,8 +101,13 @@ def render_message(
     step: SequenceStep,
     booking_url: str | None = None,
     inputs_out: dict | None = None,
+    why_now: str | None = None,
 ) -> tuple[str, str]:
     """Returns (subject, body) — the caller persists them before sending.
+
+    F02 Signal Radar: `why_now` is signal_radar.prompt_block() for the one
+    signal offered to this email (its untrusted text already delimited), or
+    None. Only the email send path passes it.
 
     Feature 3: the step's brief is enriched with the product's founder voice
     profile (app/services/voice_profiler.py) when one has been analysed, so
@@ -134,6 +139,8 @@ def render_message(
     used["loom_cta"] = bool(cta)
     if cta:
         context = f"{context}\n\n{cta}".strip()
+    if why_now:
+        context = f"{context}\n\n{why_now}".strip()
     voice = style_profile.suffix_for_strategy(session, strategy)
     used["style_profile"] = bool(voice)
     # Feature 3: the founder's own voice, cloned from their LinkedIn posts and

@@ -46,6 +46,7 @@ import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPa
 import { ConsentPanel } from "@/components/leads/ConsentPanel";
 import { ProvenancePanel } from "@/components/leads/ProvenancePanel";
 import { EmailVerdictPanel } from "@/components/leads/EmailVerdictPanel";
+import { SignalRadarPanel } from "@/components/leads/SignalRadarPanel";
 
 const TABS = [
   { value: "overview", label: "Overview" },
@@ -231,6 +232,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
       <EmailVerdictPanel leadId={lead.id} />
       {/* Part 1 Feature 10: where each enriched field came from, and how old. */}
       <ProvenancePanel leadId={lead.id} />
+      {/* F02: dated "why now" signals with source links (renders nothing when off). */}
+      <SignalRadarPanel leadId={lead.id} />
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent>

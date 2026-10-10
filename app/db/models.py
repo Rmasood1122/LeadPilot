@@ -4938,3 +4938,49 @@ class EnrichmentAttempt(TimestampMixin, Base):
     cost_units: Mapped[int] = mapped_column(Integer, default=0)
     claimed_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
     email_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+
+class LeadSignal(Base):
+    """One dated "why now" event about a lead's company, derived ONLY from data
+    the system already stored (company news, the lead's LinkedIn posts, the
+    Apollo organisation record, the strategy's market intel). Nothing here is
+    fetched; app/services/signal_radar.py re-shapes what is already on the lead.
+
+    A table and not a JSON column on `leads` because the success metric joins
+    a message's cited signal back to a dated, owned row, and because GDPR
+    erasure must be able to delete exactly these rows.
+
+    `user_id` is the owning account, denormalised so every read can carry an
+    ownership filter and the account export can reach the table directly.
+    """
+
+    __tablename__ = "lead_signals"
+    __table_args__ = (
+        UniqueConstraint("lead_id", "dedupe_key", name="uq_lead_signals_lead_dedupe"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE")
+    )
+    # funding | hiring | launch | news | post
+    signal_type: Mapped[str] = mapped_column(String(20))
+    # newsapi | linkedin_post | apollo | market_intel
+    source: Mapped[str] = mapped_column(String(30))
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    source_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    title: Mapped[str] = mapped_column(String(500))
+    excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    confidence: Mapped[float] = mapped_column(Float)
+    dedupe_key: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

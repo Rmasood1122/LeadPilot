@@ -364,7 +364,9 @@ class TestEnrollment:
 
 
 def _fake_render(subject, body):
-    def _render(session, strategy, lead, sequence, message):
+    # Accepts the send path's keyword arguments (F02 passes `now=`) so this
+    # stand-in keeps matching the real renderer's call.
+    def _render(session, strategy, lead, sequence, message, **_kwargs):
         message.subject, message.body = subject, body
         return OutboundMessage(message_id=str(message.id), lead_id=str(lead.id),
                                to_address=lead.email, subject=subject, body=body)
