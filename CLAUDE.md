@@ -23,7 +23,8 @@ python3 evals/fixtures/verify_block_fixtures.py             # seen-it-fire: ever
 The suite is offline by design: SQLite in-memory, FakeClaude, zero network.
 Keep new tests deterministic and offline, or they don't belong in the hard gate.
 Merge policy B (`docs/program/DECISIONS.md` MERGE-B): merge to `master` only via
-`scripts/gate/safe_merge.sh` (all required checks green, PR not a draft, squash);
+`scripts/gate/safe_merge.sh <PR> [--dry-run]` (all required checks in
+`scripts/gate/required_checks.txt` green, PR not a draft, up to date, squash);
 co-founder review follows the merge. Never merge from the web UI or with `gh pr merge`.
 
 ## Sealed files — do not touch inside a feature task

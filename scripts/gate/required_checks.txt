@@ -1,0 +1,7 @@
+# Check runs that must conclude "success" on a PR head before
+# scripts/gate/safe_merge.py will merge it. One job name per line.
+# Adding a name here makes it required; GitHub itself enforces nothing on a
+# private repo on GitHub Free (docs/program/DECISIONS.md, GH-PRO).
+# Removing a name is a gate change: its own PR, with a written reason.
+
+gate        # .github/workflows/eval-gate.yml — offline suite + promote gate

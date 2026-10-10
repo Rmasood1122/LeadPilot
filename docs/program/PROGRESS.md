@@ -2,6 +2,17 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+## 2026-10-10 — Phase 1, item 1.4 (safe_merge + merge hook), cloud session: PR open
+
+**State: merge gate built and tested; PR open. PRs #44, #45, #46 are merged (INC-44/45 recorded in `DECISIONS.md`).**
+
+- `scripts/gate/safe_merge.sh` → `safe_merge.py`: refuses unless the PR is open, targets master, is not a draft, has no conflict, is not behind master, every check in `scripts/gate/required_checks.txt` (today: `gate`) succeeded on the head SHA, no other check is running/failed, and no commit status is pending/failed. Squash-merges with the head SHA pinned. `--dry-run` checks only. Live dry-run against PR #46 refused it correctly (closed; behind master).
+- `.claude/hooks/guard_merge.py` + `.claude/settings.json`: PreToolUse hook blocks `gh pr merge`, REST calls to `pulls/<n>/merge`, `git push` to master/main (incl. `HEAD:master`, `+master`, bare push while on master) and MCP merge tools. `safe_merge.sh` is allowed.
+- Tests: `tests/test_safe_merge.py` (22) and `tests/test_claude_hooks.py` (26), offline.
+- Still not enforced: the GitHub web UI Merge button. Deploy gating (item 1.7) is the backstop.
+
+Next: item 1.2 (sealed: eval-gate triggers), 1.3 (sealed: baseline refresh), 1.5 (quick gate + pre-push + more hooks).
+
 ## 2026-10-10 — Phase 1, item 1b (PD-1 webhook schema), cloud session: PR open
 
 **State: PostgreSQL integration suite 132 passed / 0 failed with migration 0071. Stacked on PR #44; merge #44 first.**
