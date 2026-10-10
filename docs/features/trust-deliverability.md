@@ -19,6 +19,12 @@ the lower of the two scores wins. Below `deliverability_health_threshold`
 (default 70) the user gets a `deliverability_warning` alert once, and a
 campaign launch returns a `warning`.
 
+With the **Deliverability Autopilot** on (`deliverability_autopilot_enabled`,
+default off — see `f03-deliverability-autopilot.md`) a launch, approval or
+resume is **blocked** (409) when the sending mailbox fails the SPF / DKIM /
+DMARC-alignment preflight or the one-click unsubscribe headers are missing
+from the message the send path builds. The warning above is unchanged.
+
 Spamhaus refuses queries from public DNS resolvers (answering `127.255.255.x`);
 those lists are shown as "could not be queried", never as listed. Use a
 resolver of your own or an MXToolbox key for reliable results.

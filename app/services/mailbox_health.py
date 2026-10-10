@@ -26,6 +26,12 @@ is honest about what it is -- `complaint_source` says "proxy" in every payload,
 and the UI prints it. When an FBL is connected later, only `complaint_rate`
 and that label change; the score, the thresholds and the gate do not.
 
+F03 (Deliverability Autopilot, flag `deliverability_autopilot_enabled`) is
+that change: with a fresh Google Postmaster reading for the mailbox's domain,
+`complaint_rate` is the real Gmail spam rate and `complaint_source` is
+"postmaster" (stored on the row). It also adds explicit brakes -- >= 0.10%
+throttles, >= 0.30% pauses -- on top of the score. Flag off: unchanged.
+
 WHAT HAPPENS TO A BAD MAILBOX
   score >= THROTTLE_BELOW      healthy    -- normal cap
   PAUSE_BELOW <= score < ...   throttled  -- cap cut to THROTTLE_FRACTION of
@@ -219,12 +225,13 @@ def volume(db: Session, mailbox_ref: str, now: datetime) -> dict:
 
 
 def score_for(auth: dict, complaints: float | None, bounces: float | None,
-              vol: dict) -> tuple[int, list[str]]:
+              vol: dict, complaint_label: str = "Complaint rate") -> tuple[int, list[str]]:
     """0-100 and the reasons behind every deduction.
 
     Deliberately the same shape as deliverability.health_score so the two
     numbers are comparable, with complaints and volume added -- the two things
-    a domain-level score cannot see.
+    a domain-level score cannot see. `complaint_label` names the rate's source
+    in the reasons (F03: the real Postmaster spam rate is not "complaints").
     """
     score, reasons = 100, []
     if auth.get("spf") is False:
@@ -247,10 +254,10 @@ def score_for(auth: dict, complaints: float | None, bounces: float | None,
     # fully unauthenticated but quiet mailbox only throttles (100 - 55 = 45).
     if complaints is not None and complaints >= COMPLAINT_BAD:
         score -= 65
-        reasons.append(f"Complaint rate {complaints:.2%} — above the 0.3% danger line")
+        reasons.append(f"{complaint_label} {complaints:.2%} — above the 0.3% danger line")
     elif complaints is not None and complaints >= COMPLAINT_WARN:
         score -= 35
-        reasons.append(f"Complaint rate {complaints:.2%} — above the 0.1% warning line")
+        reasons.append(f"{complaint_label} {complaints:.2%} — above the 0.1% warning line")
 
     if bounces is not None and bounces >= BOUNCE_BAD:
         score -= 65
@@ -300,10 +307,12 @@ def refresh(db: Session, user_id, now: datetime | None = None,
     that only needs the volume/complaint half); the auth fields then keep
     whatever the last DNS-backed refresh found, rather than being blanked.
     """
-    from app.services import deliverability  # noqa: PLC0415
+    from app.services import deliverability, deliverability_autopilot  # noqa: PLC0415
     from app.workers import notification_tasks  # noqa: PLC0415
 
     now = now or _now()
+    # F03: with the Autopilot off, nothing below differs from Part 1 Feature 4.
+    autopilot = deliverability_autopilot.enabled(db)
     out = []
     for mailbox in mailboxes(db, user_id):
         ref, account = mailbox["ref"], mailbox["account"]
@@ -324,20 +333,42 @@ def refresh(db: Session, user_id, now: datetime | None = None,
                     logger.warning("DNS auth lookup for %s failed: %s", mailbox["domain"], exc)
 
         complaints, complaint_source = complaint_rate(db, user_id, ref, now)
+        complaint_label = "Complaint rate"
+        reading = None
+        if (autopilot and mailbox["domain"]
+                and mailbox["domain"] not in deliverability.CONSUMER_DOMAINS):
+            # F03: the real Gmail spam rate replaces the proxy while fresh.
+            reading = deliverability_autopilot.postmaster_reading(
+                db, user_id, mailbox["domain"], now)
+            if reading is not None:
+                complaints = reading["spam_rate"]
+                complaint_source = deliverability_autopilot.POSTMASTER_SOURCE
+                complaint_label = "Gmail spam rate (Google Postmaster)"
         bounces = bounce_rate(db, ref, now)
         vol = volume(db, ref, now)
-        score, reasons = score_for(auth, complaints, bounces, vol)
+        score, reasons = score_for(auth, complaints, bounces, vol, complaint_label)
 
         base_cap = None
         try:
             from app.services import sequence_engine  # noqa: PLC0415
 
-            base_cap = sequence_engine.daily_allowance(
-                account, now.astimezone(timezone.utc).date())
+            base_cap = sequence_engine.ramp_allowance(
+                db, account, now.astimezone(timezone.utc).date(), autopilot=autopilot)
         except Exception:  # noqa: BLE001
             base_cap = settings.gmail_daily_cap
 
         new_state = state_for(score)
+        braked = False
+        if autopilot:
+            # F03 brakes: >= 0.10% throttles, >= 0.30% pauses, whatever the
+            # rest of the score says. A brake never makes a state better.
+            braked_state = deliverability_autopilot.apply_brake(
+                new_state, deliverability_autopilot.brake_for(complaints))
+            if braked_state != new_state:
+                braked = True
+                reasons.append(f"Spam-rate brake: {complaint_label.lower()} "
+                               f"{complaints:.2%} forces '{braked_state}'")
+                new_state = braked_state
         if row is None:
             row = MailboxHealth(user_id=_uuid(user_id), mailbox_ref=ref,
                                 channel=mailbox["channel"])
@@ -346,6 +377,7 @@ def refresh(db: Session, user_id, now: datetime | None = None,
         # a person resumes it -- a refresh that happens to score higher must
         # not quietly restart sending from a mailbox that burned.
         was_paused = row.state == PAUSED
+        previous_state = row.state
         if was_paused:
             new_state = PAUSED
         elif new_state == PAUSED:
@@ -363,6 +395,8 @@ def refresh(db: Session, user_id, now: datetime | None = None,
         row.dmarc_ok = auth.get("dmarc")
         row.dmarc_policy = auth.get("dmarc_policy")
         row.complaint_rate = complaints
+        # NULL (= "proxy") with the Autopilot off, exactly as before F03.
+        row.complaint_source = complaint_source if autopilot else None
         row.bounce_rate = bounces
         row.sends_today = vol["today"]
         row.sends_7d = vol["week"]
@@ -372,8 +406,28 @@ def refresh(db: Session, user_id, now: datetime | None = None,
 
         if new_state == PAUSED and not was_paused:
             _notify_paused(notification_tasks, user_id, row)
+        elif (braked and new_state == THROTTLED
+              and previous_state not in (THROTTLED, PAUSED)):
+            _notify_braked(notification_tasks, user_id, row)
         out.append({**mailbox_out(row), "complaint_source": complaint_source})
     return out
+
+
+def _notify_braked(notification_tasks, user_id, row: MailboxHealth) -> None:
+    """F03: the 0.10% brake engaged. Never raises, like _notify_paused."""
+    try:
+        notification_tasks.enqueue_event(
+            user_id, "deliverability_warning",
+            title=f"Sending slowed from {row.address or row.mailbox_ref}",
+            body=(row.reason or "Spam rate above 0.10%.")
+                 + " Today's limit is reduced until the rate recovers.",
+            deep_link="/settings?tab=deliverability",
+            data={"mailbox_ref": row.mailbox_ref},
+            webhook_payload={"domain": row.domain, "mailbox_ref": row.mailbox_ref,
+                             "score": row.score, "reasons": row.reasons_json or [],
+                             "complaint_source": row.complaint_source or "proxy"})
+    except Exception:  # noqa: BLE001
+        logger.exception("could not notify mailbox brake for %s", row.mailbox_ref)
 
 
 def _notify_paused(notification_tasks, user_id, row: MailboxHealth) -> None:
@@ -481,9 +535,9 @@ def mailbox_out(row: MailboxHealth) -> dict:
         "auth": {"spf": row.spf_ok, "dkim": row.dkim_ok, "dmarc": row.dmarc_ok,
                  "dmarc_policy": row.dmarc_policy},
         "complaint_rate": row.complaint_rate,
-        # Always present, always honest: this is a proxy until a real
-        # feedback loop is connected. See the module docstring.
-        "complaint_source": "proxy",
+        # Always present, always honest: "proxy" unless F03 stored the real
+        # Postmaster spam rate on this row. See the module docstring.
+        "complaint_source": row.complaint_source or "proxy",
         "bounce_rate": row.bounce_rate,
         "sends_today": row.sends_today,
         "sends_7d": row.sends_7d,

@@ -45,6 +45,15 @@ A number presented as something it is not would be worse than no number. When
 an FBL is connected, only `complaint_rate` and that label change — the score,
 the thresholds and the send gate do not.
 
+**F03 Deliverability Autopilot** (flag off by default) is that change: with a
+fresh Google Postmaster Tools reading for the mailbox's domain, the real Gmail
+spam rate replaces the proxy and `complaint_source` is `"postmaster"` — stored
+on the row (`mailbox_health.complaint_source`, migration 0072; NULL reads as
+`"proxy"`). It also adds explicit brakes on top of the score — ≥ 0.10%
+throttles, ≥ 0.30% pauses — and the stepped new-mailbox ramp in the daily
+allowance. The Postmaster importer is built but disabled and unverified
+against a live account; see `f03-deliverability-autopilot.md`.
+
 ## The score and what it does
 
 ```

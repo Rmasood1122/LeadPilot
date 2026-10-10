@@ -3685,6 +3685,10 @@ class MailboxHealth(TimestampMixin, Base):
     dmarc_ok: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     dmarc_policy: Mapped[str | None] = mapped_column(String(20), nullable=True)
     complaint_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # F03 (migration 0072): where complaint_rate came from -- "postmaster"
+    # (Google Postmaster Tools, the real Gmail spam rate) or "proxy". NULL is
+    # "proxy": every row written before 0072 or with the Autopilot off.
+    complaint_source: Mapped[str | None] = mapped_column(String(16), nullable=True)
     bounce_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
     sends_today: Mapped[int] = mapped_column(
         Integer, default=0, server_default=text("0"), nullable=False

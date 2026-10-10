@@ -357,6 +357,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.deliverability_tasks.refresh_mailbox_health",
         "schedule": crontab(hour="*/4", minute=5),
     },
+    # F03: the Google Postmaster spam-rate import. Daily -- Postmaster data
+    # is daily and lags a day or two. 07:25, clear of the domain sweep (06:10)
+    # and the :05 mailbox sweep it re-scores through. A no-op until both F03
+    # flags are on.
+    "import-postmaster-spam-rates": {
+        "task": "app.workers.deliverability_tasks.import_postmaster_spam_rates",
+        "schedule": crontab(hour=7, minute=25),
+    },
     # Feature 1: recompute every campaign's pipeline health score. Every six
     # hours, at :40 past the hour, so it never starts in the same minute as
     # the learning-loop jobs (:05/:15/:25/:35/:50) that share this queue.

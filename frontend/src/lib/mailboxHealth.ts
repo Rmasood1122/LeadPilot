@@ -28,6 +28,16 @@ export function rateText(rate: number | null | undefined): string {
   return `${(rate * 100).toFixed(2)}%`;
 }
 
+/** The complaint figure with its provenance (F03). The real Gmail spam rate
+ *  from Google Postmaster Tools is labelled as such; anything else is the
+ *  proxy and says so -- a number is never shown as something it is not. */
+export function complaintText(mailbox: Pick<MailboxHealth, "complaint_rate" | "complaint_source">): string {
+  if (mailbox.complaint_source === "postmaster") {
+    return `Spam rate ${rateText(mailbox.complaint_rate)} (Google Postmaster)`;
+  }
+  return `Complaints ${rateText(mailbox.complaint_rate)} (proxy)`;
+}
+
 /** The one line under a mailbox saying what is happening to its sending. */
 export function throttleExplanation(mailbox: MailboxHealth): string | null {
   if (mailbox.state === "paused") {

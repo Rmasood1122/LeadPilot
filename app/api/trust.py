@@ -6,6 +6,8 @@
                                       the auto-throttle state and its reason
     POST /deliverability/mailboxes/refresh          recompute now
     POST /deliverability/mailboxes/{ref}/resume     un-pause (a human decision)
+    GET  /deliverability/preflight?sequence_id=     F03: the launch preflight
+                                      report for one owned sequence
     GET  /compliance/audit            the account's per-send compliance log
     GET  /leads/{lead_id}/compliance  region, regime, legal basis, audit rows
 """
@@ -76,6 +78,25 @@ def resume_mailbox(mailbox_ref: str, db: Session = Depends(get_db),
     except LookupError:
         raise HTTPException(status_code=404, detail="mailbox not found")
     return mailbox_health.status(db, current_user.id)
+
+
+@router.get("/deliverability/preflight")
+def deliverability_preflight(sequence_id: uuid.UUID, db: Session = Depends(get_db),
+                             current_user: User = Depends(get_current_user)) -> dict:
+    """F03: what the launch preflight would say about this sequence right now
+    -- SPF, DKIM, DMARC alignment and one-click unsubscribe, each with its fix.
+    Read-only (not recorded). With the Autopilot off it reports
+    `enabled: false` and looks nothing up."""
+    from app.api.sequences import _owned_sequence  # noqa: PLC0415
+    from app.services import deliverability_autopilot  # noqa: PLC0415
+
+    sequence = _owned_sequence(db, sequence_id, current_user)
+    if not deliverability_autopilot.enabled(db):
+        return {"enabled": False}
+    enforce_rate_limit(str(current_user.id), "deliverability_preflight", "RATE_LIMIT_AI_ACTION")
+    strategy = db.get(Strategy, sequence.strategy_id)
+    return {"enabled": True,
+            **deliverability_autopilot.preflight(db, strategy, sequence=sequence)}
 
 
 @router.get("/compliance/audit")

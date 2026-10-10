@@ -4,6 +4,7 @@ import type { MailboxHealth } from "@/lib/api/trust";
 import {
   authGaps,
   bandTone,
+  complaintText,
   fleetWarning,
   rateText,
   scoreText,
@@ -147,5 +148,20 @@ describe("fleetWarning", () => {
   it("pluralises correctly", () => {
     expect(fleetWarning([mailbox({ state: "paused" }), mailbox({ state: "paused" })]))
       .toContain("2 mailboxes paused");
+  });
+});
+
+describe("complaint provenance (F03)", () => {
+  it("labels the proxy as a proxy", () => {
+    expect(complaintText(mailbox())).toBe("Complaints 0.02% (proxy)");
+  });
+
+  it("labels the real Gmail spam rate as Google Postmaster's", () => {
+    expect(complaintText(mailbox({ complaint_source: "postmaster", complaint_rate: 0.0012 })))
+      .toBe("Spam rate 0.12% (Google Postmaster)");
+  });
+
+  it("treats any unknown source as the proxy, never as real data", () => {
+    expect(complaintText(mailbox({ complaint_source: "something-new" }))).toContain("(proxy)");
   });
 });
