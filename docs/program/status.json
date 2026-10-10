@@ -7,11 +7,11 @@
   "phases": [
     {
       "phase": 0,
-      "status": "in_progress",
-      "exit_gate": "BASELINE.md committed locally, not pushed; offline gate (0.3) did not complete",
+      "status": "done",
+      "exit_gate": "BASELINE.md complete; offline gate green (3,319 tests, PROMOTE); stop condition met (OPEN P0/HIGH items); draft PR to master",
       "branch": "program/phase-0-baseline",
       "pr": null,
-      "ci_run_url": "https://github.com/Rmasood1122/LeadPilot/actions/runs/37351754168",
+      "ci_run_url": null,
       "evidence": "docs/program/BASELINE.md",
       "tasks": [
         {
@@ -28,8 +28,8 @@
         },
         {
           "id": "0.3",
-          "title": "offline gate - registry_lint ok; run_evals killed (machine out of memory); promote and block fixtures not run",
-          "status": "blocked",
+          "title": "offline gate - all four commands exit 0; 3,319 executed / 0 failed / 7 skipped; run_evals 530.5 s; promote PROMOTE (1 soft runtime warning); block fixtures proven",
+          "status": "done",
           "evidence": "docs/program/BASELINE.md#4-offline-gate-step-3"
         },
         {
@@ -55,20 +55,29 @@
           "title": "prompt vs reality discrepancies",
           "status": "done",
           "evidence": "docs/program/BASELINE.md#9-discrepancies-between-star_promptmd-and-reality-step-7"
+        },
+        {
+          "id": "0.8",
+          "title": "record founder decisions D2/D3/P0-D; re-rate F-DB-01 and RF-5 for single-tenant",
+          "status": "done",
+          "evidence": "docs/program/DECISIONS.md; docs/program/BASELINE.md#35-re-rating-under-p0-d-self-hosted-single-tenant-decided-2026-10-04"
+        },
+        {
+          "id": "0.9",
+          "title": "Phase 1 inputs: GitHub Pro for ruleset on private repo; Actions minutes per PR",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#11-phase-1-inputs"
         }
       ],
-      "blocked_on": [
-        "Offline gate needs one clean local run (was killed for low memory)",
-        "Founder: confirm pushing BASELINE.md (lists open security findings) to the public repository, or make the repo private first (D3)",
-        "gh CLI is not installed and the GitHub MCP server failed to connect: a PR cannot be opened from this machine"
-      ]
+      "blocked_on": [],
+      "ci_run_url_baseline_commit": "https://github.com/Rmasood1122/LeadPilot/actions/runs/37351754168"
     },
     {
       "phase": 1,
       "status": "todo",
       "blocked_on": [
-        "D3",
-        "D5 (ruleset step only)"
+        "D5 (ruleset step only)",
+        "GitHub Pro (ruleset enforcement on a private repo)"
       ],
       "first_task": "repair tests/integration harness (54 failures) without weakening tests"
     },
@@ -99,11 +108,6 @@
   ],
   "open_p0_high": [
     {
-      "id": "F-DB-01",
-      "title": "playbook_scores not tenant-scoped (cross-tenant learning loop)",
-      "severity": "HIGH"
-    },
-    {
       "id": "GDPR-ACCOUNT",
       "title": "no export or deletion for user accounts",
       "severity": "HIGH"
@@ -119,17 +123,49 @@
       "severity": "HIGH"
     },
     {
-      "id": "RF-5",
-      "title": "one shared WhatsApp sender for all tenants",
+      "id": "P0-D-ENF",
+      "title": "public sign-up cannot be disabled; single-tenancy not enforced by code",
       "severity": "HIGH"
     }
   ],
   "decisions": {
     "D1": "unanswered",
-    "D2": "unanswered - diagnosis complete, options in BASELINE.md section 6",
-    "D3": "unanswered",
+    "D2": "deferred to Phase 3 (no production requests until then)",
+    "D3": "private, 2026-10-10",
     "D4": "n/a",
     "D5": "unanswered",
-    "D6": "unanswered"
+    "D6": "unanswered",
+    "P0-D": "self-hosted, single-tenant, 2026-10-04"
+  },
+  "rerated_under_p0d": [
+    {
+      "id": "F-DB-01",
+      "from": "HIGH",
+      "to": "MEDIUM",
+      "status": "OPEN"
+    },
+    {
+      "id": "RF-5",
+      "from": "HIGH",
+      "to": "MEDIUM",
+      "status": "OPEN"
+    }
+  ],
+  "offline_gate": {
+    "date": "2026-10-10",
+    "python": "3.12.3",
+    "commit": "a0c104b",
+    "code_equal_to": "2170a55",
+    "registry_lint_exit": 0,
+    "run_evals_exit": 0,
+    "run_evals_wall_s": 530.5,
+    "tests_collected": 3326,
+    "tests_executed": 3319,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 7,
+    "promote_exit": 0,
+    "promote_decision": "PROMOTE (1 soft warning: suite_runtime_s)",
+    "block_fixtures_exit": 0
   }
 }

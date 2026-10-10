@@ -1,38 +1,32 @@
 # Program progress
 
-Resume from this file, `status.json` and `git log`.
+Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
-## 2026-10-10 — Phase 0 (baseline)
+## 2026-10-10 — Phase 0 (baseline), cloud session: completed
 
-**State: incomplete on one step; stop condition met.**
+**State: Phase 0 done. The exit-gate stop condition is met (OPEN P0/HIGH items), so Phases 2–4 wait. Phase 1 may start.**
 
-Done:
+Done in this session:
 
-- Git state, open PRs (0), unmerged branches — `BASELINE.md` §2.
-- Every finding from `FINDINGS_REGISTER.md`, `NEXT_STEPS.md`, `audit-fixes/*` and the Sep-24 list reconciled against `master @ 2170a55` — `BASELINE.md` §3.
-- PostgreSQL suite run against the local compose database: 54 failed / 70 passed; the harness is stale — `BASELINE.md` §5.
-- Production read-only checks; missing-heartbeat cause confirmed by experiment; D2 options — `BASELINE.md` §6.
-- Help AI diagnostic query written and syntax-checked on a local migrated database — `help_ai_diagnostic.sql`.
-- Prompt-vs-reality discrepancies — `BASELINE.md` §9.
+- Dependencies installed on CPython 3.12.3 in `/home/user/.venvs/leadpilot312` (exit 0, 58 s).
+- **Offline gate (step 3) run to completion**, four commands exactly as `CLAUDE.md` lists them, nothing else running: all exit 0; 3,319 tests executed (3,326 collected, 7 skipped), 0 failed; `run_evals.py` 530.5 s wall; `promote.py` = PROMOTE with one soft runtime warning; all 3 hard gates proven to fire. Peak memory 1.3 GB — `BASELINE.md` §4.
+- Founder decisions recorded in `DECISIONS.md`: D3 (repo private, 2026-10-10), P0-D (self-hosted, single-tenant, 2026-10-04), D2 deferred to Phase 3.
+- F-DB-01 and RF-5 re-rated HIGH → MEDIUM under P0-D, with reasoning — `BASELINE.md` §3.5. GDPR account export/deletion, P0-5 per-account spend cap and plan enforcement are **not** downgraded.
+- New finding **P0-D-ENF (HIGH)**: public sign-up cannot be disabled, so single-tenancy is not enforced by the code — `BASELINE.md` §3.5.
+- Phase 1 inputs (GitHub Pro needed for the ruleset on a private repo; Actions-minutes estimate) — `BASELINE.md` §11.
+- Correction: `BASELINE.md` §9 row 9 was wrong (`CLAUDE.md` no longer names a migration chain since `609af9a`).
+- Non-English text check on `BASELINE.md`, `PROGRESS.md`, `status.json`: none found; nothing to rewrite.
 
-Not done:
-
-- **Offline gate (step 3).** `registry_lint` passed. `run_evals.py` was killed after ~40 minutes when the machine ran low on memory; `promote.py` and `verify_block_fixtures.py` did not run. CI for the same commit is green (run 37351754168). Needs one clean local run with nothing else on the machine.
-- **PR.** The three program files are committed locally on `program/phase-0-baseline`. Not pushed: `BASELINE.md` lists open security findings and the repository is public. `gh` is not installed, so a PR could not be opened from here in any case.
-
-Where the work lives:
-
-- Worktree `../leadpilot-wt-phase0`, branch `program/phase-0-baseline`, based on `origin/master`.
-- The main checkout is on `program/setup`, which is 67 commits behind `master`. Do not run a phase from it.
+Earlier (2026-10-10, laptop session): git state, findings reconciliation, PostgreSQL suite (54 failed / 70 passed, harness stale), production read-only checks and D2 diagnosis, Help AI diagnostic SQL, prompt-vs-reality discrepancies. The laptop's offline-gate run was killed for low memory; superseded by the run above.
 
 Open questions for the founders:
 
-1. Push `BASELINE.md` to the public repo as is, or make the repo private first (D3)?
-2. D2: paid worker, or a monitor on the worker URL?
-3. P0-D: is the product multi-tenant SaaS? (`CLAUDE.md` says so; no decision record exists.)
+1. D1 (website copy vs. code), D5 (required approval), D6 (status page key and DNS) are unanswered.
+2. Upgrade to GitHub Pro before the Phase 1 ruleset step, or accept an unenforced ruleset?
+3. Approve updating `CLAUDE.md` ("Multi-tenant", "~1,985 tests") to match P0-D and the measured count?
+4. Is sign-up open on the current Render production? (UNVERIFIED: no production requests were made in this session.)
 
 Next:
 
-- Finish step 3 (one clean run of the four gate commands).
-- Phase 1. First task: repair `tests/integration/` so the PostgreSQL suite is green without weakening any test; only then can `verify-backend-postgres` be a required check.
+- Phase 1. First task: repair `tests/integration/` so the PostgreSQL suite is green without weakening any test. Only then can `verify-backend-postgres` be a required check.
 - Phases 2–4 stay blocked until the OPEN P0/HIGH items in `BASELINE.md` §1 are fixed or accepted in writing.

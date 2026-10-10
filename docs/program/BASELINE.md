@@ -5,6 +5,11 @@ clean worktree with no `.env`. Every status below was checked against the code
 at that commit in this session. Nothing here is taken from an audit document
 without re-reading the file it points at.
 
+Updated 2026-10-10 in a cloud session: section 4 (offline gate run to
+completion), P0-D re-rating (3.5, `DECISIONS.md`), repository now private, a
+correction to section 9 row 9, and section 11 (Phase 1 inputs). No production
+requests were made in that session.
+
 Status vocabulary: **FIXED** (code read, guard present, test exists) ·
 **OPEN** (code read, defect present) · **UNKNOWN** (cannot be decided from the
 repository — needs production data, credentials or a decision).
@@ -15,24 +20,28 @@ remains; the residual is stated.
 
 ## 1. Verdict
 
-**Phase 0 is incomplete: the offline gate (step 3) did not finish (section 4).**
-Everything else in this file is complete.
+**Phase 0 is complete.** The offline gate finished in a cloud session on
+2026-10-10: all four commands exit 0, 3,319 tests executed, 0 failed,
+`promote.py` = PROMOTE with one soft runtime warning (section 4).
 
-**Exit gate 0 condition for stopping is met regardless: OPEN items at P0 / HIGH
-exist.** Phases 2–4 wait. Phase 1 (gates) may proceed, and its first task is
-repairing the PostgreSQL integration harness (section 5).
+**The exit gate 0 stop condition is met: OPEN items at P0 / HIGH exist.**
+Phases 2–4 wait. Phase 1 (gates) may proceed. Its first task is repairing the
+PostgreSQL integration harness (section 5).
+
+Deployment model decided (P0-D): **self-hosted, single-tenant**, 2026-10-04
+(`DECISIONS.md`). F-DB-01 and RF-5 are re-rated in section 3.5.
 
 OPEN at P0 / HIGH:
 
 | # | Item | Why it is still open |
 |---|---|---|
-| 1 | **F-DB-01 / cross-tenant learning loop** (HIGH on multi-tenant) | `playbook_scores` has no tenant column and `pattern_key` is a hash of ICP + tactics only, so two accounts with the same play share one score row. |
-| 2 | **GDPR export / deletion for user accounts** (HIGH, compliance) | No endpoint, service or task deletes or exports a `users` row. Lead erasure exists; account erasure does not. |
-| 3 | **P0-5 AI spend cap** (P0, partly closed) | Each strategy run is capped. There is no cap per account or per period, and three plans have unlimited strategies. |
-| 4 | **Plan enforcement** (HIGH, revenue) | `max_leads_per_strategy`, `max_sequence_steps` and `channels` are declared in `PLANS` and enforced nowhere. |
-| 5 | **RF-5 shared WhatsApp sender** (HIGH on multi-tenant) | One deployment-wide sender number. Inbound routing between tenants is a heuristic because of it. |
+| 1 | **GDPR export / deletion for user accounts** (HIGH, compliance) | No endpoint, service or task deletes or exports a `users` row. Lead erasure exists; account erasure does not. Not downgraded by P0-D. |
+| 2 | **P0-5 AI spend cap** (P0, partly closed) | Each strategy run is capped. There is no cap per account or per period, and three plans have unlimited strategies. Not downgraded by P0-D. |
+| 3 | **Plan enforcement** (HIGH, revenue) | `max_leads_per_strategy`, `max_sequence_steps` and `channels` are declared in `PLANS` and enforced nowhere. Not downgraded by P0-D. |
+| 4 | **P0-D-ENF single-tenancy not enforced** (HIGH, new) | `POST /auth/signup` (`app/api/auth.py:207`) accepts any visitor and no setting disables it. Until a deployment can be closed to outside sign-ups, the single-tenant re-ratings in 3.5 hold only by configuration that does not exist. |
 
-OPEN at MEDIUM: F-SEC-05 (website-builder NULL pool, deployment-global WhatsApp
+OPEN at MEDIUM: F-DB-01 (re-rated from HIGH, 3.5), RF-5 (re-rated from HIGH,
+3.5), F-SEC-05 (website-builder NULL pool, deployment-global WhatsApp
 templates), F-OPS-03 (two settings modules), F-AI-04 (no startup model check),
 F-QA-02 (integrations never run against live vendors).
 
@@ -46,7 +55,7 @@ Proposed fix order is in section 8.
 |---|---|---|
 | Trunk | `master`, `origin/master = 2170a55` (merge of PR #41, 2026-10-05) | `git fetch --all --prune`; `git rev-parse origin/master` |
 | Open PRs | **0** | GitHub REST `GET /repos/Rmasood1122/LeadPilot/pulls?state=open` (`gh` is not installed on this machine; the GitHub MCP server failed to connect) |
-| Repo visibility | **public**, default branch `master` | GitHub REST `GET /repos/Rmasood1122/LeadPilot` |
+| Repo visibility | **private** since 2026-10-10 (founder decision D3); it was public when this baseline was first built. Default branch `master` | founder statement; the earlier public state was read via GitHub REST `GET /repos/Rmasood1122/LeadPilot` |
 | Alembic | 72 files, single head `0070_linkedin_network_messages` | `python -m alembic heads` |
 | `program/setup` | **not merged**; 1 commit ahead of master, 67 behind (branched from `e0d4624`, 2026-10-03) | `git rev-list --left-right --count origin/master...origin/program/setup` |
 
@@ -80,11 +89,11 @@ either squash-merged under another SHA or abandoned — UNVERIFIED which.
 | P0-4 duplicate send | P0 | FIXED on SQLite; UNKNOWN on PostgreSQL | atomic claim `app/workers/outreach_tasks.py:357-384` (`rowcount != 1` → `lost_claim_race`); commit `cda7fc3`; `tests/test_duplicate_send_claim.py` | read code. The two-worker PostgreSQL race test the fix report calls for does not exist in `tests/integration/`. See section 5 for the PostgreSQL rerun of the existing test |
 | P0-5 AI spend cap | P0 | FIXED per strategy; **OPEN per account** | per-run budget: `app/services/usage_meter.py:191-205`, `app/workers/tasks.py:147,207`; bounds `app/api/strategies.py:57-66` ($0.50 – `pipeline_max_usd_ceiling` $50, default $15, `app/config.py:59-60`); `max_strategies` on create `app/api/strategies.py:128-139`; `tests/test_strategy_budget.py` (24 tests) | read code. grep for a monthly / per-account cap across `app/`: none. `scale`, `pro`, `enterprise` have `max_strategies: -1` (`app/core/plans.py:96,129,146`), so their ceiling is $50 × unlimited. Model calls outside the pipeline (support chat, website builder, reply classifiers, meeting AI) are under no dollar budget — only rate limits |
 | P0-6 admin playbook endpoint | P0 | FIXED | `app/api/admin.py:283-304` (ownership subquery, no bare `except`); commit `5ed9a3d`; `tests/test_admin_playbook_scores.py` | read code |
-| RF-5 shared WhatsApp sender | HIGH | **OPEN** (by current design) | one sender for the deployment: `app/config.py:137` `whatsapp_phone_number_id`, used at `app/integrations/whatsapp.py:114,264`; `app/api/whatsapp_templates.py:98-105` states it is "deployment-wide" | read code. No per-tenant sender model exists in `app/db/models.py` |
+| RF-5 shared WhatsApp sender | ~~HIGH~~ **MEDIUM** under P0-D (3.5) | **OPEN** (by current design) | one sender for the deployment: `app/config.py:137` `whatsapp_phone_number_id`, used at `app/integrations/whatsapp.py:114,264`; `app/api/whatsapp_templates.py:98-105` states it is "deployment-wide" | read code. No per-tenant sender model exists in `app/db/models.py` |
 | Prompt injection in `personalization_context.py` | HIGH | FIXED | `app/services/personalization_context.py:164,178-181,191` wrap post / news text in `prompt_safety.block` / `inline` under `prompt_safety.NOTICE`; commits `3a81a05`, `6df0dbe`; `tests/test_prompt_injection_containment.py` (17), `tests/test_outbound_injection_containment.py` (7) | read code |
 | Plan enforcement | HIGH | **OPEN** (partial) | enforced: `max_strategies` (`strategies.py:137`), `max_site_pages` (`website_builder.py:228`), `playbook_access` (`playbook.py:46,80,121`), `ab_testing` (`strategies_advanced.py:42`), `website_builder` (`website_builder.py:216`), LinkedIn network (`linkedin_network.py:37`). Not enforced: `max_leads_per_strategy`, `max_sequence_steps`, `channels` | grep over `app/`: `check_plan_limit(` has 2 call sites; `check_channel(` has 0; `PlanGate(` has 0 (docstring only); the three unenforced keys appear only in `plans.py` and `billing_catalog.py` |
 | GDPR export / deletion for user accounts | HIGH | **OPEN** | lead erasure exists (`app/api/leads.py:261`); LinkedIn-network erasure exists (`app/api/linkedin_network.py:135`). No route, service or task deletes or exports a user | grep over `app/` for user deletion / export / anonymisation: no match |
-| Cross-tenant learning-loop leak | HIGH | **OPEN** | same as F-DB-01 below | — |
+| Cross-tenant learning-loop leak | ~~HIGH~~ **MEDIUM** under P0-D (3.5) | **OPEN** | same as F-DB-01 below | — |
 
 ### 3.2 `docs/FINDINGS_REGISTER.md` (audit 2026-10-01)
 
@@ -109,7 +118,7 @@ either squash-merged under another SHA or abandoned — UNVERIFIED which.
 | F-OPS-07 vestigial / CVE-prone deps | POTENTIAL | FIXED (removal); **OPEN** (scan) | `python-jose`, `pandas`, `google-auth*` gone from both manifests (`ed8c0e5`). No `pip-audit` / `gitleaks` / `npm audit` in any workflow | grep manifests and `.github/workflows` |
 | F-REL-01 orphaned non-atomic send path | MEDIUM | FIXED | `app/workers/send_tasks.py` deleted (`1c8466d`). A stale mention remains in a docstring at `app/services/send_time_optimizer.py:5` | `ls`, grep |
 | F-REL-02 dead task name in monitoring | LOW | FIXED | `app/workers/monitoring.py:28-45`; `tests/test_monitoring_task_names.py` | read code |
-| F-DB-01 `playbook_scores` has no tenant column | HIGH (multi-tenant) | **OPEN** | `app/db/models.py:1616-1635` (unique on `pattern_key, variant`, no `user_id`); `app/services/icp_extraction.py:215-228` — the key is a SHA-256 of ICP + tactics and the docstring says sharing across strategies "is the point"; writer `app/workers/learning_tasks.py:146-164` | read code. `CLAUDE.md` calls the product multi-tenant, so the HIGH rating applies. No written P0-D decision was found in the repo |
+| F-DB-01 `playbook_scores` has no tenant column | ~~HIGH (multi-tenant)~~ **MEDIUM** under P0-D (3.5) | **OPEN** | `app/db/models.py:1616-1635` (unique on `pattern_key, variant`, no `user_id`); `app/services/icp_extraction.py:215-228` — the key is a SHA-256 of ICP + tactics and the docstring says sharing across strategies "is the point"; writer `app/workers/learning_tasks.py:146-164` | read code. `CLAUDE.md` calls the product multi-tenant, so the HIGH rating applies. No written P0-D decision was found in the repo |
 | F-DB-02 admin playbook-scores bad column | MEDIUM | FIXED | see P0-6 | see P0-6 |
 | F-DB-03 missing index on messages | MEDIUM | FIXED | `alembic/versions/0065_messages_dispatch_index.py`; `app/db/models.py:1572` | read migration |
 | F-DB-04 redundant `playbook_scores.score` | LOW | **OPEN** | `app/workers/learning_tasks.py:158` binds `:reply_rate` into both columns | read code |
@@ -129,7 +138,7 @@ either squash-merged under another SHA or abandoned — UNVERIFIED which.
 | P0-A one trunk | FIXED | `evals/`, `eval-gate.yml` and the four P0 test files are all on `master` |
 | P0-B suspension | FIXED | F-SEC-01 |
 | P0-C Docker manifest | FIXED in manifest; image UNKNOWN | F-OPS-01 |
-| P0-D deployment-model decision | **OPEN** | no written decision found; `CLAUDE.md` says multi-tenant |
+| P0-D deployment-model decision | **DECIDED** 2026-10-04: self-hosted, single-tenant | recorded in `DECISIONS.md` on 2026-10-10. `CLAUDE.md` still says multi-tenant (conflict reported, not edited). Enforcement gap: P0-D-ENF (3.5) |
 | P1-A … P1-E | FIXED | F-SEC-02, F-SEC-03, F-AI-01 (per strategy), F-AI-02, F-OPS-02 |
 | P1-C per-account cost cap | **OPEN** | P0-5 |
 | P1-F suppression tenancy | FIXED | made admin-only rather than tenant-scoped |
@@ -144,40 +153,76 @@ either squash-merged under another SHA or abandoned — UNVERIFIED which.
 - Two-worker PostgreSQL race test for the send claim (P0-4 report). OPEN.
 - `admin_bootstrap.py` hard-coded email (P0-3 report): no e-mail literal found in `app/core/admin_bootstrap.py` now. FIXED.
 
+### 3.5 Re-rating under P0-D (self-hosted, single-tenant, decided 2026-10-04)
+
+Model applied: one deployment (database, Redis, API, worker) per customer
+organisation. All user accounts in a deployment belong to that customer.
+
+| ID | Was | Now | Reasoning |
+|---|---|---|---|
+| F-DB-01 shared `playbook_scores` | HIGH | **MEDIUM** | The HIGH rating came from one customer's outcomes changing another customer's outreach. With one customer per deployment, every row in `playbook_scores` belongs to the same customer, and pooling across that customer's strategies is the documented intent (`app/services/icp_extraction.py:219-222`: "share a key, which is the point"). The rows hold aggregate rates and sample sizes only, no lead data. **Why not LOW:** agency mode (`app/services/client_workspaces.py`) puts several of an agency's clients, which are separate books of business, into one deployment. Their outcomes still pool into one score row, against the isolation that module promises ("every number a client sees is computed over that client's campaigns only"). Fix (add an owner column, re-key the upsert) is unchanged. It is no longer ahead of the compliance items. |
+| RF-5 one WhatsApp sender per deployment | HIGH | **MEDIUM** | One sender per deployment is one sender per customer, which is the correct model for a single-tenant install. The cross-tenant inbound routing heuristic (F-SEC-02 residual) no longer crosses a tenant boundary. **Why not LOW:** under agency mode every client's prospects see the agency's single WhatsApp number. For email the code enforces per-client sending domains in the send path (`client_workspaces.domain_allowed()`), and nothing equivalent exists for WhatsApp. Help-center article 10 must state the shared-sender model. |
+| GDPR account export / deletion | HIGH | **HIGH (unchanged)** | Founder instruction, and on the merits: the right of access and erasure belongs to every data subject. A single-tenant install still holds user accounts and has no way to export or erase them. |
+| P0-5 per-account AI spend cap | P0 | **P0 (unchanged)** | Founder instruction, and on the merits: an unlimited plan runs $50 × unlimited strategies, plus model calls outside the pipeline with no dollar budget. Who pays that bill does not change with tenancy. |
+| Plan enforcement | HIGH | **HIGH (unchanged)** | Founder instruction, and on the merits: advertised limits are unenforced whatever the tenancy model. |
+| **P0-D-ENF** (new) | — | **HIGH, OPEN** | Both downgrades above assume no outsider can create an account in a deployment. The code does not enforce that. `POST /auth/signup` (`app/api/auth.py:207-250`) creates an account for any visitor who passes the rate limit and network guard. A grep of `app/` for a sign-up switch (`allow_signup`, `signup_enabled`, `invite_only`, `registration_enabled` and variants) finds nothing. Billing, Stripe plans and public pricing also exist, which is a SaaS shape. Any deployment with open sign-up, including the current Render production if it accepts sign-ups (UNVERIFIED: no production requests in this session), is multi-tenant in practice, and F-DB-01 and RF-5 go back to HIGH there. Fix: an invite-only / closed-sign-up setting that defaults to closed in production, with a test. |
+
 ---
 
 ## 4. Offline gate (step 3)
 
-Run in the clean worktree at `2170a55`, Python 3.12.10, Windows 11.
-`python3` on this machine is the Microsoft Store stub, so the virtualenv's
-`python.exe` was used; the commands are otherwise as `CLAUDE.md` lists them.
+**Run 2026-10-10, 08:50:46–08:59:37 UTC**, in a Claude Code cloud container:
+Linux, 4 vCPU, 15 GB RAM, CPython **3.12.3** in a fresh virtualenv
+(`/home/user/.venvs/leadpilot312`). Checkout at `a0c104b` on
+`program/phase-0-baseline`. It differs from `master @ 2170a55` only by the five
+files under `docs/program/` (`git diff --stat 2170a55 a0c104b`), so the result
+applies to `2170a55` code. The venv's `bin/` was first on `PATH`, so `python3`
+resolved to 3.12.3. The four commands ran exactly as `CLAUDE.md` lists them,
+one after another, with no other workload in the container. Dependencies were
+installed first with
+`pip install -r requirements.txt fakeredis pyyaml pytest pytest-asyncio pytest-mock`
+(exit 0, 58 s).
 
-**NOT COMPLETED. The offline gate has no result for this baseline.**
+| # | Command | Exit | Wall time | Result |
+|---|---|---|---|---|
+| 1 | `python3 evals/tools/registry_lint.py evals/registry.yaml` | **0** | 0.05 s | `IE-06 registry lint: OK (evals/registry.yaml)` |
+| 2 | `python3 evals/run_evals.py` | **0** | **530.5 s** (8 min 51 s) | junit: **3,326 collected · 3,319 executed · 0 failed · 0 errors · 7 skipped**; pytest time 510.8 s. Candidate: `compliance_suite_pass_rate 1.000`, `full_suite_pass_rate 1.000`, `offline_test_count 3319`, `suite_runtime_s 510.843` |
+| 3 | `python3 evals/tools/promote.py` | **0** | 0.08 s | **`DECISION: PROMOTE (1 soft warning(s) -> human review)`** — three hard metrics PASS; `suite_runtime_s` WARN: 510.8 vs baseline 202.0 (band 120) |
+| 4 | `python3 evals/fixtures/verify_block_fixtures.py` | **0** | 0.32 s | `All 3 hard gates proven to fire; healthy run promotes.` (compliance, full-suite and count gates each BLOCK with exit 1; healthy candidate PROMOTEs with exit 0) |
 
-| # | Command | Exit | Result |
-|---|---|---|---|
-| 1 | `python evals/tools/registry_lint.py evals/registry.yaml` | 0 | `IE-06 registry lint: OK`, 1 s |
-| 2 | `python evals/run_evals.py` | — | **killed after ~40 minutes** by the Claude Code harness because the machine ran critically low on memory. No junit file and no `evals/candidate.json` were written. Test count, failures and runtime: UNVERIFIED |
-| 3 | `python evals/tools/promote.py` | — | not run (needs the candidate from step 2) |
-| 4 | `python evals/fixtures/verify_block_fixtures.py` | — | not run |
+Peak system memory during the run: **1,309 MB** (sampled every 5 s with
+`free -m`). The suite runs in one pytest process (no `pytest-xdist`).
 
-What is known: the pytest process was alive and consuming CPU for the whole
-period (about 1,230 CPU-seconds at minute 36), so it was running tests, not
-hung. It ran at the same time as the PostgreSQL suite and the Docker Desktop
-stack on the same laptop (16 unrelated containers were also up), which is the
-likely reason it was slow and the machine ran out of memory. That is an
-explanation, not a measurement.
+The 7 skips: 5 × "device-token upsert requires PostgreSQL ON CONFLICT", 1 ×
+`LEADPILOT_LIVE_GOOGLE_ACCESS_TOKEN not set`, 1 × `LEADPILOT_LIVE_ZOOM_* not set`.
 
-What this means: sections 3 and 5 stand on their own evidence (code read,
-PostgreSQL runs). The claim "the offline suite is green on `master @ 2170a55`"
-is **UNVERIFIED locally**. CI is the other source: the `eval-gate` workflow
-run for this exact commit concluded `success` on 2026-10-05
-(https://github.com/Rmasood1122/LeadPilot/actions/runs/37351754168, read from
-the public GitHub API). That run executes the same four commands. Its test
-count and runtime were not read (job logs need authentication).
+Also measured, because CI runs it after these four commands: the
+`eval-gate.yml` live-fire step (`run_evals.py --sabotage compliance --from-junit
+out_evals/junit.xml`, then `promote.py` on that candidate) took **9.3 s**.
+`promote.py` returned **exit 1 / BLOCK**, as the workflow requires.
 
-To finish this step: close other workloads, then run the four commands in
-`CLAUDE.md` in the `leadpilot-wt-phase0` worktree, on their own.
+What the numbers say:
+
+- **The offline suite is green on `2170a55`, verified locally.** This replaces the
+  earlier UNVERIFIED entry. It agrees with CI run 37351754168 (`success`).
+- **Test count is 3,319, not "~1,985".** `CLAUDE.md`, `eval-gate.yml`,
+  `run_evals.py`'s docstring and `STAR_PROMPT.md` all say ~1,985.
+  `evals/baseline.json` (sealed, last changed `f73c930`, 2026-09-29) records
+  `offline_test_count` 1985 and `suite_runtime_s` 202.0. The count gate is a
+  floor of 1,900, so the hard gate still guards against mass deletion. It now
+  allows about 1,400 tests to disappear without a BLOCK.
+- **Runtime soft warning.** 510.8 s is 2.5× the sealed baseline, for 1.67× the
+  tests. It is soft and does not block. Refreshing the baseline is a sealed-file
+  change and needs its own reviewed PR. Not done here.
+- **Why the laptop run died.** On this container the suite peaked at about
+  1.3 GB and finished in under 9 minutes. The laptop run had the PostgreSQL
+  suite, Docker Desktop and 16 other containers running alongside it. The
+  explanation in the earlier version of this section is consistent with that,
+  but it is still not a measurement of the laptop.
+
+Earlier attempt (laptop, Windows 11, Python 3.12.10): `registry_lint` exit 0;
+`run_evals.py` killed after ~40 minutes for low memory; steps 3–4 not run.
+Superseded by the run above.
 
 ---
 
@@ -300,16 +345,17 @@ Confirmed in code: 9 FAQ entries (`app/services/support_kb.py:56-146`),
 
 ## 8. Proposed fix order
 
-Each is its own branch and PR through the gate. Items 1–2 need a founder
-decision before any code.
+Each is its own branch and PR through the gate. Item 1 needs a founder
+decision (retention) before any code.
 
-1. **Decide the deployment model in writing (P0-D).** `CLAUDE.md` says multi-tenant; RF-5, F-DB-01 and F-SEC-05 are only defects under that model. One line in `CLAUDE.md` settles their severity.
-2. **GDPR account export and deletion.** Legal exposure with no workaround in the product today; an erasure request can only be met by hand in the database. Needs a founder decision on what is retained (suppression tombstones, audit trail, billing records).
-3. **F-DB-01 tenant-scope `playbook_scores`.** Add `user_id`, re-key the upsert, backfill or reset. This is the one confirmed path by which one customer's outcomes change another customer's outreach.
-4. **P0-5 per-account AI budget.** A monthly dollar cap per account, checked where the per-strategy cap is checked, covering model calls outside the pipeline.
-5. **Plan enforcement.** Call `check_channel` on the send / sequence path and `check_plan_limit` for `max_leads_per_strategy` and `max_sequence_steps`. Paying tiers are currently distinguished by three limits out of the ones advertised.
-6. **F-SEC-05.** Dedicated workspace for the marketing site; admin-gate template writes.
-7. **RF-5 per-tenant WhatsApp sender.** Largest change; removes the F-SEC-02 heuristic. Until then, state the shared-sender model truthfully in help-center article 10.
+0. ~~Decide the deployment model in writing (P0-D).~~ **Done:** self-hosted, single-tenant, decided 2026-10-04 (`DECISIONS.md`). Still to do: the "Multi-tenant" line in `CLAUDE.md` (founder-approved doc change).
+1. **GDPR account export and deletion.** Legal exposure with no workaround in the product today. An erasure request can only be met by hand in the database. Needs a founder decision on what is retained (suppression tombstones, audit trail, billing records).
+2. **P0-D-ENF closed sign-up.** A setting that makes `POST /auth/signup` refuse outsiders (invite-only), closed by default in production, with a test. A small change, and the one that makes the single-tenant re-ratings true in a running deployment.
+3. **P0-5 per-account AI budget.** A monthly dollar cap per account, checked where the per-strategy cap is checked, covering model calls outside the pipeline.
+4. **Plan enforcement.** Call `check_channel` on the send / sequence path and `check_plan_limit` for `max_leads_per_strategy` and `max_sequence_steps`. Paying tiers are currently distinguished by three limits out of the ones advertised.
+5. **F-SEC-05.** Dedicated workspace for the marketing site; admin-gate template writes.
+6. **F-DB-01 owner-scope `playbook_scores`** (MEDIUM under P0-D). Add an owner column (per account, or per client workspace in agency mode), re-key the upsert, backfill or reset.
+7. **RF-5 per-client WhatsApp sender** (MEDIUM under P0-D; matters for agency mode). Largest change. Until then, state the shared-sender model truthfully in help-center article 10.
 8. Then: PostgreSQL two-worker race test (lands naturally in Phase 1 `verify-backend-postgres`), suspended-login issuance, F-AI-04 startup model check, F-OPS-03.
 
 ---
@@ -323,10 +369,10 @@ decision before any code.
 | 3 | `app/api/support.py:187` is `GET /support/faq` | It is at `:178` |
 | 4 | Worker URL is in `render.yaml` / deploy docs | `render.yaml` has no URL. `DEPLOY_RENDER_FREE.md:245` gives `leadpilot-worker.onrender.com`, which is 404. The real host has a `-708k` suffix. `DEPLOY_RENDER_FREE.md:155` likewise gives `leadpilot-api.onrender.com` for `PUBLIC_BASE_URL`; the real host is `leadpilot-api-ph3t` |
 | 5 | Working method 5 and `<market_research>` cite `coding_standards.md` and `codebase_map` | Neither file exists in the repository |
-| 6 | "~1,985 tests" | UNVERIFIED — the offline suite did not complete (section 4) |
+| 6 | "~1,985 tests" | **3,319 executed** (3,326 collected, 7 skipped), 0 failed, 510.8 s (section 4). The same stale figure is in `CLAUDE.md`, `eval-gate.yml`, `run_evals.py` and the sealed `evals/baseline.json` |
 | 7 | UptimeRobot: "1 active keyword monitor" able to detect degraded | The keyword monitor has reported **UP for 6 d 14 h** while `/health` was `degraded`. Either its keyword matches a component-level `"status":"ok"` (database, redis) or it is not a must-contain rule. It does not detect a degraded API. Keyword configuration UNVERIFIED |
 | 8 | Layer 4: set Render Auto-Deploy to "After CI Checks Pass" | Auto-deploy is currently **off** on both live services. Deploys are manual today |
-| 9 | `CLAUDE.md` "Known stale spots": chain is 0001…0047 (49 files) | 72 files, head `0070`. `CLAUDE.md` itself is now stale on this point |
+| 9 | `CLAUDE.md` "Known stale spots": chain is 0001…0047 (49 files) | **Correction (2026-10-10):** the earlier version of this row was wrong. `CLAUDE.md` on `master` no longer names a count or head; commit `609af9a` (GAP-106, 2026-10-04) removed that claim. The real chain is 72 migration files with a single head, `0070` |
 | 10 | D2: production `/health` is degraded | True at the start of this session; `ok` after the step-5 probe woke the worker; will degrade again when it sleeps |
 
 Confirmed as stated: trunk and merged feature branches; three workflows only;
@@ -336,7 +382,8 @@ Confirmed as stated: trunk and merged feature branches; three workflows only;
 proxy statement (`docs/features/mailbox-health.md:37-43`); `system_settings.DEFAULTS`;
 `plans.PLANS`; `FEATURES.md` 1,179 lines; 31 files in `docs/features/`;
 `docs/` excluded from the image by `.dockerignore:92`; repo public while
-`README.md:164` says "Private and proprietary"; suspension fix at `auth.py:207`.
+`README.md:164` says "Private and proprietary" (resolved: the repo has been
+private since 2026-10-10, D3); suspension fix at `auth.py:207`.
 
 ---
 
@@ -348,4 +395,90 @@ proxy statement (`docs/features/mailbox-health.md:37-43`); `system_settings.DEFA
 4. `app/services/send_time_optimizer.py:5` documents an integration with `send_tasks.py`, which no longer exists.
 5. `requirements.txt:43` still carries a `TODO: verify` on the firebase-admin version.
 6. `.dockerignore:92` excludes `docs/` — Phase 2 must change this for the help-center corpus to ship.
-7. This file lists open security findings and the repository is public (D3).
+7. ~~This file lists open security findings and the repository is public (D3).~~ Resolved: the repository was made private on 2026-10-10.
+8. `.github/workflows/android-release.yml` triggers on push to `main`. The trunk is `master`, so merges never build the Android app; only `release/*` / `v*.*.*` tags and manual dispatch do.
+9. `evals/baseline.json` (sealed) is stale: `offline_test_count` 1985 and `suite_runtime_s` 202.0 against measured 3,319 and 510.8. The 1,900 count floor now lets ~1,400 tests be deleted without a BLOCK. A baseline refresh is its own reviewed PR.
+10. `CLAUDE.md` line 11 says "Multi-tenant", which contradicts P0-D. Line 19 says "~1,985 tests".
+
+---
+
+## 11. Phase 1 inputs
+
+### 11.1 Repository is private, so the Layer 4 ruleset needs GitHub Pro
+
+The repository was made private on 2026-10-10 (D3, `DECISIONS.md`). On GitHub
+Free, protected branches and rulesets are available only on public
+repositories. On a private repository they need **GitHub Pro** (personal
+account) or Team. Until the account is on Pro, `scripts/gate/ruleset_master.json`
+can be written and reviewed, but `apply_ruleset.sh` will not produce an
+enforced rule on `master`. With no enforced rule, "nothing reaches `master`
+without passing CI" is advisory: a direct push or a merge with red checks is
+still possible. Layers 1–3 (local scripts, Claude Code hooks, CI workflows) do
+not depend on the plan.
+
+### 11.2 GitHub Actions minutes per PR
+
+Allowances for private repositories: **2,000 min/month on Free, 3,000 on Pro**
+(Linux runners, 1× multiplier). Public repositories were not metered, so this
+budget starts to matter only now that the repo is private.
+
+**One `eval-gate` run**, built from the timings measured in section 4:
+
+| Step in `eval-gate.yml` | Time | Source |
+|---|---|---|
+| checkout + setup-python | ~0.3 min | estimate, not measured |
+| `pip install …` (the workflow has no pip cache) | 1.0 min | measured here: 58 s |
+| registry lint + `run_evals.py` + `promote.py` + block fixtures | 8.85 min | measured: 0.05 + 530.5 + 0.08 + 0.32 s |
+| live-fire sabotage + `promote.py` | 0.15 min | measured: 9.3 s |
+| **Total** | **~10.3 min → billed 11 min** | GitHub rounds each job up to the whole minute |
+
+Caveat: the measurement is from a 4-vCPU cloud container. GitHub's standard
+Linux runner for private repositories has fewer cores. The suite runs in one
+process, so per-core speed matters more than core count, and the runner's
+per-core speed is UNVERIFIED. As a pessimistic case, a runner 1.5× slower
+gives ~16 billed minutes per run.
+
+**Runs per PR.** `eval-gate.yml` triggers on every `push` (any branch) **and**
+every `pull_request`. Each commit pushed to a branch with an open PR therefore
+runs the full suite **twice**: once for `push`, once for `pull_request:
+synchronize`. A PR that is pushed, opened, updated N more times and merged
+costs:
+
+- 1 run for the first branch push
+- 1 run for `pull_request: opened`
+- 2 runs for each of the N follow-up pushes
+- 1 run for the merge commit's `push` to `master`
+
+That is **3 + 2N runs**.
+
+| PR shape | Runs | Minutes at 11 / run | Minutes at 16 / run |
+|---|---|---|---|
+| N = 0 (open, merge, no review fixes) | 3 | 33 | 48 |
+| N = 2 (two review / fix rounds) | 7 | 77 | 112 |
+| N = 4 | 11 | 121 | 176 |
+
+**PRs per month this allows** (eval-gate only, nothing else using minutes):
+
+| Plan | N = 0, 11 min | N = 2, 11 min | N = 2, 16 min |
+|---|---|---|---|
+| Free, 2,000 min | 60 | 25 | 17 |
+| Pro, 3,000 min | 90 | 38 | 26 |
+
+Planning figure: **about 25 PRs/month on Free and 38 on Pro** at two fix
+rounds per PR. That is before Phase 1's own sabotage PRs (one per required
+check), and before the `verify-*` jobs Phase 1 adds. Those jobs include a
+PostgreSQL suite (~19 min locally in section 5, though that run was inflated by
+the parallel offline suite), a Docker image build, a frontend build and
+Playwright. They could double or triple the per-PR cost.
+
+Levers (each is a separate decision, none applied here):
+
+- Run the suite once per commit. Restrict `push` to `master` and keep
+  `pull_request`. This roughly halves the cost (2 + N runs instead of 3 + 2N).
+  `eval-gate.yml` is sealed, so this is its own reviewed PR.
+- Add `cache: pip` to `setup-python`: saves under 1 min per run.
+- `concurrency` with `cancel-in-progress` (planned for `verify.yml`): a rapid
+  second push cancels the first run instead of paying for both.
+- Path filters on the Phase 1 `verify-*` jobs (already in the plan), so a
+  docs-only or incident-only PR does not pay for PostgreSQL, image and
+  Playwright runs.
