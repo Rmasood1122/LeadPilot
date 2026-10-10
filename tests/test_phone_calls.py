@@ -344,7 +344,12 @@ class TestApi:
         assert detail.json()["id"] == str(placed_call.id)
         assert detail.json()["voicemail_text"] == "Hi Sara, AI assistant here."
 
-    def test_call_now(self, client, db_session, phone_lead, voice, calling_on, fake_claude):
+    def test_call_now(self, client, db_session, phone_lead, voice, calling_on, fake_claude,
+                      test_user):
+        # Plan enforcement: AI calls need a plan with the phone channel (Scale
+        # and up); this test is about the call path, not plans.
+        test_user.plan = m.PlanTier.SCALE
+        db_session.commit()
         resp = client.post(f"/leads/{phone_lead.id}/call", json={})
         assert resp.status_code == 201, resp.text
         assert resp.json()["status"] == "ringing"

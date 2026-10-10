@@ -53,7 +53,12 @@ class TestSourceEndpoint:
                               json={"icp_criteria": criteria})
         assert r.json()["icp_criteria_json"] == criteria
 
-    def test_max_leads_capped_by_settings(self, leads_client, verified_strategy):
+    def test_max_leads_capped_by_settings(self, leads_client, verified_strategy, db_session,
+                                          test_user):
+        # Plan enforcement caps Free at 100 leads per strategy; Scale allows
+        # 10,000, so only the LEADS_MAX_PER_RUN setting is under test here.
+        test_user.plan = m.PlanTier.SCALE
+        db_session.commit()
         r = leads_client.post(f"/strategies/{verified_strategy.id}/leads/source",
                               json={"max_leads": 1000})
         assert r.json()["requested_leads"] == 200  # LEADS_MAX_PER_RUN default
@@ -129,7 +134,7 @@ class TestGdprDelete:
 
         source = FakeLeadSource(feed=[make_raw(99, email=email)])
         counts = source_leads_impl(db_session, batch.id, source=source)
-        assert counts == {"added": 0, "duplicates": 0, "suppressed": 1}, \
+        assert counts == {"added": 0, "duplicates": 0, "suppressed": 1, "plan_limit": 0}, \
             "the suppression tombstone blocks re-sourcing, no exceptions"
 
     def test_delete_unknown_lead_404(self, leads_client):
