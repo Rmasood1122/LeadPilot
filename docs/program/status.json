@@ -132,14 +132,22 @@
         {
           "id": "1.6",
           "title": "verify.yml deep checks (postgres, frontend, image, security) + post-merge alarm",
-          "status": "in_progress",
+          "status": "done (PR #52 open, stacked on #51); sabotage proof PR #53 closed",
           "branch": "claude/gate-verify-workflows",
-          "evidence": "docs/program/plans/phase1-06-verify-workflows.md"
+          "evidence": "docs/program/plans/phase1-06-verify-workflows.md",
+          "pr": "https://github.com/Rmasood1122/LeadPilot/pull/52"
         },
         {
           "id": "1.7",
           "title": "GATES.md, deploy-gating founder steps (Render/Vercel), minutes report, sabotage proofs",
-          "status": "todo"
+          "status": "in_progress",
+          "branch": "claude/gate-docs",
+          "evidence": "docs/program/GATES.md",
+          "blocked_on": [
+            "founders: Render Auto-Deploy = After CI Checks Pass (both services)",
+            "founders/Ahmad: Vercel Deployment Checks",
+            "required_checks.txt += verify-* after a green verify run on master"
+          ]
         },
         {
           "id": "PD-2",

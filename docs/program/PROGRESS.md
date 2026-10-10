@@ -2,6 +2,17 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+## 2026-10-10 — Phase 1, items 1.6 and 1.7, cloud session
+
+**State: all Phase 1 PRs open: #47, #48, #49, #50, #51, #52 and this one (GATES.md). Merge order: #48 → #47 → #49 → #50 → #51 → #52 → this.**
+
+- 1.6 (#52): `verify.yml` (postgres, frontend, image, security) + `post-merge-alarm.yml`. Validated locally on PostgreSQL 16 + Redis 7 (integration 132 passed; migration round-trip exit 0).
+- Sabotage proof (#53, closed): all four verify jobs failed at the intended step. The first run exposed a scanner bug (`db\b` excluded `db.example.com`); fixed in #51 with regression tests; second run red as required.
+- PD-2 (#50): `frontend/package-lock.json` out of sync; `npm ci` failed on master. Fixed; Vercel preview build green; vitest 721 passed.
+- 1.7: `docs/program/GATES.md` — layers, what is not enforced, proofs with run URLs, founder steps for Render/Vercel deploy gating, minutes.
+
+Next (after merges): add `verify-*` to `required_checks.txt` once green on master; founders set Render/Vercel deploy gating; then Phase 1 exit. Open P0/HIGH items (spend cap, GDPR account export/deletion, plan enforcement, sign-up shut-off P0-D-ENF) are next, one PR each.
+
 ## 2026-10-10 — Phase 1, items 1.2, 1.3, 1.5, cloud session
 
 **State: PRs #47 (1.2) and #48 (1.4) green; #49 (1.3) open; item 1.5 PR stacked on #48.**
