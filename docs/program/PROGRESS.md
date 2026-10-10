@@ -2,6 +2,15 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+## 2026-10-10 — Phase 1, items 1.2, 1.3, 1.5, cloud session
+
+**State: PRs #47 (1.2) and #48 (1.4) green; #49 (1.3) open; item 1.5 PR stacked on #48.**
+
+- 1.2 (#47, sealed): `eval-gate.yml` runs on `pull_request` + `push` to master only; superseded PR runs cancelled. Verified on #47: one `gate` run per commit, no `push` run on the branch.
+- 1.3 (#49, sealed): `offline_test_count` floor 1,900 → 3,150; baseline rebuilt from 2 runs (3,319 tests, 436.7 s); fixtures re-measured with real sabotage runs. PROMOTE; all hard gates fire; live-fire BLOCK.
+- 1.5: `scripts/gate/quick_gate.sh` (secrets, syntax, critical lint, single Alembic head, registry lint, related + sealed tests, frontend if changed; stamps the tree on a clean full pass), `scan_secrets.py`, `full_gate.sh`, `.githooks/pre-push` + `install_hooks.sh`, Claude hooks `require_gate.py` (no `--no-verify`, no unstamped push), `protect_sealed.py` (gate files only on `gate/`/`claude/gate-` branches), `stop_check.py` (once per stop, never loops). Tests: `tests/test_gate_scripts.py`.
+
+
 ## 2026-10-10 — Phase 1, item 1.4 (safe_merge + merge hook), cloud session: PR open
 
 **State: merge gate built and tested; PR open. PRs #44, #45, #46 are merged (INC-44/45 recorded in `DECISIONS.md`).**

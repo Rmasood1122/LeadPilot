@@ -26,6 +26,9 @@ Merge policy B (`docs/program/DECISIONS.md` MERGE-B): merge to `master` only via
 `scripts/gate/safe_merge.sh <PR> [--dry-run]` (all required checks in
 `scripts/gate/required_checks.txt` green, PR not a draft, up to date, squash);
 co-founder review follows the merge. Never merge from the web UI or with `gh pr merge`.
+Before every push: `scripts/gate/quick_gate.sh` (stamps the commit; the pre-push hook
+and Claude hooks require the stamp). Once per clone: `scripts/gate/install_hooks.sh`.
+Before marking a PR ready: `scripts/gate/full_gate.sh` (runs what CI runs).
 
 ## Sealed files — do not touch inside a feature task
 `evals/registry.yaml`, `evals/compliance_testset.yaml`, `evals/baseline.json`,

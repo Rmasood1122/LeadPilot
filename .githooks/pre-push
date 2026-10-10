@@ -1,0 +1,40 @@
+#!/bin/sh
+# LeadPilot pre-push hook. Install once per clone: scripts/gate/install_hooks.sh
+#
+# 1. Refuses any push whose destination is master or main (MERGE-B: master
+#    changes only through scripts/gate/safe_merge.sh).
+# 2. Accepts a pushed commit only if its tree passed scripts/gate/quick_gate.py
+#    (stamp in <git-common-dir>/leadpilot-gate/<tree>.ok). If the pushed
+#    commit is the checked-out HEAD and has no stamp, the quick gate runs now.
+#
+# `git push --no-verify` skips this hook; Claude Code sessions are blocked
+# from using it by .claude/hooks/require_gate.py, and CI is the authority.
+
+z40=0000000000000000000000000000000000000000
+PY="${PYTHON:-python3}"
+command -v "$PY" >/dev/null 2>&1 || PY=python
+root=$(git rev-parse --show-toplevel) || exit 1
+common=$(git rev-parse --git-common-dir) || exit 1
+case "$common" in /*) ;; *) common="$root/$common" ;; esac
+stampdir="$common/leadpilot-gate"
+head=$(git rev-parse HEAD)
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/master|refs/heads/main)
+      echo "pre-push: pushing to ${remote_ref#refs/heads/} is refused. Open a PR and merge with scripts/gate/safe_merge.sh." >&2
+      exit 1 ;;
+  esac
+  [ "$local_sha" = "$z40" ] && continue   # branch deletion
+  tree=$(git rev-parse "$local_sha^{tree}") || exit 1
+  [ -f "$stampdir/$tree.ok" ] && continue
+  if [ "$local_sha" = "$head" ]; then
+    echo "pre-push: no quick-gate stamp for $local_ref; running scripts/gate/quick_gate.py ..." >&2
+    "$PY" "$root/scripts/gate/quick_gate.py" </dev/null || exit 1
+    [ -f "$stampdir/$tree.ok" ] || { echo "pre-push: quick gate did not stamp this commit (uncommitted changes?)." >&2; exit 1; }
+  else
+    echo "pre-push: $local_ref is not checked out and has no quick-gate stamp. Check it out and run scripts/gate/quick_gate.sh." >&2
+    exit 1
+  fi
+done
+exit 0
