@@ -2,6 +2,17 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+## 2026-10-10 — Phase 1, item 1b (PD-1 webhook schema), cloud session: PR open
+
+**State: PostgreSQL integration suite 132 passed / 0 failed with migration 0071. Stacked on PR #44; merge #44 first.**
+
+- Migration `0071_webhook_schema_sync`: `webhook_targets.event_types` text[] → json; `webhook_deliveries.payload_json` text → json (invalid JSON kept as `legacy_text`); `last_status_code` (copied from `last_response_code`) and `delivered_at` added. Nothing dropped. Downgrade tested.
+- Correction: `subject_line_patterns` is NOT part of PD-1. Live raw SQL matches the migrated table; the ORM model is stale. Reported only.
+- Deploy: the next API deploy runs 0071 on Neon. Founders: run the read-only query in `docs/program/plans/phase1-01b-pd1-webhook-schema.md` first.
+- Detail: `docs/program/plans/phase1-01b-pd1-webhook-schema.md`.
+
+Next: item 2 (sealed PR: eval-gate.yml triggers).
+
 ## 2026-10-10 — Phase 1, item 1 (PostgreSQL integration repair), cloud session: PR open, suite NOT green
 
 **State: 54 failed / 70 passed → 125 passed / 4 errors. The 4 errors are product defect PD-1, reported, not fixed. Waiting on founder review of the PR and on the A/B merge-policy answer (Amendment 0).**

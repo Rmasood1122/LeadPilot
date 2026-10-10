@@ -91,6 +91,16 @@
           ]
         },
         {
+          "id": "1.1b",
+          "title": "PD-1: migration 0071 syncs webhook tables with the model",
+          "status": "in_progress",
+          "branch": "claude/pd1-webhook-schema",
+          "pr": null,
+          "depends_on": "https://github.com/Rmasood1122/LeadPilot/pull/44",
+          "evidence": "docs/program/plans/phase1-01b-pd1-webhook-schema.md",
+          "result": "tests/integration 132 passed / 0 failed"
+        },
+        {
           "id": "1.2",
           "title": "sealed PR: eval-gate.yml triggers = pull_request + push to master",
           "status": "todo"
@@ -209,9 +219,9 @@
   "product_defects": [
     {
       "id": "PD-1",
-      "title": "webhook_targets.event_types is text[] in migration 0011 but JSON in the model; create_target fails on PostgreSQL",
+      "title": "webhook_targets.event_types text[] and webhook_deliveries payload_json/last_status_code/delivered_at drift vs model; create_target and delivery fail on PostgreSQL",
       "severity": "HIGH",
-      "status": "OPEN",
+      "status": "FIX IN PR (0071_webhook_schema_sync)",
       "found_by": "tests/integration/test_chunk5_production_launch.py::TestWebhookDelivery"
     }
   ]
