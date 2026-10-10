@@ -16,8 +16,16 @@ Rules enforced here:
 
 import os
 import re
+import socket
+import sys
 
 os.environ["APP_ENV"] = "test"
+# No proxies: the suite is offline (no_external_network below). A proxy would
+# also hide the real destination from that guard -- the socket would only
+# ever see the proxy's loopback address.
+for _proxy_var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+                   "http_proxy", "https_proxy", "all_proxy"):
+    os.environ.pop(_proxy_var, None)
 os.environ["ANTHROPIC_API_KEY"] = "test-key-never-used"
 os.environ["DATABASE_URL"] = "sqlite://"
 # Hard-assigned like DATABASE_URL, never setdefault: settings read .env for any
@@ -85,6 +93,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db.base import Base, get_db
 from app.db import models as m  # noqa: F401  (registers tables)
+from app.services.anthropic_client import get_client as _REAL_GET_CLIENT
 
 
 def _assert_local_redis_only() -> None:
@@ -749,6 +758,110 @@ def no_real_anthropic(monkeypatch):
         raise RuntimeError("test attempted a real Anthropic call -- use fake_claude")
 
     monkeypatch.setattr("app.services.anthropic_client.get_client", _refuse)
+    # 13 modules do `from app.services.anthropic_client import get_client`, so
+    # patching the module attribute alone missed any of them imported before
+    # this fixture ran (at collection, say): they kept the REAL function, and
+    # which ones did depended on test order. In a full run
+    # test_terminal_failure.py sent a real request to api.anthropic.com
+    # through icp_extraction this way. Patch every such binding too.
+    for module in list(sys.modules.values()):
+        if (getattr(module, "__name__", "").startswith("app.")
+                and getattr(module, "get_client", None) is _REAL_GET_CLIENT):
+            monkeypatch.setattr(module, "get_client", _refuse)
+
+
+@pytest.fixture(autouse=True)
+def no_market_intel_fetch(monkeypatch):
+    """Refuse the market-intelligence fetchers (Google News RSS, Apollo org
+    search) unless a test installs its own.
+
+    run_pipeline calls market_intel.ensure_signals before any step, so every
+    test that runs the pipeline task used to fetch news.google.com and call
+    api.apollo.io for real. ensure_signals records fetch errors and never
+    raises, so refusing is safe; tests of the feature itself monkeypatch these
+    two attributes afterwards and win.
+    """
+    def _refuse(*_a, **_k):
+        raise RuntimeError("test attempted a real market-intel fetch -- monkeypatch it")
+
+    monkeypatch.setattr("app.services.market_intel.fetch_google_news", _refuse)
+    monkeypatch.setattr("app.services.market_intel._apollo_org_search", _refuse)
+
+
+# --------------------------------------------------------------------------
+# The suite is OFFLINE. Enforced, not assumed.
+# --------------------------------------------------------------------------
+#
+# CLAUDE.md: "The suite is offline by design ... Keep new tests deterministic
+# and offline, or they don't belong in the hard gate." Nothing enforced it, and
+# because the app catches network errors by design (market intel, scoring,
+# briefs degrade instead of failing), a test that reached the internet still
+# PASSED -- in CI, where the internet is reachable, it really fetched. Every
+# connection to a non-loopback host is now refused AND fails the test that
+# made it, even when the application swallowed the error.
+
+_LOOPBACK_PREFIXES = ("127.", "::1", "0:0:0:0:0:0:0:1", "localhost")
+
+
+class ExternalNetworkBlocked(OSError):
+    pass
+
+
+def _is_loopback(host) -> bool:
+    if host is None:
+        return True
+    if isinstance(host, bytes):
+        host = host.decode("ascii", "ignore")
+    host = str(host).strip("[]").lower()
+    return host == "" or host.startswith(_LOOPBACK_PREFIXES)
+
+
+@pytest.fixture(autouse=True)
+def no_external_network(monkeypatch, request):
+    attempts: list[str] = []
+    real_getaddrinfo = socket.getaddrinfo
+    real_create_connection = socket.create_connection
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+
+    def _guard(host, port):
+        if _is_loopback(host):
+            return
+        attempts.append(f"{host}:{port}")
+        raise ExternalNetworkBlocked(
+            f"test attempted a real network connection to {host}:{port}")
+
+    def _getaddrinfo(host, port, *a, **k):
+        _guard(host, port)
+        return real_getaddrinfo(host, port, *a, **k)
+
+    def _create_connection(address, *a, **k):
+        _guard(address[0], address[1])
+        return real_create_connection(address, *a, **k)
+
+    def _addr(sock, address):
+        if sock.family in (socket.AF_INET, socket.AF_INET6) and isinstance(address, tuple):
+            _guard(address[0], address[1])
+
+    def _connect(sock, address):
+        _addr(sock, address)
+        return real_connect(sock, address)
+
+    def _connect_ex(sock, address):
+        _addr(sock, address)
+        return real_connect_ex(sock, address)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _getaddrinfo)
+    monkeypatch.setattr(socket, "create_connection", _create_connection)
+    monkeypatch.setattr(socket.socket, "connect", _connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", _connect_ex)
+    yield attempts
+    if attempts:
+        pytest.fail(
+            "the offline suite reached for the network: "
+            + ", ".join(sorted(set(attempts)))
+            + ". Stub the client (see no_market_intel_fetch / fake_claude).",
+            pytrace=False)
 
 
 # --------------------------------------------------------------------------
