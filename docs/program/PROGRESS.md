@@ -11,6 +11,8 @@ Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 - Deploy: the next API deploy runs 0071 on Neon. Founders: run the read-only query in `docs/program/plans/phase1-01b-pd1-webhook-schema.md` first.
 - Detail: `docs/program/plans/phase1-01b-pd1-webhook-schema.md`.
 
+PR: https://github.com/Rmasood1122/LeadPilot/pull/46 (draft; merge after #44).
+
 Next: item 2 (sealed PR: eval-gate.yml triggers).
 
 ## 2026-10-10 — Phase 1, item 1 (PostgreSQL integration repair), cloud session: PR open, suite NOT green

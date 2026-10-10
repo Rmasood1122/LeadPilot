@@ -61,9 +61,11 @@ def _columns(engine, table: str) -> dict[str, str]:
     return {c["name"]: str(c["type"]) for c in inspect(engine).get_columns(table)}
 
 
-def _seed_legacy_rows(engine) -> tuple[str, str]:
-    """One target and one delivery in the pre-0071 shapes, with real data."""
+def _seed_legacy_rows(engine) -> tuple[str, str, str]:
+    """One target and two deliveries in the pre-0071 shapes: one with a JSON
+    payload, one whose payload text is not valid JSON."""
     user_id, target_id, delivery_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    bad_id = uuid.uuid4()
     with engine.begin() as c:
         c.execute(text("INSERT INTO users (id, email, plan, theme_json, is_admin, is_suspended, "
                        "email_verified) VALUES (:id, 'legacy@test.io', 'FREE', '{}', false, "
@@ -77,14 +79,24 @@ def _seed_legacy_rows(engine) -> tuple[str, str]:
                        "'meeting_booked', :payload, 'failed', 2, 503)"),
                   {"id": delivery_id, "tid": target_id,
                    "payload": json.dumps({"event": "meeting_booked", "data": {"lead": "l1"}})})
-    return str(target_id), str(delivery_id)
+        c.execute(text("INSERT INTO webhook_deliveries (id, target_id, event_type, payload_json, "
+                       "status, attempts) VALUES (:id, :tid, 'x', 'not json {', 'failed', 1)"),
+                  {"id": bad_id, "tid": target_id})
+    return str(target_id), str(delivery_id), str(bad_id)
+
+
+def _column_info(engine, table: str, column: str) -> tuple[str, str | None]:
+    with engine.connect() as c:
+        return c.execute(text(
+            "SELECT data_type, column_default FROM information_schema.columns "
+            "WHERE table_name = :t AND column_name = :c"), {"t": table, "c": column}).one()
 
 
 def test_upgrade_converts_legacy_rows_and_matches_the_model(scratch_url):
     _alembic(scratch_url, "upgrade", BEFORE)
     engine = create_engine(scratch_url)
     try:
-        target_id, delivery_id = _seed_legacy_rows(engine)
+        target_id, delivery_id, bad_id = _seed_legacy_rows(engine)
 
         _alembic(scratch_url, "upgrade", AFTER)
 
@@ -100,14 +112,6 @@ def test_upgrade_converts_legacy_rows_and_matches_the_model(scratch_url):
         assert row.delivered_at is None
 
         # A payload that is not valid JSON is kept, not lost and not fatal.
-        bad_id = uuid.uuid4()
-        with engine.begin() as c:
-            c.execute(text("ALTER TABLE webhook_deliveries ALTER COLUMN payload_json TYPE text"))
-            c.execute(text("INSERT INTO webhook_deliveries (id, target_id, event_type, "
-                           "payload_json, status, attempts) VALUES (:id, :tid, 'x', "
-                           "'not json {', 'failed', 1)"), {"id": bad_id, "tid": target_id})
-        _alembic(scratch_url, "downgrade", BEFORE)
-        _alembic(scratch_url, "upgrade", AFTER)
         with engine.connect() as c:
             kept = c.execute(text("SELECT payload_json FROM webhook_deliveries WHERE id = :id"),
                              {"id": bad_id}).scalar_one()
@@ -116,6 +120,7 @@ def test_upgrade_converts_legacy_rows_and_matches_the_model(scratch_url):
         targets, deliveries = (_columns(engine, "webhook_targets"),
                                _columns(engine, "webhook_deliveries"))
         assert targets["event_types"] == "JSON"
+        assert _column_info(engine, "webhook_targets", "event_types")[1] == "'[]'::json"
         assert deliveries["payload_json"] == "JSON"
         assert {"last_status_code", "delivered_at"} <= deliveries.keys()
     finally:
@@ -160,22 +165,33 @@ def test_downgrade_restores_the_previous_shapes(scratch_url):
     _alembic(scratch_url, "upgrade", BEFORE)
     engine = create_engine(scratch_url)
     try:
-        target_id, delivery_id = _seed_legacy_rows(engine)
+        target_id, delivery_id, bad_id = _seed_legacy_rows(engine)
         _alembic(scratch_url, "upgrade", AFTER)
+        # A status code written by the post-0071 code must survive a downgrade.
+        with engine.begin() as c:
+            c.execute(text("UPDATE webhook_deliveries SET last_status_code = 418 WHERE id = :id"),
+                      {"id": bad_id})
         _alembic(scratch_url, "downgrade", BEFORE)
+
+        assert _column_info(engine, "webhook_targets", "event_types") == (
+            "ARRAY", "'{}'::text[]")
+        assert _column_info(engine, "webhook_deliveries", "payload_json")[0] == "text"
+        deliveries = _columns(engine, "webhook_deliveries")
+        assert "last_status_code" not in deliveries and "delivered_at" not in deliveries
 
         with engine.connect() as c:
             events = c.execute(text("SELECT event_types FROM webhook_targets WHERE id = :id"),
                                {"id": target_id}).scalar_one()
-            row = c.execute(text("SELECT payload_json, last_response_code FROM "
-                                 "webhook_deliveries WHERE id = :id"),
-                            {"id": delivery_id}).one()
+            good = c.execute(text("SELECT payload_json, last_response_code FROM "
+                                  "webhook_deliveries WHERE id = :id"),
+                             {"id": delivery_id}).one()
+            bad = c.execute(text("SELECT payload_json, last_response_code FROM "
+                                 "webhook_deliveries WHERE id = :id"), {"id": bad_id}).one()
         assert events == ["meeting_booked", "reply_received"]
-        assert json.loads(row.payload_json) == {"event": "meeting_booked",
-                                                "data": {"lead": "l1"}}
-        assert row.last_response_code == 503
-        deliveries = _columns(engine, "webhook_deliveries")
-        assert "last_status_code" not in deliveries and "delivered_at" not in deliveries
-        assert deliveries["payload_json"] == "TEXT"
+        assert json.loads(good.payload_json) == {"event": "meeting_booked",
+                                                 "data": {"lead": "l1"}}
+        assert good.last_response_code == 503
+        assert bad.payload_json == "not json {"     # legacy_text unwrapped
+        assert bad.last_response_code == 418
     finally:
         engine.dispose()

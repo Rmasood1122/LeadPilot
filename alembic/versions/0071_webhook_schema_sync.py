@@ -25,7 +25,11 @@ but dropping data is a separate, deliberate decision. max_retries is NOT NULL
 with server default 5, so ORM inserts that omit it still succeed.
 
 Downgrade restores the 0070 shapes (event_types back to text[], payload_json
-back to text, last_status_code copied back into last_response_code).
+back to text with legacy_text unwrapped, last_status_code copied back into
+last_response_code). delivered_at values are dropped on downgrade.
+
+Both directions set lock_timeout = 15s for their transaction (see
+_bounded_lock_wait).
 
 Revision ID: 0071_webhook_schema_sync
 Revises: 0070_linkedin_network_messages
@@ -63,9 +67,19 @@ def _is_postgres() -> bool:
     return op.get_bind().dialect.name == "postgresql"
 
 
+def _bounded_lock_wait() -> None:
+    """Both ALTER TYPEs take ACCESS EXCLUSIVE on their table. app/db/migrate.py
+    sets no lock timeout, so a transaction still open on these tables (the
+    outgoing API instance) would make this deploy's startup wait forever and
+    queue every webhook query behind it. Fail the migration instead; the
+    entrypoint then never starts uvicorn and the old instance keeps serving."""
+    op.execute("SET LOCAL lock_timeout = '15s'")
+
+
 def upgrade() -> None:
     if not _is_postgres():
         return
+    _bounded_lock_wait()
 
     op.execute("ALTER TABLE webhook_targets ALTER COLUMN event_types DROP DEFAULT")
     op.execute("ALTER TABLE webhook_targets ALTER COLUMN event_types TYPE json "
@@ -87,13 +101,25 @@ def upgrade() -> None:
 def downgrade() -> None:
     if not _is_postgres():
         return
+    _bounded_lock_wait()
 
+    # delivered_at did not exist before 0071; its values are dropped.
     op.drop_column("webhook_deliveries", "delivered_at")
     op.execute("UPDATE webhook_deliveries SET last_response_code = last_status_code "
                "WHERE last_status_code IS NOT NULL")
     op.drop_column("webhook_deliveries", "last_status_code")
-    op.execute("ALTER TABLE webhook_deliveries ALTER COLUMN payload_json TYPE text "
-               "USING payload_json::text")
+    # Unwrap what upgrade wrapped: a {"legacy_text": ...} object goes back to
+    # its original text. Nested CASE so json_object_keys-style operators never
+    # see a non-object.
+    op.execute("""
+        ALTER TABLE webhook_deliveries ALTER COLUMN payload_json TYPE text USING
+        CASE WHEN json_typeof(payload_json) = 'object' THEN
+            CASE WHEN payload_json::jsonb ? 'legacy_text'
+                  AND payload_json::jsonb - 'legacy_text' = '{}'::jsonb
+                 THEN payload_json->>'legacy_text'
+                 ELSE payload_json::text END
+        ELSE payload_json::text END
+    """)
 
     op.execute(_JSON_TO_TEXT_ARRAY)
     op.execute("ALTER TABLE webhook_targets ALTER COLUMN event_types DROP DEFAULT")
