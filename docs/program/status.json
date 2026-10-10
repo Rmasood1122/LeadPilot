@@ -93,9 +93,9 @@
         {
           "id": "1.1b",
           "title": "PD-1: migration 0071 syncs webhook tables with the model",
-          "status": "in_progress",
+          "status": "done (PR open, awaiting #44 merge)",
           "branch": "claude/pd1-webhook-schema",
-          "pr": null,
+          "pr": "https://github.com/Rmasood1122/LeadPilot/pull/46",
           "depends_on": "https://github.com/Rmasood1122/LeadPilot/pull/44",
           "evidence": "docs/program/plans/phase1-01b-pd1-webhook-schema.md",
           "result": "tests/integration 132 passed / 0 failed"
