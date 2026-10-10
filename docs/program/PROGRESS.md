@@ -2,6 +2,17 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+## 2026-10-10 — Phase 1, item 1 (PostgreSQL integration repair), cloud session: PR open, suite NOT green
+
+**State: 54 failed / 70 passed → 125 passed / 4 errors. The 4 errors are product defect PD-1, reported, not fixed. Waiting on founder review of the PR and on the A/B merge-policy answer (Amendment 0).**
+
+- Root causes, all 54, by group: `docs/program/plans/phase1-01-integration-repair.md`. G1 (50): root conftest Anthropic guard; the integration mock never intercepted anthropic SDK 1.x (`httpx2`), so lifting the guard sent a real request to api.anthropic.com. G2 (7 of G1): Calendly mock signed with a 2023 timestamp, refused by F-OPS-02 replay check. G3 (4 of G1): `/suppression` is admin-only (F-SEC-04); tests called it as a user and ignored the 403. G4 (4): `webhook_delivery` API rebuilt in `41cea92`; tests ported to the current API.
+- PD-1: `webhook_targets.event_types` is `text[]` (migration 0011) but `JSON` in the model; creating any outbound webhook target fails on PostgreSQL. Needs its own PR with a migration.
+- Offline gate unchanged: 4 commands exit 0, 3,319 tests, PROMOTE (1 soft runtime warning).
+- Amendment 0 (PR #43 incident, merge policy A or B): asked; not recorded until the founders pick A or B.
+
+Next: founders review the PR; decide whether PD-1 is fixed before `verify-backend-postgres` becomes required. Then item 2 (eval-gate.yml triggers, sealed-file PR).
+
 ## 2026-10-10 — Phase 0 (baseline), cloud session: completed
 
 **State: Phase 0 done. The exit-gate stop condition is met (OPEN P0/HIGH items), so Phases 2–4 wait. Phase 1 may start.**

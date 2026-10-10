@@ -69,7 +69,7 @@ class TestEmailComplianceRules:
         )
 
     async def test_send_to_suppressed_email_is_blocked(
-        self, api_client: AsyncClient, user_a_tokens, all_mocks, db_session
+        self, api_client: AsyncClient, admin_tokens, user_a_tokens, all_mocks, db_session
     ):
         """
         If an email is added to the suppression list AFTER it was scheduled,
@@ -88,11 +88,15 @@ class TestEmailComplianceRules:
         })
         assert resp.status_code in (200, 201)
 
-        # Add to suppression BEFORE the send runs
-        await api_client.post("/suppression", headers=headers, json={
+        # Add to suppression BEFORE the send runs.
+        # /suppression is operator-only (F-SEC-04: the list is global across
+        # tenants), so it is read and written as admin. Calling it as user_a
+        # used to answer 403, which this test never checked.
+        resp = await api_client.post("/suppression", headers=_auth_headers(admin_tokens), json={
             "email": email,
             "reason": "test suppression",
         })
+        assert resp.status_code == 201, resp.text
 
         gmail_mock.reset_capture()
 
@@ -181,7 +185,7 @@ class TestEmailComplianceRules:
         assert len(deferred) >= 3, f"Expected 3 deferred sends, got {len(deferred)}"
 
     async def test_unsubscribe_reply_suppresses_and_stops_sequence(
-        self, api_client: AsyncClient, user_a_tokens, all_mocks, db_session
+        self, api_client: AsyncClient, admin_tokens, user_a_tokens, all_mocks, db_session
     ):
         """
         A reply containing 'stop emailing me' must be classified as unsubscribe_request,
@@ -216,7 +220,11 @@ class TestEmailComplianceRules:
         # {"entries": [...]} and takes no filter params -- the previous
         # `len(resp.json()) >= 1` counted dict KEYS, so it passed on an empty
         # list.
-        resp = await api_client.get("/suppression", headers=headers)
+        # /suppression is operator-only (F-SEC-04: the list is global across
+        # tenants), so it is read and written as admin. Calling it as user_a
+        # used to answer 403, which this test never checked.
+        resp = await api_client.get("/suppression", headers=_auth_headers(admin_tokens))
+        assert resp.status_code == 200, resp.text
         entries = resp.json()["entries"]
         assert any((e["email"] or "").lower() == lead["email"].lower() for e in entries), (
             "Email not added to suppression list after unsubscribe reply"
@@ -312,7 +320,7 @@ class TestWhatsAppComplianceRules:
         assert len(whatsapp_mock.get_capture().send_calls) == 0
 
     async def test_stop_message_adds_suppression_and_stops_sequence_atomically(
-        self, api_client: AsyncClient, user_a_tokens, all_mocks, db_session
+        self, api_client: AsyncClient, admin_tokens, user_a_tokens, all_mocks, db_session
     ):
         """
         An inbound 'STOP' message must atomically:
@@ -359,8 +367,12 @@ class TestWhatsAppComplianceRules:
         )
         assert resp.status_code == 200
 
-        # 1. Suppression list must contain this phone
-        resp = await api_client.get("/suppression", headers=headers)
+        # 1. Suppression list must contain this phone.
+        # /suppression is operator-only (F-SEC-04: the list is global across
+        # tenants), so it is read and written as admin. Calling it as user_a
+        # used to answer 403, which this test never checked.
+        resp = await api_client.get("/suppression", headers=_auth_headers(admin_tokens))
+        assert resp.status_code == 200, resp.text
         entries = resp.json()["entries"]
         assert any(e["phone"] == phone for e in entries), (
             "Phone not added to suppression after STOP"

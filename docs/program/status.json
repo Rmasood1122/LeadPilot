@@ -3,7 +3,7 @@
   "updated": "2026-10-10",
   "trunk": "master",
   "baseline_ref": "2170a55ba10eb38ad6b97e72dc728cef5416ba69",
-  "current_phase": 0,
+  "current_phase": 1,
   "phases": [
     {
       "phase": 0,
@@ -74,11 +74,40 @@
     },
     {
       "phase": 1,
-      "status": "todo",
+      "status": "in_progress",
       "blocked_on": [
-        "founders' replacement design for Layer 4 (next session)"
+        "merge policy A or B (Amendment 0) \u2014 asked 2026-10-10"
       ],
-      "first_task": "repair tests/integration harness (54 failures) without weakening tests"
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "repair tests/integration on PostgreSQL without weakening tests",
+          "status": "in_progress",
+          "branch": "claude/nice-allen-8wgv8a",
+          "pr": null,
+          "ci_run_url": null,
+          "evidence": "docs/program/plans/phase1-01-integration-repair.md",
+          "result": "before 54 failed / 70 passed; after 125 passed / 4 errors (PD-1)",
+          "blocked_on": [
+            "PD-1: webhook_targets.event_types text[] vs JSON \u2014 product fix needs its own PR"
+          ]
+        },
+        {
+          "id": "1.2",
+          "title": "sealed PR: eval-gate.yml triggers = pull_request + push to master",
+          "status": "todo"
+        },
+        {
+          "id": "1.3",
+          "title": "sealed PR: baseline.json refresh to 3,319 tests / ~511 s and raise test-count floor",
+          "status": "todo"
+        },
+        {
+          "id": "1.4",
+          "title": "safe_merge.sh + PreToolUse merge hook, then quick/full gate, verify.yml, post-merge alarm, sabotage proofs",
+          "status": "todo"
+        }
+      ]
     },
     {
       "phase": 2,
@@ -176,5 +205,14 @@
       "free_2000": 31,
       "pro_3000": 47
     }
-  }
+  },
+  "product_defects": [
+    {
+      "id": "PD-1",
+      "title": "webhook_targets.event_types is text[] in migration 0011 but JSON in the model; create_target fails on PostgreSQL",
+      "severity": "HIGH",
+      "status": "OPEN",
+      "found_by": "tests/integration/test_chunk5_production_launch.py::TestWebhookDelivery"
+    }
+  ]
 }

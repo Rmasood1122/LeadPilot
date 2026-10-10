@@ -252,16 +252,20 @@ class TestFlow1WithClients:
         )
 
     async def test_suppression_list_respected_at_sourcing(
-        self, api_client: AsyncClient, user_a_tokens, all_mocks, db_session
+        self, api_client: AsyncClient, admin_tokens, user_a_tokens, all_mocks, db_session
     ):
         """Add alice to suppression list before sourcing; her email must not appear in leads."""
         headers = _auth_headers(user_a_tokens)
 
-        # Add to suppression list
-        await api_client.post("/suppression", headers=headers, json={
+        # Add to suppression list.
+        # /suppression is operator-only (F-SEC-04: the list is global across
+        # tenants), so it is read and written as admin. Calling it as user_a
+        # used to answer 403, which this test never checked.
+        resp = await api_client.post("/suppression", headers=_auth_headers(admin_tokens), json={
             "email": "alice.chen@saasco.io",
             "reason": "prior unsubscribe",
         })
+        assert resp.status_code == 201, resp.text
 
         product = await create_product(api_client, headers)
         await create_past_clients(api_client, headers, product["id"])
