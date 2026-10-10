@@ -1,0 +1,69 @@
+name: post-merge-alarm
+# Phase 1 item 1.6. GitHub Free cannot stop a merge from the web UI on a
+# private repo, so a red master must at least be loud. When eval-gate or
+# verify fails on master, open (or update) one issue labelled
+# `master-broken`. When they pass again, the issue is closed.
+# Deploy gating (Render "After CI Checks Pass", Vercel Deployment Checks)
+# keeps the red commit out of production meanwhile.
+
+on:
+  workflow_run:
+    workflows: [eval-gate, verify]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  master-alarm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.workflow_run.event == 'push'
+    steps:
+      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const label = 'master-broken';
+            const sha = run.head_sha.slice(0, 7);
+            const failed = ['failure', 'timed_out', 'startup_failure'].includes(run.conclusion);
+            const { owner, repo } = context.repo;
+
+            const open = await github.paginate(github.rest.issues.listForRepo,
+              { owner, repo, state: 'open', labels: label, per_page: 100 });
+
+            if (failed) {
+              const body = [
+                `**${run.name}** failed on \`master\` at ${sha}: ${run.html_url}`,
+                '',
+                'master is red. Do not deploy this commit. Fix forward with a PR merged via',
+                '`scripts/gate/safe_merge.sh`, or revert the offending merge.',
+              ].join('\n');
+              if (open.length) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: open[0].number, body });
+              } else {
+                try {
+                  await github.rest.issues.createLabel({ owner, repo, name: label, color: 'b60205',
+                    description: 'A required workflow failed on master' });
+                } catch (e) { /* label exists */ }
+                await github.rest.issues.create({ owner, repo, labels: [label],
+                  title: `master is red: ${run.name} failed at ${sha}`, body });
+              }
+            } else if (run.conclusion === 'success' && open.length) {
+              // Close only when EVERY watched workflow is green on this commit,
+              // so eval-gate passing cannot close an alarm raised by verify.
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo(
+                { owner, repo, head_sha: run.head_sha, per_page: 100 });
+              const watched = data.workflow_runs.filter(r => ['eval-gate', 'verify'].includes(r.name) && r.event === 'push');
+              const names = new Set(watched.map(r => r.name));
+              const allGreen = names.has('eval-gate') && names.has('verify')
+                && watched.every(r => r.status === 'completed' && r.conclusion === 'success');
+              if (!allGreen) return;
+              for (const issue of open) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: issue.number,
+                  body: `**${run.name}** passed on \`master\` at ${sha}: ${run.html_url}. Closing; reopen if another workflow is still red.` });
+                await github.rest.issues.update({ owner, repo, issue_number: issue.number, state: 'closed' });
+              }
+            }

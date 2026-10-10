@@ -124,19 +124,28 @@
         {
           "id": "1.5",
           "title": "quick_gate.sh, pre-push hook, Claude push/sealed-file/stop hooks",
-          "status": "in_progress",
+          "status": "done (PR #51 open, stacked on #48)",
           "branch": "claude/gate-quick-gate",
-          "depends_on": "https://github.com/Rmasood1122/LeadPilot/pull/48"
+          "depends_on": "https://github.com/Rmasood1122/LeadPilot/pull/48",
+          "pr": "https://github.com/Rmasood1122/LeadPilot/pull/51"
         },
         {
           "id": "1.6",
           "title": "verify.yml deep checks (postgres, frontend, image, security) + post-merge alarm",
-          "status": "todo"
+          "status": "in_progress",
+          "branch": "claude/gate-verify-workflows",
+          "evidence": "docs/program/plans/phase1-06-verify-workflows.md"
         },
         {
           "id": "1.7",
           "title": "GATES.md, deploy-gating founder steps (Render/Vercel), minutes report, sabotage proofs",
           "status": "todo"
+        },
+        {
+          "id": "PD-2",
+          "title": "frontend package-lock.json out of sync (npm ci failed on master)",
+          "status": "done (PR #50 open)",
+          "pr": "https://github.com/Rmasood1122/LeadPilot/pull/50"
         }
       ]
     },
