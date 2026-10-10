@@ -82,9 +82,9 @@
         {
           "id": "1.1",
           "title": "repair tests/integration on PostgreSQL without weakening tests",
-          "status": "in_progress",
+          "status": "blocked",
           "branch": "claude/nice-allen-8wgv8a",
-          "pr": null,
+          "pr": "https://github.com/Rmasood1122/LeadPilot/pull/44",
           "ci_run_url": null,
           "evidence": "docs/program/plans/phase1-01-integration-repair.md",
           "result": "before 54 failed / 70 passed; after 125 passed / 4 errors (PD-1)",

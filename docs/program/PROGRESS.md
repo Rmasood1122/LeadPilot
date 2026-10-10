@@ -11,6 +11,8 @@ Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 - Offline gate unchanged: 4 commands exit 0, 3,319 tests, PROMOTE (1 soft runtime warning).
 - Amendment 0 (PR #43 incident, merge policy A or B): asked; not recorded until the founders pick A or B.
 
+PR: https://github.com/Rmasood1122/LeadPilot/pull/44 (draft).
+
 Next: founders review the PR; decide whether PD-1 is fixed before `verify-backend-postgres` becomes required. Then item 2 (eval-gate.yml triggers, sealed-file PR).
 
 ## 2026-10-10 — Phase 0 (baseline), cloud session: completed
