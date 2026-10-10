@@ -78,6 +78,7 @@ from app.api.client_workspaces import router as clients_router        # Part 1 F
 from app.api.practice import router as practice_router                # Part 2
 from app.api.quickstart import router as quickstart_router            # F06
 from app.api.reply_copilot import router as reply_copilot_router      # F04
+from app.api.pilots import router as pilots_router                    # F09
 
 # M7
 from app.api.devices import router as devices_router
@@ -323,6 +324,8 @@ app.include_router(signals_router)               # F02: /leads/{id}/signals, /si
 app.include_router(quickstart_router)            # F06: /quickstart* (flag: quickstart_enabled)
 app.include_router(reply_copilot_router)         # F04: /reply-copilot* (flag: reply_copilot_enabled)
 app.include_router(spend_guard_router)           # F07: /spend-guard/* (flag: spend_guard_enabled)
+# F09. /pilots is a new prefix; nothing else is mounted under it.
+app.include_router(pilots_router)                # F09: /pilots* (flag: pilot_mode_enabled)
 
 
 # ---------------------------------------------------------------------------

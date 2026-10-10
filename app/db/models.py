@@ -5281,3 +5281,105 @@ class SpendForecast(TimestampMixin, Base):
     month_spent_micros: Mapped[int] = mapped_column(BigInteger, default=0)
     cap_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     detail_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+
+class Pilot(TimestampMixin, Base):
+    """F09 (migration 0077) -- one 30-day pilot of an account
+    (docs/features/f09-pilot-mode.md).
+
+    The buyer writes the success criteria on day 1 (`criteria_json`, locked:
+    there is no edit path); the hourly sweep sends a weekly scorecard and, when
+    `ends_at` passes, ends the pilot and stores its verdict. Every number comes
+    from the F08 meetings ledger; the verdict keeps an aggregate snapshot of it
+    so the verdict page reads the same after the pilot is over.
+
+    ONE ACTIVE PILOT PER ACCOUNT, enforced by the schema: `active_owner_id`
+    equals `user_id` while the pilot is active and is NULL once it ends, and it
+    is UNIQUE (NULLs never collide, on SQLite and PostgreSQL alike).
+
+    NOTHING HERE TOUCHES BILLING. `plan_at_start` / `plan_at_end` are records
+    for the verdict page, never inputs to a plan change.
+    """
+
+    __tablename__ = "pilots"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    started_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    active_owner_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, nullable=True, unique=True
+    )
+    # active | ended
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default=text("'active'"),
+        nullable=False, index=True
+    )
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date] = mapped_column(Date)            # day 30, inclusive
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    criteria_json: Mapped[dict] = mapped_column(JSON)
+    currency: Mapped[str] = mapped_column(String(3))
+    strategy_ids_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    scorecard_emails: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
+    )
+    plan_at_start: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    plan_at_end: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # completed | ended_early
+    end_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    verdict_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    verdict_emailed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    verdict_email_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    # NULL (not tried) | sending | sent | failed. Claimed as `sending` BEFORE
+    # the send; a `sending` row is never retried automatically (a crash
+    # between send and record must not mail the verdict twice).
+    verdict_email_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    exported_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+
+class PilotScorecard(TimestampMixin, Base):
+    """F09 -- one weekly scorecard email of a pilot (weeks 1-4).
+
+    UNIQUE (pilot_id, week) is the idempotency key: the sweep INSERTs the row
+    (status `sending`) BEFORE it sends, so a second sweep, an overlapping beat
+    or a second worker cannot email the same week twice. `failed` rows are
+    retried by compare-and-set on `attempts`. `summary_json` is what was
+    emailed (aggregates only)."""
+
+    __tablename__ = "pilot_scorecards"
+    __table_args__ = (
+        UniqueConstraint("pilot_id", "week", name="uq_pilot_scorecard_week"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    pilot_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("pilots.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    week: Mapped[int] = mapped_column(Integer)
+    # sending | sent | failed
+    status: Mapped[str] = mapped_column(
+        String(20), default="sending", server_default=text("'sending'"), nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    summary_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

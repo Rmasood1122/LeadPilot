@@ -25,6 +25,7 @@ from the signed-in person, never from the workspace owner.
 | Launch a campaign | ✓ | ✓ | after approval¹ | – |
 | Approve / decline SDR launches | ✓ | ✓ | – | – |
 | Integrations, webhooks, costs, deleting | ✓ | ✓ | – | – |
+| Start / end a 30-day pilot (F09) | ✓ | ✓ | – | – |
 | Invite / manage SDRs and viewers | ✓ | ✓ | – | – |
 | Invite / manage managers | ✓ | – | – | – |
 | Workspace settings, white label | ✓ | – | – | – |

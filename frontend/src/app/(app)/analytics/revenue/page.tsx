@@ -111,6 +111,11 @@ export default function RevenuePage() {
 
       {/* F08: cost per qualified conversation / booked / held meeting. */}
       <MeetingsLedgerPanel dateFrom={range.from} dateTo={range.to} />
+      {/* F09: the same numbers, judged against criteria set on day 1. */}
+      <p className="text-xs text-muted-foreground">
+        Evaluating LeadPilot? <Link className="underline" href="/pilot">Run a 30-day pilot</Link>{" "}
+        with success criteria you set up front.
+      </p>
 
       <CostsCard currency={data?.currency ?? "USD"} />
     </div>

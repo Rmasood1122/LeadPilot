@@ -330,6 +330,20 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "spend_guard_hunter_usd_per_credit": (0.0, "USD Spend Guard charges per "
                                           "Hunter request (finder or verifier). "
                                           "0 = counted, not priced."),
+    # F09 -- 30-Day Pilot Mode (docs/features/f09-pilot-mode.md). Off by
+    # default: it adds an hourly sweep that emails the account owner. It
+    # never touches billing and never contacts a prospect.
+    "pilot_mode_enabled": (False, "Let accounts run a 30-day pilot: success "
+                           "criteria locked on day 1, a weekly scorecard "
+                           "email to the owner, a day-30 verdict from the "
+                           "meetings-per-dollar ledger and a full export. "
+                           "Never changes a plan or billing."),
+    "pilot_mode_verdict_grace_hours": (24, "Hours after a pilot's 30 days end "
+                                       "before its verdict is frozen, so a "
+                                       "meeting marked held or a reply "
+                                       "classified just after the end still "
+                                       "counts (0-168; values above 168 are "
+                                       "treated as 168)."),
 }
 
 
