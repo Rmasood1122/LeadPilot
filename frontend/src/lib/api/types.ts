@@ -145,9 +145,14 @@ export interface TutorialCatalogue {
 // --------------------------------------------------------------------------
 
 export interface FaqEntry {
+  /** Permanent legacy FAQ id (stored chat messages reference it). */
   id: string;
   question: string;
+  /** Since Phase 2: the opening paragraph of the help-center section. */
   answer: string;
+  /** Help-center chunk that answers it; null if the corpus failed to load. */
+  chunk_id?: string | null;
+  source_title?: string | null;
 }
 
 export interface SupportFaq {
@@ -159,6 +164,8 @@ export interface SupportFaq {
 /** Why the user got this text. Mirrors app/services/support_chat.py. */
 export type AnswerReason =
   | "answered"
+  | "mock_faq_match"
+  | "mock_no_match"
   | "off_topic"
   | "low_confidence"
   | "model_error"
@@ -166,13 +173,26 @@ export type AnswerReason =
   | "empty_answer"
   | "empty_question";
 
+/**
+ * A help-center article an answer was drawn from (Phase 2). One per article:
+ * `id` is the first cited chunk of that article.
+ */
+export interface AnswerSource {
+  id: string;
+  article_id: string;
+  title: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   reason: AnswerReason | null;
   confidence: number | null;
+  /** Cited help-center chunk ids (older rows: legacy FAQ ids). */
   faq_ids: string[];
+  /** Optional: absent on optimistic local echoes and on older API builds. */
+  sources?: AnswerSource[];
   suggest_ticket: boolean;
   created_at: string | null;
 }
@@ -182,6 +202,7 @@ export interface ChatAnswer {
   on_topic: boolean;
   confidence: number;
   faq_ids: string[];
+  sources?: AnswerSource[];
   suggest_ticket: boolean;
   reason: AnswerReason;
 }

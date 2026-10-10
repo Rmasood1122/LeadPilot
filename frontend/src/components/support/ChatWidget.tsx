@@ -33,6 +33,7 @@ import { ApiError } from "@/lib/api/client";
 import type { ChatMessage } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
+import { MessageSources } from "@/components/support/MessageSources";
 import { cn } from "@/lib/utils";
 
 type Mode = "chat" | "ticket";
@@ -289,6 +290,7 @@ export function ChatWidget() {
                 )}
               >
                 {message.content}
+                <MessageSources message={message} />
                 {message.role === "assistant" && message.suggest_ticket && (
                   <button
                     type="button"

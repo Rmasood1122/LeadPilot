@@ -45,6 +45,13 @@ RUN pip install --upgrade pip && pip install .
 COPY . .
 RUN pip install --no-deps .
 
+# The support assistant's knowledge base (Phase 2). .dockerignore excludes
+# docs/ except docs/help-center/, which COPY . . brings to /code. Pointing at
+# it explicitly matters because `pip install .` also puts the `app` package in
+# site-packages: a process that imports it from there would resolve the
+# directory relative to site-packages and find nothing.
+ENV HELP_CENTER_DIR=/code/docs/help-center
+
 EXPOSE 8000
 
 # Default command = API; worker/beat override it (docker-compose `command`,

@@ -1,0 +1,109 @@
+---
+id: workspaces-and-agency-mode
+title: Workspaces, team roles and agency mode
+audience: customer
+last_verified: 2026-10-10
+owner: help-center
+sources:
+  - app/services/rbac.py
+  - app/services/auth.py
+  - app/services/workspaces.py
+  - app/api/sequences.py
+  - app/db/models.py
+  - app/services/client_workspaces.py
+  - app/api/client_workspaces.py
+  - app/services/billing.py
+  - frontend/src/components/shell/Shell.tsx
+  - app/config.py
+  - frontend/src/app/(app)/team/page.tsx
+  - frontend/src/components/shell/WorkspaceSwitcher.tsx
+  - frontend/src/app/(app)/clients/page.tsx
+  - frontend/src/lib/clients.ts
+  - frontend/src/lib/api/clients.ts
+  - docs/features/workspaces.md
+  - docs/features/agency-mode.md
+  - docs/program/BASELINE.md
+---
+
+# Workspaces, team roles and agency mode
+
+A workspace lets other people work on your LeadPilot account with a role that limits what they can do. Agency mode (the **Clients** page) is a separate feature that lets an agency keep each client's campaigns, reporting, sending domains and invoice apart. This article explains both.
+
+## What is a workspace?
+
+A workspace is its owner's account. Your products, strategies, leads, integrations and deals stay yours; the people you invite work on your records. Every user owns exactly one workspace, created automatically the first time they use the app, and can also be a member of other people's workspaces.
+
+When you are a member of someone else's workspace, pick it with the **Workspace** switcher in the top bar. From then on you see and act on that owner's data, within your role. Personal things always stay your own whatever workspace is selected: your sign-in and password, your profile and theme, your API keys, your support chats, tutorials, onboarding and your own billing.
+
+A member works under the owner's plan and is not asked to buy a plan of their own, as long as the owner has a paid plan.
+
+## What can each role do?
+
+There are four roles:
+
+- **Owner** – everything, including workspace settings, white label and managing managers.
+- **Manager** – everything an owner can do with the data: work leads, sequences, deals and meetings, launch campaigns, approve or decline SDR launches, manage integrations, webhooks and costs, delete things, and invite or manage SDRs and viewers. Managers cannot invite or manage other managers, and cannot change workspace settings or white label.
+- **SDR** – can read everything and work leads, sequences, deals and meetings. An SDR cannot change integrations, webhooks or costs, and cannot delete anything ("Deleting needs a manager in this workspace."). Launching a campaign may need a manager's approval (see below).
+- **Viewer** – read-only ("Viewers have read-only access to this workspace.").
+
+These rules are checked by the server on every request, not just hidden in the screens.
+
+## How do I invite someone?
+
+Open **Team**, go to the **Members** tab, and use the **Invite** card: enter the **Email**, choose a **Role**, and press **Send invite**.
+
+- Owners can invite any role. Managers can invite SDRs and viewers only.
+- The invitation is emailed, and the link is also shown to you as **Invitation link (also emailed)**, so you can send it yourself.
+- The link expires after 7 days and works once. It only works for a signed-in person using the invited email address.
+- Inviting the same address again replaces the earlier link. You can also **Revoke** a pending invitation.
+
+## How do campaign approvals work?
+
+By default, when an SDR launches a sequence for the first time, nothing is sent. The launch is held as "pending approval" and the owner and managers are notified. They see it in **Team** › **Approvals**.
+
+- **Approve** carries out the SDR's launch exactly as they asked.
+- **Decline** lets you write "What should change? (sent to the SDR)" and press **Send decline**. The sequence goes back to draft and the SDR sees your note.
+- Either way, the SDR is told the decision.
+- Once a sequence has been approved, later launches of that same sequence do not need approval again.
+- Approval is refused while that sequence's pre-launch review is blocked. The review findings are shown right in the request.
+
+The owner can switch this off in **Team** › **Settings** by unticking **SDR campaign launches need a manager's approval**. Owners and managers never need approval.
+
+## What is white label?
+
+The owner can brand the app under **Team** › **White label**: a brand name, a logo (PNG, JPEG or WebP, up to 1 MB; SVG is refused), a primary colour, a support email and a custom domain. A custom domain must be verified with a DNS record shown on that page, and the deployment's operator also has to add the domain to the hosting. The deployment's administrator can turn white label off for everyone.
+
+Branding changes what people see in the app and the brand name used in invitation emails. Outreach still goes out from the owner's connected Gmail account.
+
+## Who sends the outreach when a teammate works a lead?
+
+The workspace owner's connected accounts. Inside a workspace, a lead can be assigned to a member (the **Owner** column in the CRM grid), but that only records who works the lead. Messages are still sent from the owner's Gmail and LinkedIn accounts, written in the owner's voice profile. The person a lead is assigned to is not notified, and the grid cannot filter by assignee yet.
+
+## What is agency mode (Clients)?
+
+Agency mode is for an agency running outreach for several clients from one account. Open **Clients** and press **Add a client**, with a **Client name** and a **Monthly retainer**. Each client then gets:
+
+- **Separate reporting** – sent messages, reply rate, meetings and revenue are counted only over that client's campaigns.
+- **Separate sending domains** – with **Reserve a sending domain**, you list the email domains that client's campaigns may send from. LeadPilot checks this at the moment of sending. A message that would go out from a domain not on the client's list is not sent; it is marked failed with a reason.
+- **A billing view** – **Show this month's invoice** shows the retainer, the per-meeting fee, the number of meetings this month and the lines that add up to the total.
+
+If a client has no sending domain reserved, there is no restriction: its campaigns can send from any connected mailbox, and the page warns you about this.
+
+A campaign that is not filed under any client is treated as the agency's own work. The page warns that such work "is not on any invoice". Deleting a client does not delete the outreach done for it.
+
+Creating clients, changing their prices and changing their domain lists needs a manager or the owner. Any member can read them.
+
+## What are the limits of agency mode?
+
+- Filing a strategy under a client is currently done through the LeadPilot API; the web app has no button for it yet.
+- An account can connect only one Gmail mailbox. So a client's domain list can block sends from the wrong domain, but it cannot route sends between several mailboxes.
+- WhatsApp uses one sender number for the whole deployment, so every client's prospects see the same WhatsApp number. Domain isolation applies to email only.
+- The learning loop's playbook scores are pooled across the whole deployment, so outcomes from different clients feed the same scores.
+
+## Related
+- [Plans, limits and billing](22-plans-limits-billing.md)
+- [Send review queue](12-send-review-queue.md)
+- [WhatsApp outreach](10-whatsapp-outreach.md)
+- [Learning loop and A/B tests](17-learning-loop-and-ab-tests.md)
+- [Account security](23-account-security.md)
+- [Known limitations](29-known-limitations.md)
