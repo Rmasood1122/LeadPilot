@@ -1,14 +1,15 @@
 "use client";
 
-/** Profile: display name, plan, password. */
+/** Profile: display name, plan, password, download your data (GDPR). */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { changePassword, getMe, saveName } from "@/lib/api/profile";
+import { changePassword, exportMyData, getMe, saveName } from "@/lib/api/profile";
 import { clearSession } from "@/lib/api/client";
 import { resetAuthStore } from "@/lib/stores/authStore";
 import {
-  canUpgrade, passwordErrorMessage, planLabel, validateName, validatePasswordChange,
+  accountExportFilename, canUpgrade, exportErrorMessage, passwordErrorMessage, planLabel,
+  validateName, validatePasswordChange,
 } from "@/lib/profile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +25,8 @@ export default function ProfilePage() {
   const [next, setNext] = useState("");
   const [again, setAgain] = useState("");
   const [pwError, setPwError] = useState<string | null>(null);
+  const [exportPw, setExportPw] = useState("");
+  const [exportMsg, setExportMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => { if (me.data) setName(me.data.full_name ?? ""); }, [me.data]);
 
@@ -46,6 +49,22 @@ export default function ProfilePage() {
       router.replace("/login");
     },
     onError: (e) => setPwError(passwordErrorMessage(e)),
+  });
+
+  const exportMut = useMutation({
+    mutationFn: () => exportMyData(exportPw),
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 1)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = accountExportFilename();
+      link.click();
+      URL.revokeObjectURL(url);
+      setExportPw("");
+      setExportMsg({ ok: true, text: "Your data has been downloaded." });
+    },
+    onError: (e) => setExportMsg({ ok: false, text: exportErrorMessage(e) }),
   });
 
   if (me.isLoading) return <p className="p-6 text-sm">Loading…</p>;
@@ -122,6 +141,31 @@ export default function ProfilePage() {
                     pwMut.mutate();
                   }}>
             Change password
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Download your data</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            One JSON file with everything this account holds: profile, products, strategies,
+            leads, messages, meetings and settings. Passwords and connection secrets are
+            left out.
+          </p>
+          <div>
+            <Label htmlFor="export-pw">Confirm with your password</Label>
+            <Input id="export-pw" type="password" autoComplete="current-password"
+                   value={exportPw}
+                   onChange={(e) => { setExportPw(e.target.value); setExportMsg(null); }} />
+          </div>
+          {exportMsg && (
+            <p role={exportMsg.ok ? "status" : "alert"}
+               className={`text-sm ${exportMsg.ok ? "" : "text-red-600"}`}>{exportMsg.text}</p>
+          )}
+          <Button disabled={exportMut.isPending || !exportPw}
+                  onClick={() => { setExportMsg(null); exportMut.mutate(); }}>
+            {exportMut.isPending ? "Preparing…" : "Download my data"}
           </Button>
         </CardContent>
       </Card>

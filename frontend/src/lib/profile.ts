@@ -37,3 +37,16 @@ const LABELS: Record<string, string> = {
 export const planLabel = (plan: string): string => LABELS[plan] ?? plan;
 /** Enterprise is the top tier: there is nothing to upgrade to. */
 export const canUpgrade = (plan: string): boolean => plan !== "enterprise";
+
+/** File name for the account export, e.g. leadpilot-account-export-2026-10-10.json */
+export function accountExportFilename(now: Date = new Date()): string {
+  return `leadpilot-account-export-${now.toISOString().slice(0, 10)}.json`;
+}
+
+export function exportErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 403 && err.detail === "INVALID_PASSWORD") return "That password is not right.";
+    if (err.status === 429) return "Too many attempts. Wait a while and try again.";
+  }
+  return "Could not prepare your data. Try again.";
+}

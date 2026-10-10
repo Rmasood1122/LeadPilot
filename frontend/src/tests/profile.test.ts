@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { changePassword, saveName } from "@/lib/api/profile";
+import { changePassword, exportMyData, saveName } from "@/lib/api/profile";
 import {
-  canUpgrade, passwordErrorMessage, planLabel, validateName, validatePasswordChange,
+  accountExportFilename, canUpgrade, exportErrorMessage, passwordErrorMessage, planLabel,
+  validateName, validatePasswordChange,
 } from "@/lib/profile";
 import { NAV } from "@/components/shell/nav";
 
@@ -30,6 +31,24 @@ describe("wire", () => {
     expect(JSON.parse(calls[0].init.body as string)).toEqual({
       current_password: "old-pass-1", new_password: "new-pass-2",
     });
+  });
+});
+
+describe("data export (GDPR)", () => {
+  it("POSTs the password to /me/data-export", async () => {
+    await exportMyData("my-pass-1");
+    expect(calls[0].url).toMatch(/\/me\/data-export$/);
+    expect(calls[0].init.method).toBe("POST");
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({ password: "my-pass-1" });
+  });
+  it("names the file by date", () => {
+    expect(accountExportFilename(new Date("2026-10-10T13:00:00Z")))
+      .toBe("leadpilot-account-export-2026-10-10.json");
+  });
+  it("maps export errors", () => {
+    expect(exportErrorMessage(new ApiError(403, "INVALID_PASSWORD"))).toMatch(/password is not right/);
+    expect(exportErrorMessage(new ApiError(429, "x"))).toMatch(/Too many/);
+    expect(exportErrorMessage(new Error("boom"))).toMatch(/Try again/);
   });
 });
 
