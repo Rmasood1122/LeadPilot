@@ -31,6 +31,8 @@ RATE_LIMITED_ROUTES = [
     # F01: re-verifying an address can spend a paid Hunter verification.
     ("/leads/{lead_id}/email-verdict/refresh", "POST"),
     ("/quickstart", "POST"),  # F06
+    ("/reply-copilot/drafts/{draft_id}/approve", "POST"),  # F04
+    ("/reply-copilot/drafts/{draft_id}/copy", "POST"),     # F04
 ]
 
 

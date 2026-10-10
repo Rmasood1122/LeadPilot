@@ -235,6 +235,11 @@ class FakeClaude:
         # Day 0 rule-repair path can be exercised.
         self.displacement_dm_response: object | None = None
         self.displacement_dm_prompts: list[str] = []
+        # F04 Reply Copilot. Same contract: a dict is returned verbatim, a
+        # list is a SCRIPT (one per call, last repeats), an Exception is raised.
+        self.reply_copilot_response: object | None = None
+        self.reply_copilot_prompts: list[str] = []
+        self.reply_copilot_systems: list[str] = []
         # Feature A1 (claim engine). Same contract: dict returned, Exception
         # raised; default "no claims found" so the rules alone decide.
         self.claim_extraction_response: object | None = None
@@ -282,6 +287,20 @@ class FakeClaude:
     # ---- JSON completions (patterns + verification judge) ----
     def complete_json(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None) -> dict:
         self.completions += 1
+        if "Reply Copilot drafter" in system:  # F04
+            self.reply_copilot_prompts.append(prompt)
+            self.reply_copilot_systems.append(system)
+            response = self.reply_copilot_response
+            if isinstance(response, list):
+                index = min(len(self.reply_copilot_prompts) - 1, len(response) - 1)
+                response = response[index]
+            if isinstance(response, Exception):
+                raise response
+            if response is not None:
+                return response
+            return {"body": "Thanks Sara - happy to walk you through it. "
+                            "Would a short call this week suit?",
+                    "meeting_time_request": False}
         if "LeadPilot in-app support assistant" in system:  # Feature 3
             self.support_prompts.append(prompt)
             if isinstance(self.support_response, Exception):

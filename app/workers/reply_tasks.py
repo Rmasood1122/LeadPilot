@@ -69,19 +69,34 @@ def process_inbound_reply_impl(session: Session, reply_id, force: bool = False) 
 
     plan = reengagement_memory.plan_for_reply(session, reply)
 
+    # F04 Reply Copilot: a grounded, claim-verified answer queued for a person.
+    # Behind reply_copilot_enabled (default off): off = one settings read and a
+    # return value identical to before. Its own idempotency (one draft per
+    # reply, UNIQUE), so a redelivery or force=True never replaces a draft a
+    # person may be editing. Never raises.
+    from app.services import reply_copilot  # noqa: PLC0415
+
+    copilot = (reply_copilot.draft_for_reply(session, reply)
+               if reply_copilot.enabled(session) else None)
+
+    def _out(result: dict) -> dict:
+        if copilot is not None:
+            result["copilot"] = copilot
+        return result
+
     if reply.classified_at is not None and not force:
-        return {"status": "skipped", "category": reply.reply_category,
-                "intent": intent["label"],
-                "reengagement_plan_id": str(plan.id) if plan else None}
+        return _out({"status": "skipped", "category": reply.reply_category,
+                     "intent": intent["label"],
+                     "reengagement_plan_id": str(plan.id) if plan else None})
 
     result = reply_intelligence.classify_reply(session, reply.id)
     if result.get("error"):
-        return {"status": "failed", "category": None, "intent": intent["label"],
-                "reengagement_plan_id": str(plan.id) if plan else None}
+        return _out({"status": "failed", "category": None, "intent": intent["label"],
+                     "reengagement_plan_id": str(plan.id) if plan else None})
     reply_intelligence.apply(session, reply, result)
-    return {"status": "classified", "category": reply.reply_category,
-            "intent": intent["label"],
-            "reengagement_plan_id": str(plan.id) if plan else None}
+    return _out({"status": "classified", "category": reply.reply_category,
+                 "intent": intent["label"],
+                 "reengagement_plan_id": str(plan.id) if plan else None})
 
 
 @celery_app.task(name="app.workers.reply_tasks.process_inbound_reply")
@@ -110,6 +125,62 @@ def enqueue(reply_id) -> bool:
         return True
     except Exception:  # noqa: BLE001 -- see the docstring
         logger.exception("reply intelligence: could not enqueue reply %s", reply_id)
+        return False
+
+
+# --------------------------------------------------------------------------
+# F04 Reply Copilot: send an approved answer THROUGH the chokepoint
+# --------------------------------------------------------------------------
+
+
+def send_reply_draft_impl(session: Session, message_id) -> str:
+    """Send one approved Reply Copilot message via
+    outreach_tasks.send_message_impl -- every gate applies (suppression,
+    exclusions, Bounce Shield, consent, send window, caps, send review,
+    forbidden phrases, one-click unsubscribe headers). Records the result on
+    the draft. Inside the same `outreach` usage scope as every send."""
+    import uuid  # noqa: PLC0415
+
+    from app.db.models import Message, Sequence, Strategy  # noqa: PLC0415
+    from app.services import reply_copilot, usage_meter  # noqa: PLC0415
+    from app.workers import outreach_tasks  # noqa: PLC0415
+
+    mid = uuid.UUID(str(message_id))
+    message = session.get(Message, mid)
+    sequence = session.get(Sequence, message.sequence_id) if message else None
+    strategy = session.get(Strategy, sequence.strategy_id) if sequence else None
+    with usage_meter.owner_scope(session, strategy, "outreach"):
+        result = outreach_tasks.send_message_impl(
+            session, mid, outcome_source=reply_copilot.OUTCOME_SOURCE)
+    reply_copilot.after_send_attempt(session, mid, result)
+    return result
+
+
+@celery_app.task(name="app.workers.reply_tasks.send_reply_draft", bind=True, max_retries=3)
+def send_reply_draft(self, message_id: str) -> str:
+    """Celery entry point. Retried on a transient failure like every send
+    (send_message_impl leaves the row SCHEDULED, and its idempotency guards
+    make a retry unable to double-send)."""
+    session = SessionLocal()
+    try:
+        return send_reply_draft_impl(session, message_id)
+    except Exception as exc:
+        session.rollback()
+        logger.exception("reply copilot: send failed for message %s -- retrying", message_id)
+        raise self.retry(exc=exc, countdown=60)
+    finally:
+        session.close()
+
+
+def enqueue_send(message_id) -> bool:
+    """Publish send_reply_draft. Never raises: if the broker refuses, the
+    message is still SCHEDULED and the beat dispatcher sends it once its
+    dispatch guard has passed."""
+    try:
+        send_reply_draft.apply_async(args=[str(message_id)], retry=False)
+        return True
+    except Exception:  # noqa: BLE001 -- see the docstring
+        logger.exception("reply copilot: could not enqueue send of message %s", message_id)
         return False
 
 

@@ -104,3 +104,11 @@ isolation. `tests/test_inbox_migration.py` (5) — including that
 `handled_by_user_id` is `ON DELETE SET NULL`, so the fact that a reply *was*
 handled outlives the account of whoever handled it.
 `frontend/src/tests/inbox.test.ts` (18).
+
+## F04 Reply Copilot
+
+With `reply_copilot_enabled` on, the thread view shows a **Reply Copilot**
+card above the conversation: drafted answers to approve / edit / discard
+(LinkedIn: copy-only). Approving or copying marks the reply handled through
+`inbox.mark_handled`; discarding does not. See
+`docs/features/f04-reply-copilot.md`.

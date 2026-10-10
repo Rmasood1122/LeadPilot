@@ -395,8 +395,15 @@ class decides the routing:
 steps** — because `stop_enrollment` stops *enrollments*, not channels. Someone
 who replied on one channel is not still cold on another.
 
-**LeadPilot never auto-replies to a human.** Not in this version, not behind a
-flag.
+**Routing never replies to a human.** By default nothing answers a reply but a
+person. **Reply Copilot (F04, flag `reply_copilot_enabled`, off by default)**
+drafts a grounded, claim-verified answer to interested / question / objection
+replies and queues it in the inbox for approve / edit / discard (LinkedIn:
+copy-only); never for opt-outs, suppressed or excluded contacts. An approved
+email goes through the ordinary send chokepoint. The only automatic answer is
+the opt-in "send me a time" email reply, off at two levels (admin
+`reply_copilot_auto_send_allowed` and the account's own opt-in)
+(`docs/features/f04-reply-copilot.md`).
 
 ### The cross-tenant bug this code is built around
 
@@ -744,7 +751,11 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Per-channel daily caps with warm-up ramps; over-cap sends deferred, never lost
 - Bounce-rate auto-pause with owner notification
 - CAN-SPAM footer + RFC 8058 one-click unsubscribe on every email
-- Reply classification and routing; **no auto-reply to humans**
+- Reply classification and routing; **no auto-reply to humans by default**
+- Reply Copilot (F04, flag `reply_copilot_enabled`, off by default): grounded,
+  claim-verified answer drafts queued in the inbox (approve / edit / discard;
+  LinkedIn copy-only), sent only through the send chokepoint; opt-in
+  "send me a time" auto-send, off at two levels
 - Automated follow-up with per-step delay and enable/disable
 - Opt-in post-sequence re-engagement: one email per completed, neutral
   enrollment, per-campaign toggle (off by default), own daily/weekly caps under
@@ -1057,8 +1068,10 @@ page, not a document.
 
 **Deliberate product limits**
 
-- **No auto-replying to humans.** Replies are classified and routed; a person
-  writes the answer.
+- **No auto-replying to humans by default.** Replies are classified and
+  routed; a person writes or approves the answer. The single exception is
+  Reply Copilot's opt-in "send me a time" email auto-send (F04), off at two
+  levels.
 - **LinkedIn is not implemented.** The API rejects it explicitly rather than
   half-supporting it.
 - **Data ownership is still one account per workspace.** Workspaces

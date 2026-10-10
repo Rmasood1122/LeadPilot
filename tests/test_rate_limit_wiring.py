@@ -42,6 +42,10 @@ RATE_LIMITED_ROUTES = {
     ("/leads/{lead_id}/email-verdict/refresh", "POST"): "RATE_LIMIT_AI_ACTION",
     # F06: creates a strategy and starts its full pipeline -- same bucket.
     ("/quickstart", "POST"): "RATE_LIMIT_STRATEGIES",
+    # F04: approving / copying a Reply Copilot draft re-runs claim
+    # verification, which may make one claim-extraction model call.
+    ("/reply-copilot/drafts/{draft_id}/approve", "POST"): "RATE_LIMIT_CRM_WRITE",
+    ("/reply-copilot/drafts/{draft_id}/copy", "POST"): "RATE_LIMIT_CRM_WRITE",
 }
 
 

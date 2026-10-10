@@ -55,7 +55,11 @@ BUDGETED_PURPOSES = ("pipeline", "verification")
 #
 # F06 adds "quickstart": a Quickstart run (ICP extraction + review-only
 # drafts) stops cleanly between drafts, so it is capped like the others.
-ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstart")
+#
+# F04 adds "reply_copilot": a reply draft stops cleanly (no draft; a person
+# answers by hand), so it is capped like the others.
+ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstart",
+                           "reply_copilot")
 
 # A prompt's size in tokens is not known before the call. English averages
 # about 4 characters per token, so dividing by 3 OVER-estimates the input and

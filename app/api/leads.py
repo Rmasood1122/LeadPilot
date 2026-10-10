@@ -350,6 +350,11 @@ def gdpr_delete_lead(
     from app.services import quickstart  # noqa: PLC0415
 
     quickstart.erase_lead_drafts(db, lead.id)
+    # F04: a Reply Copilot draft quotes the person and answers their reply.
+    # Same reason as above: erased explicitly, in the same transaction.
+    from app.services import reply_copilot  # noqa: PLC0415
+
+    reply_copilot.erase_for_lead(db, lead.id)
     db.commit()
     # Feature Group 4: forget which CRM record this person was synced to.
     # (What the CRM itself holds is the CRM owner's to erase.)
