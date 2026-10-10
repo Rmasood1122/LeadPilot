@@ -76,8 +76,7 @@
       "phase": 1,
       "status": "todo",
       "blocked_on": [
-        "D5 (ruleset step only)",
-        "GitHub Pro (ruleset enforcement on a private repo)"
+        "founders' replacement design for Layer 4 (next session)"
       ],
       "first_task": "repair tests/integration harness (54 failures) without weakening tests"
     },
@@ -133,9 +132,10 @@
     "D2": "deferred to Phase 3 (no production requests until then)",
     "D3": "private, 2026-10-10",
     "D4": "n/a",
-    "D5": "unanswered",
+    "D5": "yes, written policy only (other co-founder approves every PR to master); not enforceable by GitHub without Pro",
     "D6": "unanswered",
-    "P0-D": "self-hosted, single-tenant, 2026-10-04"
+    "P0-D": "self-hosted, single-tenant, 2026-10-04",
+    "GH-PRO": "no, 2026-10-10; Layer 4 ruleset dropped; replacement design supplied next session"
   },
   "rerated_under_p0d": [
     {

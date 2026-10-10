@@ -8,7 +8,7 @@ project records (gap register, requirements, evidence index) live in the
 AI outbound/GTM system (FastAPI + SQLAlchemy/PostgreSQL + Celery/Redis +
 Anthropic pipeline; Next.js frontend; Android app; Python SDK). Revenue
 product with a **zero-tolerance legal-compliance posture** (CAN-SPAM / GDPR /
-CASL / PDPA). Multi-tenant — cross-tenant bugs have shipped before from
+CASL / PDPA). Self-hosted, single-tenant per P0-D (`docs/program/DECISIONS.md`) — cross-tenant bugs have shipped before from
 ad-hoc lookups (`app/services/notifications.py:300`); never query tenant-owned
 rows without an ownership filter.
 
@@ -16,7 +16,7 @@ rows without an ownership filter.
 ```bash
 pip install -r requirements.txt fakeredis pyyaml pytest pytest-asyncio pytest-mock
 python3 evals/tools/registry_lint.py evals/registry.yaml   # schema lint
-python3 evals/run_evals.py                                  # full offline suite (~1,985 tests, junit-scored)
+python3 evals/run_evals.py                                  # full offline suite (3,319 tests, ~9 minutes, junit-scored)
 python3 evals/tools/promote.py                              # gate: candidate vs baseline (exit 0 = PROMOTE)
 python3 evals/fixtures/verify_block_fixtures.py             # seen-it-fire: every hard gate proven to block
 ```

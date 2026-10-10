@@ -138,7 +138,7 @@ either squash-merged under another SHA or abandoned — UNVERIFIED which.
 | P0-A one trunk | FIXED | `evals/`, `eval-gate.yml` and the four P0 test files are all on `master` |
 | P0-B suspension | FIXED | F-SEC-01 |
 | P0-C Docker manifest | FIXED in manifest; image UNKNOWN | F-OPS-01 |
-| P0-D deployment-model decision | **DECIDED** 2026-10-04: self-hosted, single-tenant | recorded in `DECISIONS.md` on 2026-10-10. `CLAUDE.md` still says multi-tenant (conflict reported, not edited). Enforcement gap: P0-D-ENF (3.5) |
+| P0-D deployment-model decision | **DECIDED** 2026-10-04: self-hosted, single-tenant | recorded in `DECISIONS.md` on 2026-10-10. `CLAUDE.md` line 11 updated to match on 2026-10-10 (founder-approved). Enforcement gap: P0-D-ENF (3.5) |
 | P1-A … P1-E | FIXED | F-SEC-02, F-SEC-03, F-AI-01 (per strategy), F-AI-02, F-OPS-02 |
 | P1-C per-account cost cap | **OPEN** | P0-5 |
 | P1-F suppression tenancy | FIXED | made admin-only rather than tenant-scoped |
@@ -348,7 +348,7 @@ Confirmed in code: 9 FAQ entries (`app/services/support_kb.py:56-146`),
 Each is its own branch and PR through the gate. Item 1 needs a founder
 decision (retention) before any code.
 
-0. ~~Decide the deployment model in writing (P0-D).~~ **Done:** self-hosted, single-tenant, decided 2026-10-04 (`DECISIONS.md`). Still to do: the "Multi-tenant" line in `CLAUDE.md` (founder-approved doc change).
+0. ~~Decide the deployment model in writing (P0-D).~~ **Done:** self-hosted, single-tenant, decided 2026-10-04 (`DECISIONS.md`). `CLAUDE.md` line 11 updated to match on 2026-10-10.
 1. **GDPR account export and deletion.** Legal exposure with no workaround in the product today. An erasure request can only be met by hand in the database. Needs a founder decision on what is retained (suppression tombstones, audit trail, billing records).
 2. **P0-D-ENF closed sign-up.** A setting that makes `POST /auth/signup` refuse outsiders (invite-only), closed by default in production, with a test. A small change, and the one that makes the single-tenant re-ratings true in a running deployment.
 3. **P0-5 per-account AI budget.** A monthly dollar cap per account, checked where the per-strategy cap is checked, covering model calls outside the pipeline.
@@ -398,13 +398,17 @@ private since 2026-10-10, D3); suspension fix at `auth.py:207`.
 7. ~~This file lists open security findings and the repository is public (D3).~~ Resolved: the repository was made private on 2026-10-10.
 8. `.github/workflows/android-release.yml` triggers on push to `main`. The trunk is `master`, so merges never build the Android app; only `release/*` / `v*.*.*` tags and manual dispatch do.
 9. `evals/baseline.json` (sealed) is stale: `offline_test_count` 1985 and `suite_runtime_s` 202.0 against measured 3,319 and 510.8. The 1,900 count floor now lets ~1,400 tests be deleted without a BLOCK. A baseline refresh is its own reviewed PR.
-10. `CLAUDE.md` line 11 says "Multi-tenant", which contradicts P0-D. Line 19 says "~1,985 tests".
+10. ~~`CLAUDE.md` line 11 says "Multi-tenant"; line 19 says "~1,985 tests".~~ Fixed 2026-10-10 with founder approval (single-tenant per P0-D; 3,319 tests, ~9 minutes).
 
 ---
 
 ## 11. Phase 1 inputs
 
 ### 11.1 Repository is private, so the Layer 4 ruleset needs GitHub Pro
+
+**Decided 2026-10-10 (`DECISIONS.md`, GH-PRO): Pro will not be bought, and the
+Layer 4 ruleset is dropped.** The founders will supply a replacement design.
+D5 (co-founder approval) is a written policy that GitHub cannot enforce.
 
 The repository was made private on 2026-10-10 (D3, `DECISIONS.md`). On GitHub
 Free, protected branches and rulesets are available only on public

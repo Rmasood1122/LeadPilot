@@ -20,14 +20,14 @@ Done in this session:
 
 Earlier (2026-10-10, laptop session): git state, findings reconciliation, PostgreSQL suite (54 failed / 70 passed, harness stale), production read-only checks and D2 diagnosis, Help AI diagnostic SQL, prompt-vs-reality discrepancies. The laptop's offline-gate run was killed for low memory; superseded by the run above.
 
+Follow-up decisions, same day (`DECISIONS.md`): GitHub Pro will not be bought, so the Layer 4 ruleset is dropped and the founders will give a replacement design next session. D5 is a written policy only; GitHub cannot enforce it. `CLAUDE.md` lines 11 and 19 updated (single-tenant per P0-D; 3,319 tests, ~9 minutes).
+
 Open questions for the founders:
 
-1. D1 (website copy vs. code), D5 (required approval), D6 (status page key and DNS) are unanswered.
-2. Upgrade to GitHub Pro before the Phase 1 ruleset step, or accept an unenforced ruleset?
-3. Approve updating `CLAUDE.md` ("Multi-tenant", "~1,985 tests") to match P0-D and the measured count?
-4. Is sign-up open on the current Render production? (UNVERIFIED: no production requests were made in this session.)
+1. D1 (website copy vs. code) and D6 (status page key and DNS) are unanswered.
+2. Is sign-up open on the current Render production? (UNVERIFIED: no production requests were made in this session.)
 
 Next:
 
-- Phase 1. First task: repair `tests/integration/` so the PostgreSQL suite is green without weakening any test. Only then can `verify-backend-postgres` be a required check.
+- Phase 1, using the founders' replacement for Layer 4. First task: repair `tests/integration/` so the PostgreSQL suite is green without weakening any test. Only then can `verify-backend-postgres` be a required check.
 - Phases 2–4 stay blocked until the OPEN P0/HIGH items in `BASELINE.md` §1 are fixed or accepted in writing.
