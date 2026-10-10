@@ -425,7 +425,11 @@ def test_unsubscribe_and_gdpr_suppress_the_profile(client, db_session, verified_
     assert other.linkedin_url is None
 
 
-def test_sequences_api_accepts_linkedin_steps(client, verified_strategy):
+def test_sequences_api_accepts_linkedin_steps(client, verified_strategy, db_session, test_user):
+    # Plan enforcement: LinkedIn sequences need a plan that includes the
+    # channel (Growth and up); this test is about the sequence API, not plans.
+    test_user.plan = m.PlanTier.GROWTH
+    db_session.commit()
     resp = client.post(f"/strategies/{verified_strategy.id}/sequences", json={
         "name": "LI", "channel": "linkedin",
         "steps": [{"step_no": 1, "template": "connect"},

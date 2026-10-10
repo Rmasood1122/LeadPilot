@@ -10,6 +10,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.plans import (
+    PlanLimitExceeded, check_plan_quantity, check_send_channel, plan_limit_response,
+)
 from app.db.base import get_db
 from app.db.models import (
     ChannelType,
@@ -49,6 +52,31 @@ def _owned_sequence(db: Session, sequence_id: uuid.UUID, current_user: User) -> 
         raise HTTPException(status_code=404, detail="sequence not found")
     _owned_strategy(db, sequence.strategy_id, current_user)
     return sequence
+
+
+def _enforce_plan(user: User, channels, step_count: int) -> None:
+    """402 when the account's plan does not cover this sequence.
+
+    `channels` is every channel a step would send on (a step's own channel or
+    the sequence's), `step_count` the number of steps. Checked at creation and
+    again at every launch, so a sequence built on a higher plan cannot be
+    launched after a downgrade. `user` is the data owner (in a workspace, the
+    owner whose plan pays), which is what get_current_user returns here.
+    """
+    try:
+        check_plan_quantity(user, "max_sequence_steps", step_count,
+                            f"This sequence has {step_count} steps.")
+        for channel in sorted({getattr(c, "value", c) for c in channels}):
+            check_send_channel(user, channel)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(status_code=402, detail=plan_limit_response(exc))
+
+
+def _enforce_plan_for(db: Session, sequence: Sequence, user: User) -> None:
+    steps = db.execute(
+        select(SequenceStep).where(SequenceStep.sequence_id == sequence.id)
+    ).scalars().all()
+    _enforce_plan(user, [s.channel or sequence.channel for s in steps], len(steps))
 
 
 class StepIn(BaseModel):
@@ -191,6 +219,10 @@ def create_sequence(
                        f"exactly the template's variables "
                        f"{sorted(expected)} — {exc}")
 
+    # Plan (402) after every shape check (422), so a malformed request is told
+    # what is wrong with it before being told to upgrade.
+    _enforce_plan(current_user, [s.channel or body.channel for s in body.steps],
+                  len(body.steps))
     sequence = Sequence(strategy_id=strategy.id, name=body.name,
                         channel=body.channel, booking_url=body.booking_url,
                         status=SequenceStatus.DRAFT)
@@ -265,6 +297,7 @@ def enroll(
 
     identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
+    _enforce_plan_for(db, sequence, current_user)
     # Feature A7: the red-team review gates the launch request itself, so an
     # SDR cannot queue blocked content for a manager to approve blind.
     _review_gate(db, sequence, current_user)
@@ -365,6 +398,7 @@ def approve_sequence(
 
     identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
+    _enforce_plan_for(db, sequence, current_user)
     _review_gate(db, sequence, current_user)
     actor = _actor(request, current_user)
     payload = EnrollRequest(**(sequence.approval_payload_json or {}))

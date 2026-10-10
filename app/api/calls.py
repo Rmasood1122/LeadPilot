@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.leads import _owned_lead, _owned_strategy
+from app.core.plans import PlanLimitExceeded, check_send_channel, plan_limit_response
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
 from app.db.models import Call, CallOutcome, CrmActivityKind, Lead, ProcessedWebhook, Strategy, User
@@ -158,6 +159,10 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
 
     if not system_settings.get(db, "phone_calling_enabled"):
         raise HTTPException(status_code=409, detail="AI calling is disabled by the administrator")
+    try:  # plan channels: only Scale and Enterprise include phone
+        check_send_channel(current_user, "phone")
+    except PlanLimitExceeded as exc:
+        raise HTTPException(status_code=402, detail=plan_limit_response(exc))
     if not phone_calls.e164(lead.phone):
         raise HTTPException(status_code=422, detail="this lead has no dialable phone number")
     if is_suppressed(db, lead.email, lead.phone, linkedin=lead.linkedin_url):

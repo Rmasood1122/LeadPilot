@@ -129,7 +129,11 @@ PLANS: dict[str, dict[str, Any]] = {
         "max_strategies": -1,
         "max_leads_per_strategy": -1,
         "max_sequence_steps": -1,
-        "channels": ["gmail", "whatsapp"],
+        # Channels were not enforced before plan enforcement shipped, so every
+        # Pro account could use all four. Pro is ranked above Growth
+        # (_LINKEDIN_NETWORK_PLANS) and "keeps exactly what it has", so it
+        # keeps all four. Founder decision PLAN-PRO in DECISIONS.md.
+        "channels": ["gmail", "whatsapp", "linkedin", "phone"],
         "ab_testing": True,
         "playbook_access": True,
         "multi_variate": True,
@@ -256,6 +260,52 @@ def check_channel(user, channel: str) -> None:
                 f"Allowed: {', '.join(allowed)}."
             ),
         )
+
+
+def check_plan_quantity(user, resource: str, requested: int, what: str) -> None:
+    """Raise PlanLimitExceeded if `requested` is more than the plan allows.
+
+    For limits on the size of ONE thing (steps in a sequence, leads in a
+    strategy), where check_plan_limit's "one more than you have" wording does
+    not fit. `what` finishes the message ("This sequence has 7 steps.").
+    -1 means unlimited.
+    """
+    plan_name = getattr(user, "plan", "free") or "free"
+    plan = get_plan(plan_name)
+    limit = plan.get(resource, -1)
+    if limit == -1 or requested <= limit:
+        return
+    raise PlanLimitExceeded(
+        limit_key=resource,
+        current_plan=plan_name,
+        upgrade_to=_PLAN_UPGRADE_PATH.get(plan_name),
+        message=(
+            f"{plan['display_name']} plan allows {limit} "
+            f"{resource.replace('max_', '').replace('_', ' ')}. {what}"
+        ),
+    )
+
+
+def plan_limit_remaining(user, resource: str, used: int) -> Optional[int]:
+    """How many more of `resource` the plan allows, or None for unlimited."""
+    plan_name = getattr(user, "plan", "free") or "free"
+    limit = get_plan(plan_name).get(resource, -1)
+    if limit == -1:
+        return None
+    return max(int(limit) - int(used), 0)
+
+
+# Sequence/send channels (models.ChannelType values) -> the names PLANS uses.
+# Email goes out through the connected Gmail account, so the plan calls it
+# "gmail".
+PLAN_CHANNEL_NAME = {"email": "gmail", "whatsapp": "whatsapp",
+                     "linkedin": "linkedin", "phone": "phone"}
+
+
+def check_send_channel(user, channel) -> None:
+    """check_channel for a models.ChannelType (or its string value)."""
+    value = str(getattr(channel, "value", channel))
+    check_channel(user, PLAN_CHANNEL_NAME.get(value, value))
 
 
 def plan_limit_response(exc: PlanLimitExceeded) -> dict:

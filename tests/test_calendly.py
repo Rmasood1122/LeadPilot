@@ -138,7 +138,7 @@ class TestSequenceApi:
         assert [s["step_no"] for s in r.json()["steps"]] == [1, 2]
 
     def test_whatsapp_sequence_requires_template_linkedin_now_available(
-            self, leads_client, verified_strategy):
+            self, leads_client, verified_strategy, db_session, test_user):
         """MODIFIED in M4 Chunk 4 (was test_non_email_channel_rejected_in_m3)
         and again in Feature Group 5. A cold WhatsApp step without an
         approved-template reference is still rejected (422, template
@@ -151,6 +151,10 @@ class TestSequenceApi:
         })
         assert r.status_code == 422
         assert "whatsapp_template_id" in r.json()["detail"]
+        # Plan enforcement: LinkedIn sequences need a plan that includes the
+        # channel (Growth and up); this test is about the sequence API, not plans.
+        test_user.plan = m.PlanTier.GROWTH
+        db_session.commit()
         r = leads_client.post(f"/strategies/{verified_strategy.id}/sequences", json={
             "name": "LI", "channel": "linkedin",
             "steps": [{"step_no": 1, "template": "hi"}],

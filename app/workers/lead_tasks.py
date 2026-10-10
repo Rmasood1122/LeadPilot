@@ -21,7 +21,7 @@ import logging
 import uuid
 
 from celery import chain
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -176,6 +176,31 @@ def _linkedin_url(payload: dict | None) -> str | None:
     return linkedin_url_from(payload)
 
 
+def strategy_lead_count(session: Session, strategy_id: uuid.UUID) -> int:
+    """Leads that count toward max_leads_per_strategy: every lead of the
+    strategy except DROPPED ones (suppressed, GDPR-erased, rejected)."""
+    return int(session.execute(
+        select(func.count(Lead.id)).where(Lead.strategy_id == strategy_id,
+                                          Lead.status != LeadStatus.DROPPED)
+    ).scalar_one() or 0)
+
+
+def strategy_lead_room(session: Session, strategy_id: uuid.UUID) -> int | None:
+    """How many more leads the strategy's owner's plan allows, None = unlimited."""
+    from app.core.plans import plan_limit_remaining  # noqa: PLC0415
+    from app.db.models import Product, Strategy, User  # noqa: PLC0415
+
+    owner = session.execute(
+        select(User).join(Product, Product.user_id == User.id)
+        .join(Strategy, Strategy.product_id == Product.id)
+        .where(Strategy.id == strategy_id)
+    ).scalar_one_or_none()
+    if owner is None:
+        return None
+    return plan_limit_remaining(owner, "max_leads_per_strategy",
+                                strategy_lead_count(session, strategy_id))
+
+
 def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource | None = None) -> dict:
     batch = session.get(LeadBatch, batch_id)
     _set_stage(session, batch, BatchStage.SOURCING)
@@ -183,8 +208,16 @@ def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
 
     raw_leads = source.search(batch.icp_criteria_json or {}, batch.requested_leads)
 
-    added = skipped_duplicate = skipped_suppressed = 0
+    # Plan limit (max_leads_per_strategy), enforced HERE as well as at the API:
+    # the API caps the request, but two batches for one strategy can run, and
+    # an account can be downgraded between the request and this task.
+    remaining = strategy_lead_room(session, batch.strategy_id)
+
+    added = skipped_duplicate = skipped_suppressed = skipped_plan_limit = 0
     for raw in raw_leads:
+        if remaining is not None and remaining <= 0:
+            skipped_plan_limit += 1
+            continue
         if is_suppressed(session, raw.email, raw.phone):
             skipped_suppressed += 1
             continue
@@ -208,11 +241,14 @@ def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
         try:
             session.commit()  # per-lead commit: crash-safe, resume-safe
             added += 1
+            if remaining is not None:
+                remaining -= 1
         except IntegrityError:
             session.rollback()  # racing worker inserted it — schema-level dedupe
             skipped_duplicate += 1
 
-    counts = {"added": added, "duplicates": skipped_duplicate, "suppressed": skipped_suppressed}
+    counts = {"added": added, "duplicates": skipped_duplicate, "suppressed": skipped_suppressed,
+              "plan_limit": skipped_plan_limit}
     logger.info("batch %s sourced: %s", batch_id, counts)
     return counts
 

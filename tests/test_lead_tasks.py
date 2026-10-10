@@ -27,7 +27,7 @@ class TestSourcing:
                             make_raw(2, domain="acme2.com"),
                             make_raw(3)]
         counts = source_leads_impl(db_session, lead_batch.id, source=fake_source)
-        assert counts == {"added": 3, "duplicates": 0, "suppressed": 0}
+        assert counts == {"added": 3, "duplicates": 0, "suppressed": 0, "plan_limit": 0}
         leads = batch_leads(db_session, lead_batch)
         assert [l.status for l in leads] == [m.LeadStatus.SOURCED] * 3
         assert leads[1].enrichment_json["company_domain"] == "acme2.com"
@@ -38,7 +38,7 @@ class TestSourcing:
         first = source_leads_impl(db_session, lead_batch.id, source=fake_source)
         second = source_leads_impl(db_session, lead_batch.id, source=fake_source)
         assert first["added"] == 2
-        assert second == {"added": 0, "duplicates": 2, "suppressed": 0}
+        assert second == {"added": 0, "duplicates": 2, "suppressed": 0, "plan_limit": 0}
         assert len(batch_leads(db_session, lead_batch)) == 2
 
     def test_dedupe_by_email_across_different_external_ids(self, db_session, lead_batch, fake_source):
@@ -55,7 +55,7 @@ class TestSourcing:
                             make_raw(2, phone="+15550009999"),
                             make_raw(3, email="fine@acme3.com")]
         counts = source_leads_impl(db_session, lead_batch.id, source=fake_source)
-        assert counts == {"added": 1, "duplicates": 0, "suppressed": 2}
+        assert counts == {"added": 1, "duplicates": 0, "suppressed": 2, "plan_limit": 0}
         leads = batch_leads(db_session, lead_batch)
         assert len(leads) == 1 and leads[0].email == "fine@acme3.com"
 

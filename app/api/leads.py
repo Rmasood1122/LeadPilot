@@ -20,6 +20,7 @@ from app.api.schemas import (
     SourceLeadsRequest,
 )
 from app.config import settings
+from app.core.plans import PlanLimitExceeded, check_plan_quantity, plan_limit_response
 from app.db.base import get_db
 from app.db.models import (
     DisplacementAlert, Lead, LeadBatch, LeadStatus, Product, Strategy,
@@ -88,6 +89,19 @@ def source_leads_for_strategy(
             ),
         )
 
+    # Plan limit (max_leads_per_strategy): refuse when the strategy is full,
+    # otherwise ask for no more than the room left. The worker re-checks per
+    # lead (app/workers/lead_tasks.py::source_leads_impl).
+    room = lead_tasks.strategy_lead_room(db, strategy.id)
+    if room is not None and room <= 0:
+        try:
+            check_plan_quantity(
+                current_user, "max_leads_per_strategy",
+                lead_tasks.strategy_lead_count(db, strategy.id) + 1,
+                "This strategy already has that many leads.")
+        except PlanLimitExceeded as exc:
+            raise HTTPException(status_code=402, detail=plan_limit_response(exc))
+
     criteria = body.icp_criteria or extract_icp_criteria(db, strategy)
 
     # Bind this strategy to its playbook bucket. Sourcing is the first moment
@@ -98,7 +112,8 @@ def source_leads_for_strategy(
     batch = LeadBatch(
         strategy_id=strategy.id,
         requested_leads=min(body.max_leads or settings.leads_max_per_run,
-                            settings.leads_max_per_run),
+                            settings.leads_max_per_run,
+                            room if room is not None else settings.leads_max_per_run),
         icp_criteria_json=criteria,
         source_provider=settings.lead_source_provider,
         verifier_provider=settings.email_verifier_provider,
