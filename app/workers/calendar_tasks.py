@@ -337,10 +337,15 @@ def generate_summary_impl(session: Session, meeting_id: uuid.UUID) -> str:
     if meeting is None:
         return "missing"
 
-    result = meeting_ai.generate_meeting_summary(
-        meeting.transcript, meeting.raw_notes,
-        meeting_ai.context_for_meeting(session, meeting),
-    )
+    from app.services import usage_meter  # noqa: PLC0415
+
+    # P0-5b: metered to the host's account (on its daily AI limit). Joins the
+    # endpoint's scope when called inline from POST /generate-summary.
+    with usage_meter.user_scope(session, meeting.host_user_id, "meeting_summary"):
+        result = meeting_ai.generate_meeting_summary(
+            meeting.transcript, meeting.raw_notes,
+            meeting_ai.context_for_meeting(session, meeting),
+        )
     if not result.get("ok"):
         logger.info("no summary generated for meeting %s: %s", meeting_id,
                     result.get("error"))

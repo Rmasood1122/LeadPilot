@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.api.sequences import _owned_sequence
 from app.db.base import get_db
 from app.db.models import User
@@ -35,8 +36,9 @@ class OverrideIn(BaseModel):
 def run_review(sequence_id: uuid.UUID, db: Session = Depends(get_db),
                current_user: User = Depends(get_current_user)) -> dict:
     sequence = _owned_sequence(db, sequence_id, current_user)
-    review = adversarial_review.run_review(db, sequence, current_user.id)
-    return adversarial_review.review_out(review, sequence)
+    with metered(db, current_user, "review"):
+        review = adversarial_review.run_review(db, sequence, current_user.id)
+        return adversarial_review.review_out(review, sequence)
 
 
 @router.get("/sequences/{sequence_id}/review")

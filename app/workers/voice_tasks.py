@@ -36,10 +36,20 @@ def build_voice_profile_impl(session: Session, product_id, posts: list) -> dict:
     failure leaves any EXISTING profile untouched, so a broken re-analysis
     never costs the founder the voice they already had.
     """
-    from app.services import voice_profiler  # noqa: PLC0415
+    from app.db.models import Product  # noqa: PLC0415
+    from app.services import usage_meter, voice_profiler  # noqa: PLC0415
 
+    # P0-5b: metered to the product's owner, on its daily AI limit.
     try:
-        profile = voice_profiler.extract_voice_profile(session, product_id, posts)
+        import uuid  # noqa: PLC0415
+
+        product = session.get(Product, uuid.UUID(str(product_id)))
+    except (ValueError, TypeError):
+        product = None  # extract_voice_profile reports it as not_found
+    owner = product.user_id if product is not None else None
+    try:
+        with usage_meter.user_scope(session, owner, "voice_profile"):
+            profile = voice_profiler.extract_voice_profile(session, product_id, posts)
     except voice_profiler.InvalidPosts as exc:
         logger.warning("voice profile: unusable posts for product %s: %s",
                        product_id, exc)

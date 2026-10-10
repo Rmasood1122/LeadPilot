@@ -45,6 +45,13 @@ class OpenAIClient:
             "max_tokens": max_tokens,
             "temperature": 0.4,
         }
+        # P0-5b: the same pre-call gate the Claude gateway has. GPT-4o spend
+        # used to be uncappable by the strategy budget or the account cap.
+        from app.services import usage_meter  # noqa: PLC0415
+
+        usage_meter.warn_if_unscoped("openai")
+        usage_meter.check_budget(input_chars=len(system) + len(prompt),
+                                 max_output_tokens=max_tokens, provider="openai")
         last = "no attempt made"
         for attempt in range(1, self.max_retries + 1):
             try:

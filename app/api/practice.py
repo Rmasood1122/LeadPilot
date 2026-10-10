@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
 from app.db.models import Lead, MeetingPrepBrief, RoleplaySession, User
@@ -201,8 +202,9 @@ def post_reply(session_id: uuid.UUID, body: ReplyIn, db: Session = Depends(get_d
     one thing a practice tool must not do."""
     enforce_rate_limit(str(current_user.id), "roleplay", "RATE_LIMIT_AI_ACTION")
     session = _owned_session(db, session_id, current_user)
-    result = roleplay.reply(db, session, body.message)
-    return {**result, "session": roleplay.session_out(db, session)}
+    with metered(db, current_user, "practice"):
+        result = roleplay.reply(db, session, body.message)
+        return {**result, "session": roleplay.session_out(db, session)}
 
 
 @router.post("/practice/sessions/{session_id}/finish")
@@ -219,5 +221,6 @@ def finish_session(session_id: uuid.UUID, body: FinishIn,
     if session.status != roleplay.ACTIVE:
         raise HTTPException(status_code=409,
                             detail=f"this session is already {session.status}")
-    roleplay.finish(db, session, abandoned=body.abandoned)
-    return roleplay.session_out(db, session)
+    with metered(db, current_user, "practice"):
+        roleplay.finish(db, session, abandoned=body.abandoned)
+        return roleplay.session_out(db, session)

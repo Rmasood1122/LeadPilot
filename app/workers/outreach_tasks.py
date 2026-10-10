@@ -995,7 +995,19 @@ def _score_authenticity(session: Session, reply: InboundReply, lead: Lead,
 
 def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
     """Match an inbound message to a lead and apply the routing rules.
-    Never auto-replies to humans."""
+    Never auto-replies to humans.
+
+    P0-5b: the classifier calls are metered to the account whose inbox
+    received the message -- counted, never capped (STOP / bounce / unsubscribe
+    handling must not be starved by the daily AI limit)."""
+    from app.services import usage_meter  # noqa: PLC0415
+
+    with usage_meter.user_scope(session, getattr(account, "user_id", None),
+                                "reply_handling"):
+        return _route_inbound(session, inbound, account)
+
+
+def _route_inbound(session: Session, inbound, account: GmailAccount) -> str:
     # Every lookup below is scoped to the leads owned by the user whose Gmail
     # account received this message. Both used to be global: an inbound reply
     # was matched to the FIRST lead anywhere in the database with that address
@@ -1121,6 +1133,23 @@ def route_inbound_impl(session: Session, inbound, account: GmailAccount) -> str:
 
 def route_whatsapp_inbound_impl(session: Session, lead: Lead,
                                 reply: InboundReply) -> str:
+    """Metered wrapper (P0-5b): counted to the lead's owner, never capped."""
+    with _reply_scope(session, lead):
+        return _route_whatsapp_inbound(session, lead, reply)
+
+
+def _reply_scope(session: Session, lead: Lead):
+    from app.services import notifications, usage_meter  # noqa: PLC0415
+
+    try:
+        owner = notifications.owner_of_lead(session, lead)
+    except Exception:  # noqa: BLE001 -- attribution must never block routing
+        owner = None
+    return usage_meter.user_scope(session, owner, "reply_handling")
+
+
+def _route_whatsapp_inbound(session: Session, lead: Lead,
+                            reply: InboundReply) -> str:
     """Classify a non-STOP inbound WhatsApp message with the SAME Claude
     classifier as email and apply the SAME unified stop rules (M4 Chunk 3):
     a WhatsApp reply stops the WHOLE sequence — including pending cold
@@ -1191,6 +1220,13 @@ def route_whatsapp_inbound_impl(session: Session, lead: Lead,
 
 def route_linkedin_inbound_impl(session: Session, lead: Lead,
                                 reply: InboundReply) -> str:
+    """Metered wrapper (P0-5b): counted to the lead's owner, never capped."""
+    with _reply_scope(session, lead):
+        return _route_linkedin_inbound(session, lead, reply)
+
+
+def _route_linkedin_inbound(session: Session, lead: Lead,
+                            reply: InboundReply) -> str:
     """Classify a LinkedIn reply with the SAME classifier and apply the SAME
     unified stop rules as email and WhatsApp. An unsubscribe request
     suppresses the email, the phone AND the LinkedIn profile. Never
@@ -1576,11 +1612,23 @@ def check_followup_due() -> int:
         session.close()
 
 
+def _enrollment_scope(session: Session, enrollment_id):
+    """owner_scope(strategy, "outreach") for an enrollment's campaign."""
+    from app.services import usage_meter  # noqa: PLC0415
+
+    enrollment = session.get(SequenceEnrollment, uuid.UUID(str(enrollment_id)))
+    sequence = session.get(Sequence, enrollment.sequence_id) if enrollment else None
+    strategy = session.get(Strategy, sequence.strategy_id) if sequence else None
+    return usage_meter.owner_scope(session, strategy, "outreach")
+
+
 @celery_app.task(name="leadpilot.outreach.send_followup", bind=True, max_retries=3)
 def send_followup_task(self, enrollment_id: str, step_no: int) -> str:
     session = SessionLocal()
     try:
-        return send_followup_impl(session, uuid.UUID(enrollment_id), int(step_no))
+        # P0-5b: the follow-up brief and the render are metered like any send.
+        with _enrollment_scope(session, enrollment_id):
+            return send_followup_impl(session, uuid.UUID(enrollment_id), int(step_no))
     except Exception as exc:
         session.rollback()
         logger.exception("auto follow-up failed for enrollment %s step %s — "
@@ -1688,7 +1736,9 @@ def check_reengagement_due() -> int:
 def send_reengagement_task(self, enrollment_id: str) -> str:
     session = SessionLocal()
     try:
-        return send_reengagement_impl(session, uuid.UUID(enrollment_id))
+        # P0-5b: the re-engagement brief and the render are metered like any send.
+        with _enrollment_scope(session, enrollment_id):
+            return send_reengagement_impl(session, uuid.UUID(enrollment_id))
     except Exception as exc:
         session.rollback()
         logger.exception("re-engagement failed for enrollment %s — retrying", enrollment_id)

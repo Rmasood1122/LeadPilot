@@ -42,6 +42,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import refuse_if_daily_limit_reached
 from app.core.plans import PlanLimitExceeded, check_feature, check_plan_limit, plan_limit_response
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
@@ -277,6 +278,8 @@ def create_page(body: PageCreateIn, db: Session = Depends(get_db),
 
     if _taken_slugs(db, [body.slug]):
         raise HTTPException(status_code=409, detail="slug already exists")
+    if body.auto_generate:
+        refuse_if_daily_limit_reached(db, current_user.id)  # P0-5b
 
     page = _new_page(body, workspace_id)
     db.add(page)
@@ -285,7 +288,7 @@ def create_page(body: PageCreateIn, db: Session = Depends(get_db),
     if body.auto_generate:
         from app.workers import site_tasks  # noqa: PLC0415
 
-        site_tasks.enqueue_generation(page.id)
+        site_tasks.enqueue_generation(page.id, current_user.id)
     return _out(page)
 
 
@@ -344,13 +347,14 @@ def regenerate_page(page_id: uuid.UUID, db: Session = Depends(get_db),
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     _gate(current_user)
     page = _owned_page(db, page_id, current_user)
+    refuse_if_daily_limit_reached(db, current_user.id)  # P0-5b
 
     page.generation_version = (page.generation_version or 1) + 1
     db.commit()
 
     from app.workers import site_tasks  # noqa: PLC0415
 
-    site_tasks.enqueue_generation(page.id)
+    site_tasks.enqueue_generation(page.id, current_user.id)
     return {"status": "queued", "generation_version": page.generation_version}
 
 
@@ -486,6 +490,8 @@ def bulk_create_pages(body: BulkPageCreateIn, db: Session = Depends(get_db),
                     "message": "these slugs already exist or repeat in the request",
                     "conflicting_slugs": conflicts})
 
+    if any(page.auto_generate for page in body.pages):
+        refuse_if_daily_limit_reached(db, current_user.id)  # P0-5b
     created = [_new_page(page, workspace_id) for page in body.pages]
     db.add_all(created)
     db.commit()
@@ -494,7 +500,7 @@ def bulk_create_pages(body: BulkPageCreateIn, db: Session = Depends(get_db),
 
     for requested, page in zip(body.pages, created):
         if requested.auto_generate:
-            site_tasks.enqueue_generation(page.id)
+            site_tasks.enqueue_generation(page.id, current_user.id)
     return [_out(page) for page in created]
 
 
