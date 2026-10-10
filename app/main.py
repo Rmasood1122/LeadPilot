@@ -72,6 +72,7 @@ from app.api.sequence_reviews import router as sequence_reviews_router # Feature
 from app.api.send_reviews import router as send_reviews_router       # Part 1 Feature 5
 from app.api.inbox import router as inbox_router                      # Part 1 Feature 6
 from app.api.attribution import router as attribution_router          # Part 1 Feature 8
+from app.api.meetings_ledger import router as meetings_ledger_router  # F08
 from app.api.consent import router as consent_router                  # Part 1 Feature 9
 from app.api.client_workspaces import router as clients_router        # Part 1 Feature 11
 from app.api.practice import router as practice_router                # Part 2
@@ -295,6 +296,9 @@ app.include_router(inbox_router)                 # unified cross-channel inbox
 # /leads/{id}/attribution a new sub-path. Nothing here writes an outcome; it
 # only explains the ones that already happened.
 app.include_router(attribution_router)           # transparent attribution ledger
+# F08. /analytics/meetings-ledger is a new sub-path beside /analytics/revenue;
+# read-only, behind meetings_ledger_enabled (default off).
+app.include_router(meetings_ledger_router)       # meetings-per-dollar ledger
 # Part 1 Feature 9. /compliance/consent and /compliance/requirements are new
 # sub-paths under trust.py's /compliance/audit; /leads/{id}/consent* are new.
 app.include_router(consent_router)               # consent ledger + cross-channel withdrawal
