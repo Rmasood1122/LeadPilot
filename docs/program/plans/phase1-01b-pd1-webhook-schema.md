@@ -40,7 +40,16 @@ changes there. Reported below as an out-of-scope model/migration mismatch.
   `last_response_code`; `delivered_at` added.
 - Nothing dropped. `last_response_code` and `max_retries` stay (nullable /
   server default 5, so ORM inserts succeed).
-- Downgrade restores the 0070 shapes and copies status codes back.
+- Downgrade restores the 0070 shapes, unwraps `legacy_text` back to the
+  original text and copies status codes back. `delivered_at` values are
+  dropped on downgrade (the column did not exist before).
+- `SET LOCAL lock_timeout = '15s'` in both directions. Both type changes take
+  ACCESS EXCLUSIVE and `app/db/migrate.py` sets no timeout, so an open
+  transaction on these tables would otherwise hang API startup and queue every
+  webhook query behind it. With the timeout the migration fails, the
+  entrypoint never starts uvicorn, and the previous instance keeps serving.
+- `scripts/activate_with_keys.py` `TARGET_REVISION` → `0071_webhook_schema_sync`
+  (required by `tests/test_activation_script.py`; 0070 moved it the same way).
 
 ## Evidence
 
@@ -50,6 +59,10 @@ changes there. Reported below as an out-of-scope model/migration mismatch.
 | New tests + ported webhook tests, after | same + `test_chunk5_production_launch.py::TestWebhookDelivery` | 8 passed |
 | Full PostgreSQL suite | `python -m pytest tests/integration -q -p no:cacheprovider` | **132 passed, 0 failed, exit 0**, 261 s |
 | Single head | `python -m alembic heads` | `0071_webhook_schema_sync (head)` |
+| Strengthened downgrade test vs. the first version of 0071 (no unwrap) | `pytest tests/integration/test_migration_0071_webhook_schema.py` | 1 failed (`'{"legacy_text": ...}' == 'not json {'`), proving the assertion bites; passes on the fix |
+| Full PostgreSQL suite, final | same | 132 passed, 0 failed, exit 0, 265 s |
+| Offline gate, first run | four `CLAUDE.md` commands | **BLOCK**: 1 failure, `test_activation_script.py::test_target_revision_matches_the_latest_migration` (TARGET_REVISION still 0070). Fixed. |
+| Offline gate, final | four `CLAUDE.md` commands | all exit 0; 3,319 tests, 0 failed; PROMOTE (soft runtime warning, 629 s) |
 | Drift after upgrade | `alembic.autogenerate.compare_metadata` on a fresh migrated DB | No breaking webhook differences left (see remaining list) |
 
 The three new tests: legacy rows converted on upgrade (arrays, JSON payload,
