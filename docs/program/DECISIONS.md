@@ -16,6 +16,7 @@ Help-center articles and specs may cite this file as a source.
 | D6 | Status page data (UptimeRobot key, DNS) | — | — | **Unanswered.** Blocks Phase 3. |
 | GH-PRO | Buy GitHub Pro | **No**, 2026-10-10 | 2026-10-10 | Will not be purchased. The Layer 4 ruleset (`STAR_PROMPT.md` §A.3: `ruleset_master.json`, `apply_ruleset.sh`, required status checks and approvals on `master`) is **dropped**. Phase 1 will use a replacement design the founders supply in the next session. Actions budget stays at 2,000 min/month (Free); see `BASELINE.md` §11.2. |
 | P0-D | Deployment model | **Self-hosted, single-tenant**, 2026-10-04 | 2026-10-10 | See below. |
+| P0-5-CAPS | Daily AI spend cap per plan (USD per UTC day) | — | — | **Unanswered.** `app/core/plans.py` ships placeholders so no plan is unlimited: free 10, starter 25, growth 60, pay_per_meeting 60, scale 150, pro 150, enterprise 400. Founders confirm or replace the numbers, and say whether a monthly cap is wanted as well (`BASELINE.md` §12 item 3 proposed monthly). Detail: `plans/p0-5-account-spend-cap.md`. |
 
 ## P0-D — self-hosted, single-tenant (decided 2026-10-04)
 

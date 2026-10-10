@@ -155,7 +155,8 @@ export async function restoreSession(): Promise<boolean> {
 }
 
 /** Normalize any backend/network failure into ApiError with a human
- *  detail string (FastAPI puts errors in `detail`, sometimes as a list). */
+ *  detail string (FastAPI puts errors in `detail`, sometimes as a list, and
+ *  sometimes as an object carrying a `message`). */
 export async function normalizeError(resp: Response): Promise<ApiError> {
   let detail = `${resp.status} ${resp.statusText}`;
   try {
@@ -169,6 +170,13 @@ export async function normalizeError(resp: Response): Promise<ApiError> {
             .join(": "),
         )
         .join("; ");
+    } else if (
+      data.detail &&
+      typeof data.detail === "object" &&
+      typeof data.detail.message === "string"
+    ) {
+      // Structured refusals: 402 plan_limit_exceeded, 429 daily_ai_limit_reached.
+      detail = data.detail.message;
     }
   } catch {
     /* non-JSON body — keep the status line */

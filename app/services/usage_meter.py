@@ -44,6 +44,16 @@ logger = logging.getLogger(__name__)
 # same strategy (purpose "send", scoring, briefs...) must not eat it.
 BUDGETED_PURPOSES = ("pipeline", "verification")
 
+# P0-5. The per-ACCOUNT daily cap (plans.PLANS[...]["max_ai_spend_usd_per_day"])
+# is ENFORCED only in scopes with these purposes. Spend from every purpose
+# counts toward the day's total, but a send, a meeting brief or a call
+# analysis is not stopped halfway: stopping those mid-flight leaves a message
+# claimed but unsent or a booked meeting without its brief, and their spend is
+# small. Pipelines, verification and lead scoring are where the money goes
+# (one Flow-2 strategy ~ $8.29) and they stop cleanly: the strategy becomes
+# BUDGET_EXHAUSTED (resumable) and lead scoring falls back to no score.
+ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring")
+
 # A prompt's size in tokens is not known before the call. English averages
 # about 4 characters per token, so dividing by 3 OVER-estimates the input and
 # makes the gate stop a little early rather than a little late.
@@ -63,6 +73,15 @@ class BudgetExceededError(ClientHunterError):
         self.budget_micros = budget_micros
         self.spent_micros = spent_micros
 
+
+class AccountBudgetExceededError(BudgetExceededError):
+    """The next model call could take the ACCOUNT past its plan's daily cap.
+
+    A BudgetExceededError, so every path that already stops cleanly on a
+    strategy budget (no retry, strategy -> BUDGET_EXHAUSTED) does the same here.
+    """
+
+
 _PRICE_KEYS = {
     "anthropic": ("claude_input_cost_per_mtok", "claude_output_cost_per_mtok"),
     "openai": ("openai_input_cost_per_mtok", "openai_output_cost_per_mtok"),
@@ -80,6 +99,10 @@ class _Scope:
     prior_micros: int = 0      # already recorded for this strategy before the scope opened
     spent_micros: int = 0      # spent inside this scope so far (flushed or not)
     prices: dict = field(default_factory=dict)   # provider -> (micros/token in, out)
+    # P0-5 -- None/0 unless the scope's account has a daily cap in force.
+    account_budget_micros: int | None = None
+    account_prior_micros: int = 0   # the account's spend so far today, at scope open
+    account_plan: str = ""
 
 
 _current: ContextVar[_Scope | None] = ContextVar("usage_scope", default=None)
@@ -99,7 +122,7 @@ def note(provider: str, model: str, input_tokens: int, output_tokens: int) -> No
     try:
         tin, tout = int(input_tokens or 0), int(output_tokens or 0)
         active.notes.append((provider, model or "", tin, tout))
-        if active.budget_micros is not None:
+        if active.budget_micros is not None or active.account_budget_micros is not None:
             price_in, price_out = active.prices.get(provider, (0.0, 0.0))
             active.spent_micros += int(round(tin * price_in + tout * price_out))
     except (TypeError, ValueError):
@@ -161,6 +184,61 @@ def spent_micros(session: Session, strategy_id) -> int:
     ).scalar_one() or 0)
 
 
+def utc_day_start(now=None):
+    """Midnight UTC of the day `now` falls in: the account cap's window."""
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    now = now.astimezone(timezone.utc)
+    return now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def account_spent_today_micros(session: Session, user_id, now=None) -> int:
+    """Everything recorded against this account since 00:00 UTC, all purposes.
+
+    Filtered by the account's own id (callers pass the authenticated user or
+    a strategy owner they resolved). Uses ix_api_usage_user_ts.
+    """
+    from sqlalchemy import func, select  # noqa: PLC0415
+
+    from app.db.models import ApiUsage  # noqa: PLC0415
+
+    uid = _uuid(user_id)
+    if uid is None:
+        return 0
+    return int(session.execute(
+        select(func.coalesce(func.sum(ApiUsage.cost_micros), 0)).where(
+            ApiUsage.user_id == uid, ApiUsage.ts >= utc_day_start(now)
+        )
+    ).scalar_one() or 0)
+
+
+def account_daily_cap(session: Session, user_id) -> tuple[int | None, str]:
+    """(cap in micro-dollars or None for no cap, plan name) for an account.
+
+    The cap comes from the account's plan (app/core/plans.py,
+    max_ai_spend_usd_per_day). An unknown account has no cap here: the caller
+    has nothing to attribute spend to. A plan value of -1 or missing means no
+    cap; every shipped plan sets a finite one.
+    """
+    from app.core import plans  # noqa: PLC0415
+    from app.db.models import User  # noqa: PLC0415
+
+    uid = _uuid(user_id)
+    if uid is None:
+        return None, ""
+    user = session.get(User, uid)
+    if user is None:
+        return None, ""
+    plan_name = getattr(user.plan, "value", user.plan) or "free"
+    usd = plans.get_plan(plan_name).get("max_ai_spend_usd_per_day", -1)
+    if usd is None or usd < 0:
+        return None, plan_name
+    return int(round(float(usd) * 1_000_000)), plan_name
+
+
 def _price_table(session: Session) -> dict:
     from app.services import system_settings  # noqa: PLC0415
 
@@ -179,31 +257,47 @@ def price_table(session: Session) -> dict:
 
 def check_budget(*, input_chars: int, max_output_tokens: int,
                  provider: str = "anthropic") -> None:
-    """Refuse a model call that could take the active scope past its budget.
+    """Refuse a model call that could take the active scope past a budget.
 
-    A no-op outside a scope and in a scope with no budget. The call is priced
-    at its WORST CASE -- the whole prompt as input, and the model using every
-    one of `max_output_tokens` -- so a call that passes this check cannot, in
-    itself, cross the cap. The price is that the run may stop up to one call's
-    worth early; it is never allowed to run past.
+    Two budgets can be in force: the strategy's (F-AI-01) and the account's
+    daily cap (P0-5). A no-op outside a scope and in a scope with neither. The
+    call is priced at its WORST CASE -- the whole prompt as input, and the
+    model using every one of `max_output_tokens` -- so a call that passes this
+    check cannot, in itself, cross either cap. The price is that the run may
+    stop up to one call's worth early; it is never allowed to run past.
     """
     active = _current.get()
-    if active is None or active.budget_micros is None:
+    if active is None or (active.budget_micros is None
+                          and active.account_budget_micros is None):
         return
     price_in, price_out = active.prices.get(provider, (0.0, 0.0))
     reserve = int(round(
         (max(int(input_chars), 0) / _CHARS_PER_TOKEN_CONSERVATIVE) * price_in
         + max(int(max_output_tokens), 0) * price_out
     ))
-    spent = active.prior_micros + active.spent_micros
-    if spent + reserve > active.budget_micros:
-        raise BudgetExceededError(
-            f"strategy budget of ${active.budget_micros / 1_000_000:.2f} reached "
-            f"(${spent / 1_000_000:.2f} spent; the next model call could cost up to "
-            f"${reserve / 1_000_000:.2f} more). Nothing was spent on that call. "
-            "Raise the budget and resume to continue.",
-            budget_micros=active.budget_micros, spent_micros=spent,
-        )
+    if active.budget_micros is not None:
+        spent = active.prior_micros + active.spent_micros
+        if spent + reserve > active.budget_micros:
+            raise BudgetExceededError(
+                f"strategy budget of ${active.budget_micros / 1_000_000:.2f} reached "
+                f"(${spent / 1_000_000:.2f} spent; the next model call could cost up to "
+                f"${reserve / 1_000_000:.2f} more). Nothing was spent on that call. "
+                "Raise the budget and resume to continue.",
+                budget_micros=active.budget_micros, spent_micros=spent,
+            )
+    if active.account_budget_micros is not None:
+        spent_today = active.account_prior_micros + active.spent_micros
+        if spent_today + reserve > active.account_budget_micros:
+            plan = active.account_plan or "current"
+            raise AccountBudgetExceededError(
+                f"daily AI limit for the {plan} plan reached "
+                f"(${active.account_budget_micros / 1_000_000:.2f} per day; "
+                f"${spent_today / 1_000_000:.2f} used today; the next model call "
+                f"could cost up to ${reserve / 1_000_000:.2f} more). Nothing was spent "
+                "on that call. The limit resets at 00:00 UTC; resume then, or "
+                "upgrade the plan.",
+                budget_micros=active.account_budget_micros, spent_micros=spent_today,
+            )
 
 
 def flush_active(session: Session) -> None:
@@ -235,7 +329,9 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
     """Attribute every model call inside the block. See the module docstring.
 
     `budget_micros` (F-AI-01) turns on spend tracking for the scope and arms
-    check_budget(). Only the OUTERMOST scope decides; a nested scope joins it.
+    check_budget(). For ACCOUNT_CAPPED_PURPOSES with a known `user_id`, the
+    account's daily cap (P0-5) is armed as well. Only the OUTERMOST scope
+    decides; a nested scope joins it.
     """
     if _current.get() is not None:
         yield _current.get()
@@ -245,6 +341,14 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
         active.budget_micros = int(budget_micros)
         active.prices = _price_table(session)
         active.prior_micros = spent_micros(session, active.strategy_id)
+    if active.user_id is not None and purpose in ACCOUNT_CAPPED_PURPOSES:
+        cap, plan_name = account_daily_cap(session, active.user_id)
+        if cap is not None:
+            active.account_budget_micros = cap
+            active.account_plan = plan_name
+            active.account_prior_micros = account_spent_today_micros(session, active.user_id)
+            if not active.prices:
+                active.prices = _price_table(session)
     token = _current.set(active)
     failed = False
     try:
