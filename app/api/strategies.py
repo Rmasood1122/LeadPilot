@@ -152,19 +152,9 @@ def create_strategy(
     if product is None or product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="product not found")
 
-    # F-AI-01: the plan's max_strategies. Counted over the caller's OWN
-    # strategies, across all their products -- never another account's. After
-    # the ownership check, so a foreign product id is 404 whatever the count.
-    owned_strategies = db.execute(
-        select(func.count(Strategy.id))
-        .join(Product, Product.id == Strategy.product_id)
-        .where(Product.user_id == current_user.id)
-    ).scalar_one()
-    try:
-        check_plan_limit(current_user, "max_strategies", owned_strategies)
-    except PlanLimitExceeded as exc:
-        raise HTTPException(status_code=402, detail=plan_limit_response(exc))
-    _refuse_if_daily_ai_limit_reached(db, current_user)
+    # After the ownership check, so a foreign product id is 404 whatever the
+    # count.
+    check_new_strategy_allowed(db, current_user)
 
     has_clients = (
         db.execute(
@@ -183,8 +173,45 @@ def create_strategy(
                    "(POST /products/{id}/past-clients first)",
         )
 
+    budget_micros, steps_per_phase = plan_budget(db, flow_type, body.max_budget_usd)
+    strategy = Strategy(product_id=product.id, flow_type=flow_type,
+                        budget_micros=budget_micros, steps_per_phase=steps_per_phase)
+    db.add(strategy)
+    db.commit()
+    db.refresh(strategy)
+
+    worker_tasks.run_pipeline.delay(str(strategy.id))
+    return _strategy_out(db, strategy)
+
+
+def check_new_strategy_allowed(db: Session, current_user: User) -> None:
+    """The account-level checks every new strategy passes: the plan's
+    max_strategies (402) and today's AI cap (429).
+
+    Shared by create_strategy and F06 Quickstart (app/api/quickstart.py), which
+    creates a strategy too and must not be a way around either limit.
+    """
+    # F-AI-01: the plan's max_strategies. Counted over the caller's OWN
+    # strategies, across all their products -- never another account's.
+    owned_strategies = db.execute(
+        select(func.count(Strategy.id))
+        .join(Product, Product.id == Strategy.product_id)
+        .where(Product.user_id == current_user.id)
+    ).scalar_one()
+    try:
+        check_plan_limit(current_user, "max_strategies", owned_strategies)
+    except PlanLimitExceeded as exc:
+        raise HTTPException(status_code=402, detail=plan_limit_response(exc))
+    _refuse_if_daily_ai_limit_reached(db, current_user)
+
+
+def plan_budget(db: Session, flow_type: FlowType,
+                max_budget_usd: float | None) -> tuple[int, int | None]:
+    """(budget_micros, steps_per_phase) for a new strategy, or 422.
+
+    Shared by create_strategy and F06 Quickstart."""
     budget_micros = _budget_micros(
-        body.max_budget_usd if body.max_budget_usd is not None
+        max_budget_usd if max_budget_usd is not None
         else settings.pipeline_max_usd_default
     )
     # F-AI-01b: fit the run to the budget -- fewer steps per phase for a small
@@ -199,14 +226,7 @@ def create_strategy(
                    f"complete pipeline; this flow needs at least "
                    f"${exc.minimum_micros / 1_000_000:.2f}.",
         )
-    strategy = Strategy(product_id=product.id, flow_type=flow_type,
-                        budget_micros=budget_micros, steps_per_phase=steps_per_phase)
-    db.add(strategy)
-    db.commit()
-    db.refresh(strategy)
-
-    worker_tasks.run_pipeline.delay(str(strategy.id))
-    return _strategy_out(db, strategy)
+    return budget_micros, steps_per_phase
 
 
 @router.get("/strategies/{strategy_id}", response_model=StrategyStatusOut)

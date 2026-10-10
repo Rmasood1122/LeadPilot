@@ -275,6 +275,19 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                              "let email cite the freshest one -- only when the "
                              "claim engine ties the sentence to that stored "
                              "source."),
+    # F06 -- Quickstart (docs/features/f06-quickstart.md). Off by default:
+    # it fetches a user-supplied URL and spends provider credits before the
+    # strategy is verified. Drafts are review-only; nothing is ever sent
+    # from a Quickstart run.
+    "quickstart_enabled": (False, "Let users start from a website URL and a "
+                           "one-line offer: derive an ICP, source verified "
+                           "leads and write review-only first-touch drafts "
+                           "while the full research pipeline runs."),
+    "quickstart_lead_target": (25, "Leads a Quickstart run sources (also "
+                               "capped by the plan's leads per strategy)."),
+    "quickstart_budget_usd": (1.0, "Most a single Quickstart run may spend on "
+                              "model calls (ICP extraction + drafts). The "
+                              "plan's daily AI cap applies on top."),
 }
 
 

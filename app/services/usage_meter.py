@@ -52,7 +52,10 @@ BUDGETED_PURPOSES = ("pipeline", "verification")
 # small. Pipelines, verification and lead scoring are where the money goes
 # (one Flow-2 strategy ~ $8.29) and they stop cleanly: the strategy becomes
 # BUDGET_EXHAUSTED (resumable) and lead scoring falls back to no score.
-ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring")
+#
+# F06 adds "quickstart": a Quickstart run (ICP extraction + review-only
+# drafts) stops cleanly between drafts, so it is capped like the others.
+ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstart")
 
 # A prompt's size in tokens is not known before the call. English averages
 # about 4 characters per token, so dividing by 3 OVER-estimates the input and
@@ -325,13 +328,18 @@ def flush_active(session: Session) -> None:
 
 @contextmanager
 def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "other",
-          budget_micros: int | None = None):
+          budget_micros: int | None = None, prior_micros: int | None = None):
     """Attribute every model call inside the block. See the module docstring.
 
     `budget_micros` (F-AI-01) turns on spend tracking for the scope and arms
     check_budget(). For ACCOUNT_CAPPED_PURPOSES with a known `user_id`, the
     account's daily cap (P0-5) is armed as well. Only the OUTERMOST scope
     decides; a nested scope joins it.
+
+    `prior_micros` (F06) is what the budget has already been charged before
+    this scope opened. Omitted, it is the strategy's pipeline + verification
+    spend (spent_micros), which is right for the pipeline. A budget that is
+    NOT the strategy's -- a Quickstart run's own cap -- passes its own figure.
     """
     if _current.get() is not None:
         yield _current.get()
@@ -340,7 +348,8 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
     if budget_micros is not None:
         active.budget_micros = int(budget_micros)
         active.prices = _price_table(session)
-        active.prior_micros = spent_micros(session, active.strategy_id)
+        active.prior_micros = (int(prior_micros) if prior_micros is not None
+                               else spent_micros(session, active.strategy_id))
     if active.user_id is not None and purpose in ACCOUNT_CAPPED_PURPOSES:
         cap, plan_name = account_daily_cap(session, active.user_id)
         if cap is not None:

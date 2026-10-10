@@ -344,6 +344,12 @@ def gdpr_delete_lead(
     from app.services import signal_radar  # noqa: PLC0415
 
     signal_radar.erase_for_lead(db, lead.id)
+    # F06: a Quickstart draft quotes the person's name and company. The lead
+    # row is tombstoned, not deleted, so its FK cascade never fires -- erase
+    # the drafts explicitly, in the same transaction.
+    from app.services import quickstart  # noqa: PLC0415
+
+    quickstart.erase_lead_drafts(db, lead.id)
     db.commit()
     # Feature Group 4: forget which CRM record this person was synced to.
     # (What the CRM itself holds is the CRM owner's to erase.)
