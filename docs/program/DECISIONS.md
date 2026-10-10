@@ -39,5 +39,11 @@ The decision is **not enforced by the code today**. `POST /auth/signup`
 deployment that leaves sign-up open is multi-tenant in practice, and the HIGH
 ratings return for it. Tracked as **P0-D-ENF** in `BASELINE.md`.
 
+**P0-D-ENF — unanswered decision.** The switch now exists (`SIGNUP_ENABLED`,
+`SIGNUP_ALLOWED_EMAIL_DOMAINS`; the defaults keep sign-up open to anyone).
+Founders choose per deployment: closed, limited to the customer's own email
+domains, or open (then the HIGH ratings above apply to it). Detail:
+`plans/p0-d-enf-signup-switch.md`.
+
 `CLAUDE.md` line 11 was updated to "Self-hosted, single-tenant per P0-D" on
 2026-10-10, with founder approval.

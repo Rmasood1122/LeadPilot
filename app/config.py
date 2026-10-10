@@ -431,6 +431,22 @@ class Settings(BaseSettings):
     # provider misclassifies as hosting, a monitoring probe).
     vpn_allowlist_ips: str = ""
 
+    # --- Public sign-up (P0-D-ENF) ----------------------------------------
+    # P0-D: each deployment serves ONE customer organisation. An open
+    # POST /auth/signup lets any visitor create an account, which makes a
+    # deployment multi-tenant in practice. Two switches, both read on every
+    # sign-up (an env change + restart takes effect, no deploy):
+    #   SIGNUP_ENABLED=false               nobody can self-register; accounts
+    #                                      come from the admin CLI only
+    #   SIGNUP_ALLOWED_EMAIL_DOMAINS=a.com,b.co
+    #                                      only these exact domains may register
+    #                                      (empty = any domain)
+    # Defaults keep today's behaviour (open, any domain); whether production
+    # closes it is a founder decision (DECISIONS.md P0-D-ENF). Existing accounts
+    # can always log in.
+    signup_enabled: bool = True
+    signup_allowed_email_domains: str = ""
+
     # --- Phone verification (SMS one-time code) ----------------------------
     #   twilio   Twilio Messages API (TWILIO_* below)
     #   console  log a MASKED notice, deliver nothing (local dev)
@@ -488,6 +504,15 @@ class Settings(BaseSettings):
         if self.vpn_block_enabled is not None:
             return bool(self.vpn_block_enabled)
         return (self.app_env or "").strip().lower() in {"production", "prod", "live"}
+
+    @property
+    def signup_allowed_domains(self) -> frozenset[str]:
+        """SIGNUP_ALLOWED_EMAIL_DOMAINS parsed: lower-case, no '@', no blanks."""
+        raw = self.signup_allowed_email_domains or ""
+        return frozenset(
+            d.strip().lower().lstrip("@") for d in raw.split(",")
+            if d.strip().lstrip("@")
+        )
 
     @property
     def broker_url(self) -> str:
