@@ -377,7 +377,7 @@ class TestCrossTenantIsolation:
 
 class TestUnsubscribeToken:
     async def test_valid_signed_unsubscribe_token_works_without_auth(
-        self, api_client: AsyncClient, user_a_tokens, all_mocks, db_session
+        self, api_client: AsyncClient, admin_tokens, user_a_tokens, all_mocks, db_session
     ):
         """
         The unsubscribe endpoint must accept a valid signed token without requiring
@@ -399,9 +399,14 @@ class TestUnsubscribeToken:
         resp = await api_client.get(f"/unsubscribe/{token}")
         assert resp.status_code in (200, 302)  # redirect or success page
 
-        # Email must be suppressed
-        resp = await api_client.get(f"/suppression?email={email}", headers=headers)
-        assert len(resp.json()) >= 1
+        # Email must be suppressed. /suppression is operator-only (F-SEC-04)
+        # and takes no ?email filter. The old check, `len(resp.json()) >= 1`
+        # as user_a, counted the keys of the 403 body, so it could not fail.
+        resp = await api_client.get("/suppression", headers=_auth_headers(admin_tokens))
+        assert resp.status_code == 200, resp.text
+        assert any((e["email"] or "").lower() == email for e in resp.json()["entries"]), (
+            "Email not suppressed after a valid unsubscribe link was used"
+        )
 
     async def test_invalid_unsubscribe_token_rejected_safely(
         self, api_client: AsyncClient, all_mocks

@@ -180,24 +180,84 @@ class TestPlanEnforcement:
 # ===========================================================================
 
 class TestWebhookDelivery:
+    """app/services/webhook_delivery.py, on the real PostgreSQL schema.
 
-    def test_create_delivery_inserts_row(self, mock_db):
-        from app.services.webhook_delivery import create_delivery
-        with patch("app.workers.webhook_tasks.deliver_webhook") as mock_task:
-            mock_task.delay = MagicMock()
-            delivery_id = create_delivery(
-                db_session=mock_db,
-                target_id="target-1",
-                event_type="meeting_booked",
-                payload={"lead_id": "lead-1"},
-            )
-        assert delivery_id is not None
-        assert len(delivery_id) == 36  # UUID length
+    These five tests were written for the M8-C5 module, whose API was
+    create_delivery(db_session=, target_id=, event_type=, payload=) -> id | None
+    and mark_failed_attempt(db, id, status, error, attempt) -> bool. Commit
+    41cea92 rebuilt the module (its docstring explains why: the old raw SQL
+    never delivered anything on PostgreSQL) and removed both functions, so
+    four of these tests failed on import or signature before testing anything.
 
-    def test_unknown_event_type_returns_none(self, mock_db):
+    Each test keeps its name and the behaviour it pinned, restated against the
+    current API: a delivery row is inserted and queued; an event nobody
+    subscribed to produces no delivery; a failed attempt with retries left is
+    rescheduled; a failed final attempt is terminal. They used to run against
+    a MagicMock session, so they now also prove the rows persist on Postgres.
+    """
+
+    URL = "https://hooks.example.com/leadpilot"
+
+    @pytest.fixture()
+    def target(self, db_session, monkeypatch):
+        import uuid as _uuid
+
+        from app.db.models import User
+        from app.services import webhook_delivery
+
+        # Delivery re-resolves the host (SSRF guard). Answer with a public
+        # address instead of doing a DNS lookup: the suite stays offline.
+        monkeypatch.setattr(webhook_delivery, "_resolve", lambda host: ["93.184.216.34"])
+        user = User(email=f"hooks_{_uuid.uuid4().hex[:8]}@test.io", email_verified=True)
+        db_session.add(user)
+        db_session.commit()
+        target, _secret = webhook_delivery.create_target(
+            db_session, user.id, self.URL, ["meeting_booked"])
+        return target
+
+    @staticmethod
+    def _answer(monkeypatch, status: int) -> list:
+        import httpx
+
+        from app.services import webhook_delivery
+
+        calls: list = []
+
+        def handler(request):
+            calls.append(request)
+            return httpx.Response(status)
+
+        monkeypatch.setattr(webhook_delivery, "_http",
+                            lambda: httpx.Client(transport=httpx.MockTransport(handler)))
+        return calls
+
+    def test_create_delivery_inserts_row(self, db_session, target, queued_jobs):
+        from app.db.models import WebhookDelivery
         from app.services.webhook_delivery import create_delivery
-        result = create_delivery(mock_db, "target-1", "unknown_event", {})
-        assert result is None
+
+        delivery = create_delivery(db_session, target, "meeting_booked", {"lead_id": "lead-1"})
+
+        assert delivery is not None
+        assert len(str(delivery.id)) == 36  # UUID length
+        db_session.expire_all()
+        row = db_session.get(WebhookDelivery, delivery.id)
+        assert row is not None and row.status == "pending" and row.attempts == 0
+        assert row.payload_json["data"] == {"lead_id": "lead-1"}
+        # ... and it was queued for delivery, as deliver_webhook.delay was.
+        # (queued_jobs stores every non-bool argument as a string.)
+        assert (str(delivery.id), "0") in queued_jobs["webhooks"]
+
+    def test_unknown_event_type_returns_none(self, db_session, target, queued_jobs):
+        from app.db.models import WebhookDelivery
+        from app.services.webhook_delivery import fire_event
+
+        # The event hub enters through fire_event; an event no target is
+        # subscribed to must produce no delivery at all.
+        result = fire_event(db_session, target.user_id, "unknown_event", {})
+
+        assert result == []
+        assert db_session.query(WebhookDelivery).count() == 0
+        assert queued_jobs["webhooks"] == []
 
     def test_retry_delays_correct_length(self):
         from app.services.webhook_delivery import RETRY_DELAYS_SECONDS
@@ -205,15 +265,42 @@ class TestWebhookDelivery:
         assert RETRY_DELAYS_SECONDS[0] == 30
         assert RETRY_DELAYS_SECONDS[-1] == 7200
 
-    def test_mark_failed_returns_true_if_retries_remain(self, mock_db):
-        from app.services.webhook_delivery import mark_failed_attempt
-        has_more = mark_failed_attempt(mock_db, "delivery-1", 500, "Server error", attempt=0)
-        assert has_more is True
+    def test_mark_failed_returns_true_if_retries_remain(
+            self, db_session, target, queued_jobs, monkeypatch):
+        from app.db.models import WebhookDelivery
+        from app.services.webhook_delivery import create_delivery, deliver
 
-    def test_mark_failed_returns_false_when_exhausted(self, mock_db):
-        from app.services.webhook_delivery import mark_failed_attempt
-        has_more = mark_failed_attempt(mock_db, "delivery-1", 500, "Server error", attempt=4)
-        assert has_more is False
+        calls = self._answer(monkeypatch, 500)
+        delivery = create_delivery(db_session, target, "meeting_booked", {}, enqueue=False)
+
+        has_more = deliver(db_session, delivery.id)   # attempt 1 of 5
+
+        assert has_more == "retry"
+        assert len(calls) == 1
+        db_session.expire_all()
+        row = db_session.get(WebhookDelivery, delivery.id)
+        assert row.status == "pending" and row.attempts == 1
+        assert row.last_status_code == 500 and row.next_attempt_at is not None
+        assert (str(delivery.id), "30") in queued_jobs["webhooks"]
+
+    def test_mark_failed_returns_false_when_exhausted(
+            self, db_session, target, queued_jobs, monkeypatch):
+        from app.db.models import WebhookDelivery
+        from app.services.webhook_delivery import RETRY_DELAYS_SECONDS, create_delivery, deliver
+
+        calls = self._answer(monkeypatch, 500)
+        delivery = create_delivery(db_session, target, "meeting_booked", {}, enqueue=False)
+        delivery.attempts = len(RETRY_DELAYS_SECONDS) - 1   # four failures so far
+        db_session.commit()
+
+        has_more = deliver(db_session, delivery.id)   # attempt 5 of 5
+
+        assert has_more == "exhausted"
+        assert len(calls) == 1
+        db_session.expire_all()
+        row = db_session.get(WebhookDelivery, delivery.id)
+        assert row.status == "exhausted" and row.next_attempt_at is None
+        assert queued_jobs["webhooks"] == []   # nothing rescheduled
 
 
 # ===========================================================================

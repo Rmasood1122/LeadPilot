@@ -3,7 +3,7 @@
   "updated": "2026-10-10",
   "trunk": "master",
   "baseline_ref": "2170a55ba10eb38ad6b97e72dc728cef5416ba69",
-  "current_phase": 0,
+  "current_phase": 1,
   "phases": [
     {
       "phase": 0,
@@ -74,11 +74,48 @@
     },
     {
       "phase": 1,
-      "status": "todo",
-      "blocked_on": [
-        "founders' replacement design for Layer 4 (next session)"
-      ],
-      "first_task": "repair tests/integration harness (54 failures) without weakening tests"
+      "status": "in_progress",
+      "blocked_on": [],
+      "tasks": [
+        {
+          "id": "1.1",
+          "title": "repair tests/integration on PostgreSQL without weakening tests",
+          "status": "blocked",
+          "branch": "claude/nice-allen-8wgv8a",
+          "pr": "https://github.com/Rmasood1122/LeadPilot/pull/44",
+          "ci_run_url": null,
+          "evidence": "docs/program/plans/phase1-01-integration-repair.md",
+          "result": "before 54 failed / 70 passed; after 125 passed / 4 errors (PD-1)",
+          "blocked_on": [
+            "PD-1: webhook_targets.event_types text[] vs JSON \u2014 product fix needs its own PR"
+          ]
+        },
+        {
+          "id": "1.1b",
+          "title": "PD-1: migration 0071 syncs webhook tables with the model",
+          "status": "in_progress",
+          "branch": "claude/pd1-webhook-schema",
+          "pr": null,
+          "depends_on": "https://github.com/Rmasood1122/LeadPilot/pull/44",
+          "evidence": "docs/program/plans/phase1-01b-pd1-webhook-schema.md",
+          "result": "tests/integration 132 passed / 0 failed"
+        },
+        {
+          "id": "1.2",
+          "title": "sealed PR: eval-gate.yml triggers = pull_request + push to master",
+          "status": "todo"
+        },
+        {
+          "id": "1.3",
+          "title": "sealed PR: baseline.json refresh to 3,319 tests / ~511 s and raise test-count floor",
+          "status": "todo"
+        },
+        {
+          "id": "1.4",
+          "title": "safe_merge.sh + PreToolUse merge hook, then quick/full gate, verify.yml, post-merge alarm, sabotage proofs",
+          "status": "todo"
+        }
+      ]
     },
     {
       "phase": 2,
@@ -132,10 +169,12 @@
     "D2": "deferred to Phase 3 (no production requests until then)",
     "D3": "private, 2026-10-10",
     "D4": "n/a",
-    "D5": "yes, written policy only (other co-founder approves every PR to master); not enforceable by GitHub without Pro",
+    "D5": "superseded by MERGE-B, 2026-10-10",
     "D6": "unanswered",
     "P0-D": "self-hosted, single-tenant, 2026-10-04",
-    "GH-PRO": "no, 2026-10-10; Layer 4 ruleset dropped; replacement design supplied next session"
+    "GH-PRO": "no, 2026-10-10; Layer 4 ruleset dropped; replacement design supplied next session",
+    "MERGE-B": "B, 2026-10-10: merge only via scripts/gate/safe_merge.sh (required checks green, not draft, squash); co-founder review after merge",
+    "INC-43": "PR #43 merged 09:51:47 UTC 2026-10-10 before CI finished and without review; CI later passed (38042867994, 38042869509, 38042886592)"
   },
   "rerated_under_p0d": [
     {
@@ -176,5 +215,14 @@
       "free_2000": 31,
       "pro_3000": 47
     }
-  }
+  },
+  "product_defects": [
+    {
+      "id": "PD-1",
+      "title": "webhook_targets.event_types text[] and webhook_deliveries payload_json/last_status_code/delivered_at drift vs model; create_target and delivery fail on PostgreSQL",
+      "severity": "HIGH",
+      "status": "FIX IN PR (0071_webhook_schema_sync)",
+      "found_by": "tests/integration/test_chunk5_production_launch.py::TestWebhookDelivery"
+    }
+  ]
 }

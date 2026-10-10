@@ -346,6 +346,118 @@ def capture_push_notifications(monkeypatch):
     return firebase_mock.install(monkeypatch)
 
 
+def _respx_backed_anthropic_client(router):
+    """A real ClaudeClient whose SDK transport is the test's respx router.
+
+    respx patches httpx/httpcore. The anthropic SDK (1.x) sends through its
+    own `httpx2` package, which respx never sees: with only the respx route
+    registered, a ClaudeClient built normally reached the real
+    api.anthropic.com (observed 2026-10-10: HTTP 401 "invalid x-api-key" with
+    a live request_id). So the SDK is handed an explicit MockTransport that
+    forwards each request to router.handler. An unrouted request raises
+    inside respx (assert_all_mocked) and never reaches a socket.
+    """
+    import anthropic
+    import httpx
+    from anthropic import _base_client
+
+    from app.services.anthropic_client import ClaudeClient
+
+    sdk_http = getattr(_base_client, "httpx2", None) or httpx
+
+    def _forward(sdk_request):
+        sdk_request.read()
+        response = router.handler(httpx.Request(
+            sdk_request.method, str(sdk_request.url),
+            headers=list(sdk_request.headers.raw), content=sdk_request.content,
+        ))
+        response.read()
+        return sdk_http.Response(
+            response.status_code,
+            headers=list(response.headers.raw), content=response.content,
+        )
+
+    client = ClaudeClient()
+    client._client = anthropic.Anthropic(
+        api_key=get_settings().anthropic_api_key,
+        http_client=sdk_http.Client(transport=sdk_http.MockTransport(_forward)),
+    )
+    return client
+
+
+@pytest.fixture(autouse=True)
+def no_real_anthropic(request, monkeypatch):
+    """Integration override of the root conftest's `no_real_anthropic`.
+
+    The root guard replaces anthropic_client.get_client with a function that
+    always raises, because root tests use FakeClaude. This directory mocks
+    Anthropic one layer lower, at HTTP (tests/integration/mocks/
+    anthropic_mock.py on the respx router), so that the real ClaudeClient --
+    retries, truncation check, usage meter -- runs. Under the root guard all
+    50 of those tests failed before reaching the code under test.
+
+    The guard is kept, narrowed to what it protects against: a request leaving
+    the machine. get_client returns a ClaudeClient wired to this test's respx
+    router only when that router has an api.anthropic.com route; any other
+    test keeps the refusal. The module singleton is never built or touched.
+    """
+    router = (request.getfixturevalue("mock_transports")
+              if "mock_transports" in request.fixturenames else None)
+    built: list = []
+
+    def _guarded():
+        routed = router is not None and any(
+            "api.anthropic.com" in repr(route.pattern) for route in router.routes
+        )
+        if not routed:
+            raise RuntimeError(
+                "test attempted a real Anthropic call -- register "
+                "anthropic_mock on mock_transports (all_mocks) first"
+            )
+        if not built:
+            built.append(_respx_backed_anthropic_client(router))
+        return built[0]
+
+    for module in _anthropic_get_client_bindings():
+        monkeypatch.setattr(module, "get_client", _guarded)
+
+
+def _is_gateway_binding(fn) -> bool:
+    """True for the gateway's get_client or a test stand-in for it.
+
+    A module that binds get_client by name can hold the gateway itself or
+    whatever an earlier test patched in: root conftest's _refuse or
+    fake_claude, _guarded above, or a root test module's own lambda
+    (test_support_chat, test_strategy_budget, ...). All of those must be
+    replaced, or a stale fake answers instead of the respx mock.
+    """
+    origin = getattr(fn, "__module__", None) or ""
+    return origin == "app.services.anthropic_client" or origin.startswith("tests.")
+
+
+def _anthropic_get_client_bindings() -> list:
+    """Every loaded app module holding the Anthropic gateway's get_client.
+
+    Twelve modules bind it by name at import (engine, pattern_recognition,
+    icp_extraction, ...). A module first imported while a test's patch is in
+    place keeps THAT test's function for the rest of the session, so patching
+    only anthropic_client.get_client left later tests calling a stale guard --
+    the suite passed or failed depending on order. Scanning sys.modules
+    catches every binding without a hand-kept list. Same-named functions that
+    are not the gateway (mailreach, unipile_linkedin, client_workspaces) have
+    another __module__ and are left alone.
+    """
+    # Import the gateway first: a module that is not loaded yet cannot be
+    # patched, and anything imported later binds the patched attribute.
+    import app.services.anthropic_client  # noqa: F401
+
+    return [
+        module for name, module in list(sys.modules.items())
+        if (name == "app" or name.startswith("app.")) and module is not None
+        and _is_gateway_binding(getattr(module, "get_client", None))
+    ]
+
+
 @pytest.fixture()
 def all_mocks(mock_transports):
     """Register every external API mock on the shared respx router."""

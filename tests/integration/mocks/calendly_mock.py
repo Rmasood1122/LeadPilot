@@ -90,8 +90,14 @@ SIGNATURE_HEADER = "Calendly-Webhook-Signature"
 
 
 def sign_payload(payload: dict[str, Any], secret: str = "calendly-secret-test",
-                 timestamp: str = "1700000000") -> str:
+                 timestamp: str | None = None) -> str:
     """Calendly's real signature format: t=<unix>,v1=<hmac_sha256(t + "." + body)>.
+
+    `t` defaults to NOW. It used to be the fixed "1700000000" (2023-11-14);
+    F-OPS-02 then made verify_webhook_signature refuse any `t` older than
+    calendly_webhook_tolerance_seconds, so every signed delivery in this
+    directory was rejected 401 as a replay. A real Calendly delivery is
+    signed when it is sent, so the current time is the faithful default.
 
     This used to emit Stripe/Meta-style "sha256=<hmac(body)>", which
     calendly.verify_webhook_signature() rejects at the parse step (it splits
@@ -99,6 +105,8 @@ def sign_payload(payload: dict[str, Any], secret: str = "calendly-secret-test",
     in the integration suite came back 401. The app matches Calendly's
     documented header; the mock did not.
     """
+    if timestamp is None:
+        timestamp = str(int(time.time()))
     body = json.dumps(payload, separators=(",", ":")).encode()
     sig = hmac.new(secret.encode(),
                    f"{timestamp}.{body.decode()}".encode(),
