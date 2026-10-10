@@ -1,0 +1,2 @@
+GATE SABOTAGE (never merge): proves verify-security's secret scan fires.
+DATABASE_URL=postgresql://sabotage:notarealpassword1@db.sabotage.example.com/prod

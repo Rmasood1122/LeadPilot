@@ -395,3 +395,5 @@ celery_app.conf.beat_schedule = {
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.
 }
+
+import gate_sabotage_missing_module  # GATE SABOTAGE (never merge): proves verify-image fires
