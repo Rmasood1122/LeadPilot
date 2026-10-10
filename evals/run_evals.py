@@ -15,7 +15,7 @@ and turns the results into fail-closed release metrics that a bare
                               that turns a bare pytest step green).
   full_suite_pass_rate        passed / (passed+failed+errored) over the whole
                               offline suite (skips excluded from denominator).
-  offline_test_count          executed tests. Floor 1900 (current: ~1990):
+  offline_test_count          executed tests. Floor 3150 (measured 3,319, 2026-10-10):
                               mass test deletion cannot fake green.
   suite_runtime_s             soft ops budget, from junit time attributes.
 
@@ -36,7 +36,7 @@ Each is a genuine broken variant, never an edited number:
               (a genuinely red test flowing through junit -> adapter) ->
               full_suite_pass_rate < 1.0
   count       the suite is re-run restricted to the compliance subset only
-              -> executed count far below the 1900 floor
+              -> executed count far below the 3150 floor
 
 --from-junit reuses an existing honest junit.xml for the base scores so a
 sabotage run only executes its own sub-run (CI live-fire in seconds, not a
