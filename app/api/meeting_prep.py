@@ -25,6 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.api.leads import _owned_lead
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
@@ -259,7 +260,10 @@ def log_meeting_outcome(lead_id: uuid.UUID, body: OutcomeIn,
         currency=body.currency, deal_name=body.deal_name,
     )
     if body.generate_followup:
-        meeting_followup.draft_followup(db, row, user=current_user)
+        # The outcome is already logged; a draft refused on the daily AI limit
+        # is marked failed and can be regenerated, so no 429 here.
+        with metered(db, current_user, "drafting", refuse_after=False):
+            meeting_followup.draft_followup(db, row, user=current_user)
     db.refresh(row)
     return row
 
@@ -295,7 +299,8 @@ def regenerate_followup_draft(outcome_id: uuid.UUID, db: Session = Depends(get_d
     row = _owned_outcome(db, outcome_id, current_user)
     if row.sent_at is not None:
         raise HTTPException(status_code=409, detail="this follow-up was already sent")
-    return meeting_followup.draft_followup(db, row, user=current_user)
+    with metered(db, current_user, "drafting"):
+        return meeting_followup.draft_followup(db, row, user=current_user)
 
 
 @router.post("/meeting-outcomes/{outcome_id}/send", response_model=OutcomeOut)

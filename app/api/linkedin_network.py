@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.core.plans import PLANS, PlanLimitExceeded, plan_limit_response
 from app.db.base import get_db
 from app.db.models import (
@@ -192,7 +193,8 @@ def list_messages(db: Session = Depends(get_db),
 def draft_message(body: DraftIn, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user)) -> dict:
     _require_plan(current_user)
-    return _msg_out(_run(nm.draft, db, current_user, body.connection_id, body.product_id))
+    with metered(db, current_user, "drafting"):
+        return _msg_out(_run(nm.draft, db, current_user, body.connection_id, body.product_id))
 
 
 @router.put("/messages/{message_id}")

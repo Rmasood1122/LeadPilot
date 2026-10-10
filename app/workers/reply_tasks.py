@@ -53,35 +53,61 @@ def process_inbound_reply_impl(session: Session, reply_id, force: bool = False) 
         return {"status": "not_found", "category": None}
     if reply is None:
         return {"status": "not_found", "category": None}
-    # Part 1 Feature 1: the positive-reply label is a SEPARATE question with
-    # its own idempotency marker (intent_at), so a reply classified before
-    # that feature existed still gets a label on the next pass without
-    # regenerating the draft the user may already be editing.
-    from app.services import reply_intent  # noqa: PLC0415
+    # P0-5b: every model call below is metered to the account that owns the
+    # reply -- counted, never capped (it drives STOP / not-now handling).
+    from app.services import usage_meter  # noqa: PLC0415
 
-    intent = reply_intent.classify_and_apply(session, reply, force=force)
+    with usage_meter.user_scope(session, _reply_owner(session, reply), "reply_handling"):
+        # Part 1 Feature 1: the positive-reply label is a SEPARATE question with
+        # its own idempotency marker (intent_at), so a reply classified before
+        # that feature existed still gets a label on the next pass without
+        # regenerating the draft the user may already be editing.
+        from app.services import reply_intent  # noqa: PLC0415
 
-    # Part 1 Feature 7: a "not now" is a DATE, not a dead end. Turning it into
-    # a plan happens here, right after the label is decided, and never raises
-    # -- a prospect who said "not now" must still be stored and routed exactly
-    # as before if the plan cannot be made.
-    from app.services import reengagement_memory  # noqa: PLC0415
+        intent = reply_intent.classify_and_apply(session, reply, force=force)
 
-    plan = reengagement_memory.plan_for_reply(session, reply)
+        # Part 1 Feature 7: a "not now" is a DATE, not a dead end. Turning it into
+        # a plan happens here, right after the label is decided, and never raises
+        # -- a prospect who said "not now" must still be stored and routed exactly
+        # as before if the plan cannot be made.
+        from app.services import reengagement_memory  # noqa: PLC0415
 
-    if reply.classified_at is not None and not force:
-        return {"status": "skipped", "category": reply.reply_category,
+        plan = reengagement_memory.plan_for_reply(session, reply)
+
+        if reply.classified_at is not None and not force:
+            return {"status": "skipped", "category": reply.reply_category,
+                    "intent": intent["label"],
+                    "reengagement_plan_id": str(plan.id) if plan else None}
+
+        result = reply_intelligence.classify_reply(session, reply.id)
+        if result.get("error"):
+            return {"status": "failed", "category": None, "intent": intent["label"],
+                    "reengagement_plan_id": str(plan.id) if plan else None}
+        reply_intelligence.apply(session, reply, result)
+        return {"status": "classified", "category": reply.reply_category,
                 "intent": intent["label"],
                 "reengagement_plan_id": str(plan.id) if plan else None}
 
-    result = reply_intelligence.classify_reply(session, reply.id)
-    if result.get("error"):
-        return {"status": "failed", "category": None, "intent": intent["label"],
-                "reengagement_plan_id": str(plan.id) if plan else None}
-    reply_intelligence.apply(session, reply, result)
-    return {"status": "classified", "category": reply.reply_category,
-            "intent": intent["label"],
-            "reengagement_plan_id": str(plan.id) if plan else None}
+
+def _reply_owner(session: Session, reply):
+    """The account a reply belongs to: its lead's owner, else the Gmail
+    account it arrived in (unmatched email). None when neither is known."""
+    try:
+        if reply.lead_id is not None:
+            from app.db.models import Lead  # noqa: PLC0415
+            from app.services import notifications  # noqa: PLC0415
+
+            lead = session.get(Lead, reply.lead_id)
+            if lead is not None:
+                return notifications.owner_of_lead(session, lead)
+        import uuid  # noqa: PLC0415
+
+        from app.db.models import GmailAccount  # noqa: PLC0415
+
+        account = session.get(GmailAccount, uuid.UUID(str(reply.account_ref)))
+        return account.user_id if account is not None else None
+    except Exception:  # noqa: BLE001 -- attribution must never block a reply
+        return None
 
 
 @celery_app.task(name="app.workers.reply_tasks.process_inbound_reply")

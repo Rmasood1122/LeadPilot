@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered, refuse_if_daily_limit_reached
 from app.api.leads import _owned_lead, _owned_strategy
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
@@ -185,13 +186,14 @@ def mutate_strategy(strategy_id: uuid.UUID, db: Session = Depends(get_db),
     strategy = _owned_strategy(db, strategy_id, current_user)
     if not strategy.strategy_document:
         raise HTTPException(status_code=409, detail="this strategy has no document yet")
-    try:
-        return strategy_mutation.mutate(db, strategy, trigger="manual",
-                                        actor_user_id=current_user.id)
-    except Exception as exc:  # noqa: BLE001
-        db.rollback()
-        raise HTTPException(status_code=502,
-                            detail=f"the mutation could not be generated: {exc}") from exc
+    with metered(db, current_user, "mutation"):
+        try:
+            return strategy_mutation.mutate(db, strategy, trigger="manual",
+                                            actor_user_id=current_user.id)
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            raise HTTPException(status_code=502,
+                                detail=f"the mutation could not be generated: {exc}") from exc
 
 
 @router.post("/strategies/{strategy_id}/versions/{version_id}/apply",
@@ -230,6 +232,7 @@ def rescore_strategy_leads(strategy_id: uuid.UUID, db: Session = Depends(get_db)
                            current_user: User = Depends(get_current_user)) -> dict:
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     strategy = _owned_strategy(db, strategy_id, current_user)
+    refuse_if_daily_limit_reached(db, current_user.id)  # P0-5b: the task is metered
     queued = intelligence_tasks.enqueue(intelligence_tasks.rescore_strategy,
                                         str(strategy.id))
     return {"queued": queued}
@@ -241,7 +244,8 @@ def rescore_lead(lead_id: uuid.UUID, db: Session = Depends(get_db),
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
     strategy = db.get(Strategy, lead.strategy_id)
-    lead_scoring.score_leads(db, strategy, [lead])
+    with metered(db, current_user, "lead_scoring"):
+        lead_scoring.score_leads(db, strategy, [lead])
     return LeadScoreOut(lead_id=lead.id, ai_booking_likelihood=lead.ai_booking_likelihood,
                         ai_score_reason=lead.ai_score_reason,
                         ai_score_factors=lead.ai_score_factors,
