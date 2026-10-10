@@ -42,9 +42,17 @@ logger = get_logger("core.plans")
 # Plan definitions (canonical — single source of truth)
 # ---------------------------------------------------------------------------
 
+# max_ai_spend_usd_per_day (P0-5): the most model spend one ACCOUNT may run up
+# per UTC day across its pipelines, verification and lead scoring, enforced
+# before each model call by app/services/usage_meter.py. Every plan has a
+# finite number on purpose -- "unlimited" here is the $398/day-per-free-account
+# hole the audit found. The numbers are PLACEHOLDERS pending the founders'
+# pricing decision (docs/program/DECISIONS.md, P0-5-CAPS); they live only here.
+# A typical full Flow-2 strategy costs about $8.29, so Free allows one a day.
 PLANS: dict[str, dict[str, Any]] = {
     "free": {
         "max_strategies": 3,
+        "max_ai_spend_usd_per_day": 10.0,
         "max_leads_per_strategy": 100,
         "max_sequence_steps": 5,
         "channels": ["gmail"],
@@ -61,6 +69,7 @@ PLANS: dict[str, dict[str, Any]] = {
     },
     "starter": {
         "max_strategies": 10,
+        "max_ai_spend_usd_per_day": 25.0,
         "max_leads_per_strategy": 500,
         "max_sequence_steps": 10,
         "channels": ["gmail", "whatsapp"],
@@ -79,6 +88,7 @@ PLANS: dict[str, dict[str, Any]] = {
     # stays so accounts already on it keep exactly what they have.
     "growth": {
         "max_strategies": 25,
+        "max_ai_spend_usd_per_day": 60.0,
         "max_leads_per_strategy": 2500,
         "max_sequence_steps": 15,
         "channels": ["gmail", "whatsapp", "linkedin"],
@@ -94,6 +104,7 @@ PLANS: dict[str, dict[str, Any]] = {
     },
     "scale": {
         "max_strategies": -1,
+        "max_ai_spend_usd_per_day": 150.0,
         "max_leads_per_strategy": 10000,
         "max_sequence_steps": -1,
         "channels": ["gmail", "whatsapp", "linkedin", "phone"],
@@ -112,6 +123,7 @@ PLANS: dict[str, dict[str, Any]] = {
     # outcome, so the caps bound the platform's own sending cost.
     "pay_per_meeting": {
         "max_strategies": 10,
+        "max_ai_spend_usd_per_day": 60.0,
         "max_leads_per_strategy": 1000,
         "max_sequence_steps": 10,
         "channels": ["gmail", "whatsapp", "linkedin"],
@@ -127,6 +139,7 @@ PLANS: dict[str, dict[str, Any]] = {
     },
     "pro": {
         "max_strategies": -1,
+        "max_ai_spend_usd_per_day": 150.0,
         "max_leads_per_strategy": -1,
         "max_sequence_steps": -1,
         "channels": ["gmail", "whatsapp"],
@@ -144,6 +157,7 @@ PLANS: dict[str, dict[str, Any]] = {
     # mirror 'pro' entitlements so those users are never HTTP-402'd.
     "enterprise": {
         "max_strategies": -1,
+        "max_ai_spend_usd_per_day": 400.0,
         "max_leads_per_strategy": -1,
         "max_sequence_steps": -1,
         "channels": ["gmail", "whatsapp", "linkedin", "phone"],

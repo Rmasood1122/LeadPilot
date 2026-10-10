@@ -99,6 +99,33 @@ def _owned_strategy(db: Session, strategy_id: uuid.UUID, current_user: User) -> 
     return strategy
 
 
+def _refuse_if_daily_ai_limit_reached(db: Session, user: User) -> None:
+    """P0-5: don't enqueue a pipeline the account cannot pay for today.
+
+    The worker enforces the cap before every model call anyway
+    (usage_meter.check_budget); this answers early with a clear 429 instead of
+    queueing a run that would stop at its first call. Uses the caller's own
+    account id only.
+    """
+    cap, plan_name = usage_meter.account_daily_cap(db, user.id)
+    if cap is None:
+        return
+    spent = usage_meter.account_spent_today_micros(db, user.id)
+    if spent >= cap:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "daily_ai_limit_reached",
+                "plan": plan_name,
+                "limit_usd": round(cap / 1_000_000, 2),
+                "spent_today_usd": round(spent / 1_000_000, 2),
+                "message": (f"Your {plan_name} plan's daily AI limit "
+                            f"(${cap / 1_000_000:.2f}) is used up. It resets at "
+                            "00:00 UTC."),
+            },
+        )
+
+
 # Rate limited: the most expensive operation in the system (a 72/144-step
 # pipeline plus 10 verification passes, ~150 Claude calls). See
 # app/core/config.py::RATE_LIMIT_STRATEGIES for why the limit is 2/hour.
@@ -137,6 +164,7 @@ def create_strategy(
         check_plan_limit(current_user, "max_strategies", owned_strategies)
     except PlanLimitExceeded as exc:
         raise HTTPException(status_code=402, detail=plan_limit_response(exc))
+    _refuse_if_daily_ai_limit_reached(db, current_user)
 
     has_clients = (
         db.execute(
@@ -291,6 +319,7 @@ def resume_strategy(
                        "already spent on this strategy",
             )
         strategy.budget_micros = new_micros
+    _refuse_if_daily_ai_limit_reached(db, current_user)
     if strategy.status is StrategyStatus.BUDGET_EXHAUSTED:
         strategy.status = StrategyStatus.PENDING
         strategy.error = None

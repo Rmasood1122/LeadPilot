@@ -108,11 +108,21 @@ class TestMeterAndGate:
             usage_meter.note("anthropic", "claude-sonnet-4-6", 0, 1_000_000)
             assert scope.spent_micros == 3_000_000 + 15_000_000
 
-    def test_no_budget_means_no_gate(self, db_session, product_with_strategy):
+    def test_no_budget_means_no_gate(self, db_session, product_with_strategy, monkeypatch):
+        # Strategy-level semantics: no strategy budget, no STRATEGY gate. Since
+        # P0-5 every account also has a daily cap, so this test switches that
+        # cap off to isolate the strategy gate, and then proves the same huge
+        # call IS refused once the account cap is in force
+        # (tests/test_account_spend_cap.py covers the account cap in full).
         strategy = _strategy(db_session, product_with_strategy, None)
+        monkeypatch.setattr(usage_meter, "account_daily_cap", lambda s, u: (None, ""))
         with usage_meter.owner_scope(db_session, strategy, "pipeline"):
             usage_meter.note("anthropic", "x", 500_000_000, 500_000_000)
             usage_meter.check_budget(input_chars=10**9, max_output_tokens=10**6)  # no raise
+        monkeypatch.undo()
+        with usage_meter.owner_scope(db_session, strategy, "pipeline"):
+            with pytest.raises(usage_meter.AccountBudgetExceededError):
+                usage_meter.check_budget(input_chars=10**9, max_output_tokens=10**6)
 
     def test_a_call_that_could_cross_the_cap_is_refused(self, db_session, product_with_strategy):
         # $0.05 cap; a 4096-token reply alone can cost 4096*15 = $0.0614.

@@ -62,4 +62,22 @@ describe("normalizeError", () => {
     expect(err.status).toBe(400);
     expect(typeof err.detail).toBe("string");
   });
+
+  it("uses the message of a structured detail (402 plan limit, 429 daily AI limit)", async () => {
+    const err = await normalizeError(
+      makeResp(429, {
+        detail: {
+          error: "daily_ai_limit_reached",
+          plan: "free",
+          limit_usd: 10,
+          spent_today_usd: 10,
+          message: "Your free plan's daily AI limit ($10.00) is used up. It resets at 00:00 UTC.",
+        },
+      }),
+    );
+    expect(err.status).toBe(429);
+    expect(err.detail).toBe(
+      "Your free plan's daily AI limit ($10.00) is used up. It resets at 00:00 UTC.",
+    );
+  });
 });
