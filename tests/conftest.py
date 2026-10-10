@@ -694,7 +694,7 @@ def queued_jobs(monkeypatch):
     jobs["site_generate"] = []
     jobs["site_export"] = []
 
-    def _site_generate(page_id):
+    def _site_generate(page_id, user_id=None):
         jobs["site_generate"].append(str(page_id))
         return True
 

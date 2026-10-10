@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.core.plans import (
     PlanLimitExceeded, check_plan_quantity, check_send_channel, plan_limit_response,
 )
@@ -300,18 +301,19 @@ def enroll(
     _enforce_plan_for(db, sequence, current_user)
     # Feature A7: the red-team review gates the launch request itself, so an
     # SDR cannot queue blocked content for a manager to approve blind.
-    _review_gate(db, sequence, current_user)
-    if _needs_approval(db, request, sequence):
-        return _request_approval(db, request, sequence, body)
-    result = {"enrolled": _launch(db, sequence, body.lead_statuses)}
-    # Feature Group 9: launching into a sick sending domain is allowed, but
-    # never silently.
-    from app.services import deliverability  # noqa: PLC0415
+    with metered(db, current_user, "launch"):  # P0-5b: review + enrolment scoring, counted
+        _review_gate(db, sequence, current_user)
+        if _needs_approval(db, request, sequence):
+            return _request_approval(db, request, sequence, body)
+        result = {"enrolled": _launch(db, sequence, body.lead_statuses)}
+        # Feature Group 9: launching into a sick sending domain is allowed, but
+        # never silently.
+        from app.services import deliverability  # noqa: PLC0415
 
-    warning = deliverability.launch_warning(db, current_user.id)
-    if warning:
-        result["warning"] = warning
-    return result
+        warning = deliverability.launch_warning(db, current_user.id)
+        if warning:
+            result["warning"] = warning
+        return result
 
 
 # --------------------------------------------------------------------------
@@ -399,20 +401,21 @@ def approve_sequence(
     identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
     _enforce_plan_for(db, sequence, current_user)
-    _review_gate(db, sequence, current_user)
-    actor = _actor(request, current_user)
-    payload = EnrollRequest(**(sequence.approval_payload_json or {}))
-    sequence.approved_by_user_id = actor.id
-    sequence.approved_at = datetime.now(timezone.utc)
-    db.commit()
-    enrolled = _launch(db, sequence, payload.lead_statuses)
-    if sequence.status is SequenceStatus.PENDING_APPROVAL:
-        # Approved, but no lead matched yet: it can be launched again later
-        # without another approval.
-        sequence.status = SequenceStatus.DRAFT
+    with metered(db, current_user, "launch"):  # P0-5b: review + enrolment scoring, counted
+        _review_gate(db, sequence, current_user)
+        actor = _actor(request, current_user)
+        payload = EnrollRequest(**(sequence.approval_payload_json or {}))
+        sequence.approved_by_user_id = actor.id
+        sequence.approved_at = datetime.now(timezone.utc)
         db.commit()
-    _notify_decision(sequence, True, actor)
-    return {"status": sequence.status.value, "enrolled": enrolled}
+        enrolled = _launch(db, sequence, payload.lead_statuses)
+        if sequence.status is SequenceStatus.PENDING_APPROVAL:
+            # Approved, but no lead matched yet: it can be launched again later
+            # without another approval.
+            sequence.status = SequenceStatus.DRAFT
+            db.commit()
+        _notify_decision(sequence, True, actor)
+        return {"status": sequence.status.value, "enrolled": enrolled}
 
 
 class RejectRequest(BaseModel):
