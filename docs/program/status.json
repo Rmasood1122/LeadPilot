@@ -1,0 +1,180 @@
+{
+  "program": "LeadPilot STAR program",
+  "updated": "2026-10-10",
+  "trunk": "master",
+  "baseline_ref": "2170a55ba10eb38ad6b97e72dc728cef5416ba69",
+  "current_phase": 0,
+  "phases": [
+    {
+      "phase": 0,
+      "status": "done",
+      "exit_gate": "BASELINE.md complete; offline gate green (3,319 tests, PROMOTE); stop condition met (OPEN P0/HIGH items); draft PR to master",
+      "branch": "program/phase-0-baseline",
+      "pr": "https://github.com/Rmasood1122/LeadPilot/pull/43",
+      "ci_run_url": "https://github.com/Rmasood1122/LeadPilot/actions/runs/38040021205",
+      "evidence": "docs/program/BASELINE.md",
+      "tasks": [
+        {
+          "id": "0.1",
+          "title": "git state, open PRs, unmerged branches",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#2-repository-state-step-1"
+        },
+        {
+          "id": "0.2",
+          "title": "findings reconciliation",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#3-findings-reconciliation-step-2"
+        },
+        {
+          "id": "0.3",
+          "title": "offline gate - all four commands exit 0; 3,319 executed / 0 failed / 7 skipped; run_evals 530.5 s; promote PROMOTE (1 soft runtime warning); block fixtures proven",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#4-offline-gate-step-3"
+        },
+        {
+          "id": "0.4",
+          "title": "PostgreSQL suite - 54 failed / 70 passed, harness stale",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#5-postgresql-suite-step-4"
+        },
+        {
+          "id": "0.5",
+          "title": "production read-only checks and D2 diagnosis",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#6-production-step-5--read-only-http"
+        },
+        {
+          "id": "0.6",
+          "title": "Help AI diagnostic SQL (written, not run on production)",
+          "status": "done",
+          "evidence": "docs/program/help_ai_diagnostic.sql"
+        },
+        {
+          "id": "0.7",
+          "title": "prompt vs reality discrepancies",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#9-discrepancies-between-star_promptmd-and-reality-step-7"
+        },
+        {
+          "id": "0.8",
+          "title": "record founder decisions D2/D3/P0-D; re-rate F-DB-01 and RF-5 for single-tenant",
+          "status": "done",
+          "evidence": "docs/program/DECISIONS.md; docs/program/BASELINE.md#35-re-rating-under-p0-d-self-hosted-single-tenant-decided-2026-10-04"
+        },
+        {
+          "id": "0.9",
+          "title": "Phase 1 inputs: GitHub Pro for ruleset on private repo; Actions minutes per PR",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#11-phase-1-inputs"
+        }
+      ],
+      "blocked_on": [],
+      "ci_run_url_baseline_commit": "https://github.com/Rmasood1122/LeadPilot/actions/runs/37351754168"
+    },
+    {
+      "phase": 1,
+      "status": "todo",
+      "blocked_on": [
+        "founders' replacement design for Layer 4 (next session)"
+      ],
+      "first_task": "repair tests/integration harness (54 failures) without weakening tests"
+    },
+    {
+      "phase": 2,
+      "status": "blocked",
+      "blocked_on": [
+        "Phase 0 found OPEN P0/HIGH items",
+        "D1"
+      ]
+    },
+    {
+      "phase": 3,
+      "status": "blocked",
+      "blocked_on": [
+        "Phase 1",
+        "D2",
+        "D6"
+      ]
+    },
+    {
+      "phase": 4,
+      "status": "blocked",
+      "blocked_on": [
+        "Phases 1-3"
+      ]
+    }
+  ],
+  "open_p0_high": [
+    {
+      "id": "GDPR-ACCOUNT",
+      "title": "no export or deletion for user accounts",
+      "severity": "HIGH"
+    },
+    {
+      "id": "P0-5",
+      "title": "no per-account AI spend cap (per-strategy cap exists)",
+      "severity": "P0"
+    },
+    {
+      "id": "PLAN-ENF",
+      "title": "max_leads_per_strategy, max_sequence_steps, channels not enforced",
+      "severity": "HIGH"
+    },
+    {
+      "id": "P0-D-ENF",
+      "title": "public sign-up cannot be disabled; single-tenancy not enforced by code",
+      "severity": "HIGH"
+    }
+  ],
+  "decisions": {
+    "D1": "unanswered",
+    "D2": "deferred to Phase 3 (no production requests until then)",
+    "D3": "private, 2026-10-10",
+    "D4": "n/a",
+    "D5": "yes, written policy only (other co-founder approves every PR to master); not enforceable by GitHub without Pro",
+    "D6": "unanswered",
+    "P0-D": "self-hosted, single-tenant, 2026-10-04",
+    "GH-PRO": "no, 2026-10-10; Layer 4 ruleset dropped; replacement design supplied next session"
+  },
+  "rerated_under_p0d": [
+    {
+      "id": "F-DB-01",
+      "from": "HIGH",
+      "to": "MEDIUM",
+      "status": "OPEN"
+    },
+    {
+      "id": "RF-5",
+      "from": "HIGH",
+      "to": "MEDIUM",
+      "status": "OPEN"
+    }
+  ],
+  "offline_gate": {
+    "date": "2026-10-10",
+    "python": "3.12.3",
+    "commit": "a0c104b",
+    "code_equal_to": "2170a55",
+    "registry_lint_exit": 0,
+    "run_evals_exit": 0,
+    "run_evals_wall_s": 530.5,
+    "tests_collected": 3326,
+    "tests_executed": 3319,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 7,
+    "promote_exit": 0,
+    "promote_decision": "PROMOTE (1 soft warning: suite_runtime_s)",
+    "block_fixtures_exit": 0
+  },
+  "actions_minutes_estimate": {
+    "eval_gate_job_billed_min": 9,
+    "measured_run": "https://github.com/Rmasood1122/LeadPilot/actions/runs/38038727255",
+    "runs_per_pr": "3 + 2N",
+    "prs_per_month_N2": {
+      "free_2000": 31,
+      "pro_3000": 47
+    }
+  }
+}
