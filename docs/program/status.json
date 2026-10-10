@@ -10,8 +10,8 @@
       "status": "done",
       "exit_gate": "BASELINE.md complete; offline gate green (3,319 tests, PROMOTE); stop condition met (OPEN P0/HIGH items); draft PR to master",
       "branch": "program/phase-0-baseline",
-      "pr": null,
-      "ci_run_url": null,
+      "pr": "https://github.com/Rmasood1122/LeadPilot/pull/43",
+      "ci_run_url": "https://github.com/Rmasood1122/LeadPilot/actions/runs/38040021205",
       "evidence": "docs/program/BASELINE.md",
       "tasks": [
         {
@@ -167,5 +167,14 @@
     "promote_exit": 0,
     "promote_decision": "PROMOTE (1 soft warning: suite_runtime_s)",
     "block_fixtures_exit": 0
+  },
+  "actions_minutes_estimate": {
+    "eval_gate_job_billed_min": 9,
+    "measured_run": "https://github.com/Rmasood1122/LeadPilot/actions/runs/38038727255",
+    "runs_per_pr": "3 + 2N",
+    "prs_per_month_N2": {
+      "free_2000": 31,
+      "pro_3000": 47
+    }
   }
 }

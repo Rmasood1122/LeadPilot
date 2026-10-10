@@ -13,7 +13,8 @@ Done in this session:
 - Founder decisions recorded in `DECISIONS.md`: D3 (repo private, 2026-10-10), P0-D (self-hosted, single-tenant, 2026-10-04), D2 deferred to Phase 3.
 - F-DB-01 and RF-5 re-rated HIGH → MEDIUM under P0-D, with reasoning — `BASELINE.md` §3.5. GDPR account export/deletion, P0-5 per-account spend cap and plan enforcement are **not** downgraded.
 - New finding **P0-D-ENF (HIGH)**: public sign-up cannot be disabled, so single-tenancy is not enforced by the code — `BASELINE.md` §3.5.
-- Phase 1 inputs (GitHub Pro needed for the ruleset on a private repo; Actions-minutes estimate) — `BASELINE.md` §11.
+- Phase 1 inputs — `BASELINE.md` §11: GitHub Pro is needed for the ruleset on a private repo. `eval-gate` bills 9 min per run (measured on CI run 38038727255); runs per PR = 3 + 2N; about 31 PRs/month on Free and 47 on Pro at N = 2.
+- Draft PR: https://github.com/Rmasood1122/LeadPilot/pull/43.
 - Correction: `BASELINE.md` §9 row 9 was wrong (`CLAUDE.md` no longer names a migration chain since `609af9a`).
 - Non-English text check on `BASELINE.md`, `PROGRESS.md`, `status.json`: none found; nothing to rewrite.
 

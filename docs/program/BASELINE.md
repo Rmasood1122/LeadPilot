@@ -422,21 +422,25 @@ Allowances for private repositories: **2,000 min/month on Free, 3,000 on Pro**
 (Linux runners, 1× multiplier). Public repositories were not metered, so this
 budget starts to matter only now that the repo is private.
 
-**One `eval-gate` run**, built from the timings measured in section 4:
+**One `eval-gate` run, measured on GitHub's runner.** CI run
+[38038727255](https://github.com/Rmasood1122/LeadPilot/actions/runs/38038727255)
+(commit `a0c104b`, same code as `2170a55`, `ubuntu-latest`, conclusion
+`success`). Job timestamps from the Actions API:
 
-| Step in `eval-gate.yml` | Time | Source |
+| Step in `eval-gate.yml` | Time on GitHub runner | Same step in this container (section 4) |
 |---|---|---|
-| checkout + setup-python | ~0.3 min | estimate, not measured |
-| `pip install …` (the workflow has no pip cache) | 1.0 min | measured here: 58 s |
-| registry lint + `run_evals.py` + `promote.py` + block fixtures | 8.85 min | measured: 0.05 + 530.5 + 0.08 + 0.32 s |
-| live-fire sabotage + `promote.py` | 0.15 min | measured: 9.3 s |
-| **Total** | **~10.3 min → billed 11 min** | GitHub rounds each job up to the whole minute |
+| set up job + checkout + setup-python | 3 s | — |
+| `pip install …` (the workflow has no pip cache) | 34 s | 58 s |
+| registry lint | <1 s | 0.05 s |
+| `run_evals.py` (offline suite) | **486 s** | 530.5 s |
+| `promote.py` + block fixtures | 1 s | 0.4 s |
+| live-fire sabotage + `promote.py` | 7 s | 9.3 s |
+| **Job total** | **8 min 52 s → billed 9 min** | ~10.3 min |
 
-Caveat: the measurement is from a 4-vCPU cloud container. GitHub's standard
-Linux runner for private repositories has fewer cores. The suite runs in one
-process, so per-core speed matters more than core count, and the runner's
-per-core speed is UNVERIFIED. As a pessimistic case, a runner 1.5× slower
-gives ~16 billed minutes per run.
+GitHub rounds each job up to the whole minute. The 9-minute figure is used
+below. The 4-vCPU container figure (~11 billed minutes) serves as a
+pessimistic case. The suite grows with every feature, so re-measure this
+before relying on it.
 
 **Runs per PR.** `eval-gate.yml` triggers on every `push` (any branch) **and**
 every `pull_request`. Each commit pushed to a branch with an open PR therefore
@@ -451,20 +455,20 @@ costs:
 
 That is **3 + 2N runs**.
 
-| PR shape | Runs | Minutes at 11 / run | Minutes at 16 / run |
+| PR shape | Runs | Minutes at 9 / run (measured) | Minutes at 11 / run |
 |---|---|---|---|
-| N = 0 (open, merge, no review fixes) | 3 | 33 | 48 |
-| N = 2 (two review / fix rounds) | 7 | 77 | 112 |
-| N = 4 | 11 | 121 | 176 |
+| N = 0 (open, merge, no review fixes) | 3 | 27 | 33 |
+| N = 2 (two review / fix rounds) | 7 | 63 | 77 |
+| N = 4 | 11 | 99 | 121 |
 
 **PRs per month this allows** (eval-gate only, nothing else using minutes):
 
-| Plan | N = 0, 11 min | N = 2, 11 min | N = 2, 16 min |
+| Plan | N = 0, 9 min | N = 2, 9 min | N = 2, 11 min |
 |---|---|---|---|
-| Free, 2,000 min | 60 | 25 | 17 |
-| Pro, 3,000 min | 90 | 38 | 26 |
+| Free, 2,000 min | 74 | 31 | 25 |
+| Pro, 3,000 min | 111 | 47 | 38 |
 
-Planning figure: **about 25 PRs/month on Free and 38 on Pro** at two fix
+Planning figure: **about 31 PRs/month on Free and 47 on Pro** at two fix
 rounds per PR. That is before Phase 1's own sabotage PRs (one per required
 check), and before the `verify-*` jobs Phase 1 adds. Those jobs include a
 PostgreSQL suite (~19 min locally in section 5, though that run was inflated by
