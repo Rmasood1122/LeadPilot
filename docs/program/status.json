@@ -80,25 +80,23 @@
         {
           "id": "1.1",
           "title": "repair tests/integration on PostgreSQL without weakening tests",
-          "status": "blocked",
+          "status": "done",
           "branch": "claude/nice-allen-8wgv8a",
           "pr": "https://github.com/Rmasood1122/LeadPilot/pull/44",
           "ci_run_url": null,
           "evidence": "docs/program/plans/phase1-01-integration-repair.md",
-          "result": "before 54 failed / 70 passed; after 125 passed / 4 errors (PD-1)",
-          "blocked_on": [
-            "PD-1: webhook_targets.event_types text[] vs JSON \u2014 product fix needs its own PR"
-          ]
+          "result": "before 54 failed / 70 passed; after 125 passed / 4 errors (PD-1, fixed in 1.1b). Merged as PR #44 on 2026-10-10 (while still a draft: INC-44/45).",
+          "blocked_on": []
         },
         {
           "id": "1.1b",
           "title": "PD-1: migration 0071 syncs webhook tables with the model",
-          "status": "done (PR open, awaiting #44 merge)",
+          "status": "done",
           "branch": "claude/pd1-webhook-schema",
           "pr": "https://github.com/Rmasood1122/LeadPilot/pull/46",
           "depends_on": "https://github.com/Rmasood1122/LeadPilot/pull/44",
           "evidence": "docs/program/plans/phase1-01b-pd1-webhook-schema.md",
-          "result": "tests/integration 132 passed / 0 failed"
+          "result": "tests/integration 132 passed / 0 failed. Merged as PR #45 (with red CI) and PR #46 (green; restored master)."
         },
         {
           "id": "1.2",
@@ -112,7 +110,23 @@
         },
         {
           "id": "1.4",
-          "title": "safe_merge.sh + PreToolUse merge hook, then quick/full gate, verify.yml, post-merge alarm, sabotage proofs",
+          "title": "safe_merge.sh + PreToolUse merge hook",
+          "status": "in_progress",
+          "branch": "claude/gate-safe-merge"
+        },
+        {
+          "id": "1.5",
+          "title": "quick_gate.sh, pre-push hook, Claude push/sealed-file/stop hooks",
+          "status": "todo"
+        },
+        {
+          "id": "1.6",
+          "title": "verify.yml deep checks (postgres, frontend, image, security) + post-merge alarm",
+          "status": "todo"
+        },
+        {
+          "id": "1.7",
+          "title": "GATES.md, deploy-gating founder steps (Render/Vercel), minutes report, sabotage proofs",
           "status": "todo"
         }
       ]
