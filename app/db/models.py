@@ -4898,3 +4898,43 @@ class GuardrailLibraryEntry(TimestampMixin, Base):
     created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+
+
+
+
+class EnrichmentAttempt(TimestampMixin, Base):
+    """F01: one provider attempt made by the email waterfall -- the per-attempt
+    cost ledger.
+
+    One row per finder call and per verifier call, INCLUDING cache hits
+    (cached=True, cost_units=0), so "how much did finding this person's email
+    cost, and who found it" has an answer. Deliberately holds no personal data:
+    the email DOMAIN only, never the address or the name. Owned by the account
+    (user_id, CASCADE) like every other ledger; the lead link is SET NULL so a
+    deleted lead does not delete the record of what was spent on it.
+    """
+
+    __tablename__ = "enrichment_attempts"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lead_batches.id", ondelete="SET NULL"), nullable=True
+    )
+    step: Mapped[str] = mapped_column(String(32))          # apollo | hunter | reverify
+    provider: Mapped[str] = mapped_column(String(50))      # who was called
+    operation: Mapped[str] = mapped_column(String(20))     # find_email | verify
+    outcome: Mapped[str] = mapped_column(String(20))
+    cached: Mapped[bool] = mapped_column(Boolean, default=False)
+    cost_units: Mapped[int] = mapped_column(Integer, default=0)
+    claimed_status: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    email_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)

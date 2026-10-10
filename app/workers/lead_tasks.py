@@ -355,6 +355,14 @@ def find_missing_emails_impl(
     _set_stage(session, batch, BatchStage.FINDING_EMAILS)
     verifier = verifier or _get_verifier(batch)
 
+    # F01: with the waterfall on, this stage walks the provider chain instead
+    # (find AND verify, stop at the first verified address). Off = the code
+    # below, unchanged.
+    from app.services import waterfall_enrichment  # noqa: PLC0415
+
+    if waterfall_enrichment.enabled(session):
+        return _find_emails_waterfall(session, batch, verifier)
+
     leads = session.execute(
         select(Lead).where(Lead.batch_id == batch_id, Lead.status == LeadStatus.ENRICHED)
     ).scalars().all()
@@ -426,6 +434,11 @@ def verify_emails_impl(
     _set_stage(session, batch, BatchStage.VERIFYING)
     verifier = verifier or _get_verifier(batch)
 
+    from app.services import waterfall_enrichment  # noqa: PLC0415
+
+    if waterfall_enrichment.enabled(session):
+        return _verify_emails_waterfall(session, batch, verifier)
+
     leads = session.execute(
         select(Lead).where(Lead.batch_id == batch_id, Lead.status == LeadStatus.EMAIL_FOUND)
     ).scalars().all()
@@ -446,6 +459,124 @@ def verify_emails_impl(
         provenance.record_email_verification(session, lead, result.status.value,
                                              result.score, commit=False)
         session.commit()  # per-lead: resume-safe
+        if lead.status is LeadStatus.VERIFIED:
+            counts["verified"] += 1
+        elif lead.status is LeadStatus.FLAGGED:
+            counts["flagged"] += 1
+        else:
+            counts["dropped"] += 1
+    return counts
+
+
+def _find_emails_waterfall(session: Session, batch: LeadBatch,
+                           verifier: EmailVerifier) -> dict:
+    """F01 find stage: run the provider chain per ENRICHED lead.
+
+    Same counts and the same statuses as the legacy stage: a lead with an
+    address moves to EMAIL_FOUND carrying its waterfall verdict (the verify
+    stage maps that verdict and never pays for it again); no address, or a
+    suppressed one, drops the lead.
+    """
+    from app.services import provenance  # noqa: PLC0415
+    from app.services import waterfall_enrichment as wf  # noqa: PLC0415
+
+    steps, disabled = wf.configured_steps(session, verifier)
+    if disabled:
+        logger.info("batch %s: waterfall steps skipped: %s", batch.id, disabled)
+
+    leads = session.execute(
+        select(Lead).where(Lead.batch_id == batch.id, Lead.status == LeadStatus.ENRICHED)
+    ).scalars().all()
+
+    found = already_had = dropped = 0
+    for lead in leads:
+        ctx = wf.context_for_lead(session, lead, batch)
+        original = (lead.email or "").strip().lower()
+        result = wf.run_for_lead(session, lead, verifier, ctx, steps)
+
+        if result.verdict in (wf.NOT_FOUND, wf.SUPPRESSED):
+            lead.status = LeadStatus.DROPPED
+            lead.enrichment_json = {
+                **(lead.enrichment_json or {}),
+                "dropped_reason": ("suppressed" if result.verdict == wf.SUPPRESSED
+                                   else "no_email_found"),
+            }
+            session.commit()
+            dropped += 1
+            continue
+
+        lead.email = result.email
+        wf.store_chain_result(lead, result)
+        lead.status = LeadStatus.EMAIL_FOUND
+        is_new = result.email.lower() != original
+        if is_new:
+            # Same Part 1 Feature 10 tag the legacy stage writes for a found
+            # address; the verify stage overwrites it with the verdict.
+            provenance.record(session, lead, "email", provenance.HUNTER_PATTERN,
+                              detail=(f"found by {result.provider} from the domain "
+                                      f"{(lead.enrichment_json or {}).get('company_domain')}"),
+                              value=result.email, commit=False)
+        try:
+            session.commit()
+            if is_new:
+                found += 1
+            else:
+                already_had += 1
+        except IntegrityError:  # duplicate email within the strategy
+            session.rollback()
+            lead.email = None
+            lead.status = LeadStatus.DROPPED
+            lead.enrichment_json = {**(lead.enrichment_json or {}),
+                                    "dropped_reason": "duplicate_email"}
+            session.commit()
+            dropped += 1
+
+    return {"found": found, "already_had": already_had, "dropped": dropped}
+
+
+def _verify_emails_waterfall(session: Session, batch: LeadBatch,
+                             verifier: EmailVerifier) -> dict:
+    """F01 verify stage: map the verdict the find stage stored. A lead with no
+    verdict for its current address (the flag was switched on mid-batch, or
+    the address was edited) is verified now -- once, ledgered."""
+    from app.services import provenance  # noqa: PLC0415
+    from app.services import waterfall_enrichment as wf  # noqa: PLC0415
+
+    leads = session.execute(
+        select(Lead).where(Lead.batch_id == batch.id, Lead.status == LeadStatus.EMAIL_FOUND)
+    ).scalars().all()
+
+    counts = {"verified": 0, "flagged": 0, "dropped": 0}
+    for lead in leads:
+        record = wf.verdict_for(lead)
+        if record is None:
+            if not lead.email or is_suppressed(session, email=lead.email):
+                lead.status = LeadStatus.DROPPED
+                lead.enrichment_json = {**(lead.enrichment_json or {}),
+                                        "dropped_reason": ("suppressed" if lead.email
+                                                           else "no_email_found")}
+                session.commit()
+                counts["dropped"] += 1
+                continue
+            ctx = wf.context_for_lead(session, lead, batch)
+            verified = wf.verify_address(session, lead, lead.email, verifier, ctx,
+                                         step="verify")
+            record = wf.store_verdict(
+                lead, verdict=verified.verdict, email=lead.email,
+                provider=lead.source, verifier=verified.verifier, score=verified.score,
+                legacy_status=verified.legacy_status, checked_at=verified.checked_at)
+
+        verdict = record["verdict"]
+        lead.status = wf.LEAD_STATUS_FOR[verdict]
+        lead.enrichment_json = {
+            **(lead.enrichment_json or {}),
+            # The legacy key, still read by older consumers.
+            "verification": {"status": record.get("legacy_status") or verdict,
+                             "score": record.get("score")},
+        }
+        provenance.record_email_verification(session, lead, wf.PROVENANCE_STATUS_FOR[verdict],
+                                             record.get("score"), commit=False)
+        session.commit()
         if lead.status is LeadStatus.VERIFIED:
             counts["verified"] += 1
         elif lead.status is LeadStatus.FLAGGED:

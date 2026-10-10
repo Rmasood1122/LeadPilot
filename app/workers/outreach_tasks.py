@@ -224,6 +224,23 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if enrollment.status is not EnrollmentStatus.STOPPED:
             engine.stop_enrollment(session, enrollment, reason="suppressed_excluded")
         return "cancelled_excluded"
+    # ---- F01 Bounce Shield (SAFETY GUARD, email only, flag default off) ----
+    # An email goes only to an address verified valid (fresh), catch-all under
+    # an 'allow' policy, or one a manager overrode for this lead. Blocked =
+    # FAILED with the shield prefix (kept, releasable by override/re-verify),
+    # audited; the enrollment is NOT stopped. Flag off: not even read.
+    email_verdict_tag = None
+    if not (is_whatsapp or is_linkedin or is_phone):
+        from app.services import bounce_shield  # noqa: PLC0415
+
+        if bounce_shield.enabled(session):
+            shield = bounce_shield.decide(session, lead, now)
+            if not shield.allowed:
+                bounce_shield.block_message(session, message, shield)
+                _audit(session, strategy, lead, message, bounce_shield.AUDIT_BLOCKED)
+                session.commit()
+                return bounce_shield.SEND_RESULT
+            email_verdict_tag = shield.tag
 
     # ---- Feature 5: opt-in re-engagement's own switch and cap -------------
     # IN ADDITION to every gate here, never instead of one. A campaign whose
@@ -573,6 +590,11 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     sent_meta = {"step_no": message.step_no, "variant": message.variant}
     if outcome_source:
         sent_meta["source"] = outcome_source
+    if email_verdict_tag:
+        # F01: what the shield let this send through on -- the success metric
+        # (bounces on verified sends) is measured on this tag. Absent when the
+        # shield is off, so the meta stays byte-identical to before.
+        sent_meta["email_verdict"] = email_verdict_tag
     session.add(Outcome(lead_id=lead.id, message_id=message.id,
                         event=OutcomeEvent.SENT,
                         channel=message.channel.value,
@@ -1436,11 +1458,17 @@ def _last_sent_message(session: Session, enrollment: SequenceEnrollment) -> Mess
 
 
 def _has_pending_message(session: Session, enrollment: SequenceEnrollment) -> bool:
+    # A message a send-time guard HOLDS (F01 Bounce Shield: FAILED + the
+    # guard's prefix) is still pending for its step. Without this the
+    # follow-up sweep made a new copy of a held step every time its lock
+    # expired, and every copy sent when the hold released.
+    from app.services import send_holds  # noqa: PLC0415
+
     return session.execute(
         select(Message.id).where(
             Message.sequence_id == enrollment.sequence_id,
             Message.lead_id == enrollment.lead_id,
-            Message.status.in_([MessageStatus.SCHEDULED, MessageStatus.SENDING]),
+            send_holds.pending_clause(),
         ).limit(1)
     ).scalars().first() is not None
 
