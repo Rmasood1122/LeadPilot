@@ -244,7 +244,8 @@ class TestWebhookDelivery:
         assert row is not None and row.status == "pending" and row.attempts == 0
         assert row.payload_json["data"] == {"lead_id": "lead-1"}
         # ... and it was queued for delivery, as deliver_webhook.delay was.
-        assert (str(delivery.id), 0) in queued_jobs["webhooks"]
+        # (queued_jobs stores every non-bool argument as a string.)
+        assert (str(delivery.id), "0") in queued_jobs["webhooks"]
 
     def test_unknown_event_type_returns_none(self, db_session, target, queued_jobs):
         from app.db.models import WebhookDelivery
@@ -280,7 +281,7 @@ class TestWebhookDelivery:
         row = db_session.get(WebhookDelivery, delivery.id)
         assert row.status == "pending" and row.attempts == 1
         assert row.last_status_code == 500 and row.next_attempt_at is not None
-        assert (str(delivery.id), 30) in queued_jobs["webhooks"]
+        assert (str(delivery.id), "30") in queued_jobs["webhooks"]
 
     def test_mark_failed_returns_false_when_exhausted(
             self, db_session, target, queued_jobs, monkeypatch):

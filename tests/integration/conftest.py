@@ -422,12 +422,17 @@ def no_real_anthropic(request, monkeypatch):
         monkeypatch.setattr(module, "get_client", _guarded)
 
 
-# Where a get_client bound by `from app.services.anthropic_client import
-# get_client` can come from: the gateway itself, or a stand-in an earlier
-# test patched in (root conftest's _refuse / fake_claude, or _guarded above).
-_GATEWAY_ORIGINS = frozenset({
-    "app.services.anthropic_client", "tests.conftest", "tests.integration.conftest",
-})
+def _is_gateway_binding(fn) -> bool:
+    """True for the gateway's get_client or a test stand-in for it.
+
+    A module that binds get_client by name can hold the gateway itself or
+    whatever an earlier test patched in: root conftest's _refuse or
+    fake_claude, _guarded above, or a root test module's own lambda
+    (test_support_chat, test_strategy_budget, ...). All of those must be
+    replaced, or a stale fake answers instead of the respx mock.
+    """
+    origin = getattr(fn, "__module__", None) or ""
+    return origin == "app.services.anthropic_client" or origin.startswith("tests.")
 
 
 def _anthropic_get_client_bindings() -> list:
@@ -449,8 +454,7 @@ def _anthropic_get_client_bindings() -> list:
     return [
         module for name, module in list(sys.modules.items())
         if (name == "app" or name.startswith("app.")) and module is not None
-        and getattr(getattr(module, "get_client", None), "__module__", None)
-        in _GATEWAY_ORIGINS
+        and _is_gateway_binding(getattr(module, "get_client", None))
     ]
 
 

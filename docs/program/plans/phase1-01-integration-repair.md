@@ -14,6 +14,7 @@ respx 0.23.1, httpx 0.28.1.
 | After, run 1 | same | **125 passed, 4 errors**, exit 1 | 260 s |
 | After, run 2 | same | 125 passed, 4 errors, exit 1 | 260 s |
 | After, files in reverse order | same, files listed `sort -r` | 125 passed, 4 errors, exit 1 | 253 s |
+| After review fixes | same | 125 passed, 4 errors, exit 1 | 263 s |
 
 Collected tests: 124 before, 129 after (5 new self-tests in
 `test_harness_guards.py`). No test was skipped, deleted or marked xfail.
@@ -28,7 +29,7 @@ this item. It is reported, not fixed.
 |---|---|---|---|
 | G1 | 50 (`test_flows` 20, `test_notifications_wiring` 9, `test_compliance` 8, `test_security` 7, `test_idempotency` 6) | Root `tests/conftest.py::no_real_anthropic` (autouse) makes `get_client()` raise. These tests mock Anthropic at HTTP with respx instead. 47 raised directly; 3 were the same error wrapped in a Celery `Retry`. | Override `no_real_anthropic` in `tests/integration/conftest.py` (details below). 39 of the 50 then pass. The other 11 had a second cause hidden behind the first (G2, G3). |
 | G2 | 7 of G1 (`test_security` 2, `test_notifications_wiring` 2, `test_idempotency` 1, `test_flows` 2) | `calendly_mock.sign_payload` signed with fixed `t=1700000000` (2023-11-14). F-OPS-02 later made `verify_webhook_signature` refuse a `t` older than the tolerance, so every Calendly delivery returned 401 as a replay. | Sign with the current time by default. Same HMAC, still verified by the real verifier. |
-| G3 | 4 of G1 (`test_compliance` 3, `test_flows` 1) | `GET`/`POST /suppression` became admin-only (F-SEC-04). The tests called it as `user_a` and never checked the response, so the POST was a silent 403 and nothing was suppressed. The send and sourcing paths were correct to proceed. | Call `/suppression` with `admin_tokens`, and assert 201/200 on it, so a setup failure is loud. Every original assertion is unchanged. |
+| G3 | 4 of G1 (`test_compliance` 3, `test_flows` 1), plus 1 passing test that could not fail (`test_security::test_valid_signed_unsubscribe_token_works_without_auth`) | `GET`/`POST /suppression` became admin-only (F-SEC-04). The tests called it as `user_a` and never checked the response, so the POST was a silent 403 and nothing was suppressed. The send and sourcing paths were correct to proceed. | Call `/suppression` with `admin_tokens`, and assert 201/200 on it, so a setup failure is loud. Every original assertion is unchanged. The fifth test asserted `len(resp.json()) >= 1` on the 403 body (always true); it now asserts the email is in `entries`. |
 | G4 | 4 (`test_chunk5_production_launch::TestWebhookDelivery`) | `app/services/webhook_delivery.py` was rebuilt in `41cea92`. `create_delivery(db_session=, target_id=, event_type=)` and `mark_failed_attempt` no longer exist (TypeError / ImportError / AttributeError). | Ported to the current API, same test names and intent, on real PostgreSQL rows instead of a `MagicMock` session. They now error in setup on PD-1. |
 
 ### G1 in detail — why the guard could not simply be removed
@@ -75,9 +76,27 @@ outbound webhooks cannot work. The SQLite offline suite cannot see this,
 because `create_all` builds the column from the model. Whether production's
 column is still `text[]` is UNVERIFIED (no production access in this session).
 
-Fix shape for its own PR: a migration converting the column to `json`
-(`USING to_json(event_types)`), with a downgrade, plus the four tests above as
-its proof.
+PD-1 is wider than that one column. With `event_types` patched to JSON in a
+local throwaway edit of migration 0011 (reverted), the same four tests then
+fail on `column "last_status_code" of relation "webhook_deliveries" does not
+exist`. `alembic.autogenerate.compare_metadata` of the ORM against a freshly
+migrated PostgreSQL 16 database (`alembic upgrade head` exit 0) shows these
+material differences (TIMESTAMP-vs-DATETIME and similar name-only diffs
+omitted):
+
+| Table | Migrated schema | Model expects |
+|---|---|---|
+| `webhook_targets` | `event_types text[]` | `JSON` |
+| `webhook_deliveries` | no `last_status_code`, no `delivered_at` | both columns |
+| `webhook_deliveries` | `payload_json text`, two columns the model lacks | `JSON` |
+| `subject_line_patterns` | no `updated_at` | column present |
+| `strategies` | two columns the model lacks | — |
+
+So outbound-webhook creation **and** delivery fail on PostgreSQL. Fix shape
+for its own PR: one migration bringing `webhook_targets`, `webhook_deliveries`
+and `subject_line_patterns` in line with the model (with a downgrade), plus a
+single-head / no-drift check in `verify-backend-postgres` so the next drift
+fails CI. The four ported tests are its proof.
 
 ## Other observations (reported, not fixed)
 
