@@ -50,6 +50,10 @@ frontend/.vercel/
 frontend/android/
 **/node_modules/
 
+# The status page (status.calendarharvest.com) is its own Vercel project and
+# must never depend on, or ship inside, the API image it reports on.
+status-page/
+
 # ---------------------------------------------------------------------------
 # Python caches and local venvs
 # ---------------------------------------------------------------------------
