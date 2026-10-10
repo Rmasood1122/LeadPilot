@@ -94,10 +94,17 @@ def test_bare_push_depends_on_current_branch(tmp_path, branch, expected):
     assert _bash("git push origin", cwd=tmp_path).returncode == expected
 
 
-def test_settings_wire_the_hook_for_bash_and_mcp_merge_tools():
+def test_settings_wire_every_gate_hook():
     settings = json.loads((HOOK.parents[1] / "settings.json").read_text(encoding="utf-8"))
-    matchers = {entry["matcher"]: entry["hooks"][0]["command"]
+    commands = {entry["matcher"]: [h["command"] for h in entry["hooks"]]
                 for entry in settings["hooks"]["PreToolUse"]}
-    assert "Bash" in matchers
-    assert any(m.startswith("mcp__") and "erge" in m for m in matchers)
-    assert all("guard_merge.py" in cmd for cmd in matchers.values())
+    bash = " ".join(commands["Bash"])
+    assert "guard_merge.py" in bash and "require_gate.py" in bash
+    mcp = [m for m in commands if m.startswith("mcp__") and "erge" in m]
+    assert mcp and all("guard_merge.py" in c for m in mcp for c in commands[m])
+    edit = [m for m in commands if "Edit" in m.split("|") and "Write" in m.split("|")]
+    assert edit and all("protect_sealed.py" in c for m in edit for c in commands[m])
+    stop = [h["command"] for entry in settings["hooks"]["Stop"] for h in entry["hooks"]]
+    assert any("stop_check.py" in c for c in stop)
+    for name in ("guard_merge.py", "require_gate.py", "protect_sealed.py", "stop_check.py"):
+        assert (HOOK.parent / name).is_file(), name
