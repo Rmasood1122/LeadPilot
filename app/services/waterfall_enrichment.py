@@ -42,6 +42,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.models import EnrichmentAttempt, Lead, LeadBatch, LeadStatus, Strategy
 from app.integrations.base import EmailVerificationStatus, EmailVerifier, VerificationResult
+from app.services.spend_guard import MonthlySpendCapReached
 
 logger = logging.getLogger(__name__)
 
@@ -417,6 +418,8 @@ def verify_address(db: Session, lead: Lead, email: str, verifier: EmailVerifier,
     _reset_last_call(verifier)
     try:
         result = verifier.verify(email)
+    except MonthlySpendCapReached:
+        raise       # F07 refused the call before it was made: not a provider attempt
     except Exception:
         _ledger(db, ctx, lead, step=step, provider=provider, operation="verify",
                 outcome="error", domain=email_domain(email))
@@ -453,6 +456,8 @@ def run_for_lead(db: Session, lead: Lead, verifier: EmailVerifier, ctx: Context 
     for step in steps:
         try:
             found = step.find(lead)
+        except MonthlySpendCapReached:
+            raise   # F07 refused the call before it was made: not a provider attempt
         except Exception:
             _ledger(db, ctx, lead, step=step.key, provider=step.key,
                     operation="find_email", outcome="error")

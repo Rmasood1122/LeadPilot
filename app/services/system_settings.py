@@ -312,6 +312,24 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                                  "(hosting, database, queue). 0 "
                                                  "= not included; the ledger "
                                                  "says so."),
+    # F07 -- Spend Guard + Cost Forecast (docs/features/f07-spend-guard.md).
+    # Off by default: turning it on forecasts every strategy / lead-sourcing /
+    # Quickstart run, enforces each account's own monthly cap (on top of the
+    # plan's daily cap, never instead of it), meters every paid data-provider
+    # call and sends 50/80/100% alerts. Prices default to 0 = credits are
+    # counted but not priced; nothing is invented.
+    "spend_guard_enabled": (False, "Forecast the cost of every strategy, "
+                            "lead-sourcing and Quickstart run, let each account "
+                            "set a monthly spend cap (with 50/80/100% alerts) "
+                            "that refuses runs and stops AI/data calls at the "
+                            "cap, and show the usage page."),
+    "spend_guard_apollo_usd_per_credit": (0.0, "USD Spend Guard charges per "
+                                          "Apollo credit (one search result or "
+                                          "one enrich). 0 = credits counted, "
+                                          "not priced."),
+    "spend_guard_hunter_usd_per_credit": (0.0, "USD Spend Guard charges per "
+                                          "Hunter request (finder or verifier). "
+                                          "0 = counted, not priced."),
 }
 
 

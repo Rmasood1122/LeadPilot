@@ -110,6 +110,8 @@ class _Scope:
     account_budget_micros: int | None = None
     account_prior_micros: int = 0   # the account's spend so far today, at scope open
     account_plan: str = ""
+    # F07 -- the account's own monthly cap (app/services/spend_guard.py); None unless armed.
+    monthly_guard: object | None = None
 
 
 _current: ContextVar[_Scope | None] = ContextVar("usage_scope", default=None)
@@ -274,6 +276,8 @@ def check_budget(*, input_chars: int, max_output_tokens: int,
     stop up to one call's worth early; it is never allowed to run past.
     """
     active = _current.get()
+    if active is not None and active.monthly_guard is not None:  # F07: monthly cap
+        active.monthly_guard.check_model_call(active, input_chars, max_output_tokens, provider)
     if active is None or (active.budget_micros is None
                           and active.account_budget_micros is None):
         return
@@ -362,6 +366,9 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
             active.account_prior_micros = account_spent_today_micros(session, active.user_id)
             if not active.prices:
                 active.prices = _price_table(session)
+    from app.services import spend_guard  # noqa: PLC0415  (F07: no-op unless armed)
+
+    spend_guard.arm(session, active)
     token = _current.set(active)
     failed = False
     try:
@@ -386,6 +393,8 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
                     session.rollback()
                 except Exception:
                     pass
+        if active.monthly_guard is not None:  # F07: a refused call fires the 100% alert
+            spend_guard.after_scope(session, active, failed)
 
 
 def record_meeting_usage(session: Session, outcome, *, now=None):

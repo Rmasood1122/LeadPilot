@@ -69,7 +69,17 @@ def refresh_market_signals(strategy_id: str) -> int:
         strategy = session.get(Strategy, uuid.UUID(strategy_id))
         if strategy is None:
             return 0
-        payload = market_intel.ensure_signals(session, strategy, force=True) or {}
+        # F07: the Apollo organization search is a paid call outside any run;
+        # check it against the owner's monthly cap and meter it.
+        from app.services import notifications, spend_guard  # noqa: PLC0415
+
+        owner = (notifications.owner_of_strategy(session, strategy)
+                 if spend_guard.enabled(session) else None)
+        if owner is None:
+            payload = market_intel.ensure_signals(session, strategy, force=True) or {}
+        else:
+            with spend_guard.data_scope(session, owner, strategy_id=strategy.id):
+                payload = market_intel.ensure_signals(session, strategy, force=True) or {}
         return len(payload.get("signals") or [])
     finally:
         session.close()

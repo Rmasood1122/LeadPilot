@@ -5191,3 +5191,93 @@ class ReplyCopilotSettings(TimestampMixin, Base):
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+
+
+class SpendCap(TimestampMixin, Base):
+    """F07 Spend Guard -- an account's own monthly spending ceiling.
+
+    An ADDITIONAL ceiling: it never raises or replaces the plan's daily AI cap
+    (plans.max_ai_spend_usd_per_day) or a strategy's budget; whichever is
+    reached first stops the work. NULL monthly_cap_micros = no monthly cap
+    (the row may exist only to hold the alert preference). One row per
+    account, enforced by the unique index on user_id.
+    See docs/features/f07-spend-guard.md.
+    """
+
+    __tablename__ = "spend_caps"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+    )
+    monthly_cap_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    email_alerts: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
+    # Who changed it (a workspace member acting for the account). Actor, not owner.
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+
+class SpendAlert(TimestampMixin, Base):
+    """F07 -- one fired 50/80/100% alert. The UNIQUE (user_id, period,
+    threshold) constraint is what makes "once per threshold per month" hold
+    even when two workers evaluate the same account at the same moment."""
+
+    __tablename__ = "spend_alerts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "period", "threshold",
+                         name="uq_spend_alert_user_period_threshold"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    period: Mapped[str] = mapped_column(String(7))          # YYYY-MM (UTC)
+    threshold: Mapped[int] = mapped_column(Integer)          # 50 | 80 | 100
+    cap_micros: Mapped[int] = mapped_column(BigInteger)
+    spent_micros: Mapped[int] = mapped_column(BigInteger)
+    email_status: Mapped[str] = mapped_column(String(20), default="skipped")
+
+
+
+class SpendForecast(TimestampMixin, Base):
+    """F07 -- the cost forecast taken BEFORE one run (strategy pipeline,
+    lead-sourcing batch or Quickstart), allowed or refused.
+
+    Kept so the success metric can be measured: spend_guard.reconcile()
+    compares it with the api_usage and enrichment_attempts rows the run
+    actually produced. No personal data."""
+
+    __tablename__ = "spend_forecasts"
+    __table_args__ = (
+        Index("ix_spend_forecasts_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    kind: Mapped[str] = mapped_column(String(20))       # strategy_run | enrichment_run | quickstart
+    decision: Mapped[str] = mapped_column(String(10))   # allowed | refused
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lead_batches.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    requested_leads: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ai_purposes: Mapped[list] = mapped_column(JSON, default=list)
+    ai_input_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+    ai_output_tokens: Mapped[int] = mapped_column(BigInteger, default=0)
+    ai_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    data_units_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    data_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    total_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    month_spent_micros: Mapped[int] = mapped_column(BigInteger, default=0)
+    cap_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    detail_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

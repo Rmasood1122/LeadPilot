@@ -93,6 +93,7 @@ from app.api.strategies_advanced import plans_router
 from app.api.account_data import router as account_data_router
 from app.api.guardrails import router as guardrails_router  # F05 Guardrails Studio
 from app.api.bounce_shield import router as bounce_shield_router
+from app.api.spend_guard import router as spend_guard_router  # F07
 from app.api.signals import router as signals_router                   # F02 Signal Radar
 
 # M9: registers the SQLAlchemy session listeners that publish CRM events
@@ -321,6 +322,7 @@ app.include_router(bounce_shield_router)         # F01: /leads/{id}/email-verdic
 app.include_router(signals_router)               # F02: /leads/{id}/signals, /signals/report
 app.include_router(quickstart_router)            # F06: /quickstart* (flag: quickstart_enabled)
 app.include_router(reply_copilot_router)         # F04: /reply-copilot* (flag: reply_copilot_enabled)
+app.include_router(spend_guard_router)           # F07: /spend-guard/* (flag: spend_guard_enabled)
 
 
 # ---------------------------------------------------------------------------

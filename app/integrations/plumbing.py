@@ -205,6 +205,12 @@ class BaseHttpAdapter:
                 self.last_call = {"cached": True, "cost_units": 0}
                 return cached
 
+        # F07 Spend Guard: a paid call (cache miss) is checked against the
+        # account's monthly cap BEFORE the request. No-op outside a guarded run.
+        from app.services import spend_guard  # noqa: PLC0415
+
+        spend_guard.before_data_call(self.provider, cost_units)
+
         auth = self._auth()
         headers = auth.get("headers", {})
         merged_params = {**(auth.get("params") or {}), **(params or {})}
@@ -258,6 +264,7 @@ class BaseHttpAdapter:
             if cache_ttl:
                 self.cache.set(endpoint, cache_payload, data, cache_ttl)
             self.last_call = {"cached": False, "cost_units": cost_units}
+            spend_guard.after_data_call(self.provider, endpoint, cost_units)  # F07 meter
             return data
 
         # Retries exhausted
