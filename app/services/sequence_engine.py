@@ -223,9 +223,17 @@ def enroll_leads(
             select(SequenceEnrollment).where(SequenceEnrollment.sequence_id == sequence.id)
         ).scalars()
     }
+    # F05 Guardrails Studio: the owning account's exclusion lists. None when
+    # the feature is off -- then this loop is exactly what it was.
+    from app.services import guardrails  # noqa: PLC0415
+
+    guard_owner = guardrails.active_owner(session, sequence.strategy_id)
     for lead in leads:
         if lead.id in existing or is_suppressed(session, lead.email, lead.phone,
                                                 linkedin=lead.linkedin_url):
+            continue
+        if guard_owner is not None and guardrails.exclusion_for_lead(
+                session, lead, user_id=guard_owner) is not None:
             continue
         # Part 1 Feature 3: the plan this prospect was enrolled INTO, frozen
         # here. Editing the sequence later must not retroactively turn a

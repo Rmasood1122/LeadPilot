@@ -167,6 +167,13 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
         raise HTTPException(status_code=422, detail="this lead has no dialable phone number")
     if is_suppressed(db, lead.email, lead.phone, linkedin=lead.linkedin_url):
         raise HTTPException(status_code=409, detail="this contact is on the suppression list")
+    # F05 Guardrails Studio: this is the one cold send that does not pass
+    # through send_message_impl, so the account's exclusion lists are checked
+    # here too (no-op while guardrails_enabled is off).
+    from app.services import guardrails  # noqa: PLC0415
+
+    if guardrails.send_block(db, lead, db.get(Strategy, lead.strategy_id)) is not None:
+        raise HTTPException(status_code=409, detail="this contact is on your exclusion list")
     if not phone_calls.consent_ok(db, lead):
         raise HTTPException(status_code=409,
                             detail="no phone consent recorded for this lead -- record it first")

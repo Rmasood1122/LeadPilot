@@ -206,6 +206,24 @@ def rule_findings(session: Session, sequence: Sequence) -> list[dict]:
             else:
                 findings += _text_findings(template.body or "", step.step_no, channel="whatsapp")
 
+    # F05 Guardrails Studio: this account's forbidden phrases for this
+    # product. A BLOCK, like every deterministic compliance rule here. The
+    # send path checks the final words again (the review's content hash does
+    # not cover the library), so a phrase banned after this review still
+    # cannot go out. A lookup failure is a warning, never a silent pass.
+    from app.services import guardrails  # noqa: PLC0415
+
+    try:
+        for step_no, phrase in guardrails.sequence_phrase_hits(session, sequence):
+            findings.append(_finding(f"guardrail:forbidden:{phrase.lower()}", BLOCK, "compliance",
+                                     f"“{phrase}” is on this product's forbidden-phrases list "
+                                     "(Guardrails Studio).", step_no=step_no, evidence=phrase))
+    except Exception:  # noqa: BLE001
+        logger.exception("forbidden-phrase check failed for sequence %s", sequence.id)
+        findings.append(_finding("guardrail:unavailable", WARN, "compliance",
+                                 "The forbidden-phrases list could not be checked; the send-time "
+                                 "check still applies."))
+
     # Rendered-but-unsent copy (e.g. a paused sequence being relaunched).
     for message in session.execute(select(Message).where(
             Message.sequence_id == sequence.id, Message.status == MessageStatus.SCHEDULED,

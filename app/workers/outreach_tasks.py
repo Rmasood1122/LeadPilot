@@ -195,6 +195,36 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             engine.stop_enrollment(session, enrollment, reason="suppressed")
         return "cancelled_suppressed"
 
+    # ---- F05 Guardrails Studio: the account's exclusion lists -------------
+    # SAFETY GUARD. Customers, open deals, churned accounts and do-not-contact
+    # entries of THIS account (domain / company / contact), checked NOW -- an
+    # exclusion added after the message was scheduled still stops it. Off
+    # (system setting guardrails_enabled) = one settings read, no list
+    # lookup, and nothing else changes. A lookup error
+    # fails CLOSED: the message waits an hour and is checked again; it is
+    # never sent unchecked.
+    from app.services import guardrails  # noqa: PLC0415
+
+    try:
+        excluded = guardrails.send_block(session, lead, strategy)
+    except Exception:
+        logger.exception("exclusion check failed for message %s -- deferred", message_id)
+        session.rollback()
+        message = session.get(Message, message_id)
+        message.scheduled_at = now + timedelta(hours=1)
+        message.error = "exclusion list could not be checked -- deferred (fails closed)"
+        session.commit()
+        return "deferred_guardrails_unavailable"
+    if excluded is not None:
+        message.status = MessageStatus.CANCELLED
+        message.error = f"excluded by guardrails: {excluded.kind} ({excluded.reason})"
+        _audit(session, strategy, lead, message, "blocked_excluded",
+               extra={"exclusion": excluded.audit()})
+        session.commit()
+        if enrollment.status is not EnrollmentStatus.STOPPED:
+            engine.stop_enrollment(session, enrollment, reason="suppressed_excluded")
+        return "cancelled_excluded"
+
     # ---- Feature 5: opt-in re-engagement's own switch and cap -------------
     # IN ADDITION to every gate here, never instead of one. A campaign whose
     # re-engagement was switched off since scheduling cancels; an exhausted
@@ -444,6 +474,16 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 message.body = decision["body"]
                 session.commit()
 
+        # ---- F05: forbidden phrases, over the words that will ACTUALLY go
+        # out -- after any reviewer edit, so an approved edit cannot bring a
+        # banned phrase back. Raised, so the handler below releases whatever
+        # the prepare step reserved (LinkedIn slot, call slot).
+        from app.services import guardrails  # noqa: PLC0415
+
+        banned = guardrails.send_copy_block(session, strategy, outbound.subject, outbound.body)
+        if banned:
+            raise guardrails.ForbiddenPhraseBlocked(banned)
+
         if channel is None:
             if is_linkedin:
                 channel = _get_linkedin_channel(session, strategy)
@@ -470,6 +510,17 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         # compliance block raised on the EMAIL render path, so the resulting
         # status has to depend on the channel: NEEDS_TEMPLATE is a WhatsApp
         # state and would be nonsense on an email row.
+        from app.services.guardrails import ForbiddenPhraseBlocked  # noqa: PLC0415
+
+        if isinstance(exc, ForbiddenPhraseBlocked):
+            # Never retried: the same words would be refused again. Surfaced
+            # on the message for the owner to fix the copy or the library.
+            message.status = MessageStatus.FAILED
+            message.error = f"forbidden phrase: {', '.join(exc.phrases)}"[:2000]
+            _audit(session, strategy, lead, message, "blocked_forbidden_phrase",
+                   extra={"forbidden_phrases": exc.phrases[:20]})
+            session.commit()
+            return "blocked_forbidden_phrase"
         from app.core.exceptions import ComplianceError
         if isinstance(exc, ComplianceError):
             # A compliance guard fired (suppression/opt-in/window/template).
@@ -538,7 +589,7 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
 
 
 def _audit(session: Session, strategy: Strategy, lead: Lead, message: Message,
-           decision: str) -> None:
+           decision: str, extra: dict | None = None) -> None:
     """Add a compliance_audit_log row (committed by the caller). Never raises:
     an audit failure must not turn into a send that silently did not happen."""
     try:
@@ -546,7 +597,8 @@ def _audit(session: Session, strategy: Strategy, lead: Lead, message: Message,
 
         compliance_audit.record(session, lead=lead, message=message,
                                 channel=message.channel.value, decision=decision,
-                                user_id=notifications.owner_of_strategy(session, strategy))
+                                user_id=notifications.owner_of_strategy(session, strategy),
+                                extra=extra)
     except Exception:
         logger.exception("compliance audit for message %s failed", message.id)
 

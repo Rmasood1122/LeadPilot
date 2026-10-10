@@ -468,6 +468,14 @@ def enforce(session: Session, *, strategy: Strategy | None, lead: Lead, message:
         logger.exception("claim verification setup failed for lead %s; failing closed", lead.id)
         evidence, sender_vocab, model_claims, fail_closed = [], "", {}, True
 
+    # F05 Guardrails Studio: proof claims about US ("we helped 40 agencies
+    # grow 3x") must be backed by the product's approved-claims library. None
+    # = not applicable (feature off, or the product has no approved claims),
+    # and then nothing below changes. See app/services/guardrails.py.
+    from app.services import guardrails  # noqa: PLC0415
+
+    sender = guardrails.sender_claim_context(session, strategy)
+
     out: dict[str, str | None] = {}
     decisions: list[Decision] = []
     for name, value in fields.items():
@@ -486,6 +494,13 @@ def enforce(session: Session, *, strategy: Strategy | None, lead: Lead, message:
                         d.verdict, d.replacement = STRIPPED, None
                     else:
                         d.verdict, d.replacement = REWRITTEN, empty
+        if sender is not None and new_value:
+            verified = frozenset(d.claim_text for d in field_decisions if d.verdict == VERIFIED)
+            new_value, sender_decisions = guardrails.verify_sender_claims(
+                new_value, sender.claims, field_name=name[:30], lead=lead,
+                product_name=sender.product_name, short=short, empty=empty,
+                verified_texts=verified)
+            field_decisions += sender_decisions
         out[name] = new_value
         decisions += field_decisions
     if fail_closed:

@@ -4828,3 +4828,73 @@ class LinkedInNetworkMessage(TimestampMixin, Base):
     channel: Mapped[str | None] = mapped_column(String(20), nullable=True)  # copy|unipile|bulk
     error: Mapped[str | None] = mapped_column(String(300), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# --------------------------------------------------------------------------
+# F05 Guardrails Studio (migration 0072): per-account exclusion lists and the
+# per-product approved-claims / forbidden-phrases library.
+# --------------------------------------------------------------------------
+
+
+class GuardrailExclusion(TimestampMixin, Base):
+    """One entity this ACCOUNT must never pitch: a domain, a company or a
+    contact. Account-owned (user_id) -- unlike suppression_list, which is the
+    deployment-wide opt-out list and stays exactly as it is.
+
+    `value` is NORMALISED (app/services/guardrails.py::normalize) and UNIQUE per
+    (user_id, kind), which is also the lookup index the send path uses.
+    Removal is a soft delete (`removed_at`) so the read-only production audit
+    query in docs/features/f05-guardrails-studio.md can tell whether an
+    exclusion was active at the moment of a send; re-adding reactivates the
+    row and moves `active_since`.
+    """
+
+    __tablename__ = "guardrail_exclusions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kind", "value", name="uq_guardrail_exclusion"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(10))            # domain | company | contact
+    value: Mapped[str] = mapped_column(String(320))          # normalised
+    display_value: Mapped[str] = mapped_column(String(320))  # as entered / as the CRM had it
+    # customer | open_deal | churned | partner | competitor | do_not_contact | other
+    reason: Mapped[str] = mapped_column(String(20))
+    # manual | csv | crm_local | crm_hubspot | crm_salesforce
+    source: Mapped[str] = mapped_column(String(20))
+    external_ref: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    active_since: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class GuardrailLibraryEntry(TimestampMixin, Base):
+    """An approved claim about US, or a phrase this account never sends.
+
+    `product_id` NULL = every product of the account. Approved claims feed
+    claim_verification (sender claims); forbidden phrases feed the pre-launch
+    review and the send-time check -- see app/services/guardrails.py.
+    """
+
+    __tablename__ = "guardrail_library"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(20))            # approved_claim | forbidden_phrase
+    text: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

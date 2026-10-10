@@ -29,6 +29,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   funding: "Funding", headcount: "Headcount", hiring: "Hiring", job_change: "Job change",
   news: "News", metrics: "Metrics", expansion: "Expansion", their_content: "Their post",
   other: "Other claim",
+  // F05 Guardrails Studio: a proof claim about the SENDER, checked against the
+  // product's approved-claims library.
+  sender_claim: "Claim about us",
 };
 
 export function categoryLabel(category: string): string {
@@ -42,10 +45,12 @@ export function sourceLabel(source: string | null): string {
   const [provider, rest = ""] = source.split(/:(.+)/);
   const names: Record<string, string> = {
     apollo: "Apollo", hunter: "Hunter", newsapi: "NewsAPI", linkedin_post: "LinkedIn post",
-    signalforge: "SIGNALFORGE", manual: "Manual entry",
+    signalforge: "SIGNALFORGE", manual: "Manual entry", approved_claim: "Approved claim",
   };
   const name = names[provider] ?? provider;
-  if (provider === "newsapi" || provider === "linkedin_post") return name;
+  if (provider === "newsapi" || provider === "linkedin_post" || provider === "approved_claim") {
+    return name;
+  }
   const leaf = rest.split(/[.[\]]/).filter(Boolean).pop();
   return leaf ? `${name} · ${leaf.replace(/_/g, " ")}` : name;
 }
