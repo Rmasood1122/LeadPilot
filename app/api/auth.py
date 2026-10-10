@@ -204,6 +204,30 @@ def _deliver_verification(db: Session, user: User) -> bool:
     return True
 
 
+SIGNUP_CLOSED_DETAIL = ("Sign-up is closed on this LeadPilot deployment. "
+                        "Ask your administrator for an account.")
+SIGNUP_DOMAIN_DETAIL = ("Sign-up on this LeadPilot deployment is limited to "
+                        "approved email domains. Ask your administrator for an "
+                        "account.")
+
+
+def _enforce_signup_policy(email: str) -> None:
+    """P0-D-ENF: refuse a self-registration the deployment does not allow.
+
+    Runs before any account lookup, so a closed deployment answers the same
+    403 whether or not the address already has an account (no enumeration),
+    and a pre-auth row cannot be claimed through a closed door either. The
+    allowed domains are not echoed back: they name the customer.
+    """
+    if not settings.signup_enabled:
+        raise HTTPException(status_code=403, detail=SIGNUP_CLOSED_DETAIL)
+    allowed = settings.signup_allowed_domains
+    if allowed:
+        domain = email.rsplit("@", 1)[-1].strip().lower()
+        if domain not in allowed:
+            raise HTTPException(status_code=403, detail=SIGNUP_DOMAIN_DETAIL)
+
+
 @router.post("/auth/signup", status_code=201)
 def signup(request: Request, response: Response, body: Credentials,
            db: Session = Depends(get_db)) -> dict:
@@ -217,6 +241,9 @@ def signup(request: Request, response: Response, body: Credentials,
     # malformed payload cannot burn a slot.
     enforce_rate_limit(f"ip:{client_ip(request)}", "auth_ip",
                        "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+    # P0-D-ENF: after the limiter (probing a closed door still spends quota),
+    # before the VPN lookup (no provider call for a request we refuse anyway).
+    _enforce_signup_policy(body.email.lower().strip())
     # Section D: no signups through a VPN/proxy/Tor/datacenter address. After
     # the limiter (a blocked flood still spends quota, and cannot turn the
     # provider lookup into the thing being flooded), before any account work.
