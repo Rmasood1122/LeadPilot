@@ -28,8 +28,11 @@ PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_\-]{35}\b")),
     ("Private key block", re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----")),
     ("Database URL with password",
+     # The local-host exclusion must match the WHOLE host: an earlier version
+     # used `db\b`, which also excluded `db.example.com` (caught by the gate
+     # sabotage proof, PR #53).
      re.compile(r"\b(?:postgres(?:ql)?|redis|rediss|mysql)://[^\s:/@]+:[^\s@/]{6,}@"
-                r"(?!localhost\b|127\.0\.0\.1\b|db\b|redis\b|postgres\b)[^\s/]+")),
+                r"(?!(?:localhost|127\.0\.0\.1|db|redis|postgres)(?:[:/\s'\"]|$))[^\s/]+")),
 )
 
 

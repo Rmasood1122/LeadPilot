@@ -108,6 +108,12 @@ def test_scanner_ignores_removed_lines_and_allow_marker():
     ("postgresql://user:hunter2pass@ep-cool.neon.tech/db", True),  # gate: allow-secret
     ("rediss://default:abcdef123456@x.upstash.io:6379", True),  # gate: allow-secret
     ("postgresql://leadpilot:leadpilot@localhost:5433/clienthunter_test", False),
+    # Regression (PR #53 sabotage proof): a host that merely STARTS with an
+    # excluded local name must still be flagged.
+    ("postgresql://u:notarealpassword1@db.example.com/prod", True),  # gate: allow-secret
+    ("redis://default:abcdef123456@redis.example.com:6379", True),  # gate: allow-secret
+    ("postgresql://leadpilot:leadpilot@db:5432/leadpilot", False),
+    ("redis://default:abcdef123456@redis:6379/0", False),  # gate: allow-secret
 ])
 def test_scanner_database_urls(url, flagged):
     assert bool(scan_secrets.scan_diff(_diff("c.py", [f"+URL = '{url}'"]))) is flagged
