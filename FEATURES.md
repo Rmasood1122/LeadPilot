@@ -347,6 +347,19 @@ Every single send runs this gauntlet, in this order:
    reason. Anything else is held as `FAILED` (`bounce_shield: …`), audited,
    and released back through every gate on override or re-verification. No
    bounce threshold changes (`app/services/bounce_shield.py`).
+   Before it, **F10 Champion Tracker** (safety guard, every channel): a
+   prospect confirmed to have **left** the company is never messaged at the
+   old lead or the old address again — cancelled, audited, sequence stopped,
+   and this holds even with the flag off once a departure is recorded. With
+   `champion_tracker_enabled` on (default off), a message whose title/company
+   was last observed more than `champion_staleness_days` (90) ago is held as
+   `FAILED` (`champion_tracker: …`) — no provider call in the send path — and
+   a 15-minute sweep re-verifies the role through the existing Apollo
+   enrichment (budget-capped, F01 ledger): still in role → released through
+   every gate; moved → old address closed and, for a past positive replier or
+   customer, a new verified lead at the new company with a "Changed jobs"
+   re-engagement plan (never auto-enrolled). Spec:
+   `docs/features/f10-champion-tracker.md` (`app/services/champion_tracker.py`).
 5. **WhatsApp rules** (defence in depth — the adapter checks again):
    no opt-in → the message is *skipped* and the sequence continues on its other
    channels; a free-form message whose 24-hour customer-service window closed

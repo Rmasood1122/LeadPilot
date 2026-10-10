@@ -33,6 +33,8 @@ RATE_LIMITED_ROUTES = [
     ("/quickstart", "POST"),  # F06
     ("/reply-copilot/drafts/{draft_id}/approve", "POST"),  # F04
     ("/reply-copilot/drafts/{draft_id}/copy", "POST"),     # F04
+    # F10: a role check can spend a paid lead-source lookup.
+    ("/leads/{lead_id}/role-check/refresh", "POST"),
 ]
 
 

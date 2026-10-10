@@ -292,8 +292,27 @@ def gdpr_delete_lead(
     - the lead row keeps only its id + provider external_id as a
       non-personal tombstone; the (strategy, source, external_id) unique
       key then blocks re-insertion within this strategy too.
+    - F10: the SAME PERSON's other lead rows that this account's Champion
+      Tracker linked by a job change (the old lead <-> the re-engagement lead
+      at the new company, transitively) are erased the same way. The erasure
+      request is about the person, not about one row.
     """
     lead = _owned_lead(db, lead_id, current_user)
+    from app.services import champion_tracker  # noqa: PLC0415
+
+    # Collected BEFORE erasing: the links are lead ids, which erasure keeps.
+    linked = champion_tracker.linked_lead_ids(db, current_user.id, lead.id)
+    _gdpr_erase_lead(db, lead, current_user)
+    for other_id in sorted(linked, key=str):
+        other = db.get(Lead, other_id)
+        if other is None or champion_tracker.is_erased(other):
+            continue
+        # Same account only: _owned_lead raises 404 for anything else.
+        _gdpr_erase_lead(db, _owned_lead(db, other.id, current_user), current_user)
+
+
+def _gdpr_erase_lead(db: Session, lead: Lead, current_user: User) -> None:
+    """Erase ONE lead row (the body of the GDPR delete, unchanged)."""
 
     def _suppress(email: str | None, phone: str | None) -> None:
         if email:
@@ -361,6 +380,12 @@ def gdpr_delete_lead(
     from app.services import reply_copilot  # noqa: PLC0415
 
     reply_copilot.erase_for_lead(db, lead.id)
+    # F10: a recorded job change names the person's employers and holds a hash
+    # of the old address -- scrub it (the row stays as a non-personal
+    # tombstone so the counts survive), in the same commit.
+    from app.services import champion_tracker  # noqa: PLC0415
+
+    champion_tracker.erase_for_lead(db, lead.id)
     db.commit()
     # Feature Group 4: forget which CRM record this person was synced to.
     # (What the CRM itself holds is the CRM owner's to erase.)

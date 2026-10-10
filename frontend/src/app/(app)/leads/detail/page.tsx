@@ -46,6 +46,7 @@ import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPa
 import { ConsentPanel } from "@/components/leads/ConsentPanel";
 import { ProvenancePanel } from "@/components/leads/ProvenancePanel";
 import { EmailVerdictPanel } from "@/components/leads/EmailVerdictPanel";
+import { ChampionPanel } from "@/components/leads/ChampionPanel";
 import { SignalRadarPanel } from "@/components/leads/SignalRadarPanel";
 
 const TABS = [
@@ -230,6 +231,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
       <ConsentPanel leadId={lead.id} />
       {/* F01: is the address verified, and will the next email actually send. */}
       <EmailVerdictPanel leadId={lead.id} />
+      {/* F10: does this person still hold the role, and did a champion move. */}
+      <ChampionPanel leadId={lead.id} />
       {/* Part 1 Feature 10: where each enriched field came from, and how old. */}
       <ProvenancePanel leadId={lead.id} />
       {/* F02: dated "why now" signals with source links (renders nothing when off). */}

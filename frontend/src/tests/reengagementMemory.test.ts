@@ -94,6 +94,18 @@ describe("suggestedOpener", () => {
   it("does not break without a name", () => {
     expect(suggestedOpener(plan({ lead: null }))).toContain("Hi there");
   });
+
+  it("F10: a job change acknowledges the move and never quotes them", () => {
+    const moved = plan({ reason_kind: "job_change", reason_label: "Changed jobs",
+                         reason_text: null, interval_days: 0,
+                         lead: { id: "l2", full_name: "Sara Khan", company: "NewCo",
+                                 email: "sara@newco.com", status: "verified" } });
+    expect(suggestedOpener(moved))
+      .toBe("Hi Sara — congratulations on the new role at NewCo. "
+        + "Is the same problem on your plate there?");
+    expect(suggestedOpener(moved)).not.toContain("you said");
+    expect(whyThisDate(moved)).toContain("moved to a new company");
+  });
 });
 
 describe("tones", () => {

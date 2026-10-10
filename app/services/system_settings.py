@@ -344,6 +344,25 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                        "classified just after the end still "
                                        "counts (0-168; values above 168 are "
                                        "treated as 168)."),
+    # F10 -- Champion Tracker + staleness check
+    # (docs/features/f10-champion-tracker.md). Off by default: it holds sends
+    # whose role data is old and spends Apollo/Hunter units re-verifying.
+    # A departure it has RECORDED blocks the old address even after it is
+    # switched off -- see the spec.
+    "champion_tracker_enabled": (False, "Hold a message when the prospect's "
+                                 "title/company is older than the staleness "
+                                 "limit until enrichment re-confirms it; block "
+                                 "every message to people confirmed to have "
+                                 "left; turn a champion's job change into a "
+                                 "re-engagement lead at the new company."),
+    "champion_staleness_days": (90, "Role data older than this many days is "
+                                "re-verified before a send (60-365)."),
+    "champion_refresh_run_cap": (100, "Most provider role checks one champion "
+                                 "sweep run may make, across all accounts."),
+    "champion_account_monthly_units": (200, "Most provider units the champion "
+                                       "tracker may spend per account in a "
+                                       "rolling 30 days (role checks + email "
+                                       "lookups at the new company)."),
 }
 
 

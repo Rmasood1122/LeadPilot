@@ -5383,3 +5383,63 @@ class PilotScorecard(TimestampMixin, Base):
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error: Mapped[str | None] = mapped_column(String(300), nullable=True)
     summary_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+
+class ChampionMove(TimestampMixin, Base):
+    """F10 (migration 0077) -- one person confirmed to have LEFT the company a
+    lead was sourced at.
+
+    Two jobs, both reasons it is a table and not a JSON key on the lead:
+
+    1. THE DEPARTURE BLOCK. The send chokepoint cancels any message to the old
+       lead, or to any lead of the same account carrying the old address
+       (matched by `old_email_sha256` -- a hash, never the address). A row is
+       a recorded fact: it keeps blocking even if the feature flag is later
+       switched off, until a person dismisses it (`dismissed_at`).
+    2. THE METRIC. "Champion re-engagements" counts rows with outcome
+       `lead_created`; "sends after departure" joins sends back to
+       `detected_at`.
+
+    UNIQUE(old_lead_id): a re-run of the sweep, a retry or two overlapping
+    checks cannot record the same departure twice. Owned by the account
+    (user_id, CASCADE); both lead links are SET NULL so a deleted lead does not
+    erase the block on its address. GDPR delete scrubs the company/title
+    fields and the hash (app/services/champion_tracker.py::erase_for_lead) and
+    keeps the row as a non-personal tombstone.
+    """
+
+    __tablename__ = "champion_moves"
+    __table_args__ = (
+        UniqueConstraint("old_lead_id", name="uq_champion_move_old_lead"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    old_lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True
+    )
+    new_lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    old_email_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    # positive_reply | customer | NULL (not a champion)
+    champion_kind: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    from_company: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    from_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    to_company: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    to_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    to_domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # send_hold | refresh | manual
+    trigger: Mapped[str] = mapped_column(String(20))
+    # lead_created | not_champion | suppressed | excluded | existing_lead | no_company
+    outcome: Mapped[str] = mapped_column(String(30))
+    detail: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dismissed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    dismiss_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)

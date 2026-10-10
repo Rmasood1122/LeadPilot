@@ -46,7 +46,10 @@ export function updateReengagement(
 
 export type ReasonKind =
   | "budget" | "contract" | "timing" | "project" | "headcount" | "priority"
-  | "unspecified";
+  | "unspecified"
+  /** F10: a champion moved to a new company (observed by enrichment, not
+   *  said by the prospect -- reason_text is always null). */
+  | "job_change";
 export type PlanStatus = "scheduled" | "due" | "sent" | "cancelled";
 
 export interface ReengagementPlan {

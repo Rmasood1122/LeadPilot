@@ -79,6 +79,8 @@ celery_app = Celery(
         "app.workers.spend_guard_tasks",
         # F09: 30-Day Pilot Mode -- hourly scorecard / verdict sweep.
         "app.workers.pilot_tasks",
+        # F10: Champion Tracker sweeps (held re-verification, champion refresh).
+        "app.workers.champion_tasks",
     ],
 )
 
@@ -192,6 +194,9 @@ celery_app.conf.task_routes = {
     # F09 Pilot Mode: short per-pilot database work + at most one
     # transactional email per pilot -- account mail, like invitations.
     "app.workers.pilot_tasks.*": {"queue": "default"},
+    # F10 Champion Tracker: one Apollo lookup per lead, and a held message is
+    # waiting on the first sweep -- NOT behind 144-step builds on `pipeline`.
+    "leadpilot.champion.*": {"queue": "default"},
 }
 
 celery_app.conf.update(
@@ -438,6 +443,19 @@ celery_app.conf.beat_schedule = {
     "pilot-mode-sweep": {
         "task": "app.workers.pilot_tasks.run_pilot_sweep",
         "schedule": crontab(minute=55),
+    },
+    # F10 Champion Tracker. Held messages are re-verified every 15 minutes
+    # (at :07/:22/:37/:52, clear of the :05/:20/:35/:50 attribution sweep);
+    # the champion refresh runs daily at 04:40, before the 05:50 re-engagement
+    # memory sweep, so a job change found overnight is in the morning list.
+    # Both are no-ops with the flag off except releasing any leftover holds.
+    "champion-reverify-held": {
+        "task": "leadpilot.champion.reverify_held",
+        "schedule": crontab(minute="7,22,37,52"),
+    },
+    "champion-refresh": {
+        "task": "leadpilot.champion.refresh",
+        "schedule": crontab(hour=4, minute=40),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.
