@@ -1,0 +1,135 @@
+{
+  "program": "LeadPilot STAR program",
+  "updated": "2026-10-10",
+  "trunk": "master",
+  "baseline_ref": "2170a55ba10eb38ad6b97e72dc728cef5416ba69",
+  "current_phase": 0,
+  "phases": [
+    {
+      "phase": 0,
+      "status": "in_progress",
+      "exit_gate": "BASELINE.md committed locally, not pushed; offline gate (0.3) did not complete",
+      "branch": "program/phase-0-baseline",
+      "pr": null,
+      "ci_run_url": "https://github.com/Rmasood1122/LeadPilot/actions/runs/37351754168",
+      "evidence": "docs/program/BASELINE.md",
+      "tasks": [
+        {
+          "id": "0.1",
+          "title": "git state, open PRs, unmerged branches",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#2-repository-state-step-1"
+        },
+        {
+          "id": "0.2",
+          "title": "findings reconciliation",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#3-findings-reconciliation-step-2"
+        },
+        {
+          "id": "0.3",
+          "title": "offline gate - registry_lint ok; run_evals killed (machine out of memory); promote and block fixtures not run",
+          "status": "blocked",
+          "evidence": "docs/program/BASELINE.md#4-offline-gate-step-3"
+        },
+        {
+          "id": "0.4",
+          "title": "PostgreSQL suite - 54 failed / 70 passed, harness stale",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#5-postgresql-suite-step-4"
+        },
+        {
+          "id": "0.5",
+          "title": "production read-only checks and D2 diagnosis",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#6-production-step-5--read-only-http"
+        },
+        {
+          "id": "0.6",
+          "title": "Help AI diagnostic SQL (written, not run on production)",
+          "status": "done",
+          "evidence": "docs/program/help_ai_diagnostic.sql"
+        },
+        {
+          "id": "0.7",
+          "title": "prompt vs reality discrepancies",
+          "status": "done",
+          "evidence": "docs/program/BASELINE.md#9-discrepancies-between-star_promptmd-and-reality-step-7"
+        }
+      ],
+      "blocked_on": [
+        "Offline gate needs one clean local run (was killed for low memory)",
+        "Founder: confirm pushing BASELINE.md (lists open security findings) to the public repository, or make the repo private first (D3)",
+        "gh CLI is not installed and the GitHub MCP server failed to connect: a PR cannot be opened from this machine"
+      ]
+    },
+    {
+      "phase": 1,
+      "status": "todo",
+      "blocked_on": [
+        "D3",
+        "D5 (ruleset step only)"
+      ],
+      "first_task": "repair tests/integration harness (54 failures) without weakening tests"
+    },
+    {
+      "phase": 2,
+      "status": "blocked",
+      "blocked_on": [
+        "Phase 0 found OPEN P0/HIGH items",
+        "D1"
+      ]
+    },
+    {
+      "phase": 3,
+      "status": "blocked",
+      "blocked_on": [
+        "Phase 1",
+        "D2",
+        "D6"
+      ]
+    },
+    {
+      "phase": 4,
+      "status": "blocked",
+      "blocked_on": [
+        "Phases 1-3"
+      ]
+    }
+  ],
+  "open_p0_high": [
+    {
+      "id": "F-DB-01",
+      "title": "playbook_scores not tenant-scoped (cross-tenant learning loop)",
+      "severity": "HIGH"
+    },
+    {
+      "id": "GDPR-ACCOUNT",
+      "title": "no export or deletion for user accounts",
+      "severity": "HIGH"
+    },
+    {
+      "id": "P0-5",
+      "title": "no per-account AI spend cap (per-strategy cap exists)",
+      "severity": "P0"
+    },
+    {
+      "id": "PLAN-ENF",
+      "title": "max_leads_per_strategy, max_sequence_steps, channels not enforced",
+      "severity": "HIGH"
+    },
+    {
+      "id": "RF-5",
+      "title": "one shared WhatsApp sender for all tenants",
+      "severity": "HIGH"
+    }
+  ],
+  "decisions": {
+    "D1": "unanswered",
+    "D2": "unanswered - diagnosis complete, options in BASELINE.md section 6",
+    "D3": "unanswered",
+    "D4": "n/a",
+    "D5": "unanswered",
+    "D6": "unanswered"
+  }
+}
