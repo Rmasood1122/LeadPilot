@@ -87,6 +87,7 @@ from app.api.onboarding import router as onboarding_router
 from app.api.webhook_targets import router as webhook_targets_router
 from app.api.strategies_advanced import router as strategies_advanced_router
 from app.api.strategies_advanced import plans_router
+from app.api.account_data import router as account_data_router
 
 # M9: registers the SQLAlchemy session listeners that publish CRM events
 # to Redis. Imported for its SIDE EFFECT -- install() is a no-op marker so
@@ -304,6 +305,7 @@ app.include_router(reengagement_router)          # Feature 5: /strategies/{id}/r
 app.include_router(recording_router)             # Feature 3: recording bots, /webhooks/recall
 app.include_router(benchmarks_router)            # Feature 6: /benchmarks
 app.include_router(compliance_rules_router)      # Feature 8: /admin/compliance-rules
+app.include_router(account_data_router)          # GDPR: POST /me/data-export
 
 
 # ---------------------------------------------------------------------------

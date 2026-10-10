@@ -32,6 +32,8 @@ LINKEDIN_NETWORK_ERASED = "linkedin_network.erased"
 AUTH_LOGOUT = "auth.logout"
 AUTH_PASSWORD_CHANGED = "auth.password_changed"
 AUTH_REFRESH_REUSE = "auth.refresh_reuse_detected"
+ACCOUNT_EXPORTED = "account.data_exported"
+ACCOUNT_EXPORT_DENIED = "account.data_export_denied"
 
 
 def record(db: Session, *, action: str, request: Request | None = None,

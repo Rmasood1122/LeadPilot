@@ -14,3 +14,8 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
   api<{ status: string; signed_out_everywhere: boolean }>("/auth/change-password", {
     body: { current_password: currentPassword, new_password: newPassword },
   });
+
+/** GDPR: everything this account owns, as one JSON document. The password is
+ *  re-checked server-side; the workspace header is ignored (/me is personal). */
+export const exportMyData = (password: string) =>
+  api<Record<string, unknown>>("/me/data-export", { method: "POST", body: { password } });
