@@ -9,7 +9,7 @@ Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 - Root causes, all 54, by group: `docs/program/plans/phase1-01-integration-repair.md`. G1 (50): root conftest Anthropic guard; the integration mock never intercepted anthropic SDK 1.x (`httpx2`), so lifting the guard sent a real request to api.anthropic.com. G2 (7 of G1): Calendly mock signed with a 2023 timestamp, refused by F-OPS-02 replay check. G3 (4 of G1): `/suppression` is admin-only (F-SEC-04); tests called it as a user and ignored the 403. G4 (4): `webhook_delivery` API rebuilt in `41cea92`; tests ported to the current API.
 - PD-1: `webhook_targets.event_types` is `text[]` (migration 0011) but `JSON` in the model; creating any outbound webhook target fails on PostgreSQL. Needs its own PR with a migration.
 - Offline gate unchanged: 4 commands exit 0, 3,319 tests, PROMOTE (1 soft runtime warning).
-- Amendment 0 (PR #43 incident, merge policy A or B): asked; not recorded until the founders pick A or B.
+- Amendment 0: founders chose merge policy **B** (2026-10-10). Recorded as INC-43 and MERGE-B in `DECISIONS.md`; 3 lines added to `CLAUDE.md`.
 
 PR: https://github.com/Rmasood1122/LeadPilot/pull/44 (draft).
 

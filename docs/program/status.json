@@ -75,9 +75,7 @@
     {
       "phase": 1,
       "status": "in_progress",
-      "blocked_on": [
-        "merge policy A or B (Amendment 0) \u2014 asked 2026-10-10"
-      ],
+      "blocked_on": [],
       "tasks": [
         {
           "id": "1.1",
@@ -161,10 +159,12 @@
     "D2": "deferred to Phase 3 (no production requests until then)",
     "D3": "private, 2026-10-10",
     "D4": "n/a",
-    "D5": "yes, written policy only (other co-founder approves every PR to master); not enforceable by GitHub without Pro",
+    "D5": "superseded by MERGE-B, 2026-10-10",
     "D6": "unanswered",
     "P0-D": "self-hosted, single-tenant, 2026-10-04",
-    "GH-PRO": "no, 2026-10-10; Layer 4 ruleset dropped; replacement design supplied next session"
+    "GH-PRO": "no, 2026-10-10; Layer 4 ruleset dropped; replacement design supplied next session",
+    "MERGE-B": "B, 2026-10-10: merge only via scripts/gate/safe_merge.sh (required checks green, not draft, squash); co-founder review after merge",
+    "INC-43": "PR #43 merged 09:51:47 UTC 2026-10-10 before CI finished and without review; CI later passed (38042867994, 38042869509, 38042886592)"
   },
   "rerated_under_p0d": [
     {
