@@ -4,9 +4,19 @@ name: eval-gate
 # never ran on push before this workflow.
 # Doctrine: never pipe a gating command's output on the same line as anything
 # that consumes its exit code; every gate step reads the exit code directly.
+# Triggers (sealed change, docs/program/plans/phase1-02-eval-gate-triggers.md):
+# PRs run on pull_request only (it tests the merge result); push runs only on
+# master. Before this, every commit on a PR branch ran the 9-minute gate twice
+# (push + pull_request) on a private repo with 2,000 Actions minutes/month.
 on:
   push:
+    branches: [master]
   pull_request:
+# A newer commit on the same PR makes the older run moot; master runs are
+# never cancelled.
+concurrency:
+  group: eval-gate-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   gate:
     runs-on: ubuntu-latest
