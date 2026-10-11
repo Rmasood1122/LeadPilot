@@ -112,15 +112,76 @@ def in_send_window(dt: datetime, tz_name: str,
 # --------------------------------------------------------------------------
 
 
-def daily_allowance(account: GmailAccount, on_date: date, cap: int | None = None) -> int:
+#: F03 Deliverability Autopilot: the stepped new-mailbox ramp. Each entry is
+#: (from this many days after the mailbox's FIRST send, at most this many
+#: sends a day). From RAMP_SCHEDULE_DAYS on there is no extra ceiling -- the
+#: linear ramp and the daily cap still apply. Applied only with the Autopilot on.
+RAMP_SCHEDULE: tuple[tuple[int, int], ...] = ((0, 10), (7, 20), (14, 30), (21, 40))
+RAMP_SCHEDULE_DAYS = 28
+
+
+def ramp_ceiling(days_since_first_send: int) -> int | None:
+    """The stepped ceiling for a mailbox this many days into sending, or None
+    once it has graduated."""
+    if days_since_first_send >= RAMP_SCHEDULE_DAYS:
+        return None
+    ceiling = RAMP_SCHEDULE[0][1]
+    for from_day, per_day in RAMP_SCHEDULE:
+        if days_since_first_send >= from_day:
+            ceiling = per_day
+    return ceiling
+
+
+def first_send_date(session: Session, sender_ref: str) -> date | None:
+    """The UTC date of the first message LeadPilot sent from this mailbox."""
+    first = session.execute(
+        select(func.min(Message.sent_at)).where(
+            Message.sender_ref == sender_ref,
+            Message.status.in_([MessageStatus.SENT, MessageStatus.BOUNCED]),
+            Message.sent_at.is_not(None),
+        )
+    ).scalar_one()
+    if first is None:
+        return None
+    if isinstance(first, str):  # SQLite aggregate over a DateTime column
+        first = datetime.fromisoformat(first)
+    if first.tzinfo is not None:
+        first = first.astimezone(timezone.utc)
+    return first.date()
+
+
+def daily_allowance(account: GmailAccount, on_date: date, cap: int | None = None, *,
+                    stepped: bool = False, first_sent_on: date | None = None) -> int:
     """Warm-up ramp: start low, add the increment each day, cap at the
     configured daily cap. Day 0 = the day the account was connected.
-    `cap` (Feature 8 compliance rule) can only lower the ceiling."""
+    `cap` (Feature 8 compliance rule) can only lower the ceiling.
+
+    `stepped` (F03 Autopilot) additionally applies RAMP_SCHEDULE counted from
+    `first_sent_on` -- the first day the mailbox actually sent, or `on_date`
+    for a mailbox that never has (it is new however long ago it was
+    connected). Combined by min(): it can only lower the allowance."""
     connected = account.created_at.date() if account.created_at else on_date
     age_days = max(0, (on_date - connected).days)
     ramped = settings.gmail_warmup_start_sends + settings.gmail_warmup_daily_increment * age_days
     ceiling = settings.gmail_daily_cap if cap is None else min(cap, settings.gmail_daily_cap)
-    return min(ceiling, ramped)
+    allowance = min(ceiling, ramped)
+    if stepped:
+        anchor = first_sent_on or on_date
+        step = ramp_ceiling(max(0, (on_date - anchor).days))
+        if step is not None:
+            allowance = min(allowance, step)
+    return allowance
+
+
+def ramp_allowance(session: Session, account: GmailAccount, on_date: date,
+                   cap: int | None = None, *, autopilot: bool = False) -> int:
+    """daily_allowance with the Autopilot's stepped ramp when it is on -- the
+    one place the send path, the health refresh and the stats page get
+    today's cap from, so the number shown is the number enforced."""
+    if not autopilot:
+        return daily_allowance(account, on_date, cap)
+    return daily_allowance(account, on_date, cap, stepped=True,
+                           first_sent_on=first_send_date(session, str(account.id)))
 
 
 def sends_today(session: Session, sender_ref: str, now: datetime) -> int:
@@ -135,10 +196,9 @@ def sends_today(session: Session, sender_ref: str, now: datetime) -> int:
 
 
 def allowance_left(session: Session, account: GmailAccount, now: datetime,
-                   cap: int | None = None) -> int:
-    return daily_allowance(account, now.astimezone(timezone.utc).date(), cap) - sends_today(
-        session, str(account.id), now
-    )
+                   cap: int | None = None, *, autopilot: bool = False) -> int:
+    return ramp_allowance(session, account, now.astimezone(timezone.utc).date(), cap,
+                          autopilot=autopilot) - sends_today(session, str(account.id), now)
 
 
 # --------------------------------------------------------------------------

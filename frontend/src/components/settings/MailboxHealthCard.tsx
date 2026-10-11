@@ -9,9 +9,10 @@
  *
  *  Every throttle and pause states its reason in words, because a sender who
  *  finds their campaign running slowly and cannot find out why will assume the
- *  product is broken. And the complaint rate is labelled a proxy wherever it
- *  appears — LeadPilot has no feedback-loop feed, and a number presented as
- *  something it is not is worse than no number. */
+ *  product is broken. And the complaint rate always carries its source — the
+ *  proxy is labelled a proxy, and only a Google Postmaster reading (F03) is
+ *  called a spam rate: a number presented as something it is not is worse
+ *  than no number. */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, PlayCircle, RefreshCw } from "lucide-react";
@@ -26,6 +27,7 @@ import {
   authGaps,
   bandTone,
   fleetWarning,
+  complaintText,
   rateText,
   scoreText,
   sortForDisplay,
@@ -139,7 +141,7 @@ function MailboxRow({ mailbox }: { mailbox: MailboxHealth }) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Complaints {rateText(mailbox.complaint_rate)} (proxy) · bounces{" "}
+        {complaintText(mailbox)} · bounces{" "}
         {rateText(mailbox.bounce_rate)} · {mailbox.sends_today} sent today,{" "}
         {mailbox.sends_7d} this week
         {gaps.length > 0 && <> · missing {gaps.join(", ")}</>}

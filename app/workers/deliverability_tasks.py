@@ -38,3 +38,18 @@ def refresh_mailbox_health() -> dict:
         return mailbox_health.refresh_all(session)
     finally:
         session.close()
+
+
+@celery_app.task(name="app.workers.deliverability_tasks.import_postmaster_spam_rates")
+def import_postmaster_spam_rates() -> dict:
+    """F03: the daily Google Postmaster Tools import of the real Gmail spam
+    rate. A no-op unless BOTH deliverability_autopilot_enabled and
+    postmaster_import_enabled are on (the importer is UNVERIFIED against a
+    live account -- see docs/features/f03-deliverability-autopilot.md)."""
+    from app.services import deliverability_autopilot  # noqa: PLC0415
+
+    session = SessionLocal()
+    try:
+        return deliverability_autopilot.import_all(session)
+    finally:
+        session.close()

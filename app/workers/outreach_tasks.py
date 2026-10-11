@@ -328,6 +328,7 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
 
     # ---- daily cap + warm-up (per channel; deferred, never dropped) ---------
     li_account = li_action = None
+    autopilot = False          # F03, set in the email branch below
     if is_linkedin:
         # Profile lookup, connect/message/InMail decision, account rotation
         # and the per-account daily ceiling -- see _prepare_linkedin.
@@ -383,8 +384,15 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if health["cap"] is not None:
             effective_cap = (health["cap"] if effective_cap is None
                              else min(effective_cap, health["cap"]))
+        # F03: with the Deliverability Autopilot on, the warm-up ramp also
+        # applies the stepped new-mailbox schedule (sequence_engine.RAMP_SCHEDULE)
+        # counted from this mailbox's first send. min() only: never a raise.
+        from app.services import deliverability_autopilot  # noqa: PLC0415
+
+        autopilot = deliverability_autopilot.enabled(session)
         if (health["state"] == mailbox_health.PAUSED
-                or engine.allowance_left(session, account, now, effective_cap) <= 0):
+                or engine.allowance_left(session, account, now, effective_cap,
+                                         autopilot=autopilot) <= 0):
             tomorrow = now.astimezone(timezone.utc).replace(
                 hour=0, minute=0, second=0, microsecond=0
             ) + timedelta(days=1)
@@ -458,6 +466,10 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         else:
             outbound = _render_email_outbound(session, strategy, lead,
                                               sequence, message, now=now)
+            # F03: an email without both RFC 8058 one-click unsubscribe
+            # headers never transmits (ComplianceError -> FAILED below).
+            if autopilot:
+                deliverability_autopilot.require_one_click_headers(outbound.headers)
         session.commit()  # rendered content persisted before the send
 
         # ---- Part 1 Feature 5: the human review queue ---------------------

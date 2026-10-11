@@ -238,6 +238,31 @@ def get_account(session: Session, user: User) -> GmailAccount:
 # --------------------------------------------------------------------------
 
 
+def build_mime(from_address: str | None, message: OutboundMessage) -> EmailMessage:
+    """The exact RFC-2822 message GmailChannel.send transmits.
+
+    A module function (not inlined in send) so the F03 launch preflight can
+    inspect the bytes the send path really produces -- including whether the
+    one-click unsubscribe headers survive MIME assembly -- without a mailbox,
+    a token or a network call.
+    """
+    mime = EmailMessage()
+    mime["From"] = from_address or "me"
+    mime["To"] = message.to_address
+    if message.subject:
+        mime["Subject"] = message.subject
+    for name, value in (message.headers or {}).items():
+        mime[name] = value
+    mime.set_content(message.body)
+    # Feature Group 3: the engine may supply an HTML twin (open pixel).
+    # Plain text stays the first part, so text-only clients and spam
+    # filters see exactly the message that was written.
+    html_part = (message.metadata or {}).get("html_body")
+    if html_part:
+        mime.add_alternative(html_part, subtype="html")
+    return mime
+
+
 @register_channel
 class GmailChannel(BaseHttpAdapter, OutreachChannel):
     channel = "email"
@@ -260,21 +285,7 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
         """Send one RFC-2822 message via the Gmail API. Compliance headers
         (List-Unsubscribe etc.) arrive pre-built in message.headers — this
         channel only transports them."""
-        mime = EmailMessage()
-        mime["From"] = self.account.email_address or "me"
-        mime["To"] = message.to_address
-        if message.subject:
-            mime["Subject"] = message.subject
-        for name, value in (message.headers or {}).items():
-            mime[name] = value
-        mime.set_content(message.body)
-        # Feature Group 3: the engine may supply an HTML twin (open pixel).
-        # Plain text stays the first part, so text-only clients and spam
-        # filters see exactly the message that was written.
-        html_part = (message.metadata or {}).get("html_body")
-        if html_part:
-            mime.add_alternative(html_part, subtype="html")
-
+        mime = build_mime(self.account.email_address, message)
         raw = base64.urlsafe_b64encode(mime.as_bytes()).decode()
         payload: dict = {"raw": raw}
         if message.thread_ref:

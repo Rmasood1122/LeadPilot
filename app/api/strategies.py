@@ -538,7 +538,12 @@ def campaign_overview(
     ).scalar_one_or_none()
     if account is not None:
         sends_today = engine.sends_today(db, str(account.id), now)
-        cap_today = engine.daily_allowance(account, now.date())
+        # F03: the same cap the send path enforces (stepped ramp when the
+        # Deliverability Autopilot is on; unchanged when it is off).
+        from app.services import deliverability_autopilot  # noqa: PLC0415
+
+        cap_today = engine.ramp_allowance(db, account, now.date(),
+                                          autopilot=deliverability_autopilot.enabled(db))
 
     # ---- per-channel stats (M4 Chunk 3) ---------------------------------
     from app.db.models import ChannelType, InboundReply, WhatsAppTemplate

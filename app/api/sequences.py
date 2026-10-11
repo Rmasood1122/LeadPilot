@@ -256,6 +256,20 @@ def _launch_checks(db: Session, sequence: Sequence) -> None:
                                    f"{strategy.campaign_pause_reason}")
 
 
+def _deliverability_preflight(db: Session, sequence: Sequence, action: str) -> None:
+    """F03 Deliverability Autopilot: a SAFETY GUARD. With the flag on, a launch
+    whose mailbox fails SPF/DKIM/DMARC alignment, or whose send path would
+    drop the one-click unsubscribe headers, is refused with 409. Flag off:
+    returns immediately (no DNS, no row) -- launch_warning still warns."""
+    from app.services import deliverability_autopilot  # noqa: PLC0415
+
+    strategy = db.get(Strategy, sequence.strategy_id)
+    blocked = deliverability_autopilot.launch_block(db, strategy, action=action,
+                                                    sequence=sequence)
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
+
+
 def _review_gate(db: Session, sequence: Sequence, current_user: User) -> None:
     """Feature A7: 409 SEQUENCE_REVIEW_BLOCKED while the current content has
     unresolved blocking findings and no override. The findings themselves are
@@ -298,6 +312,7 @@ def enroll(
 
     identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
+    _deliverability_preflight(db, sequence, "enroll")
     _enforce_plan_for(db, sequence, current_user)
     # Feature A7: the red-team review gates the launch request itself, so an
     # SDR cannot queue blocked content for a manager to approve blind.
@@ -400,6 +415,7 @@ def approve_sequence(
 
     identity_svc.require_verified_phone(current_user)
     _launch_checks(db, sequence)
+    _deliverability_preflight(db, sequence, "approve")
     _enforce_plan_for(db, sequence, current_user)
     with metered(db, current_user, "launch"):  # P0-5b: review + enrolment scoring, counted
         _review_gate(db, sequence, current_user)

@@ -105,6 +105,21 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "reply_fraud_detection_enabled": (True, "Second-pass check that drops "
                                       "automated replies (OOO, bots, spam "
                                       "traps) from engagement metrics."),
+    # F03 -- Deliverability Autopilot (docs/features/f03-deliverability-autopilot.md)
+    "deliverability_autopilot_enabled": (False, "Block a campaign launch when "
+                                         "SPF/DKIM/DMARC or one-click "
+                                         "unsubscribe fails the preflight, "
+                                         "apply the stepped new-mailbox ramp, "
+                                         "and brake sending at 0.10% / 0.30% "
+                                         "spam rate."),
+    "deliverability_dkim_selectors": ("google", "Comma-separated DKIM selectors "
+                                      "the launch preflight looks for (Google "
+                                      "Workspace's default is 'google')."),
+    "postmaster_import_enabled": (False, "Import the real Gmail spam rate from "
+                                  "Google Postmaster Tools daily (needs the "
+                                  "Autopilot on and a Postmaster grant). "
+                                  "UNVERIFIED against a live account -- see "
+                                  "the F03 spec before enabling."),
     # Part 1 Feature 5 -- the human review queue for high-risk sends.
     # Each trigger is separately switchable because which ones are useful
     # depends entirely on the ICP. In particular: if the people you sell to

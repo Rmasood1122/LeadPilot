@@ -78,8 +78,13 @@ def test_the_revision_follows_0073():
 
 
 def test_it_is_the_single_head():
+    # One head, and 0074 is on its line. (It pinned 0074 as THE head until
+    # F03 added 0075 after it; the property that matters is "one head".)
     script = ScriptDirectory.from_config(Config(os.path.join(_ROOT, "alembic.ini")))
-    assert script.get_heads() == ["0074_signal_radar"]
+    heads = script.get_heads()
+    assert len(heads) == 1, heads
+    lineage = {rev.revision for rev in script.walk_revisions("base", heads[0])}
+    assert "0074_signal_radar" in lineage
 
 
 def test_table_matches_the_model(from_models, from_migration):

@@ -35,6 +35,27 @@ def _build_prereqs(engine):
     meta.create_all(engine, tables=[meta.tables[t] for t in _PREREQ])
 
 
+# Columns later migrations add to this table. 0056 is create-only, so comparing
+# its table with today's model would report each of them as a column 0056
+# forgot. Naming them keeps the test meaningful -- it still fails if 0056
+# itself changes -- and makes the dependency visible (same technique as
+# tests/test_meeting_prep_migration.py).
+#
+#   0075_deliverability_autopilot (F03): complaint_source.
+_ADDED_LATER = {"complaint_source"}
+
+
+def _without_later_columns(described: dict) -> dict:
+    """The model's description of the table as it stood after 0056."""
+    return {
+        **described,
+        "columns": {name: value for name, value in described["columns"].items()
+                    if name not in _ADDED_LATER},
+        "indexes": {name: cols for name, cols in described["indexes"].items()
+                    if not set(cols) & _ADDED_LATER},
+    }
+
+
 def _describe(inspector):
     return {
         "columns": {c["name"]: {"type": str(c["type"]), "nullable": bool(c["nullable"])}
@@ -85,7 +106,7 @@ def test_state_defaults_to_healthy_so_a_new_row_never_blocks_sending(from_migrat
 
 
 def test_table_matches_the_model(from_models, from_migration):
-    assert _describe(from_migration) == _describe(from_models)
+    assert _describe(from_migration) == _without_later_columns(_describe(from_models))
 
 
 def test_downgrade_round_trips(tmp_path):

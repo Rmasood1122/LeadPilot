@@ -159,6 +159,13 @@ def resume_campaign(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     strategy = _owned_strategy(strategy_id, db, current_user)
+    # F03 Deliverability Autopilot: resuming restarts sending, so it passes
+    # the same preflight as a launch. Flag off: no-op.
+    from app.services import deliverability_autopilot  # noqa: PLC0415
+
+    blocked = deliverability_autopilot.launch_block(db, strategy, action="resume")
+    if blocked:
+        raise HTTPException(status_code=409, detail=blocked)
     strategy.campaign_state = engine.CAMPAIGN_ACTIVE
     strategy.campaign_pause_reason = None
     db.commit()
