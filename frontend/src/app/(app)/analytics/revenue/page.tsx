@@ -19,6 +19,7 @@ import {
   createCost, deleteCost, getRevenue, listCosts,
   type CostCategory, type CostInput, type RevenueReport,
 } from "@/lib/api/revenue";
+import { MeetingsLedgerPanel } from "@/components/analytics/MeetingsLedgerPanel";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,6 +108,9 @@ export default function RevenuePage() {
       <AsyncState isLoading={isLoading} error={error}>
         {data && <RevenueBody report={data} />}
       </AsyncState>
+
+      {/* F08: cost per qualified conversation / booked / held meeting. */}
+      <MeetingsLedgerPanel dateFrom={range.from} dateTo={range.to} />
 
       <CostsCard currency={data?.currency ?? "USD"} />
     </div>
@@ -323,6 +327,7 @@ function CostsCard({ currency }: { currency: string }) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["costs"] });
       qc.invalidateQueries({ queryKey: ["revenue"] });
+      qc.invalidateQueries({ queryKey: ["meetings-ledger"] });
       toast("Cost removed", "info");
     },
     onError: (e) => toast((e as Error).message, "error"),
@@ -420,6 +425,7 @@ function CostDialog({ open, onClose, currency, names }: {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["costs"] });
       qc.invalidateQueries({ queryKey: ["revenue"] });
+      qc.invalidateQueries({ queryKey: ["meetings-ledger"] });
       toast("Cost recorded", "success");
       set({ description: "", amount: "", hours: "", rate: "" });
       onClose();

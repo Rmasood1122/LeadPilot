@@ -417,42 +417,52 @@ def render_pdf(report: dict) -> bytes:
     """A human-readable rendering of the signed report (Pillow, no system
     libraries). The JSON is the signed artefact; the PDF says so and carries
     the signature so it can be matched to it."""
+    chain, sig = report.get("chain") or {}, report.get("signature") or {}
+    header = [
+        ("LeadPilot activity audit trail", "title"),
+        (f"Account {report['account']['user_id']}  ·  generated {report['generated_at']}", "body"),
+        (f"Scope: lead={report['scope']['lead_id'] or 'all'}  from={report['scope']['date_from'] or '—'}"
+         f"  to={report['scope']['date_to'] or '—'}", "body"),
+        (f"Chain {'VALID' if chain.get('valid') else 'INVALID'} · {chain.get('sealed_records', 0)} sealed "
+         f"records · head #{chain.get('head_seq_no')} {chain.get('head_hash', '')[:32]}…", "head"),
+        ("Summary: " + ", ".join(f"{k} {v}" for k, v in sorted((report.get('summary') or {}).items()))
+         or "Summary: no events", "body"),
+        (f"Signature: {sig.get('algorithm')} key {sig.get('key_id')} — verify the JSON export at "
+         "POST /audit/verify or with the key from GET /audit/public-key", "body"),
+        ("", "body"),
+        ("  #    occurred (UTC)              event     channel    lead         chain hash", "head"),
+    ]
+    rows = [(f"{r.get('seq_no') or '':>4}  {str(r.get('occurred_at'))[:23]:<24}  "
+             f"{r.get('event', ''):<8}  {r.get('channel', ''):<9}  {str(r.get('lead_ref') or '')[:8]:<11}  "
+             f"{str(r.get('chain_hash') or '')[:24]}", "body") for r in report.get("records") or []]
+    footer = [("", "body"), ("Signature value:", "head")]
+    value = str(sig.get("value") or "")
+    footer += [(value[i:i + 90], "body") for i in range(0, len(value), 90)]
+    return render_lines_pdf(header + rows + footer)
+
+
+def render_lines_pdf(lines: list[tuple[str, str]]) -> bytes:
+    """Lay `(text, style)` lines onto A4-proportioned pages and return a PDF.
+
+    `style` is "title", "head" or "body". Pillow only, no system libraries.
+    Shared by the audit-trail export above and the F08 meetings-per-dollar
+    ledger (app/services/meetings_ledger.py)."""
     from PIL import Image, ImageDraw  # noqa: PLC0415
 
     from app.services.roi_card import _font  # noqa: PLC0415
 
     width, height, margin, line = 1240, 1754, 80, 26
-    title_font, head_font, body_font = _font(34, bold=True), _font(18, bold=True), _font(15)
-    chain, sig = report.get("chain") or {}, report.get("signature") or {}
-    header = [
-        ("LeadPilot activity audit trail", title_font),
-        (f"Account {report['account']['user_id']}  ·  generated {report['generated_at']}", body_font),
-        (f"Scope: lead={report['scope']['lead_id'] or 'all'}  from={report['scope']['date_from'] or '—'}"
-         f"  to={report['scope']['date_to'] or '—'}", body_font),
-        (f"Chain {'VALID' if chain.get('valid') else 'INVALID'} · {chain.get('sealed_records', 0)} sealed "
-         f"records · head #{chain.get('head_seq_no')} {chain.get('head_hash', '')[:32]}…", head_font),
-        ("Summary: " + ", ".join(f"{k} {v}" for k, v in sorted((report.get('summary') or {}).items()))
-         or "Summary: no events", body_font),
-        (f"Signature: {sig.get('algorithm')} key {sig.get('key_id')} — verify the JSON export at "
-         "POST /audit/verify or with the key from GET /audit/public-key", body_font),
-        ("", body_font),
-        ("  #    occurred (UTC)              event     channel    lead         chain hash", head_font),
-    ]
-    rows = [(f"{r.get('seq_no') or '':>4}  {str(r.get('occurred_at'))[:23]:<24}  "
-             f"{r.get('event', ''):<8}  {r.get('channel', ''):<9}  {str(r.get('lead_ref') or '')[:8]:<11}  "
-             f"{str(r.get('chain_hash') or '')[:24]}", body_font) for r in report.get("records") or []]
-    footer = [("", body_font), ("Signature value:", head_font)]
-    value = str(sig.get("value") or "")
-    footer += [(value[i:i + 90], body_font) for i in range(0, len(value), 90)]
+    body_font = _font(15)
+    fonts = {"title": _font(34, bold=True), "head": _font(18, bold=True), "body": body_font}
 
-    pages, lines = [], header + rows + footer
+    pages = []
     per_page = (height - 2 * margin) // line
     for start in range(0, max(len(lines), 1), per_page):
         page = Image.new("RGB", (width, height), "white")
         draw = ImageDraw.Draw(page)
         y = margin
-        for content, font in lines[start:start + per_page]:
-            draw.text((margin, y), content, font=font, fill=(16, 24, 40))
+        for content, style in lines[start:start + per_page]:
+            draw.text((margin, y), content, font=fonts.get(style, body_font), fill=(16, 24, 40))
             y += line
         draw.text((margin, height - margin + 20),
                   f"Page {len(pages) + 1}", font=body_font, fill=(102, 112, 133))

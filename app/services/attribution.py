@@ -258,6 +258,14 @@ def _is_positive_reply(db: Session, outcome: Outcome) -> bool:
     return any(r.intent_label == "interested" for r in replies)
 
 
+def is_positive_reply(db: Session, outcome: Outcome) -> bool:
+    """The ledger's positive-reply rule, for readers outside this module.
+
+    F08 (meetings_ledger) counts a qualified conversation by exactly this rule
+    rather than a second copy of it that could drift."""
+    return _is_positive_reply(db, outcome)
+
+
 def run_sweep(db: Session, now: datetime | None = None, limit: int = 500, *,
               user_id=None) -> dict:
     """Credit every outcome that has no ledger entry yet.

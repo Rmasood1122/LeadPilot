@@ -288,6 +288,18 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "quickstart_budget_usd": (1.0, "Most a single Quickstart run may spend on "
                               "model calls (ICP extraction + drafts). The "
                               "plan's daily AI cap applies on top."),
+    # F08 -- meetings-per-dollar ledger (docs/features/f08-meetings-per-dollar.md).
+    # Read-only reporting; off until an admin turns it on.
+    "meetings_ledger_enabled": (False, "Show the meetings-per-dollar ledger "
+                                "(cost per qualified conversation, booked and "
+                                "held meeting per campaign, with CSV/PDF "
+                                "export) on Revenue & ROI."),
+    "meetings_ledger_infra_cents_per_1k_sends": (0, "Infrastructure cost the "
+                                                 "meetings ledger allocates, in "
+                                                 "US cents per 1,000 sends "
+                                                 "(hosting, database, queue). 0 "
+                                                 "= not included; the ledger "
+                                                 "says so."),
 }
 
 
