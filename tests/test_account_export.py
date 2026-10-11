@@ -82,12 +82,17 @@ class TestOwnershipMap:
         # for the append-only logs that outlive the account on purpose.
         set_null_ok = {"account_security_events", "api_usage", "attribution_entries",
                        "claim_verification_log", "compliance_audit_log", "consent_events"}
+        # Decision E1 (migration 0081, docs/features/gdpr-erasure.md): billing
+        # rows are kept when an account is erased, so their owner FK is
+        # RESTRICT -- still the owner column, never an actor's.
+        restrict_ok = {"billing_subscriptions", "billable_meetings"}
         for name, path in ax.OWNERSHIP.items():
             if len(path) != 1 or name in set_null_ok:
                 continue
             table = Base.metadata.tables[name]
+            expected = "RESTRICT" if name in restrict_ok else "CASCADE"
             for fk in table.c[path[0]].foreign_keys:
-                assert fk.ondelete == "CASCADE", f"{name}.{path[0]} is {fk.ondelete}"
+                assert fk.ondelete == expected, f"{name}.{path[0]} is {fk.ondelete}"
 
 
 # --------------------------------------------------------------------------

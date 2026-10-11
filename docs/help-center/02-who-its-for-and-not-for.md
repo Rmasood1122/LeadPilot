@@ -49,7 +49,7 @@ The research ranks these kinds of businesses as the closest fit, in this order:
 
 These are targets, not requirements. You can run LeadPilot for any product or service you sell to other businesses.
 
-## Who is LeadPilot not a good fit for?
+## When is LeadPilot not a good fit?
 
 The same research lists clear non-fits:
 

@@ -2,7 +2,7 @@
 id: glossary
 title: Glossary of LeadPilot terms
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - FEATURES.md
@@ -32,6 +32,7 @@ sources:
   - docs/program/BASELINE.md
   - app/api/unsubscribe.py
   - app/api/leads.py
+  - app/api/account_data.py
   - app/pipeline/engine.py
   - app/api/admin.py
 ---
@@ -110,6 +111,7 @@ This page explains the words LeadPilot uses in the app and in this help center. 
 - **SDR** – sales development representative: a team member who works leads but whose campaign launches may need approval.
 - **Client (agency mode)** – a separate book of business inside an agency account, with its own reporting, sending domains and invoice view.
 - **White label** – showing the app under your own brand name, logo and domain.
+- **Account deletion** – erasing your own account from **Profile**; billing, consent and suppression records are kept, without your name or email.
 - **API key** – a secret starting with `lpk_` that lets tools such as Zapier act as you through the API.
 - **Webhook** – a message LeadPilot sends to another tool when something happens, for example a reply or a booked meeting.
 

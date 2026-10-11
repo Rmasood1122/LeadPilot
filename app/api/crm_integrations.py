@@ -87,6 +87,14 @@ def hubspot_auth_url(db: Session = Depends(get_db),
     return {"auth_url": hubspot.build_auth_url(client_id, redirect_uri("hubspot"), state)}
 
 
+def _gone(user: User | None) -> bool:
+    """A signed state outlives the account that asked for it: an erased
+    account (GDPR tombstone) must not be given a CRM connection back."""
+    from app.services.account_erasure import is_tombstone  # noqa: PLC0415
+
+    return user is None or is_tombstone(user)
+
+
 @router.get("/integrations/hubspot/callback", include_in_schema=False)
 def hubspot_callback(code: str | None = None, state: str | None = None,
                      error: str | None = None, db: Session = Depends(get_db)):
@@ -98,7 +106,7 @@ def hubspot_callback(code: str | None = None, state: str | None = None,
         user_id = oauth_state.parse(state, "hubspot")
     except oauth_state.InvalidState as exc:
         return frontend_redirect("hubspot", "error", str(exc))
-    if db.get(User, user_id) is None:
+    if _gone(db.get(User, user_id)):
         return frontend_redirect("hubspot", "error", "unknown user")
     try:
         client_id, client_secret = _app_credentials(db, "hubspot")
@@ -134,7 +142,7 @@ def salesforce_callback(code: str | None = None, state: str | None = None,
         user_id = oauth_state.parse(state, "salesforce")
     except oauth_state.InvalidState as exc:
         return frontend_redirect("salesforce", "error", str(exc))
-    if db.get(User, user_id) is None:
+    if _gone(db.get(User, user_id)):
         return frontend_redirect("salesforce", "error", "unknown user")
     try:
         client_id, client_secret = _app_credentials(db, "salesforce")

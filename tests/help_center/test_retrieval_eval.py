@@ -185,10 +185,13 @@ class TestMockModeMeasurement:
         assert old["wrong_refuse"] > 0 == new["wrong_refuse"]
 
     def test_lowering_the_coverage_floor_would_answer_a_must_refuse_item(self):
-        """Why the floor is where it is: one notch down and the
-        privacy-policy question gets a borrowed paragraph."""
+        """Why the floor is where it is: lower it and the privacy-policy
+        question gets a borrowed paragraph. Its coverage is IDF-weighted, so
+        it moves with the corpus: 0.454 when the floor was chosen, 0.44 after
+        the 2026-10-11 rewrite of article 21 (GDPR erasure) -- probed at 0.40,
+        still well under the shipped 0.55."""
         loose = measure_golden.tally(GOLDEN, lambda q: measure_golden.new_outcome(
-            q, help_center.MOCK_MIN_SCORE, 0.45))
+            q, help_center.MOCK_MIN_SCORE, 0.40))
         assert loose["wrong_refuse"] >= 1
 
 

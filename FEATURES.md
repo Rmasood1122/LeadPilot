@@ -775,6 +775,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Deliverability triage: verified / flagged / dropped
 - Database-enforced dedupe on two keys
 - Global + per-user suppression list
+- GDPR lead erasure: personal fields, the messages written to the person and
+  their replies erased (counts' metadata kept), identifiers suppressed, proof
+  kept in the consent ledger
 - Kanban pipeline board with validated status transitions
 - Manual lead CRUD; batch resume from any stage
 </details>
@@ -880,6 +883,12 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Per-endpoint rate limiting, applied **inside** handlers so a malformed
   payload cannot burn a slot
 - Encrypted-at-rest OAuth tokens and API keys (Fernet, with key rotation)
+- GDPR for account holders: full data export (Profile › Download your data)
+  and self-serve account deletion (`DELETE /me`, password + typed DELETE):
+  plan cancelled at once, every owned row erased per `account_export.OWNERSHIP`,
+  billing kept anonymised 7 years, consent/suppression kept as opt-out proof
+  (`docs/features/gdpr-erasure.md`; retention defaults await founder/legal
+  confirmation)
 - Circuit breakers per provider, shared across workers, with an admin reset
 - Structured JSON logging with request IDs end to end
 - `/health`, `/health/channels`, `/health/learning-loop`
