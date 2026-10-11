@@ -5,3 +5,8 @@
 # Removing a name is a gate change: its own PR, with a written reason.
 
 gate        # .github/workflows/eval-gate.yml — offline suite + promote gate
+verify-backend-postgres  # .github/workflows/verify.yml — PG integration + alembic upgrade head
+verify-frontend          # tsc + vitest + lint
+verify-security          # secret scan
+verify-image             # Docker image builds and boots
+verify-status-page       # optional status-page/ app (job always concludes; scoped steps skip)

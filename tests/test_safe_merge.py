@@ -40,6 +40,10 @@ def _green_world() -> dict:
             {"name": "gate", "status": "completed", "conclusion": "success"},
             {"name": "gate", "status": "completed", "conclusion": "success"},
             {"name": "Vercel Preview Comments", "status": "completed", "conclusion": "success"},
+            # Every other required check (scripts/gate/required_checks.txt),
+            # appended so the indices above stay what the tests below edit.
+            *[{"name": name, "status": "completed", "conclusion": "success"}
+              for name in safe_merge.load_required_checks() if name != "gate"],
         ]},
         f"repos/{REPO}/commits/{SHA}/status": {"state": "success", "statuses": [
             {"context": "Vercel", "state": "success"},
@@ -183,6 +187,21 @@ def test_api_error_exits_2_without_merging():
 
 def test_required_checks_file_lists_the_eval_gate():
     assert "gate" in safe_merge.load_required_checks()
+
+
+def test_required_checks_include_the_verify_jobs():
+    # 2026-10-11 gate PR (docs/program/plans/phase4-seal-new-guards.md).
+    required = set(safe_merge.load_required_checks())
+    assert {"verify-backend-postgres", "verify-frontend", "verify-security",
+            "verify-image", "verify-status-page"} <= required
+
+
+def test_a_missing_verify_job_is_refused():
+    world = _green_world()
+    runs = world[f"repos/{REPO}/commits/{SHA}/check-runs?per_page=100"]["check_runs"]
+    runs[:] = [r for r in runs if r["name"] != "verify-backend-postgres"]
+    code, api = _run(world)
+    assert code == 1 and api.puts == []
 
 
 def test_empty_required_checks_file_is_rejected(tmp_path):

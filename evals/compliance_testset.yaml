@@ -11,9 +11,45 @@
 #     ZERO tests (the deleted-test-file attack)  -> BLOCK
 # Adding a new legal guard file? Add it here in the same reviewed commit.
 # Removing one is a threshold edit — reviewed PR with written justification.
+#
+# Extended 2026-10-11 (gate PR, justification in
+# docs/program/plans/phase4-seal-new-guards.md): the send-time guards and
+# legal duties added by F01-F10 and the 2026-10-11 gap fixes.
 files:
   - tests/test_compliance.py
   - tests/test_claim_verification.py
   - tests/test_whatsapp_optin_audit.py
   - tests/test_whatsapp_guard.py
   - tests/test_production_guard.py
+  # F05 exclusion lists + forbidden phrases at sourcing and send time
+  - tests/test_guardrails.py
+  # F01 Bounce Shield: no send to an unverified address; held steps not duplicated
+  - tests/test_bounce_shield.py
+  # F03 SPF/DKIM/DMARC launch preflight + one-click unsubscribe headers
+  - tests/test_deliverability_autopilot.py
+  # F04 Reply Copilot: opt-out replies never drafted, contact block, claim check, auto-send rules
+  - tests/test_reply_copilot.py
+  - tests/test_reply_copilot_review_fixes.py
+  # F10 departure block: never message a person's old company address
+  - tests/test_champion_tracker.py
+  # F09 pilot never converts to a paid plan automatically; owner-only mail
+  - tests/test_pilot_mode.py
+  # GDPR Art. 15/20 export completeness
+  - tests/test_account_export.py
+  # Meeting follow-up recipient guards, sourcing suppression, removed leads, enroll statuses
+  - tests/test_send_path_guards.py
+  # WhatsApp marketing templates carry an opt-out instruction (create/edit/submit/send)
+  - tests/test_whatsapp_template_optout.py
+  # Daily owner approval of automatic sending + LinkedIn risk acknowledgement
+  - tests/test_daily_send_approval.py
+  - tests/test_daily_send_approval_e2e.py
+  - tests/test_daily_send_approval_network.py
+  # Auto-renewal consent, disclosures, renewal notices, cancel
+  - tests/test_annual_billing.py
+  - tests/test_annual_billing_review.py
+  # GDPR Art. 17: account deletion, lead erasure, truthful privacy texts
+  - tests/test_account_erasure.py
+  - tests/test_lead_erasure_correspondence.py
+  - tests/test_privacy_docs_truth.py
+  # Account takeover recovery: reset signs out every device, single-use links
+  - tests/test_password_reset.py
