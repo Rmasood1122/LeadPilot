@@ -251,6 +251,15 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                        "value counts as 'block'."),
     "bounce_shield_max_age_days": (90, "A verification older than this many "
                                    "days no longer counts as verified."),
+    # F02 -- Signal Radar ("why now"). Off by default: it adds a block to the
+    # outreach prompt. It never fetches anything new and never offers a
+    # signal while claim verification is off.
+    "signal_radar_enabled": (False, "Turn stored news, LinkedIn posts, Apollo "
+                             "funding/hiring and market intel into dated 'why "
+                             "now' signals with source links on each lead, and "
+                             "let email cite the freshest one -- only when the "
+                             "claim engine ties the sentence to that stored "
+                             "source."),
 }
 
 

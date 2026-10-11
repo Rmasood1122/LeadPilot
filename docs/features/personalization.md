@@ -41,7 +41,9 @@ title and the embed URL.
 ## Audit
 Each sent email records what it was written from in
 `messages.personalization_json` (`linkedin_post_url`, `news_url`,
-`style_profile`, `loom_cta`).
+`style_profile`, `loom_cta`, and — with F02 Signal Radar on — `signal_radar`:
+the signal offered and the one the claim engine tied the copy to; see
+`f02-signal-radar.md`).
 
 ## Never blocks a send
 An unconfigured provider is skipped; a failing one is logged and the email is

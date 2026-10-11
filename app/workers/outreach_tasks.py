@@ -457,7 +457,7 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                                                  message, now)
         else:
             outbound = _render_email_outbound(session, strategy, lead,
-                                              sequence, message)
+                                              sequence, message, now=now)
         session.commit()  # rendered content persisted before the send
 
         # ---- Part 1 Feature 5: the human review queue ---------------------
@@ -626,7 +626,8 @@ def _audit(session: Session, strategy: Strategy, lead: Lead, message: Message,
 
 
 def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
-                           sequence: Sequence, message: Message) -> OutboundMessage:
+                           sequence: Sequence, message: Message,
+                           now: datetime | None = None) -> OutboundMessage:
     # Tag the scheduling link with the owning tenant so the Calendly webhook
     # can resolve the booking back to THIS account instead of guessing by
     # email across every tenant. This is the only place a booking link reaches
@@ -642,20 +643,34 @@ def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
     # right before writing. Never raises -- a failed fetch means an email
     # without that hook, never a send that did not happen.
     personalization_context.ensure_fresh(session, lead, owner_id=owner_id)
+    # F02 Signal Radar (flag, default off): re-derive the lead's dated signals
+    # from what ensure_fresh just stored -- no fetch of its own -- and pick the
+    # one citable signal to offer. Never raises; an empty pick changes nothing.
+    from app.services import signal_radar  # noqa: PLC0415
+
+    pick = signal_radar.prepare(session, lead, owner_id=owner_id, strategy=strategy, now=now)
     booking_url = tag_booking_url(sequence.booking_url, owner_id)
     used: dict = {}
+    render_kwargs = {"why_now": pick.block} if pick.block else {}
     subject, body = render_message(session, strategy, lead,
                                    _step_of(session, message), booking_url,
-                                   inputs_out=used)
+                                   inputs_out=used, **render_kwargs)
     # Feature A1: every claim about the prospect must be backed by stored data.
     # BEFORE the compliance footer is appended, so the footer is never parsed
     # for claims and never altered.
     from app.services import claim_verification  # noqa: PLC0415
 
+    decisions: list = []
     checked = claim_verification.enforce(session, strategy=strategy, lead=lead, message=message,
                                          channel="email",
-                                         fields={"subject": subject, "body": body})
+                                         fields={"subject": subject, "body": body},
+                                         decisions_out=decisions)
     subject, body = checked["subject"], checked["body"]
+    # F02: a signal counts as cited ONLY through a verified claim on its own
+    # stored source. None when nothing was offered (flag off included).
+    citation = signal_radar.resolve_citation(pick, decisions)
+    if citation is not None:
+        used["signal_radar"] = citation
     subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
     message.subject = subject
     message.body = body

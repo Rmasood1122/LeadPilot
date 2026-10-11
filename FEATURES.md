@@ -307,8 +307,18 @@ from enrichment plus the playbook, with an explicit instruction: *"never
 invented facts, names, or statistics."* A variable that cannot be filled
 **fails the send** rather than transmitting a template with an empty slot.
 
+**"Why now" signals carry a date and a source (F02, flag `signal_radar_enabled`,
+off by default).** Stored company news, the lead's own LinkedIn posts, Apollo
+funding/headcount fields and strategy market intel naming the company become
+dated `lead_signals` rows with an expiry (≤ 90 days) and a source link, shown on
+the lead. An email may be offered the one freshest linked signal, and it counts
+as *cited* only when the claim engine verified the sentence against that
+signal's own stored source. No new vendor, no new fetch, no new model call.
+See `docs/features/f02-signal-radar.md`.
+
 *Files:* `app/services/message_personalization.py`,
-`app/services/sequence_engine.py`, `app/api/sequences.py`
+`app/services/sequence_engine.py`, `app/api/sequences.py`,
+`app/services/signal_radar.py`
 
 ---
 

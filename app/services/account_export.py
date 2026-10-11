@@ -70,6 +70,7 @@ OWNERSHIP: dict[str, list[str]] = {
     "guardrail_exclusions": ["user_id"],
     "guardrail_library": ["user_id"],
     "integration_tokens": ["user_id"],
+    "lead_signals": ["user_id"],                   # F02 Signal Radar
     "linkedin_accounts": ["user_id"],
     "linkedin_connection_matches": ["user_id"],
     "linkedin_connections": ["user_id"],

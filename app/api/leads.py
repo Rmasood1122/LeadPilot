@@ -343,6 +343,12 @@ def gdpr_delete_lead(
     lead.ai_score_reason = None
     lead.ai_score_factors = None
     lead.status = LeadStatus.DROPPED
+    # F02 Signal Radar: signals hold post excerpts and headlines derived from
+    # the fields erased above. The lead row is a tombstone, not a delete, so
+    # the FK cascade never fires -- they are deleted here, in the same commit.
+    from app.services import signal_radar  # noqa: PLC0415
+
+    signal_radar.erase_for_lead(db, lead.id)
     db.commit()
     # Feature Group 4: forget which CRM record this person was synced to.
     # (What the CRM itself holds is the CRM owner's to erase.)
