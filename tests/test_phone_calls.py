@@ -28,7 +28,7 @@ from app.integrations.voice_providers import VoiceProviderError
 from app.services import credentials, phone_calls, system_settings
 from app.workers import outreach_tasks
 
-from .conftest import NOW, auth_headers
+from .conftest import NOW, auth_headers, entitle_owner
 
 UTC = timezone.utc
 
@@ -77,6 +77,9 @@ def phone_lead(db_session, verified_strategy):
 
 @pytest.fixture()
 def phone_sequence(db_session, verified_strategy):
+    # Scale is the cheapest plan with the phone channel; the send path re-checks
+    # the plan (app/services/plan_holds.py). This file is about calls, not plans.
+    entitle_owner(db_session, verified_strategy, m.PlanTier.SCALE)
     seq = m.Sequence(strategy_id=verified_strategy.id, channel=m.ChannelType.PHONE,
                      name="Calls", status=m.SequenceStatus.ACTIVE)
     db_session.add(seq)

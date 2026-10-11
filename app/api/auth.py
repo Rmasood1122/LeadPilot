@@ -23,6 +23,10 @@ GET  /auth/verify   — target of the emailed link; marks the account verified
                       and 302s to the frontend login page (Feature 1)
 POST /auth/resend-verification — send a fresh link; always 202, never reveals
                       whether the address has an account (Feature 1)
+POST /auth/password-reset/request — email a single-use reset link; always
+                      200, never reveals whether the address has an account
+POST /auth/password-reset/confirm — token + new password; signs out
+                      everywhere (docs/features/password-reset.md)
 GET  /me/theme      — the user's theme JSON (section H)
 PUT  /me/theme      — persist theme JSON (validated; contrast_warnings
                       flag persisted so the user was demonstrably informed)
@@ -39,7 +43,17 @@ import re
 import secrets
 from pathlib import Path
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
@@ -509,12 +523,142 @@ def change_password(request: Request, body: ChangePasswordIn,
         raise HTTPException(status_code=400,
                             detail="New password must be different from the current one.")
     user.password_hash = auth_svc.hash_password(body.new_password)
-    revoked = auth_sessions.revoke_all_for_user(db, user.id, "password_changed")
+    signed_out = _sign_out_everywhere(db, user, "password_changed")
     security_audit.record(db, action=security_audit.AUTH_PASSWORD_CHANGED, request=request,
                           user_id=user.id, target_type="user", target_id=user.id,
-                          details={"sessions_revoked": revoked})
+                          details=signed_out)
     db.commit()
-    return {"status": "changed", "signed_out_everywhere": True}
+    return {"status": "changed", "signed_out_everywhere": True,
+            "api_keys_revoked": signed_out["api_keys_revoked"]}
+
+
+def _sign_out_everywhere(db: Session, user: User, reason: str) -> dict:
+    """What a password change or reset does to every credential the account
+    has out there. Does not commit (the caller's transaction holds the new
+    hash too):
+
+      * every refresh session revoked (auth_sessions.revoke_all_for_user);
+      * users.password_changed_at = now, so any refresh or access token
+        issued before it -- legacy session-less refresh tokens included -- is
+        refused (auth_sessions._issued_before_password_change);
+      * every personal API key revoked: a key is a standing credential, and a
+        password change is how a person shuts out whoever had their account.
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from app.services import api_keys  # noqa: PLC0415
+
+    now = datetime.now(timezone.utc)
+    user.password_changed_at = now
+    return {"sessions_revoked": auth_sessions.revoke_all_for_user(db, user.id, reason, now),
+            "api_keys_revoked": api_keys.revoke_all_for_user(db, user.id, now)}
+
+
+# --------------------------------------------------------------------------
+# Forgotten password (docs/features/password-reset.md)
+# --------------------------------------------------------------------------
+
+
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str = Field(min_length=1, max_length=512)
+    # The rules change-password applies: 8-256 characters (and hash_password's
+    # own 8-character floor, re-checked server side).
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+PASSWORD_RESET_ACCEPTED = ("If that address has a LeadPilot account, we have "
+                           "emailed it a link to reset the password.")
+PASSWORD_RESET_INVALID = ("This reset link is invalid or has expired. "
+                          "Request a new one.")
+
+
+def _send_reset_link(email: str, raw: str) -> None:
+    """Runs after the response (BackgroundTasks). Never raises: the token is
+    already committed, and a transport failure is logged, greppable, and
+    recoverable by asking again."""
+    from app.services import password_reset  # noqa: PLC0415
+
+    try:
+        password_reset.send_link(email, raw)
+    except EmailSendError as exc:
+        logger.error("password reset email FAILED for %s: %s", email, exc)
+    except Exception:  # a background task must not crash the worker
+        logger.exception("password reset email FAILED for %s", email)
+
+
+@router.post("/auth/password-reset/request")
+def request_password_reset(request: Request, body: PasswordResetRequestIn,
+                           background: BackgroundTasks,
+                           db: Session = Depends(get_db)) -> dict:
+    """Email a single-use reset link. ALWAYS 200 with the same body.
+
+    Same no-enumeration rule as /auth/resend-verification: unknown address,
+    passwordless pre-auth row, suspended account and real account all get the
+    identical answer, and the email goes out after the response so timing does
+    not tell them apart either. Rate limited per IP and per address on its own
+    buckets (not login's), so flooding resets cannot lock someone out of
+    signing in. A 429 is keyed on the address, never on whether it exists.
+    """
+    from app.services import password_reset  # noqa: PLC0415
+
+    enforce_rate_limit(f"ip:{client_ip(request)}", "password_reset_ip",
+                       "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+    email = body.email.lower().strip()
+    enforce_rate_limit(f"acct:{email}", "password_reset_account",
+                       "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+
+    user = password_reset.find_eligible(db, email)
+    if user is not None:
+        raw = password_reset.issue_token(db, user, ip=client_ip(request))
+        if raw is not None:
+            security_audit.record(db, action=security_audit.AUTH_PASSWORD_RESET_REQUESTED,
+                                  request=request, user_id=user.id,
+                                  target_type="user", target_id=user.id)
+            # Commit BEFORE the send (email_verification.send_link explains why).
+            db.commit()
+            background.add_task(_send_reset_link, user.email, raw)
+    return {"status": "accepted", "detail": PASSWORD_RESET_ACCEPTED}
+
+
+@router.post("/auth/password-reset/confirm")
+def confirm_password_reset(request: Request, body: PasswordResetConfirmIn,
+                           db: Session = Depends(get_db)) -> dict:
+    """Set a new password from a reset link, then sign out everywhere.
+
+    400 with one message for every bad link (unknown, used, superseded,
+    expired, or an account that became suspended since the link was sent): the
+    holder of a dead link learns nothing about the account from which kind it
+    was. The reason is kept in the audit row. Issues NO tokens: the person signs
+    in normally afterwards, through the same limiter and network guard as any
+    other sign-in.
+    """
+    from app.services import password_reset  # noqa: PLC0415
+
+    enforce_rate_limit(f"ip:{client_ip(request)}", "password_reset_confirm_ip",
+                       "RATE_LIMIT_AUTH", AUTH_WINDOW_SECONDS)
+    try:
+        status, user = password_reset.redeem(db, body.token.strip(), body.new_password)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    if status != password_reset.RESET:
+        if user is not None:
+            security_audit.record(db, action=security_audit.AUTH_PASSWORD_RESET_REFUSED,
+                                  request=request, user_id=user.id, target_type="user",
+                                  target_id=user.id, details={"reason": status})
+        db.commit()  # the burnt link and the refusal record are kept
+        raise HTTPException(status_code=400, detail=PASSWORD_RESET_INVALID)
+    signed_out = _sign_out_everywhere(db, user, "password_reset")
+    security_audit.record(db, action=security_audit.AUTH_PASSWORD_RESET, request=request,
+                          user_id=user.id, target_type="user", target_id=user.id,
+                          details=signed_out)
+    db.commit()
+    return {"status": "reset", "signed_out_everywhere": True,
+            "api_keys_revoked": signed_out["api_keys_revoked"]}
 
 
 # --------------------------------------------------------------------------

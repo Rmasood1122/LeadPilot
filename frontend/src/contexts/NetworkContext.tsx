@@ -12,8 +12,9 @@
  *   • offline + !backendReachable  → "No connection" (device offline)
  *   • online  + !backendReachable  → "Server unreachable" (our cloud backend is down)
  *
- * In both cases: "Campaigns are still running on the server" — always true
- * because the backend is the engine, not the app.
+ * The banner says only what the device can know: going offline here does not
+ * stop server-side sends; an unreachable server means their state is unknown
+ * (see components/ui/OfflineBanner.tsx).
  *
  * Populated by useNetwork (called once in NativeProvider).
  * Consumed by OfflineBanner.

@@ -128,13 +128,25 @@ async def learning_loop_health(
             ),
         }
     except Exception as e:
-        logger.error("health.learning_loop_check_failed", error=str(e))
-        return {"status": "unknown", "error": str(e)}
+        # Fixed text even for admins: exception text from the Redis client can
+        # name hosts and ports, and the log already has it.
+        logger.error("health.learning_loop_check_failed", error=str(e),
+                     error_type=type(e).__name__)
+        return {"status": "unknown", "error": "check failed"}
 
 
 # ---------------------------------------------------------------------------
 # GET /health/channels  — auth required
 # ---------------------------------------------------------------------------
+
+def _channel_check_failed(channel: str, exc: Exception) -> dict[str, Any]:
+    """A channel check that raised: a fixed message for the caller, the
+    exception in the log. Exception text from the Redis client can name hosts
+    and ports, which no API response should carry."""
+    logger.error("health.channel_check_failed", channel=channel, error=str(exc),
+                 error_type=type(exc).__name__)
+    return {"status": "unknown", "error": "check failed"}
+
 
 @router.get("/channels")
 async def channel_health(
@@ -162,7 +174,7 @@ async def channel_health(
             "action_required": None if token_valid == "1" else "Re-authenticate Gmail at /integrations/gmail/auth-url",
         }
     except Exception as e:
-        channels["gmail"] = {"status": "unknown", "error": str(e)}
+        channels["gmail"] = _channel_check_failed("gmail", e)
 
     # --- WhatsApp ---
     try:
@@ -186,7 +198,7 @@ async def channel_health(
             "action_required": None if token_valid else "Refresh WhatsApp access token in Meta Business console",
         }
     except Exception as e:
-        channels["whatsapp"] = {"status": "unknown", "error": str(e)}
+        channels["whatsapp"] = _channel_check_failed("whatsapp", e)
 
     # --- Calendly ---
     try:
@@ -205,7 +217,7 @@ async def channel_health(
             ),
         }
     except Exception as e:
-        channels["calendly"] = {"status": "unknown", "error": str(e)}
+        channels["calendly"] = _channel_check_failed("calendly", e)
 
     overall = "ok"
     for ch_data in channels.values():

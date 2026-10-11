@@ -24,7 +24,7 @@ from app.services import bounce_shield, system_settings
 from app.services import sequence_engine as engine
 from app.services import waterfall_enrichment as wf
 from app.workers.outreach_tasks import send_message_impl
-from tests.conftest import NOW, auth_headers
+from tests.conftest import NOW, auth_headers, entitle_owner
 from tests.test_waterfall_enrichment import ScriptedVerifier
 
 
@@ -188,6 +188,8 @@ class TestShield:
 
     def test_non_email_channels_are_untouched(self, db_session, verified_strategy,
                                               wa_lead_no_optin, fake_channel):
+        # A plan with WhatsApp, so the plan check (plan_holds) is not what decides.
+        entitle_owner(db_session, verified_strategy, m.PlanTier.STARTER)
         seq = m.Sequence(strategy_id=verified_strategy.id, channel=m.ChannelType.WHATSAPP,
                          name="wa", status=m.SequenceStatus.ACTIVE)
         db_session.add(seq)

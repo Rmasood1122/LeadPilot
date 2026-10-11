@@ -137,12 +137,17 @@ class TestHealthUnchanged:
             b'"reason":"heartbeat stale (500s ago)","last_beat_seconds_ago":500}}}'
         )
 
-    def test_unparseable_heartbeat_is_degraded_with_the_error_text(self, make_client, async_redis):
+    def test_unparseable_heartbeat_is_degraded_with_a_fixed_error(self, make_client, async_redis):
+        """Contract changed on purpose (platform-gaps item 4): this used to
+        echo the exception text ("could not convert string to float: ...")
+        on a PUBLIC endpoint. Exception text can carry hostnames and ports;
+        the response now carries a fixed string and the detail is logged."""
         _run(async_redis.set(HEARTBEAT_KEY, "garbage"))
         r = make_client(redis=async_redis).get("/health")
         assert r.status_code == 200
         assert r.json()["components"]["celery"] == {
-            "status": "degraded", "error": "could not convert string to float: 'garbage'"}
+            "status": "degraded", "error": "heartbeat check failed"}
+        assert "could not convert" not in r.text
 
     def test_database_down_is_503_exact_bytes(self, make_client, async_redis):
         _run(async_redis.set(HEARTBEAT_KEY, str(time.time())))
@@ -155,12 +160,14 @@ class TestHealthUnchanged:
         )
 
     def test_redis_down_is_503_exact_bytes(self, make_client):
+        # celery.error was the raw exception text ("boom") until platform-gaps
+        # item 4; it is now a fixed string (the exception is logged).
         r = make_client(redis=_BrokenRedis()).get("/health")
         assert r.status_code == 503
         assert r.content == (
             b'{"detail":{"status":"down","components":{"database":{"status":"ok"},'
             b'"redis":{"status":"down","error":"ping failed"},'
-            b'"celery":{"status":"degraded","error":"boom"}}}}'
+            b'"celery":{"status":"degraded","error":"heartbeat check failed"}}}}'
         )
 
     def test_health_needs_no_authentication(self, make_client, async_redis):

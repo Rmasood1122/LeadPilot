@@ -53,9 +53,8 @@ This is an honest list of what LeadPilot does not do, does not do yet, or has no
 - **Undo an account deletion.** **Profile › Delete account** erases the account at once; there is no grace period and no way back. Download your data first if you want a copy.
 - **Have LeadPilot revoke its access inside Google, HubSpot, Salesforce or Slack when you delete your account.** The connections and their tokens are erased from LeadPilot, but the access you granted is not revoked on the provider's side; remove it there yourself. (LinkedIn accounts are disconnected at Unipile.)
 - **Have your Stripe customer record deleted when you delete your account.** Stripe keeps it under its own policy.
-- **Reset a forgotten password.** There is no "forgot password" flow. Contact support if you are locked out.
 - **Use two-factor sign-in.** It is not available.
-- **See or end individual sessions.** There is no list of signed-in devices. Changing your password signs out everywhere.
+- **See or end individual sessions.** There is no list of signed-in devices. Changing or resetting your password signs out everywhere and revokes your API keys.
 - **Erase a prospect from your CRM.** Erasing a lead erases what LeadPilot holds about the person, but data already synced to HubSpot or Salesforce stays there.
 
 ## What are the billing limitations?

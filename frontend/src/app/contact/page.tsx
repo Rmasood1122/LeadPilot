@@ -36,22 +36,30 @@ const FOR_YOU = [
 const NOT_FOR_YOU = [
   "You have a dedicated SDR team and a working outbound system.",
   "You are based outside our approved geographies.",
-  "You need clients in the next 7 days. This is a 4–8 week system, not a quick fix.",
-  "You are looking for a self-serve tool you set up once and forget.",
+  "You need clients in the next 7 days. Research comes first and new mailboxes warm up gradually, so this is not a quick fix.",
 ];
 
 const FAQ = [
   {
     q: "How long does it take to see results?",
-    a: "Most clients see their first qualified conversations in 4–6 weeks. The pipeline builds as the system learns what works for your ICP.",
+    // No timeline is promised: none is measured. What is code: research runs
+    // before outreach, and a new mailbox ramps 10 sends on day one, +10 a day
+    // (app/config.py gmail_warmup_start_sends / gmail_warmup_daily_increment).
+    a: "We do not promise a timeline; it depends on your market and offer. Research runs before any outreach, and a newly connected mailbox starts at 10 emails a day and rises by 10 a day by default, so volume builds over the first weeks.",
   },
   {
+    // Code truth (platform-gaps item 8): prices are public on /pricing, read
+    // from GET /billing/catalog (app/core/billing_catalog.py).
     q: "What does LeadPilot cost?",
-    a: "Pricing is discussed on the call. It is a premium engagement priced for US, UK, and AU markets.",
+    a: "Every plan and price is published on the Pricing page: monthly plans with a free trial, and a pay-per-booked-meeting plan. On the call we can help you choose between them.",
   },
   {
+    // Code truth: email is the default channel (app/api/sequences.py
+    // SequenceCreate.channel = EMAIL); LinkedIn is a plan channel on Growth,
+    // Scale, Enterprise and Pay per meeting (app/core/plans.py
+    // PLANS[...]["channels"]; legacy Pro has it too), not Free or Starter.
     q: "Do I need to be on LinkedIn?",
-    a: "Yes. LinkedIn is the primary outreach channel. You need an active profile — not necessarily a large following.",
+    a: "No. Email is the default channel, sent from the Gmail account you connect. LinkedIn outreach is optional, using a LinkedIn account you connect, and is included in the Growth, Scale, Enterprise and Pay per meeting plans.",
   },
 ];
 

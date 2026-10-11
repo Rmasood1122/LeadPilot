@@ -10,14 +10,22 @@
  *   OFFLINE            → device has no network at all
  *   BACKEND_UNREACHABLE → device has network but our API backend is down
  *
- * In both cases: "Campaigns are still running on the server" — always true.
- * The backend is the engine. The app is the window. Even when this banner
- * shows, no outreach is paused unless the backend itself paused it.
+ * Honesty rule (platform-gaps item 5): the banner states only what this
+ * device can know.
+ *   OFFLINE — losing THIS device's connection does not stop anything:
+ *     scheduled sends run on LeadPilot's servers, not in the app. True by
+ *     construction, so it may be said.
+ *   BACKEND_UNREACHABLE — the server did not answer, so the app cannot know
+ *     whether sends are going out. It used to say "Your campaigns are still
+ *     running", which is exactly what an outage makes unknowable. It now says
+ *     so, and points at the status page (when its link is live), which shows
+ *     "unknown" for the same situation.
  *
  * Rendered once in app/layout.tsx, outside the page content area.
  */
 
 import { useNetworkState } from '@/contexts/NetworkContext';
+import { statusPageLink } from '@/lib/statusPage';
 
 type BannerState = 'offline' | 'backend_unreachable' | 'ok';
 
@@ -27,19 +35,24 @@ function resolveBannerState(online: boolean, backendReachable: boolean): BannerS
   return 'ok';
 }
 
-const MESSAGES: Record<Exclude<BannerState, 'ok'>, { title: string; body: string }> = {
+export const MESSAGES: Record<Exclude<BannerState, 'ok'>, { title: string; body: string }> = {
   offline: {
     title: 'No connection',
-    body: 'Campaigns are still running on the server — you\'ll be back in sync when connected.',
+    body:
+      'Scheduled sends run on LeadPilot\'s servers, not on this device, so losing your ' +
+      'connection does not stop them. You\'ll be back in sync when connected.',
   },
   backend_unreachable: {
     title: 'Server temporarily unreachable',
-    body: 'Your campaigns are still running. We\'ll reconnect automatically.',
+    body:
+      'We can\'t reach LeadPilot\'s server right now, so we can\'t confirm whether ' +
+      'scheduled sends are going out. We\'ll reconnect automatically.',
   },
 };
 
-export function OfflineBanner() {
+export function OfflineBanner({ showStatusLink }: { showStatusLink?: boolean } = {}) {
   const { online, backendReachable } = useNetworkState();
+  const status = statusPageLink(showStatusLink);
   const state = resolveBannerState(online, backendReachable);
 
   if (state === 'ok') return null;
@@ -88,6 +101,11 @@ export function OfflineBanner() {
       <div>
         <span className="font-semibold">{title}</span>
         <span className="ml-1 opacity-90">{body}</span>
+        {state === 'backend_unreachable' && status && (
+          <a href={status.href} className="ml-1 font-semibold underline" data-testid="offline-status-link">
+            Check service status
+          </a>
+        )}
       </div>
     </div>
   );

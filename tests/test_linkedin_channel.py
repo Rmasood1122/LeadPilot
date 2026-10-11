@@ -29,7 +29,7 @@ from app.integrations.unipile_linkedin import UnipileError
 from app.services import credentials, linkedin_limits, linkedin_outreach, system_settings
 from app.workers import outreach_tasks
 
-from .conftest import NOW, auth_headers
+from .conftest import NOW, auth_headers, entitle_owner
 
 UTC = timezone.utc
 
@@ -105,6 +105,9 @@ def li_accounts(db_session, test_user):
 
 @pytest.fixture()
 def li_sequence(db_session, verified_strategy):
+    # Growth is the cheapest plan with LinkedIn; the send path re-checks the
+    # plan (app/services/plan_holds.py). This file is about LinkedIn, not plans.
+    entitle_owner(db_session, verified_strategy, m.PlanTier.GROWTH)
     seq = m.Sequence(strategy_id=verified_strategy.id, channel=m.ChannelType.LINKEDIN,
                      name="LinkedIn", status=m.SequenceStatus.ACTIVE)
     db_session.add(seq)

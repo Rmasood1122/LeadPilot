@@ -5,6 +5,7 @@ audience: customer
 last_verified: 2026-10-11
 owner: help-center
 sources:
+  - app/services/plan_holds.py
   - app/core/plans.py
   - app/api/sequences.py
   - app/integrations/linkedin_channel.py
@@ -36,7 +37,7 @@ LeadPilot has two separate LinkedIn features. LinkedIn steps in a sequence send 
 
 There are two different plan checks:
 
-- **LinkedIn steps in sequences** are part of the plan's channel list. The Growth, Scale, Pay per meeting, Pro and Enterprise plans include the LinkedIn channel. Free and Starter do not. If your plan does not include it, creating a sequence with a LinkedIn step is refused with an upgrade message. The check runs again when a sequence is launched, so a sequence built on a higher plan cannot be launched after a downgrade.
+- **LinkedIn steps in sequences** are part of the plan's channel list. The Growth, Scale, Pay per meeting, Pro and Enterprise plans include the LinkedIn channel. Free and Starter do not. If your plan does not include it, creating a sequence with a LinkedIn step is refused with an upgrade message. The check runs again when a sequence is launched, so a sequence built on a higher plan cannot be launched after a downgrade. For sequences enrolled from 12 October 2026 on, LinkedIn steps scheduled before a downgrade are held when they come due, not sent, and show the reason on the lead and on the Campaigns page; they are released automatically within about 15 minutes once your plan includes LinkedIn again.
 - **The Network page** (your private LinkedIn network) is included with Growth, Scale, Pro and Enterprise. It is **not** included with Pay per meeting, even though that plan includes the LinkedIn channel. On other plans the Network page still opens and shows "Upgrade in Settings".
 
 ## Has LinkedIn sending been verified against the live service?

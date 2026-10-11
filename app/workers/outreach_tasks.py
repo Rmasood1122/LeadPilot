@@ -36,6 +36,7 @@ from app.db.models import (
     Sequence,
     SequenceEnrollment,
     Strategy,
+    User,
     WhatsAppStepKind,
     WhatsAppTemplate,
     WhatsAppTemplateStatus,
@@ -325,6 +326,41 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                    extra={"reason": stale})
             session.commit()
             return champion_tracker.SEND_RESULT_HELD
+    # ---- Plan entitlement, re-checked NOW (app/services/plan_holds.py) -----
+    # Launch checks the plan; a downgrade after launch must not keep sending
+    # what the account no longer pays for. A channel the owner's CURRENT plan
+    # lacks, or a sequence step past its max_sequence_steps, is HELD (FAILED
+    # + 'plan_limit: ', kept and visible, enrollment not stopped; released by
+    # the plan-hold sweep once the plan covers it again). Grandfathered:
+    # enrollments created before plan_holds.PLAN_HOLD_EFFECTIVE_AT, admin
+    # owners, and person-approved Reply Copilot answers. Placed
+    # AFTER every gate that cancels (suppression, exclusions, departures,
+    # derived opt-outs): a message that must never go out is cancelled, not
+    # merely held. An owner that cannot be resolved fails CLOSED: deferred an
+    # hour, never sent unchecked.
+    from app.services import plan_holds  # noqa: PLC0415
+
+    try:
+        plan_owner = session.get(User, _owner_or_raise(session, strategy))
+        if plan_owner is None:
+            raise LookupError(f"owner row missing for strategy {strategy.id}")
+        over_plan = plan_holds.check(session, plan_owner, message, enrollment)
+    except Exception:
+        logger.exception("plan check failed for message %s -- deferred", message_id)
+        session.rollback()
+        message = session.get(Message, message_id)
+        message.scheduled_at = now + timedelta(hours=1)
+        message.error = "plan entitlement could not be checked -- deferred (fails closed)"
+        session.commit()
+        return "deferred_plan_check_unavailable"
+    if over_plan is not None:
+        plan_holds.hold_message(message, over_plan)
+        _audit(session, strategy, lead, message, plan_holds.AUDIT_HELD,
+               extra={"plan": str(getattr(plan_owner.plan, "value", plan_owner.plan)),
+                      "reason": over_plan})
+        session.commit()
+        return plan_holds.SEND_RESULT
+
     # ---- F01 Bounce Shield (SAFETY GUARD, email only, flag default off) ----
     # An email goes only to an address verified valid (fresh), catch-all under
     # an 'allow' policy, or one a manager overrode for this lead. Blocked =

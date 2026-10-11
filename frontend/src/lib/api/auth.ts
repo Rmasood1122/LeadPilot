@@ -51,6 +51,28 @@ export async function resendVerification(email: string): Promise<void> {
   });
 }
 
+/** Ask for a password-reset link (docs/features/password-reset.md).
+ *
+ * The backend answers 200 for every syntactically valid address, with or
+ * without an account, so the UI must show the same confirmation either way.
+ * Only a 429 (or a network failure) rejects.
+ */
+export async function requestPasswordReset(email: string): Promise<void> {
+  await api<{ status: string; detail: string }>("/auth/password-reset/request", {
+    body: { email },
+    auth: false,
+  });
+}
+
+/** Set a new password from the emailed link's token. Signs the account out
+ *  everywhere on the server and issues no tokens: the person signs in again. */
+export async function confirmPasswordReset(token: string, newPassword: string): Promise<void> {
+  await api<{ status: string; signed_out_everywhere: boolean }>("/auth/password-reset/confirm", {
+    body: { token, new_password: newPassword },
+    auth: false,
+  });
+}
+
 /** The exact detail string the backend sends when an account is unverified.
  *  Mirrors EMAIL_NOT_VERIFIED in app/services/auth.py. */
 export const EMAIL_NOT_VERIFIED = "EMAIL_NOT_VERIFIED";

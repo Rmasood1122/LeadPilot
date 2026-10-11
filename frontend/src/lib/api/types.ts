@@ -406,6 +406,8 @@ export interface CampaignOverview {
   bounce_pause_threshold?: number;
   meetings_booked?: number;
   channels: { email: ChannelStats; whatsapp: ChannelStats };
+  /** Messages held because the current plan does not cover them. */
+  plan_holds?: { count: number; reasons: string[] };
 }
 
 export interface TemplateOut {

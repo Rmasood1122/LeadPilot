@@ -41,6 +41,7 @@ import {
   type CheckoutModel,
   type MonthlyTier,
 } from "@/lib/pricing";
+import { Footer } from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { LogoMark } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
@@ -311,6 +312,7 @@ export default function PricingPage() {
           </>
         )}
       </section>
+      <Footer tone="theme" />
     </main>
   );
 }

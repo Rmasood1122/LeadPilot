@@ -63,6 +63,11 @@ wrong in some cases or misleading UI; **L** = stale doc, dead code, cosmetic.
 | D6 | L | `docs/compliance.md` | `GMAIL_DAILY_SEND_CAP` default 500; `{unsubscribe_link}` token check | `gmail_daily_cap` = 100; footer added in `build_compliant_email` |
 | D7 | L | `docs/program/BASELINE.md` | plan enforcement, per-account AI cap, sign-up switch OPEN | fixed on master by #55, #56, #58 |
 
+Status 2026-10-11 (`docs/program/fixes/platform-gaps.md`): D4, D5, D6 and D7
+corrected to the code with file:line evidence; discovery 25's password-reset
+part is fixed (self-service reset, `docs/features/password-reset.md`), while
+two-factor sign-in and a billing management UI remain open.
+
 ## Help center gaps (for a follow-up article PR)
 
 - No article covers the Learn tab / tutorials, yet article 30 and the support

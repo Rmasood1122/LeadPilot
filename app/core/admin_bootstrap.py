@@ -16,11 +16,12 @@ WHAT IT DOES
     downgraded when a different ADMIN_EMAIL is configured.
 
 WHAT IT DELIBERATELY DOES NOT DO: create the account.
-    There is no password-reset flow anywhere in this application. An account
-    conjured at startup would need either a password nobody knows (unloggable,
-    so it removes nothing - the operator still has to run the CLI) or a
-    generated one written to the logs (a credential in the log stream, which is
-    worse). So a missing ADMIN_EMAIL user is reported as a loud, actionable
+    An account conjured at startup would need either a password nobody knows
+    or a generated one written to the logs (a credential in the log stream).
+    The first is now recoverable through the forgotten-password reset
+    (app/services/password_reset.py), but creating an account nobody asked
+    for, for an address nobody has proved they control, is still the wrong
+    default. So a missing ADMIN_EMAIL user is reported as a loud, actionable
     ERROR naming the exact command instead. Signup once, or run the CLI, and
     the next restart promotes it.
 

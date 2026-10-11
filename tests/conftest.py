@@ -1531,9 +1531,30 @@ def wa_lead_no_optin(db_session, verified_strategy):
     return lead
 
 
+def entitle_owner(db_session, strategy, plan) -> None:
+    """Put the account that owns `strategy` on `plan`.
+
+    Since send-time plan entitlement (app/services/plan_holds.py), a message on
+    a channel the owner's plan lacks is held instead of sent -- exactly what a
+    downgrade must do. Tests of a channel's send path (WhatsApp, LinkedIn,
+    phone) put the owner on a plan that includes it, the same way they would
+    have launched it; tests ABOUT plans use the default Free plan.
+    """
+    product = db_session.get(m.Product, strategy.product_id)
+    owner = db_session.get(m.User, product.user_id)
+    owner.plan = plan
+    db_session.commit()
+
+
 @pytest.fixture()
 def multichannel_sequence(db_session, verified_strategy, approved_template):
-    """email step 1 -> WhatsApp template step 2 -> email step 3."""
+    """email step 1 -> WhatsApp template step 2 -> email step 3.
+
+    The owner is on Starter, the cheapest plan with WhatsApp: a sequence with a
+    WhatsApp step can only be launched on such a plan (app/api/sequences.py
+    _enforce_plan), and the send path re-checks it (app/services/plan_holds.py).
+    """
+    entitle_owner(db_session, verified_strategy, m.PlanTier.STARTER)
     seq = m.Sequence(strategy_id=verified_strategy.id, channel=m.ChannelType.EMAIL,
                      name="Multi", status=m.SequenceStatus.ACTIVE)
     db_session.add(seq)

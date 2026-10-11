@@ -6,6 +6,7 @@ last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/services/send_holds.py
+  - app/services/plan_holds.py
   - app/api/sequences.py
   - app/api/sequence_reviews.py
   - app/services/sequence_engine.py
@@ -65,7 +66,7 @@ In the app today, this creates an email-only sequence with one or two steps. Lon
 | Scale | No plan limit | Gmail, WhatsApp, LinkedIn, phone |
 | Pro, Enterprise | No plan limit | Gmail, WhatsApp, LinkedIn, phone |
 
-These are checked when the sequence is created and again at every launch, so a sequence built on a higher plan cannot be launched after a downgrade. A sequence over the limit is refused with an upgrade message.
+These are checked when the sequence is created and again at every launch, so a sequence built on a higher plan cannot be launched after a downgrade. A sequence over the limit is refused with an upgrade message. For sequences enrolled from 12 October 2026 on, messages are also checked when they come due: after a downgrade, a step on a channel your current plan does not include, or a step past your plan's step limit, is held instead of sent. The Campaigns page says how many messages are on hold and why, and the lead's message shows the reason (it starts with "plan_limit:"). Steps your plan still covers keep sending, and the sequence is not stopped. When your plan covers a held step again, for example after an upgrade, it is released automatically within about 15 minutes and goes out through the usual checks. Enrollments from before 12 October 2026, administrator accounts and Reply Copilot answers a person approved are not held this way.
 
 ## What does LeadPilot check when I launch?
 

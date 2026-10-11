@@ -33,6 +33,7 @@ Owner: `app/config.py`. See
 | `SMTP_STARTTLS` | no | `true` | |
 | `EMAIL_SEND_TIMEOUT_SECONDS` | no | `15.0` | Per-message transport timeout |
 | `EMAIL_VERIFICATION_TTL_HOURS` | no | `24` | Link lifetime. 24 is the product requirement; it is a setting so expiry can be tested without waiting a day. |
+| `PASSWORD_RESET_TTL_MINUTES` | no | `60` | Password-reset link lifetime (`app/services/password_reset.py`). The link goes to `FRONTEND_URL/reset-password`, so `FRONTEND_URL` must be the public web origin. |
 | `REQUIRE_EMAIL_VERIFICATION` | no | `true` | **KILL SWITCH.** While true, `get_current_user` refuses every unverified account on every authenticated route. Set `false` to disable enforcement with a restart and no deploy. |
 
 ### Transport cheat-sheet
@@ -186,6 +187,7 @@ RESEND_API_KEY=<key>
 EMAIL_FROM=noreply@calendarharvest.com
 EMAIL_FROM_NAME=LeadPilot
 EMAIL_VERIFICATION_TTL_HOURS=24
+PASSWORD_RESET_TTL_MINUTES=60
 REQUIRE_EMAIL_VERIFICATION=true
 ```
 

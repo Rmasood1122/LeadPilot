@@ -150,7 +150,11 @@ list.
 | **7 · Objections** | objection inventory by frequency, rebuttal scripts, proof gaps, case-study angles, ROI math, risk reversal, social-proof plan |
 | **8 · Execution** | sequence blueprints, cadence and send times, **volume ramp and warm-up**, KPI targets, budget, tooling, team, risk register, 90-day plan |
 
-### The 8 GTM phases (Flow 2 only, run first)
+### The 8 GTM phases (Flow 2 only, run after the strategy pipeline)
+
+*(Corrected 2026-10-11: this heading used to say "run first". The code runs the
+strategy pipeline first and GTM second: `app/pipeline/engine.py:37-40`
+`pipelines_for_flow` returns `[STRATEGY, GTM]` for Flow 2.)*
 
 Positioning · Pricing · Launch sequencing · Channel budget · Content plan ·
 Partnerships · Sales motion · Funnel metrics.
@@ -360,6 +364,19 @@ Every single send runs this gauntlet, in this order:
    customer, a new verified lead at the new company with a "Changed jobs"
    re-engagement plan (never auto-enrolled). Spec:
    `docs/features/f10-champion-tracker.md` (`app/services/champion_tracker.py`).
+   After those cancelling gates and before Bounce Shield, **plan entitlement,
+   re-checked now** (`app/services/plan_holds.py`): a message on a channel the
+   owner's *current* plan lacks, or a sequence step past its
+   `max_sequence_steps`, is held as `FAILED` (`plan_limit: …`), audited, never
+   sent; the enrollment is not stopped. This is what a downgrade does to
+   messages scheduled before it (launch already checked the plan). An owner
+   that cannot be resolved defers the message an hour (fails closed).
+   Grandfathered: enrollments created before `PLAN_HOLD_EFFECTIVE_AT`
+   (2026-10-12 UTC), admin owners, person-approved Reply Copilot answers. A
+   15-minute beat sweep (`leadpilot.plan_holds.release`) releases a hold as
+   soon as the owner's current plan covers it again. Holds are not counted as
+   delivery failures in the campaign's per-channel stats, and the campaign
+   overview reports them (`plan_holds`: count + reasons).
 5. **WhatsApp rules** (defence in depth — the adapter checks again):
    no opt-in → the message is *skipped* and the sequence continues on its other
    channels; a free-form message whose 24-hour customer-service window closed
@@ -484,10 +501,17 @@ is the population that was genuinely being dropped:
   template lost approval;
 - a step deleted or renumbered after its message was scheduled.
 
-**If the sequence has no next step**, the follow-up brief is generated from the
-lead's *own* message and outcome history plus the product brief — then rendered
-and sent through the ordinary path, so it is indistinguishable from a step a
-human wrote.
+**If the sequence has no step with the next number**, the follow-up brief is
+generated from the lead's *own* message and outcome history plus the product
+brief — then rendered and sent through the ordinary path, so it is
+indistinguishable from a step a human wrote. This path is narrow: when the last
+step of a sequence sends, the engine marks the enrollment COMPLETED
+(`app/services/sequence_engine.py:446-451`), and the sweep only looks at ACTIVE
+enrollments (`app/workers/outreach_tasks.py` `check_followup_due_impl`). So it
+fires only when a step was deleted or renumbered after the enrollment's last
+send, not as an extra touch after a finished sequence (that is the separate,
+opt-in re-engagement, `docs/features/reengagement.md`). *(Corrected 2026-10-11,
+help-center-discoveries D5.)*
 
 **Idempotency is two layers, and the weaker one fails open.** A Redis lock
 (`followup:{enrollment}:{step}`, 2h TTL) stops two workers acting at once; the
@@ -1140,8 +1164,13 @@ page, not a document.
   routed; a person writes or approves the answer. The single exception is
   Reply Copilot's opt-in "send me a time" email auto-send (F04), off at two
   levels.
-- **LinkedIn is not implemented.** The API rejects it explicitly rather than
-  half-supporting it.
+- **LinkedIn is a sequence channel, not yet proven live.** LinkedIn steps send
+  through Unipile (`app/integrations/linkedin_channel.py`,
+  `docs/features/linkedin-channel.md`) on the Growth plan and above
+  (`app/core/plans.py` `channels`), behind per-account daily ceilings. The
+  Unipile client is still marked `# TODO: verify` against the live service
+  (`app/integrations/unipile_linkedin.py`). *(Corrected 2026-10-11: this line
+  used to say LinkedIn "is not implemented"; help-center-discoveries D5.)*
 - **Data ownership is still one account per workspace.** Workspaces
   (`docs/features/workspaces.md`) let members act on the owner's records with
   roles, and leads can now be **assigned** to members (see below), but leads,
