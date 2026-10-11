@@ -267,8 +267,20 @@ whose state is shared across every worker via Redis**, and one structured JSON
 log line per call carrying provider, endpoint, status, latency, cost units,
 cache hit and attempt number.
 
+**F01 — Waterfall Enrichment (flag `waterfall_enrichment_enabled`, default
+off).** With the flag on, the find stage walks an ordered provider chain
+(`waterfall_provider_order`, Apollo → Hunter; providers without credentials
+are skipped) and every candidate goes through the independent verifier: the
+first address Hunter confirms wins and nothing after it is called. A bad
+Apollo address now falls through to Hunter's finder instead of dropping the
+person; a suppressed candidate drops the person outright. Every attempt —
+including 30-day cache hits at cost 0 — is a row in `enrichment_attempts`
+(domain only, never the address). Apollo's own "verified" label is recorded,
+never trusted. Spec: `docs/features/f01-waterfall-enrichment.md`.
+
 *Files:* `app/workers/lead_tasks.py`, `app/integrations/apollo.py`,
-`app/integrations/hunter.py`, `app/integrations/plumbing.py`
+`app/integrations/hunter.py`, `app/integrations/plumbing.py`,
+`app/services/waterfall_enrichment.py`
 
 ---
 
@@ -318,6 +330,13 @@ Every single send runs this gauntlet, in this order:
 2. **Campaign state.** A paused campaign sends nothing.
 3. **Enrollment state.** `STOPPED` cancels the message outright. `PAUSED` defers.
 4. **Suppression, re-checked now.** Not at scheduling time. Now.
+   Then, **F01 Bounce Shield** (flag `bounce_shield_enabled`, default off; a
+   safety guard): an email goes only to an address verified valid within
+   `bounce_shield_max_age_days`, a catch-all one under an explicit `allow`
+   policy, or one an owner/manager overrode for that lead with an audited
+   reason. Anything else is held as `FAILED` (`bounce_shield: …`), audited,
+   and released back through every gate on override or re-verification. No
+   bounce threshold changes (`app/services/bounce_shield.py`).
 5. **WhatsApp rules** (defence in depth — the adapter checks again):
    no opt-in → the message is *skipped* and the sequence continues on its other
    channels; a free-form message whose 24-hour customer-service window closed

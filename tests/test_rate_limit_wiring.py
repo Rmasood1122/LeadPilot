@@ -38,6 +38,8 @@ from app.main import app
 RATE_LIMITED_ROUTES = {
     ("/products/{product_id}/strategies", "POST"): "RATE_LIMIT_STRATEGIES",
     ("/strategies/{strategy_id}/leads/source", "POST"): "RATE_LIMIT_LEADS_SOURCE",
+    # F01: re-verifying an address can spend a paid Hunter verification.
+    ("/leads/{lead_id}/email-verdict/refresh", "POST"): "RATE_LIMIT_AI_ACTION",
 }
 
 

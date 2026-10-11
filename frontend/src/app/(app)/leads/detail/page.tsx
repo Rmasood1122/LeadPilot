@@ -45,6 +45,7 @@ import { WhyThisProspectPanel } from "@/components/leads/WhyThisProspectPanel";
 import { ReengagementMemoryPanel } from "@/components/leads/ReengagementMemoryPanel";
 import { ConsentPanel } from "@/components/leads/ConsentPanel";
 import { ProvenancePanel } from "@/components/leads/ProvenancePanel";
+import { EmailVerdictPanel } from "@/components/leads/EmailVerdictPanel";
 
 const TABS = [
   { value: "overview", label: "Overview" },
@@ -226,6 +227,8 @@ function LeadOverview({ lead }: { lead: LeadOut }) {
       <ReengagementMemoryPanel leadId={lead.id} />
       {/* Part 1 Feature 9: which channels are open, and why the others are not. */}
       <ConsentPanel leadId={lead.id} />
+      {/* F01: is the address verified, and will the next email actually send. */}
+      <EmailVerdictPanel leadId={lead.id} />
       {/* Part 1 Feature 10: where each enriched field came from, and how old. */}
       <ProvenancePanel leadId={lead.id} />
       <Card>

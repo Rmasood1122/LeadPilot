@@ -171,6 +171,11 @@ class BaseHttpAdapter:
         self.cache = ResponseCache(self.provider, self.redis)
         self.breaker = CircuitBreaker(self.provider, self.redis)
         self._sleep = sleep  # injectable so tests never actually sleep
+        # F01: what the most recent successful call() cost -- {"cached": bool,
+        # "cost_units": int} -- so a caller that keeps a cost ledger (the
+        # email waterfall) can tell a paid call from a cache hit. None until
+        # a call succeeds; never read by the adapter itself.
+        self.last_call: dict | None = None
 
     # -- override in subclasses ------------------------------------------
     def _auth(self) -> dict:
@@ -197,6 +202,7 @@ class BaseHttpAdapter:
             if cached is not None:
                 self._log(endpoint, method, status=200, latency_ms=0,
                           cost_units=0, cached=True, attempt=0)
+                self.last_call = {"cached": True, "cost_units": 0}
                 return cached
 
         auth = self._auth()
@@ -251,6 +257,7 @@ class BaseHttpAdapter:
             data = {} if resp.status_code == 204 else resp.json()
             if cache_ttl:
                 self.cache.set(endpoint, cache_payload, data, cache_ttl)
+            self.last_call = {"cached": False, "cost_units": cost_units}
             return data
 
         # Retries exhausted

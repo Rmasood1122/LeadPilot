@@ -90,6 +90,7 @@ from app.api.strategies_advanced import router as strategies_advanced_router
 from app.api.strategies_advanced import plans_router
 from app.api.account_data import router as account_data_router
 from app.api.guardrails import router as guardrails_router  # F05 Guardrails Studio
+from app.api.bounce_shield import router as bounce_shield_router
 
 # M9: registers the SQLAlchemy session listeners that publish CRM events
 # to Redis. Imported for its SIDE EFFECT -- install() is a no-op marker so
@@ -313,6 +314,7 @@ app.include_router(compliance_rules_router)      # Feature 8: /admin/compliance-
 app.include_router(account_data_router)          # GDPR: POST /me/data-export
 # F05. /guardrails is a new prefix; nothing else is mounted under it.
 app.include_router(guardrails_router)            # F05: exclusion lists + claims library
+app.include_router(bounce_shield_router)         # F01: /leads/{id}/email-verdict|override, /bounce-shield/metrics
 
 
 # ---------------------------------------------------------------------------

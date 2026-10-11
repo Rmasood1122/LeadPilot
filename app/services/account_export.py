@@ -63,6 +63,7 @@ OWNERSHIP: dict[str, list[str]] = {
     "deals": ["user_id"],
     "deliverability_checks": ["user_id"],
     "device_tokens": ["user_id"],
+    "enrichment_attempts": ["user_id"],            # F01 cost ledger (no PII)
     "external_crm_connections": ["user_id"],
     "external_crm_links": ["user_id"],
     "gmail_accounts": ["user_id"],

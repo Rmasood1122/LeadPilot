@@ -232,6 +232,25 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                            "(customers, open deals, churned, do-not-contact) "
                            "at sourcing and at send time, and its approved-"
                            "claims / forbidden-phrases library."),
+    # F01 -- waterfall enrichment + bounce shield. Both OFF by default; see
+    # docs/features/f01-waterfall-enrichment.md. Turn the waterfall on FIRST:
+    # the shield blocks every lead that has no waterfall verdict on record.
+    "waterfall_enrichment_enabled": (False, "Find each lead's email through the "
+                                     "provider chain (Apollo, then Hunter), "
+                                     "stop at the first address the verifier "
+                                     "confirms, and log every paid attempt."),
+    "waterfall_provider_order": ("apollo,hunter", "Order of the email-finder "
+                                 "chain. Providers without credentials are "
+                                 "skipped."),
+    "bounce_shield_enabled": (False, "Block an email send unless the address "
+                              "was verified valid (or a manager overrode it "
+                              "for that lead). Leads with no waterfall "
+                              "verdict are blocked until re-verified."),
+    "bounce_shield_catch_all_policy": ("block", "Catch-all (accept-all) "
+                                       "domains: 'block' or 'allow'. Any other "
+                                       "value counts as 'block'."),
+    "bounce_shield_max_age_days": (90, "A verification older than this many "
+                                   "days no longer counts as verified."),
 }
 
 
