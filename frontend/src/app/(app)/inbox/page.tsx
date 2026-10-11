@@ -34,6 +34,7 @@ import {
   type InboxThread,
 } from "@/lib/inbox";
 import { ConversationThread } from "@/components/leads/ConversationThread";
+import { ReplyCopilotPanel } from "@/components/inbox/ReplyCopilotPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -201,6 +202,10 @@ function ThreadDetail({ leadId, filter }: { leadId: string; filter: InboxFilter 
           </Card>
         )}
       </AsyncState>
+
+      {/* F04: drafted answers to approve / edit / discard (renders nothing
+          while reply_copilot_enabled is off). */}
+      <ReplyCopilotPanel leadId={leadId} />
 
       {/* The same timeline the lead page shows — one implementation, so the
           two views can never disagree about a prospect's history. */}

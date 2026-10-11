@@ -82,6 +82,8 @@ OWNERSHIP: dict[str, list[str]] = {
     "products": ["user_id"],
     "quickstart_drafts": ["user_id"],              # F06
     "quickstart_runs": ["user_id"],                # F06
+    "reply_copilot_settings": ["user_id"],         # F04
+    "reply_drafts": ["user_id"],                   # F04
     "roleplay_sessions": ["user_id"],
     "security_audit_events": ["user_id"],          # no FK by design
     "share_links": ["user_id"],

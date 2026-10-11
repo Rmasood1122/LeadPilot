@@ -77,6 +77,7 @@ from app.api.consent import router as consent_router                  # Part 1 F
 from app.api.client_workspaces import router as clients_router        # Part 1 Feature 11
 from app.api.practice import router as practice_router                # Part 2
 from app.api.quickstart import router as quickstart_router            # F06
+from app.api.reply_copilot import router as reply_copilot_router      # F04
 
 # M7
 from app.api.devices import router as devices_router
@@ -323,6 +324,7 @@ app.include_router(guardrails_router)            # F05: exclusion lists + claims
 app.include_router(bounce_shield_router)         # F01: /leads/{id}/email-verdict|override, /bounce-shield/metrics
 app.include_router(signals_router)               # F02: /leads/{id}/signals, /signals/report
 app.include_router(quickstart_router)            # F06: /quickstart* (flag: quickstart_enabled)
+app.include_router(reply_copilot_router)         # F04: /reply-copilot* (flag: reply_copilot_enabled)
 
 
 # ---------------------------------------------------------------------------

@@ -288,6 +288,18 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "quickstart_budget_usd": (1.0, "Most a single Quickstart run may spend on "
                               "model calls (ICP extraction + drafts). The "
                               "plan's daily AI cap applies on top."),
+    # F04 -- Reply Copilot (docs/features/f04-reply-copilot.md). Off by
+    # default: it adds one model call per eligible reply. Drafts are queued for
+    # a person; an approved email goes through the ordinary send chokepoint.
+    "reply_copilot_enabled": (False, "Draft a grounded, claim-verified answer to "
+                              "every interested / question / objection reply "
+                              "(email and LinkedIn) and queue it in the inbox "
+                              "for approve / edit / discard. Never drafts for "
+                              "opt-outs, suppressed or excluded contacts."),
+    "reply_copilot_auto_send_allowed": (False, "Allow accounts to opt in to "
+                                        "auto-sending Reply Copilot answers to "
+                                        "'send me a time' EMAIL replies. Off = "
+                                        "every draft waits for a person."),
     # F08 -- meetings-per-dollar ledger (docs/features/f08-meetings-per-dollar.md).
     # Read-only reporting; off until an admin turns it on.
     "meetings_ledger_enabled": (False, "Show the meetings-per-dollar ledger "

@@ -56,6 +56,13 @@ BUDGETED_PURPOSES = ("pipeline", "verification")
 feat/f06-quickstart
 # F06 adds "quickstart": a Quickstart run (ICP extraction + review-only
 # drafts) stops cleanly between drafts, so it is capped like the others.
+feat/f04-reply-copilot
+#
+# F04 adds "reply_copilot": a reply draft stops cleanly (no draft; a person
+# answers by hand), so it is capped like the others.
+ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstart",
+                           "reply_copilot")
+
 ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstar
 # P0-5b. Every model call now runs inside a scope (request handlers, webhooks
 # and Celery tasks open one), so the purposes below name every kind of work.
@@ -81,6 +88,7 @@ COUNTED_ONLY_PURPOSES = (
     "outreach", "meeting_prep", "call_analysis", "reply_handling", "launch",
     "support_chat",
 )
+master
 master
 
 # A prompt's size in tokens is not known before the call. English averages

@@ -5087,3 +5087,107 @@ class QuickstartDraft(TimestampMixin, Base):
     claims_changed: Mapped[int] = mapped_column(
         Integer, default=0, server_default=text("0"), nullable=False
     )
+
+
+# --------------------------------------------------------------------------
+# F04 Reply Copilot (migration 0077_reply_copilot)
+# --------------------------------------------------------------------------
+
+
+class ReplyDraft(TimestampMixin, Base):
+    """F04 -- one grounded, claim-verified answer to one inbound reply,
+    queued for a person to approve, edit, discard (email) or copy (LinkedIn).
+
+    A draft is NOT a send. Approving an email draft creates an ordinary
+    `messages` row (origin "reply_copilot") that goes through the send
+    chokepoint like every other message; see app/services/reply_copilot.py
+    and docs/features/f04-reply-copilot.md.
+
+    `user_id` is the owning account (lead -> strategy -> product -> user),
+    denormalised so every read filters on it directly. `reply_id` is UNIQUE:
+    a redelivered reply can never create a second draft or overwrite one a
+    person is editing. GDPR erasure deletes a lead's drafts explicitly (the
+    lead row is tombstoned, so the FK cascade never fires)."""
+
+    __tablename__ = "reply_drafts"
+    __table_args__ = (
+        UniqueConstraint("reply_id", name="uq_reply_drafts_reply_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    reply_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("inbound_replies.id", ondelete="CASCADE")
+    )
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    channel: Mapped[str] = mapped_column(String(20))           # email | linkedin
+    intent: Mapped[str] = mapped_column(String(20))            # positive | objection | question
+    meeting_time_request: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    # pending | approved | copied | discarded | superseded
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default=text("'pending'"),
+        nullable=False, index=True
+    )
+    draft_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    draft_body: Mapped[str] = mapped_column(Text)
+    final_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    final_body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The "share of drafts sent unedited" metric: final != draft, whitespace-
+    # normalised. Decided at approval, never recomputed.
+    edited: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    # Every claim-verification decision at generation that was NOT verified
+    # ({claim, verdict, category, replacement}) -- shown as "removed".
+    claim_flags_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # What the draft was grounded in: playbook steps, approved-claim ids,
+    # booking URL, number of forbidden phrases given to the model.
+    grounding_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
+    )
+    send_result: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    auto_sent: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    reply_received_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class ReplyCopilotSettings(TimestampMixin, Base):
+    """F04 -- one row per account: the per-account auto-send opt-in.
+
+    No row = the defaults (auto-send OFF). Auto-send additionally needs the
+    deployment switch `reply_copilot_auto_send_allowed` (system settings)."""
+
+    __tablename__ = "reply_copilot_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_reply_copilot_settings_user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE")
+    )
+    auto_send_meeting_time: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )

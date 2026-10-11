@@ -167,10 +167,27 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         )
     ).scalar_one_or_none()
 
+    # ---- F04 Reply Copilot: an approved answer to an inbound reply --------
+    # SAFETY GUARD. Such a row passes the stopped-enrollment gate below ONLY
+    # when the stop was the reply it answers (reply_copilot.answers_the_stop);
+    # every other gate in this function applies to it unchanged. Its own
+    # extra checks (flag still on, draft still there, no later decline or
+    # opt-out) cancel it here. Ordinary messages never enter this branch.
+    from app.services import reply_copilot  # noqa: PLC0415
+
+    is_reply_copilot = message.origin == reply_copilot.ORIGIN
+    if is_reply_copilot:
+        held = reply_copilot.send_time_hold(session, message, lead)
+        if held is not None:
+            return held
+        if outcome_source is None:
+            outcome_source = reply_copilot.OUTCOME_SOURCE
+
     # ---- hard gates (checked at SEND time, always) -------------------------
     if strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
         return "campaign_paused"
-    if enrollment is None or enrollment.status is EnrollmentStatus.STOPPED:
+    if enrollment is None or (enrollment.status is EnrollmentStatus.STOPPED
+                              and not reply_copilot.answers_the_stop(session, message, enrollment)):
         message.status = MessageStatus.CANCELLED
         message.error = "enrollment stopped"
         session.commit()
@@ -464,8 +481,13 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             outbound = _render_whatsapp_outbound(session, strategy, lead,
                                                  message, now)
         else:
-            outbound = _render_email_outbound(session, strategy, lead,
-                                              sequence, message, now=now)
+            if is_reply_copilot:
+                # F04: the approved words, never a re-render -- with the same
+                # claim check and compliant footer + headers as every email.
+                outbound = _render_reply_copilot_outbound(session, strategy, lead, message)
+            else:
+                outbound = _render_email_outbound(session, strategy, lead,
+                                                  sequence, message, now=now)
             # F03: an email without both RFC 8058 one-click unsubscribe
             # headers never transmits (ComplianceError -> FAILED below).
             if autopilot:
@@ -618,7 +640,10 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     _audit(session, strategy, lead, message, "sent")
     session.commit()
 
-    engine.schedule_next_step(session, message, now=now)
+    # F04: an answer to a reply is not a sequence step -- the stopped
+    # sequence is neither advanced nor completed by it.
+    if not is_reply_copilot:
+        engine.schedule_next_step(session, message, now=now)
     return "sent"
 
 
@@ -709,6 +734,35 @@ def _render_email_outbound(session: Session, strategy: Strategy, lead: Lead,
         headers=headers,
         thread_ref=_thread_ref_for_followup(session, message),
         metadata=metadata,
+    )
+
+
+def _render_reply_copilot_outbound(session: Session, strategy: Strategy, lead: Lead,
+                                   message: Message) -> OutboundMessage:
+    """F04: the words a person approved (reply_copilot.approved_copy -- from
+    the draft, so a retry never footers twice), re-checked by the claim engine
+    and wrapped by build_compliant_email (unsubscribe footer, region notice,
+    List-Unsubscribe + List-Unsubscribe-Post), in the prospect's reply
+    thread. No model call, no open/click tracking."""
+    from app.services import claim_verification, reply_copilot  # noqa: PLC0415
+
+    subject, body, thread_ref = reply_copilot.approved_copy(session, message)
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead,
+                                         message=message, channel="email",
+                                         fields={"subject": subject, "body": body})
+    subject, body = checked["subject"], checked["body"]
+    subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
+    message.subject = subject
+    message.body = body
+    message.unsubscribe_token = token
+    return OutboundMessage(
+        message_id=str(message.id),
+        lead_id=str(lead.id),
+        to_address=lead.email,
+        subject=subject,
+        body=body,
+        headers=headers,
+        thread_ref=thread_ref,
     )
 
 
@@ -1395,7 +1449,16 @@ def send_message(self, message_id: str) -> str:
         sequence = session.get(Sequence, message.sequence_id) if message else None
         strategy = session.get(Strategy, sequence.strategy_id) if sequence else None
         with usage_meter.owner_scope(session, strategy, "outreach"):
-            return send_message_impl(session, uuid.UUID(message_id))
+            result = send_message_impl(session, uuid.UUID(message_id))
+        # F04: a Reply Copilot answer sent (or held / cancelled) by the beat
+        # dispatcher -- e.g. after a send-review approval or a deferral --
+        # records its result and keeps the reply's inbox marker true. A no-op
+        # for every other message.
+        if message is not None and message.origin == "reply_copilot":
+            from app.services import reply_copilot  # noqa: PLC0415
+
+            reply_copilot.after_send_attempt(session, uuid.UUID(message_id), result)
+        return result
     except Exception as exc:
         session.rollback()
         logger.exception("send failed for message %s — retrying", message_id)
