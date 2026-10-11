@@ -10,6 +10,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import refuse_if_daily_limit_reached
 from app.core.plans import PlanLimitExceeded, check_plan_limit, plan_limit_response
 from app.core.rate_limiting import AUTH_WINDOW_SECONDS, enforce_rate_limit
 from app.api.schemas import (
@@ -108,23 +109,7 @@ def _refuse_if_daily_ai_limit_reached(db: Session, user: User) -> None:
     queueing a run that would stop at its first call. Uses the caller's own
     account id only.
     """
-    cap, plan_name = usage_meter.account_daily_cap(db, user.id)
-    if cap is None:
-        return
-    spent = usage_meter.account_spent_today_micros(db, user.id)
-    if spent >= cap:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": "daily_ai_limit_reached",
-                "plan": plan_name,
-                "limit_usd": round(cap / 1_000_000, 2),
-                "spent_today_usd": round(spent / 1_000_000, 2),
-                "message": (f"Your {plan_name} plan's daily AI limit "
-                            f"(${cap / 1_000_000:.2f}) is used up. It resets at "
-                            "00:00 UTC."),
-            },
-        )
+    refuse_if_daily_limit_reached(db, user.id)
 
 
 # Rate limited: the most expensive operation in the system (a 72/144-step

@@ -148,6 +148,56 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: npm run build
 
+  verify-status-page:
+    # status.calendarharvest.com (Phase 3; docs/program/STATUS_PAGE.md).
+    # Incident-only PRs land here too: incident-lint runs first so a bad
+    # front matter fails in about a minute. No env vars are set on purpose:
+    # the build must pass without UPTIMEROBOT_API_KEY or LEADPILOT_API_URL.
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: status-page
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+      - name: Scope
+        id: scope
+        working-directory: .
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if git diff --name-only "$base" HEAD | grep -qE '^status-page/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No status-page changes: skipped (success)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: steps.scope.outputs.run == 'true'
+        with:
+          # 22.18+ runs the TypeScript tests and scripts natively (type stripping).
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: status-page/package-lock.json
+      - name: npm ci
+        if: steps.scope.outputs.run == 'true'
+        run: npm ci --no-audit --no-fund
+      - name: Incident lint
+        if: steps.scope.outputs.run == 'true'
+        run: npm run incident-lint
+      - name: Type-check
+        if: steps.scope.outputs.run == 'true'
+        run: npm run type-check
+      - name: Unit tests (data layer, incidents, feeds, contrast)
+        if: steps.scope.outputs.run == 'true'
+        run: npm test
+      - name: Production build (no env vars)
+        if: steps.scope.outputs.run == 'true'
+        run: npm run build
+
   verify-image:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest

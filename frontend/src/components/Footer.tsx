@@ -7,6 +7,8 @@
 
 import Link from "next/link";
 
+import { SHOW_STATUS_LINK, statusPageLink } from "@/lib/statusPage";
+
 const COLUMNS = [
   {
     heading: "Company",
@@ -25,7 +27,9 @@ const COLUMNS = [
   },
 ];
 
-export function Footer() {
+export function Footer({ showStatusLink = SHOW_STATUS_LINK }: { showStatusLink?: boolean } = {}) {
+  // External link to status.calendarharvest.com, hidden until DNS is live.
+  const status = statusPageLink(showStatusLink);
   return (
     <footer className="border-t border-white/10 px-6 py-12">
       <div className="mx-auto max-w-6xl">
@@ -41,6 +45,13 @@ export function Footer() {
                     </Link>
                   </li>
                 ))}
+                {col.heading === "Company" && status && (
+                  <li>
+                    <a href={status.href} className="hover:text-white" data-testid="footer-status-link">
+                      {status.label}
+                    </a>
+                  </li>
+                )}
               </ul>
             </nav>
           ))}

@@ -53,13 +53,43 @@ BUDGETED_PURPOSES = ("pipeline", "verification")
 # (one Flow-2 strategy ~ $8.29) and they stop cleanly: the strategy becomes
 # BUDGET_EXHAUSTED (resumable) and lead scoring falls back to no score.
 #
+feat/f06-quickstart
 # F06 adds "quickstart": a Quickstart run (ICP extraction + review-only
 # drafts) stops cleanly between drafts, so it is capped like the others.
+feat/f04-reply-copilot
 #
 # F04 adds "reply_copilot": a reply draft stops cleanly (no draft; a person
 # answers by hand), so it is capped like the others.
 ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstart",
                            "reply_copilot")
+
+ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstar
+# P0-5b. Every model call now runs inside a scope (request handlers, webhooks
+# and Celery tasks open one), so the purposes below name every kind of work.
+# Capped: work a user starts on demand, or a sweep that can simply try again
+# tomorrow. Counted only: sends, meeting briefs, call analysis, inbound-reply
+# handling (it drives STOP / bounce / unsubscribe logic and must never be
+# starved), sequence launch (enrolment is already committed when its scoring
+# runs) and the in-app help chat (support must stay reachable).
+ACCOUNT_CAPPED_PURPOSES = (
+    "pipeline", "verification", "lead_scoring",
+    "icp",              # ICP / tactic extraction for lead sourcing
+    "intake",           # past-client pattern extraction
+    "review",           # on-demand adversarial sequence review
+    "drafting",         # templates, network drafts, loom scripts, follow-up emails, style
+    "practice",         # roleplay
+    "mutation",         # strategy mutation (on demand and nightly idle sweep)
+    "website",          # website-builder pages
+    "meeting_summary",  # meeting summaries
+    "voice_profile",    # product voice profile
+    "displacement",     # competitor-displacement DMs (12-hourly sweep)
+)
+COUNTED_ONLY_PURPOSES = (
+    "outreach", "meeting_prep", "call_analysis", "reply_handling", "launch",
+    "support_chat",
+)
+master
+master
 
 # A prompt's size in tokens is not known before the call. English averages
 # about 4 characters per token, so dividing by 3 OVER-estimates the input and
@@ -110,8 +140,16 @@ class _Scope:
     account_budget_micros: int | None = None
     account_prior_micros: int = 0   # the account's spend so far today, at scope open
     account_plan: str = ""
+feat/f07-spend-guard
     # F07 -- the account's own monthly cap (app/services/spend_guard.py); None unless armed.
     monthly_guard: object | None = None
+
+    # Set when check_budget refused a call on the ACCOUNT cap inside this
+    # scope. Many services catch every exception around a model call and
+    # degrade (heuristic score, fallback text); request handlers read this to
+    # answer 429 instead of a silently degraded 200.
+    account_refused: bool = False
+master
 
 
 _current: ContextVar[_Scope | None] = ContextVar("usage_scope", default=None)
@@ -300,6 +338,7 @@ def check_budget(*, input_chars: int, max_output_tokens: int,
         spent_today = active.account_prior_micros + active.spent_micros
         if spent_today + reserve > active.account_budget_micros:
             plan = active.account_plan or "current"
+            active.account_refused = True
             raise AccountBudgetExceededError(
                 f"daily AI limit for the {plan} plan reached "
                 f"(${active.account_budget_micros / 1_000_000:.2f} per day; "
@@ -353,7 +392,13 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
         yield _current.get()
         return
     active = _Scope(strategy_id=_uuid(strategy_id), user_id=_uuid(user_id), purpose=purpose)
-    if budget_micros is not None:
+    # A strategy's budget is what it costs to RUN its pipeline. It used to be
+    # armed for every purpose owner_scope() opened -- outreach, meeting prep,
+    # lead scoring -- whose prior spend was measured over pipeline and
+    # verification only, so a strategy that finished near its budget had every
+    # send render refused (and retried to failure). Pipeline and verification
+    # only, as BUDGETED_PURPOSES always said.
+    if budget_micros is not None and purpose in BUDGETED_PURPOSES:
         active.budget_micros = int(budget_micros)
         active.prices = _price_table(session)
         active.prior_micros = (int(prior_micros) if prior_micros is not None
@@ -395,6 +440,27 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
                     pass
         if active.monthly_guard is not None:  # F07: a refused call fires the 100% alert
             spend_guard.after_scope(session, active, failed)
+
+
+def user_scope(session: Session, user_id, purpose: str):
+    """scope() for work that belongs to an account but to no strategy run.
+
+    No strategy budget is armed (that is for pipeline runs); the account's
+    daily cap is, when `purpose` is in ACCOUNT_CAPPED_PURPOSES.
+    """
+    return scope(session, user_id=user_id, purpose=purpose)
+
+
+def active_scope() -> _Scope | None:
+    """The scope model calls are being attributed to right now, if any."""
+    return _current.get()
+
+
+def warn_if_unscoped(provider: str) -> None:
+    """Log a model call that no scope will record (P0-5b regression guard)."""
+    if _current.get() is None:
+        logger.warning("usage_meter: %s model call outside any usage scope -- not "
+                       "counted toward any account's daily AI limit", provider)
 
 
 def record_meeting_usage(session: Session, outcome, *, now=None):

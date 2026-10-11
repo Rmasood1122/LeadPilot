@@ -1,0 +1,67 @@
+# Curated synonym groups for help-center retrieval (app/services/help_center.py).
+#
+# HOW THEY ARE USED
+# Query-side only. When a question contains ANY term of a group (single word
+# or multi-word phrase), every other term of that group is added to the query
+# at half weight. Documents are never rewritten, so a chunk that uses the
+# user's own word still outranks one that only uses a synonym.
+#
+# Terms are normalised exactly like the index (lowercase, punctuation dropped,
+# simple plural stripping), so list the singular form once.
+#
+# WHAT BELONGS HERE
+# Words users type that the articles phrase differently. Not spelling
+# corrections for one golden question, and not anything that would make an
+# off-topic question look on-topic: tests/help_center measures both directions
+# (recall@6 on answerable questions and mock-mode precision on must-refuse
+# ones), so a careless group shows up as a failing test, not as quieter harm.
+groups:
+  - [price, cost, pricing, fee, how much, paid]
+  - [plan, tier, subscription]
+  - [billing, payment, invoice, charge, card, checkout, stripe]
+  - [gmail, google mail, google account, google workspace, inbox, email account, mailbox]
+  - [cancel, unsubscribe from plan, end subscription, downgrade]
+  - [stop, pause, halt, freeze, kill switch]
+  - [delete, erase, remove, wipe, erasure]
+  - [linkedin, li, linked in]
+  - [whatsapp, wa, whats app]
+  - [meeting, call, appointment, demo]
+  - [book, schedule]
+  - [calendar, availability, booking page, calendly]
+  - [lead, prospect, contact]
+  - [lead list, csv, spreadsheet, upload]
+  - [sequence, campaign, cadence, drip, follow up, followup]
+  - [reply, response, answer back, respond]
+  - [bounce, bounced, undeliverable, hard bounce]
+  - [deliverability, spam, junk, inbox placement, spf, dkim, dmarc]
+  - [limit, cap, quota, maximum, allowance]
+  - [sign up, signup, register, create account, registration]
+  - [sign in, signin, log in, login]
+  - [password, credential]
+  - [two factor, 2fa, mfa]
+  - [api key, token, personal api key]
+  - [verify, verification, confirm, confirmation]
+  - [strategy, research, pipeline]
+  - [stuck, hung, frozen, not moving, slow]
+  - [error, fail, failed, failure, broken, not working]
+  - [team, teammate, colleague, member, invite, workspace]
+  - [agency, client workspace, white label, reseller, resell]
+  - [privacy, gdpr, personal data, data protection, retention]
+  - [export, download, copy of my data]
+  - [unsubscribe, opt out, optout]
+  - [opt in, optin, consent]
+  - [android, mobile app, android app, play store, app store]
+  - [notification, alert, push]
+  - [crm, hubspot, salesforce]
+  - [webhook, zapier, make.com, integration]
+  - [support, help, ticket, human, contact support]
+  - [status page, outage, down, uptime]
+  - [ab test, a b test, split test, variant, experiment]
+  - [analytics, report, dashboard, metric, stat]
+  - [roi, return on investment, revenue]
+  - [personalization, personalisation, personalized, personalised, custom message]
+  - [glossary, definition, meaning, mean]
+  - [time zone, timezone]
+  - [transcript, recording, record]
+  - [approve, approval, review queue, send review]
+  - [ten, 10]

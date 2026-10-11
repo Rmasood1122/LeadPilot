@@ -650,6 +650,13 @@ def fake_claude(monkeypatch):
         "app.verification.loop.get_client",
     ):
         monkeypatch.setattr(target, lambda: fake)
+    # And every other module that binds get_client by import (found from its
+    # source, the same rule no_real_anthropic uses), so a module missing from
+    # the list above -- website_builder was -- gets the fake too, never a
+    # refusal or a stale fake from another test.
+    for module in list(sys.modules.values()):
+        if _binds_anthropic_get_client(module):
+            monkeypatch.setattr(module, "get_client", lambda: fake)
     return fake
 
 
@@ -713,7 +720,7 @@ def queued_jobs(monkeypatch):
     jobs["site_generate"] = []
     jobs["site_export"] = []
 
-    def _site_generate(page_id):
+    def _site_generate(page_id, user_id=None):
         jobs["site_generate"].append(str(page_id))
         return True
 
@@ -782,11 +789,41 @@ def no_real_anthropic(monkeypatch):
     # this fixture ran (at collection, say): they kept the REAL function, and
     # which ones did depended on test order. In a full run
     # test_terminal_failure.py sent a real request to api.anthropic.com
-    # through icp_extraction this way. Patch every such binding too.
+    # through icp_extraction this way. Patch every such binding too -- found
+    # by what the module's SOURCE imports, not by what it holds now: a module
+    # first imported while a test had fake_claude installed holds that test's
+    # stale fake forever, and other modules define an unrelated get_client of
+    # their own (Unipile, Mailreach) that must not be touched.
     for module in list(sys.modules.values()):
-        if (getattr(module, "__name__", "").startswith("app.")
-                and getattr(module, "get_client", None) is _REAL_GET_CLIENT):
+        if _binds_anthropic_get_client(module):
             monkeypatch.setattr(module, "get_client", _refuse)
+
+
+_ANTHROPIC_IMPORT = re.compile(
+    r"from\s+app\.services\.anthropic_client\s+import\s+"
+    r"(\([^)]*\bget_client\b[^)]*\)|[^\n]*\bget_client\b)")
+_BINDS_CACHE: dict[str, bool] = {}
+
+
+def _binds_anthropic_get_client(module) -> bool:
+    """True for an app module whose top level does
+    `from app.services.anthropic_client import ... get_client ...`."""
+    name = getattr(module, "__name__", "") or ""
+    if not name.startswith("app.") or name == "app.services.anthropic_client":
+        return False
+    if name not in _BINDS_CACHE:
+        path = getattr(module, "__file__", None)
+        try:
+            source = open(path, encoding="utf-8").read() if path else ""
+        except OSError:
+            source = ""
+        # Top-level imports only: an import inside a function body reads the
+        # module attribute at call time, which the setattr above covers.
+        top_level = "\n".join(line for line in source.splitlines()
+                              if not line.startswith((" ", "\t")) or line.startswith(")"))
+        _BINDS_CACHE[name] = bool(_ANTHROPIC_IMPORT.search(top_level)) and hasattr(
+            module, "get_client")
+    return _BINDS_CACHE[name]
 
 
 @pytest.fixture(autouse=True)

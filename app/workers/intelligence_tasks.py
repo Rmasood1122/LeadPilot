@@ -44,7 +44,11 @@ def rescore_strategy_impl(session, strategy_id: uuid.UUID) -> int:
         select(Lead).where(Lead.strategy_id == strategy_id,
                            Lead.status.in_(lead_scoring.SCORABLE))
     ).scalars().all()
-    return lead_scoring.score_leads(session, strategy, list(leads))
+    from app.services import usage_meter  # noqa: PLC0415
+
+    # P0-5b: metered to the strategy's owner, on its daily AI limit.
+    with usage_meter.owner_scope(session, strategy, "lead_scoring"):
+        return lead_scoring.score_leads(session, strategy, list(leads))
 
 
 @celery_app.task(name="app.workers.intelligence_tasks.rescore_strategy",
