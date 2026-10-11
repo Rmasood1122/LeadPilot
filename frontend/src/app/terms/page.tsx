@@ -10,7 +10,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | Clanderharvest",
+  title: "Terms of Service | Calendarharvest",
   description: "The terms that govern your use of LeadPilot Enterprise.",
   robots: "index, follow",
 };
@@ -30,7 +30,7 @@ export default function TermsPage() {
           <Section title="1. Acceptance of terms">
             <p>
               These Terms of Service (&quot;Terms&quot;) form a binding agreement between you and
-              Clanderharvest, which operates LeadPilot Enterprise (&quot;LeadPilot&quot;, &quot;we&quot;,
+              Calendarharvest, which operates LeadPilot Enterprise (&quot;LeadPilot&quot;, &quot;we&quot;,
               &quot;us&quot;, or &quot;our&quot;). By signing an engagement with us, creating an account, or
               otherwise using LeadPilot, you agree to these Terms. If you are accepting on behalf of a
               business, you confirm that you have authority to bind that business, and &quot;you&quot;
@@ -42,7 +42,8 @@ export default function TermsPage() {
             <p>
               LeadPilot Enterprise is a done-with-you outbound pipeline system. We research prospects
               who match your ideal client profile, write personalised outreach, and manage LinkedIn direct
-              message and email sequences on your behalf using human senders. The specific scope, volumes,
+              message and email sequences on your behalf. These sequences are sent automatically by our
+              software through the LinkedIn and email accounts you connect. The specific scope, volumes,
               and deliverables for your account are set out in your client engagement, which forms part of
               these Terms. Where the engagement and these Terms conflict, the engagement prevails for that
               point only.
@@ -78,8 +79,9 @@ export default function TermsPage() {
           <Section title="5. Our responsibilities">
             <p>
               We will deliver the research and outreach sequences agreed in your engagement with reasonable
-              skill and care. We maintain LinkedIn compliance by using human senders rather than automation
-              bots, and we operate within activity limits designed to protect your account. We will keep
+              skill and care. LinkedIn connection requests and messages are sent automatically through the
+              LinkedIn accounts you connect, and we operate within per-account daily activity limits designed
+              to reduce the risk of restrictions on your account. We will keep
               your business information and client data confidential and use it only to deliver the service.
               We will provide regular campaign performance reporting so you can see what is being sent and
               how prospects are responding.
@@ -110,7 +112,7 @@ export default function TermsPage() {
           <Section title="8. Intellectual property">
             <p>
               You own your prospect lists, your business data, and the materials you provide to us. You
-              grant us a limited licence to use them solely to deliver the service to you. Clanderharvest
+              grant us a limited licence to use them solely to deliver the service to you. Calendarharvest
               retains all rights in the LeadPilot system, its research methodology, its software, and all
               underlying technology, including improvements made while delivering your engagement. Nothing
               in these Terms transfers ownership of that technology to you.

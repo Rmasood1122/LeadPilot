@@ -57,7 +57,7 @@ export function Footer({ showStatusLink = SHOW_STATUS_LINK }: { showStatusLink?:
           ))}
         </div>
         <p className="mt-10 border-t border-white/10 pt-6 text-sm text-gray-400">
-          &copy; 2026 Clanderharvest. All rights reserved.
+          &copy; 2026 Calendarharvest. All rights reserved.
         </p>
       </div>
     </footer>

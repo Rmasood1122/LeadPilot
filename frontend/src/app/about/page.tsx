@@ -11,7 +11,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "About LeadPilot Enterprise | Clanderharvest",
+  title: "About LeadPilot Enterprise | Calendarharvest",
   description:
     "LeadPilot Enterprise was built by a founder who used it to find his own clients. Here is the story.",
 };
@@ -19,11 +19,11 @@ export const metadata: Metadata = {
 const STEPS = [
   {
     title: "Research",
-    body: "A 72-step research pipeline runs on every prospect before a single message is written. We analyse the real profile, and every pain signal is sourced from actual posts and activity. No invented data.",
+    body: "A 72-step research pipeline runs for each campaign before a single message is written, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability and prospects are scored for fit, and right before an email is written LeadPilot can pull the prospect's recent LinkedIn posts so the opening references something real. The AI is instructed never to invent a detail.",
   },
   {
     title: "Outreach",
-    body: "Human senders run personalised sequences across LinkedIn DM and email. LinkedIn compliance is maintained throughout: no bots, no automation tricks, no banned accounts.",
+    body: "Personalised sequences across email and LinkedIn send automatically from the accounts you connect, within permitted sending hours and daily per-account limits. By default, high-risk messages, such as those to senior executives or to prospects who last replied with an objection, are held for your approval before they send.",
   },
   {
     title: "Learning",
