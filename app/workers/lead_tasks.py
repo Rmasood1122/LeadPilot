@@ -227,7 +227,10 @@ def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
         if remaining is not None and remaining <= 0:
             skipped_plan_limit += 1
             continue
-        if is_suppressed(session, raw.email, raw.phone):
+        # All three identifiers, like every send path: after a GDPR erasure
+        # the person's LinkedIn profile is suppressed too, and a LinkedIn-only
+        # row of the same person must not be sourced again.
+        if is_suppressed(session, raw.email, raw.phone, linkedin=_linkedin_url(raw.raw)):
             skipped_suppressed += 1
             continue
         if guard_owner is not None and guardrails.find_match(
@@ -309,7 +312,8 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
             linkedin=lead.linkedin_url or _linkedin_url(enriched.enrichment),
             company=lead.company or enriched.company,
             domains=[enriched.company_domain, stored.get("company_domain")])
-        if is_suppressed(session, new_email, new_phone):
+        if is_suppressed(session, new_email, new_phone,
+                         linkedin=lead.linkedin_url or _linkedin_url(enriched.enrichment)):
             lead.status = LeadStatus.DROPPED
             lead.enrichment_json = {**stored, "dropped_reason": "suppressed"}
         elif excluded is not None:

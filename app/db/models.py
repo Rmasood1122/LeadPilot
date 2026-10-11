@@ -2946,7 +2946,9 @@ class MeetingOutcome(TimestampMixin, Base):
     followup_subject: Mapped[str | None] = mapped_column(String(500), nullable=True)
     followup_body: Mapped[str | None] = mapped_column(Text, nullable=True)
     # pending | draft_saved | sent | not_connected | reauth_required |
-    # suppressed | no_address | generation_failed | failed
+    # suppressed | blocked | no_address | generation_failed | failed
+    # (`blocked`: an F05 exclusion / F10 departure / earlier opt-out stopped it;
+    # the reason is in draft_error -- app/services/recipient_guards.py)
     draft_status: Mapped[str] = mapped_column(
         String(30), default="pending", server_default="pending", nullable=False
     )

@@ -2,7 +2,7 @@
 id: crm-and-integrations
 title: CRM and integrations
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/integrations/hubspot.py
@@ -79,12 +79,12 @@ Public channels work straight away. For a private channel, invite the bot to it 
 
 On the **Webhooks (Zapier, Make)** card, click **Add webhook**, enter an **HTTPS URL**, choose the **Events**, and click **Add**. The signing secret is shown once: "Copy it now — it will not be shown again."
 
-Available events include meeting booked, reply received, lead sourced and campaign paused, plus interested reply, deal won, call completed, strategy changed and objection spike. Every delivery carries an `X-LeadPilot-Signature` header so your system can confirm it came from LeadPilot.
+Available events include meeting booked, reply received, lead sourced and campaign paused, plus interested reply, deal won, call completed, strategy changed and objection spike, and these alerts: domain blacklisted, email health warning, mailbox paused, message held for review, re-engagement due and reply draft approved. Every delivery carries an `X-LeadPilot-Signature` header so your system can confirm it came from LeadPilot.
 
 Delivery rules:
 
 - Any 2xx response counts as delivered.
-- A failed delivery is tried 5 times in total: once, then again after 30 seconds, 2 minutes, 10 minutes and 30 minutes.
+- A failed delivery is tried 6 times in total: once, then again after 30 seconds, 2 minutes, 10 minutes, 30 minutes and 2 hours.
 - A **410 Gone** response turns the webhook off (the Zapier convention for a turned-off Zap).
 - The URL must be public HTTPS. Private or internal addresses are refused, and redirects are not followed.
 

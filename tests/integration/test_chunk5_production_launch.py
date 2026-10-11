@@ -273,7 +273,7 @@ class TestWebhookDelivery:
         calls = self._answer(monkeypatch, 500)
         delivery = create_delivery(db_session, target, "meeting_booked", {}, enqueue=False)
 
-        has_more = deliver(db_session, delivery.id)   # attempt 1 of 5
+        has_more = deliver(db_session, delivery.id)   # attempt 1 of 6
 
         assert has_more == "retry"
         assert len(calls) == 1
@@ -290,10 +290,10 @@ class TestWebhookDelivery:
 
         calls = self._answer(monkeypatch, 500)
         delivery = create_delivery(db_session, target, "meeting_booked", {}, enqueue=False)
-        delivery.attempts = len(RETRY_DELAYS_SECONDS) - 1   # four failures so far
+        delivery.attempts = len(RETRY_DELAYS_SECONDS)   # five failures so far
         db_session.commit()
 
-        has_more = deliver(db_session, delivery.id)   # attempt 5 of 5
+        has_more = deliver(db_session, delivery.id)   # attempt 6 of 6 (1 + 5 retries)
 
         assert has_more == "exhausted"
         assert len(calls) == 1

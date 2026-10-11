@@ -2,9 +2,10 @@
 id: meetings-prep-room-transcripts
 title: Meetings, prep briefs, the meeting room and transcripts
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
+  - app/services/recipient_guards.py
   - app/workers/calendar_tasks.py
   - app/api/meetings.py
   - app/db/models.py
@@ -94,7 +95,7 @@ LeadPilot does **not** collect recording consent. The bot records everyone on th
 
 On the lead's page, use **Log meeting outcome**. Pick an outcome, add notes, and for a closed-won outcome optionally a deal value. LeadPilot records the outcome first: it updates the lead's status, adds a CRM activity and note, records the result for reporting, creates a won deal for closed-won, and stops every live sequence for that lead.
 
-It then writes a follow-up email and saves it as a **Gmail draft**. It is never sent automatically. You edit it and send it yourself, from LeadPilot or from Gmail. The suppression list is checked both when drafting and when sending. Saving drafts needs Gmail's compose permission; if you connected Gmail before this feature existed, reconnect it. Until then the draft text is kept so you can copy it.
+It then writes a follow-up email and saves it as a **Gmail draft**. It is never sent automatically. You edit it and send it yourself, from LeadPilot or from Gmail. Both when drafting and when sending from LeadPilot, the same contact checks as every outreach message apply: the lead must not have been removed, and the suppression list (email, phone and LinkedIn profile), your exclusion lists when Guardrails is on, a recorded job change (the person has left the company), and an opt-out on the person's earlier record are all checked. Customer and open-deal exclusion entries, which the meeting itself creates, do not block the follow-up, but every other entry for the person does, including a do-not-contact entry on their company, domain or address. A blocked follow-up shows the reason and cannot be sent. Once the cause is gone (for example you removed the exclusion), click **Check again**; if the checks pass, the draft is saved to Gmail. If the checks cannot run, nothing is sent and you can try again. Saving drafts needs Gmail's compose permission; if you connected Gmail before this feature existed, reconnect it. Until then the draft text is kept so you can copy it.
 
 ## Related
 - [Booking meetings and your calendar](14-booking-and-calendar.md)

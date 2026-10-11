@@ -67,6 +67,9 @@ export interface ReengagementPlan {
   interval_days: number | null;
   status: PlanStatus;
   message_id: string | null;
+  /** The return message is scheduled but has not gone out: it can still be
+   *  cancelled. */
+  touch_pending: boolean;
   outcome: string | null;
   cancelled_reason: string | null;
   created_at: string | null;

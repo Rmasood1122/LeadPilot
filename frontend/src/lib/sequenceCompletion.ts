@@ -4,7 +4,7 @@
 export type StopCategory =
   | "replied" | "unsubscribed" | "bounced" | "meeting_booked" | "suppressed"
   | "opted_out" | "crm_closed" | "call_outcome" | "system_kill"
-  | "all_steps_skipped" | "other";
+  | "all_steps_skipped" | "lead_removed" | "no_address" | "other";
 
 export interface CompletionReason {
   category: StopCategory;

@@ -2,7 +2,7 @@
 id: whatsapp-outreach
 title: WhatsApp outreach
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/integrations/whatsapp.py
@@ -69,6 +69,8 @@ The launch form on the strategy page creates email sequences only. WhatsApp step
 
 - **Template step:** names any template that has not been rejected (a draft, a submitted one or an approved one) and says how each variable is filled. It only sends once the template is approved. A variable can be filled from the lead's record (full name, first name, title, company or email), or from a short brief that the AI fills from the lead's data, without inventing facts. If a variable cannot be filled, the message is not sent with an empty slot.
 - **Free-form text step:** only sends inside an open 24-hour window, and can never be the first step of a sequence.
+
+A sequence whose first step is on WhatsApp enrolls verified leads that have a phone number, including leads with no email address. If a later step is on a channel the lead has no address for (for example a WhatsApp step for a lead with no phone number), that message is cancelled and the sequence stops with the reason "no address for the step's channel".
 
 ## Do contacts need to opt in?
 

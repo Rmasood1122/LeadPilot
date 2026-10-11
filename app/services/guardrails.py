@@ -289,9 +289,23 @@ def find_match(session: Session, user_id, *, email: str | None = None,
                phone: str | None = None, linkedin: str | None = None,
                company: str | None = None, domains=()) -> Match | None:
     """The active exclusion of THIS account covering these identifiers, if
-    any. Does not look at the flag -- see send_block / active_owner."""
+    any. Does not look at the flag -- see send_block / active_owner.
+
+    ONE row (the first by kind, then age). Right for every caller that blocks
+    on ANY exclusion. A caller that exempts some reasons must look at all of
+    them -- find_matches -- or one exempt row hides a do_not_contact row."""
+    matches = find_matches(session, user_id, email=email, phone=phone, linkedin=linkedin,
+                           company=company, domains=domains, limit=1)
+    return matches[0] if matches else None
+
+
+def find_matches(session: Session, user_id, *, email: str | None = None,
+                 phone: str | None = None, linkedin: str | None = None,
+                 company: str | None = None, domains=(), limit: int | None = None) -> list[Match]:
+    """EVERY active exclusion of this account covering these identifiers,
+    first by kind then age (the order find_match has always used)."""
     if user_id is None:
-        return None
+        return []
     email_domain = email.rsplit("@", 1)[1] if email and "@" in email else None
     domain_keys = _domain_candidates(email_domain, *domains)
     contact_keys = {k for k in (_email_key(email), _phone_key(phone), _linkedin_key(linkedin))
@@ -308,31 +322,43 @@ def find_match(session: Session, user_id, *, email: str | None = None,
         clauses.append(and_(GuardrailExclusion.kind == COMPANY,
                             GuardrailExclusion.value == company_key))
     if not clauses:
-        return None
-    row = session.execute(
-        select(GuardrailExclusion)
-        .where(GuardrailExclusion.user_id == user_id,
-               GuardrailExclusion.removed_at.is_(None),
-               or_(*clauses))
-        .order_by(GuardrailExclusion.kind, GuardrailExclusion.created_at)
-        .limit(1)
-    ).scalars().first()
-    if row is None:
-        return None
-    return Match(id=row.id, kind=row.kind, display_value=row.display_value,
-                 reason=row.reason, source=row.source)
+        return []
+    query = (select(GuardrailExclusion)
+             .where(GuardrailExclusion.user_id == user_id,
+                    GuardrailExclusion.removed_at.is_(None),
+                    or_(*clauses))
+             .order_by(GuardrailExclusion.kind, GuardrailExclusion.created_at))
+    if limit is not None:
+        query = query.limit(limit)
+    return [Match(id=row.id, kind=row.kind, display_value=row.display_value,
+                  reason=row.reason, source=row.source)
+            for row in session.execute(query).scalars()]
 
 
-def exclusion_for_lead(session: Session, lead: Lead, *, user_id=None) -> Match | None:
-    """The exclusion covering this lead, for its owning account."""
+def _lead_identifiers(lead: Lead) -> dict:
+    enrichment = lead.enrichment_json or {}
+    return {"email": lead.email, "phone": lead.phone, "linkedin": lead.linkedin_url,
+            "company": lead.company, "domains": [enrichment.get("company_domain")]}
+
+
+def _resolve_owner(session: Session, lead: Lead, user_id):
     if user_id is None:
         from app.services import notifications  # noqa: PLC0415
 
         user_id = notifications.owner_of_lead(session, lead)
-    enrichment = lead.enrichment_json or {}
-    return find_match(session, user_id, email=lead.email, phone=lead.phone,
-                      linkedin=lead.linkedin_url, company=lead.company,
-                      domains=[enrichment.get("company_domain")])
+    return user_id
+
+
+def exclusion_for_lead(session: Session, lead: Lead, *, user_id=None) -> Match | None:
+    """The exclusion covering this lead, for its owning account."""
+    return find_match(session, _resolve_owner(session, lead, user_id),
+                      **_lead_identifiers(lead))
+
+
+def exclusions_for_lead(session: Session, lead: Lead, *, user_id=None) -> list[Match]:
+    """EVERY exclusion covering this lead, for its owning account."""
+    return find_matches(session, _resolve_owner(session, lead, user_id),
+                        **_lead_identifiers(lead))
 
 
 def active_owner(session: Session, strategy_id) -> uuid.UUID | None:
@@ -354,6 +380,19 @@ def send_block(session: Session, lead: Lead, strategy: Strategy | None) -> Match
 
     owner = notifications.owner_of_strategy(session, strategy)
     return exclusion_for_lead(session, lead, user_id=owner) if owner else None
+
+
+def send_blocks(session: Session, lead: Lead, strategy: Strategy | None) -> list[Match]:
+    """send_block, but EVERY matching exclusion (empty = not excluded, or the
+    feature is off). For a caller that exempts some reasons
+    (recipient_guards.person_block): it must see a do_not_contact row even
+    when an exempt row sorts first. RAISES on a database error."""
+    if not enabled(session):
+        return []
+    from app.services import notifications  # noqa: PLC0415
+
+    owner = notifications.owner_of_strategy(session, strategy)
+    return exclusions_for_lead(session, lead, user_id=owner) if owner else []
 
 
 # --------------------------------------------------------------------------
@@ -386,8 +425,26 @@ def upsert_exclusion(session: Session, user_id, kind: str, value: str | None, *,
     RETURNS (row, status) with status
       added        a new row
       reactivated  a removed row brought back (active_since moves to now)
-      exists       already active -- left as it is (first writer's reason
-                   and source stand), only last_seen_at is refreshed
+      updated      already active, and this write OUTRANKS it (below): the
+                   reason and source are replaced
+      exists       already active -- left as it is, only last_seen_at is
+                   refreshed
+
+    PRECEDENCE on an active row (first match wins):
+      1. do_not_contact is sticky: a row whose reason is do_not_contact is
+         never downgraded by any later write. (To lift it, a person removes
+         the exclusion.)
+      2. A write whose reason is do_not_contact upgrades the row, whatever
+         wrote it first -- "never contact this person" outranks "they are a
+         customer / have an open deal".
+      3. A MANUAL write replaces a row last written by an import (CSV or a
+         CRM sync): a person's explicit decision beats a sync. An import
+         never overrides a manual row.
+      4. Otherwise the first writer's reason and source stand (a CRM sync
+         re-asserting a row does not flip it back and forth).
+    The send-time F05 block is unaffected (any active exclusion blocks); the
+    precedence matters to callers that exempt some reasons
+    (recipient_guards.person_block) and to what the settings page shows.
     """
     now = now or _now()
     kind = (kind or "").strip().lower()
@@ -419,8 +476,29 @@ def upsert_exclusion(session: Session, user_id, kind: str, value: str | None, *,
         row.external_ref = (external_ref or None) and str(external_ref)[:100]
         session.flush()
         return row, "reactivated"
+    if _outranks(reason, source, row):
+        row.reason, row.source = reason, source
+        if note:
+            row.note = note.strip()[:300] or row.note
+        if external_ref:
+            row.external_ref = str(external_ref)[:100]
+        session.flush()
+        return row, "updated"
     session.flush()
     return row, "exists"
+
+
+DO_NOT_CONTACT = "do_not_contact"
+
+
+def _outranks(reason: str, source: str, row: GuardrailExclusion) -> bool:
+    """Does a write of (reason, source) replace this ACTIVE row's reason and
+    source? See upsert_exclusion's PRECEDENCE."""
+    if row.reason == DO_NOT_CONTACT:
+        return False
+    if reason == DO_NOT_CONTACT:
+        return True
+    return source == "manual" and row.source != "manual"
 
 
 def add_exclusion(session: Session, user_id, kind: str, value: str, *, reason: str = "other",
@@ -565,12 +643,12 @@ def import_csv(session: Session, user_id, text: str, *, default_reason: str = "o
             except GuardrailValueError as exc:
                 errors.append({"row": line_no, "error": str(exc)})
                 continue
-            tally[status] += 1
+            tally[status] = tally.get(status, 0) + 1
     result = {**tally, "rows": min(rows_read, MAX_CSV_ROWS), "error_count": len(errors),
               "errors": errors[:MAX_REPORTED_ERRORS]}
     _audit(session, AUDIT_IMPORTED, actor_user_id=actor_user_id, owner_user_id=user_id,
-           details={k: result[k] for k in ("added", "reactivated", "exists", "rows",
-                                           "error_count")})
+           details={k: result[k] for k in ("added", "reactivated", "updated", "exists",
+                                           "rows", "error_count") if k in result})
     session.commit()
     return result
 
@@ -716,7 +794,9 @@ def _apply(session: Session, user_id, entries: list[_Entry], source: str,
         _, status = upsert_exclusion(session, user_id, entry.kind, entry.value,
                                      reason=entry.reason, source=source,
                                      external_ref=entry.external_ref, now=now)
-        tally[status] += 1
+        # "updated" only appears when it happened (the result shape is
+        # otherwise unchanged for existing API consumers).
+        tally[status] = tally.get(status, 0) + 1
     return tally
 
 

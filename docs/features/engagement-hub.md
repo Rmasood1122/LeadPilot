@@ -114,7 +114,18 @@ production does not have and vice versa.
 
 The endpoint still checks `slot_is_offered` first, but that check is for
 turning "you booked a time I never offered" into a 409 — it is not the race
-guard.
+guard for the same page.
+
+**Across a host's pages** (send-path-gaps fix, 2026-10-11) the UNIQUE cannot
+help: a 30-minute intro at 10:30 and a 60-minute deep dive at 10:00 have
+different pages and different starts. Each booking write now takes a row lock
+on the host's `users` row (`calendar_service.lock_host_calendar`, `SELECT ...
+FOR NO KEY UPDATE` -- serialises booking writes for one host without
+blocking foreign-key inserts that reference the user) and only then runs the overlap check, so concurrent bookings for
+one host are serialised and the second sees the first. Reactivating a
+cancelled booking runs the same lock + `host_conflict` check. Residual window:
+hand-made meetings do not take the lock. An exclusion constraint would close
+it but is PostgreSQL-only. See the section comment in calendar_service.py.
 
 ### Slots are computed, never stored
 

@@ -2,9 +2,10 @@
 id: sequences-and-follow-ups
 title: Sequences and follow-ups
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
+  - app/services/send_holds.py
   - app/api/sequences.py
   - app/api/sequence_reviews.py
   - app/services/sequence_engine.py
@@ -79,7 +80,7 @@ The **pre-launch review** scans the sequence for spam and pressure phrases, comp
 
 If you are an SDR in a workspace that requires approval, your first launch is sent to a manager instead: "Sent to a manager for approval. Nothing is sent until they approve."
 
-On launch, LeadPilot enrolls the strategy's `verified` leads that have an email address (or, for a sequence whose first step is on LinkedIn, a LinkedIn profile). It skips anyone suppressed or already enrolled, and schedules step 1. If your sending domain has deliverability problems, the launch still goes ahead but shows a warning.
+On launch, LeadPilot enrolls the strategy's `verified` leads that have the address the first step needs: an email address for an email first step, a LinkedIn profile for a LinkedIn first step, and a phone number for a WhatsApp (or AI call) first step. It skips anyone suppressed or already enrolled, and schedules step 1. Only `verified` leads can be enrolled. If your sending domain has deliverability problems, the launch still goes ahead but shows a warning.
 
 ## When does each step go out?
 
@@ -101,6 +102,8 @@ Every send also passes the daily cap, the suppression check and, where triggered
 | A meeting is booked on LeadPilot's own calendar | Sequences pause. If the meeting is cancelled they resume; otherwise they resume a day after the meeting ends unless something else stopped them. |
 | A meeting is booked through Calendly | Sequences stop. (The Calendly integration has not yet been verified against the live service.) |
 | The lead is suppressed by the time a message is due | That message is cancelled and the sequence stops. |
+| You remove the lead (**Remove**, which marks it `dropped`) | The sequence stops straight away; a removed lead is never sent to. |
+| A step's channel has no address for the lead (for example a WhatsApp step and no phone number) | That message is cancelled and the sequence stops, with the reason "no address for the step's channel" (not counted as a compliance stop). |
 | An automated reply (ticket receipts, no-reply bots) | Nothing changes; it is stored but not treated as a reply. |
 
 LeadPilot also keeps a live estimate of each lead's chance of booking. After a lead has had 4 unanswered sends (the default), a lead judged to have gone cold may have its sequence paused ("cooling") or stopped ("archived").
@@ -111,7 +114,7 @@ A stopped sequence can never send to that lead again.
 
 Automatic follow-ups are separate from step delays. They catch a lead whose sequence is still active but has nothing queued, for example because a send failed permanently, a WhatsApp step needed a template, or a step was deleted.
 
-Every 30 minutes, LeadPilot looks for active sequences where the last message has had no reply for longer than that step's follow-up delay (72 hours by default; you can set 1 to 2,160 hours). If the sequence has a next step, that step is sent. If it does not, LeadPilot writes a follow-up from the lead's own message history and your product description, on the same channel as the last message, and sends it through the normal checks. It does not write automatic follow-ups for WhatsApp, because a WhatsApp first contact needs an approved template.
+Every 30 minutes, LeadPilot looks for active sequences where the last message has had no reply for longer than that step's follow-up delay (72 hours by default; you can set 1 to 2,160 hours). A sequence with a message still queued, waiting in the send-review queue, or held by a safety check is left alone. If the sequence has a next step, that step is sent. A step a reviewer rejected is never sent again; the follow-up moves on to the step after it. If it does not, LeadPilot writes a follow-up from the lead's own message history and your product description, on the same channel as the last message, and sends it through the normal checks. It does not write automatic follow-ups for WhatsApp, because a WhatsApp first contact needs an approved template.
 
 No follow-up goes to a lead who has replied, or from a paused campaign. To change the setting, go to **Campaigns**, choose the strategy, open the **Sequences** tab, and use **Auto follow-up** and **after N hours of silence** under each step.
 

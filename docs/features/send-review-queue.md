@@ -75,7 +75,11 @@ rejected message is never sent; the next person to read the queue needs to know
 why, and so does the campaign post-mortem.
 
 The **message** is cancelled; the **enrollment keeps running**. Rejecting one
-badly-timed email should not end the relationship.
+badly-timed email should not end the relationship. For a sequence step the
+sequence advances to its next step exactly as a skipped step does (not counted
+as sent), or completes when it was the last step; the follow-up sweep never
+re-creates a rejected step, and a message waiting in the queue counts as the
+step's pending message (send-path-gaps fix, 2026-10-11).
 
 ## Failure behaviour
 

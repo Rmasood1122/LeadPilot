@@ -55,18 +55,21 @@ CRM_CLOSED = "crm_closed"
 CALL_OUTCOME = "call_outcome"
 SYSTEM_KILL = "system_kill"
 ALL_STEPS_SKIPPED = "all_steps_skipped"
+LEAD_REMOVED = "lead_removed"
+NO_ADDRESS = "no_address"
 OTHER = "other"
 
 CATEGORIES = (REPLIED, UNSUBSCRIBED, BOUNCED, MEETING_BOOKED, SUPPRESSED,
               OPTED_OUT, CRM_CLOSED, CALL_OUTCOME, SYSTEM_KILL,
-              ALL_STEPS_SKIPPED, OTHER)
+              ALL_STEPS_SKIPPED, LEAD_REMOVED, NO_ADDRESS, OTHER)
 
 #: Early stops a person would recognise as a decision. Everything outside this
 #: set is reported as an unauthorised drop, however sensible it looked at the
 #: time -- including the automated kill signal, which is a product decision
 #: worth seeing the volume of.
 AUTHORISED = frozenset({REPLIED, UNSUBSCRIBED, BOUNCED, MEETING_BOOKED,
-                        SUPPRESSED, OPTED_OUT, CRM_CLOSED, CALL_OUTCOME})
+                        SUPPRESSED, OPTED_OUT, CRM_CLOSED, CALL_OUTCOME,
+                        LEAD_REMOVED})
 
 #: Human-readable labels for the breakdown, so the UI never renders a slug.
 LABELS = {
@@ -80,6 +83,8 @@ LABELS = {
     CALL_OUTCOME: "Ended on a call outcome",
     SYSTEM_KILL: "Stopped by an automated kill signal",
     ALL_STEPS_SKIPPED: "Every step was skipped",
+    LEAD_REMOVED: "Lead removed by you",
+    NO_ADDRESS: "No address for the step's channel",
     OTHER: "Unrecognised reason",
 }
 
@@ -99,6 +104,8 @@ _PREFIXES: tuple[tuple[str, str], ...] = (
     ("call_", CALL_OUTCOME),
     ("kill_signal", SYSTEM_KILL),
     ("completed_all_skipped", ALL_STEPS_SKIPPED),
+    ("lead_removed", LEAD_REMOVED),
+    ("no_address", NO_ADDRESS),
 )
 
 

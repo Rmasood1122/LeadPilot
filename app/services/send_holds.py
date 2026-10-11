@@ -10,7 +10,10 @@ the message is kept, visible and releasable:
 A held message is still the message for its step. Everything that asks "is a
 step already pending for this enrollment?" (the follow-up sweep in
 app/workers/outreach_tasks.py) must count it, or it creates a second copy of
-the step while the first is held, and every copy sends on release. And a
+the step while the first is held, and every copy sends on release. The same
+is true of a message parked in the human review queue (status
+AWAITING_REVIEW, app/services/send_review.py): approving it returns it to
+SCHEDULED, so a sweep copy made while it waited would send the step twice. And a
 release must put back AT MOST ONE message per (sequence, lead, step) -- this
 module does both, for every guard, so neither can drift from the other.
 """
@@ -43,11 +46,15 @@ def held_clause(prefixes: tuple[str, ...] = HOLD_PREFIXES):
                 or_(*[Message.error.like(f"{p}%") for p in prefixes]))
 
 
+#: A message that is the step and will still go out (or is going out now).
+PENDING_STATUSES = (MessageStatus.SCHEDULED, MessageStatus.SENDING,
+                    MessageStatus.AWAITING_REVIEW)
+
+
 def pending_clause():
-    """SQL: this message is pending for its step -- scheduled, being sent, or
-    held by a guard."""
-    return or_(Message.status.in_([MessageStatus.SCHEDULED, MessageStatus.SENDING]),
-               held_clause())
+    """SQL: this message is pending for its step -- scheduled, being sent,
+    waiting in the review queue, or held by a guard."""
+    return or_(Message.status.in_(PENDING_STATUSES), held_clause())
 
 
 def release(db: Session, lead_id, prefix: str, now: datetime | None = None) -> int:

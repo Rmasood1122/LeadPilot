@@ -183,17 +183,47 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if outcome_source is None:
             outcome_source = reply_copilot.OUTCOME_SOURCE
 
+    # ---- Part 1 Feature 7: a "not now" re-engagement touch ----------------
+    # Like a Reply Copilot answer it continues the conversation whose reply
+    # stopped the sequence: it passes the stopped-enrollment gate below ONLY
+    # when reengagement_memory.answers_the_stop ties the stop to that reply.
+    # Its own checks (switch off, plan cancelled, prospect no longer
+    # appropriate, a newer reply) cancel it here; every other gate applies.
+    from app.services import reengagement_memory  # noqa: PLC0415
+
+    is_notnow_touch = message.origin == reengagement_memory.ORIGIN
+    if is_notnow_touch:
+        held = reengagement_memory.send_time_hold(session, message, lead, now=now)
+        if held is not None:
+            return held
+
     # ---- hard gates (checked at SEND time, always) -------------------------
     if strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
         return "campaign_paused"
     if enrollment is None or (enrollment.status is EnrollmentStatus.STOPPED
-                              and not reply_copilot.answers_the_stop(session, message, enrollment)):
+                              and not reply_copilot.answers_the_stop(session, message, enrollment)
+                              and not reengagement_memory.answers_the_stop(
+                                  session, message, enrollment)):
         message.status = MessageStatus.CANCELLED
         message.error = "enrollment stopped"
         session.commit()
         return "cancelled_stopped"
     if enrollment.status is EnrollmentStatus.PAUSED:
         return "enrollment_paused"
+    # ---- a lead the account REMOVED is never sent to -----------------------
+    # "Remove" sets the lead to DROPPED (app/api/ui_support.py patch_lead,
+    # which also stops its enrollments); a GDPR erasure and the sourcing
+    # chain's suppression drop set it too. Checked here, at send time, so a
+    # message scheduled before the removal -- or a status set by any other
+    # path -- can never go out.
+    if lead.status is LeadStatus.DROPPED:
+        message.status = MessageStatus.CANCELLED
+        message.error = "lead removed (status dropped)"
+        _audit(session, strategy, lead, message, "blocked_lead_removed")
+        session.commit()
+        if enrollment.status is not EnrollmentStatus.STOPPED:
+            engine.stop_enrollment(session, enrollment, reason=engine.STOP_LEAD_REMOVED)
+        return "cancelled_lead_removed"
     is_whatsapp = message.channel is ChannelType.WHATSAPP
     # Feature Group 5: the LinkedIn channel addresses the lead's profile.
     is_linkedin = message.channel is ChannelType.LINKEDIN
@@ -209,8 +239,11 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                "blocked_suppressed" if target else "blocked_no_address")
         session.commit()
         if enrollment.status is not EnrollmentStatus.STOPPED:
-            engine.stop_enrollment(session, enrollment, reason="suppressed")
-        return "cancelled_suppressed"
+            # The honest reason: a lead with no address for this channel was
+            # NOT suppressed, and must not be counted as a compliance stop.
+            engine.stop_enrollment(session, enrollment,
+                                   reason="suppressed" if target else engine.STOP_NO_ADDRESS)
+        return "cancelled_suppressed" if target else "cancelled_no_address"
 
     # ---- F05 Guardrails Studio: the account's exclusion lists -------------
     # SAFETY GUARD. Customers, open deals, churned accounts and do-not-contact
@@ -324,9 +357,18 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     # A lead that has gone cold is not sent to: the gate pauses (cooling) or
     # stops (archived) its sequence and the send ends here. Probability alone
     # only judges after conversion_min_unanswered_sends unanswered sends.
+    # Not for a "not now" re-engagement touch (Part 1 Feature 7): the gate's
+    # kill signal for that lead IS the "not now" reply the plan answers (its
+    # routing class is typically not_interested, a hard kill here), so the
+    # gate would archive every such touch on the day it is due. A reply AFTER
+    # that one already cancelled the touch (reengagement_memory.send_time_hold),
+    # bounces / unsubscribes are enforced by suppression above and by
+    # still_appropriate (statuses, lead.kill_signal), and an admin switched
+    # the auto-send on deliberately.
     from app.services import conversion_probability  # noqa: PLC0415
 
-    held = conversion_probability.send_gate(session, lead, enrollment, now=now)
+    held = (None if is_notnow_touch
+            else conversion_probability.send_gate(session, lead, enrollment, now=now))
     if held is not None:
         return held
 
@@ -564,8 +606,13 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 return "held_for_review"
             if decision["action"] == "cancel":
                 message.status = MessageStatus.CANCELLED
-                message.error = f"rejected in review: {decision['reason']}"
+                message.error = f"{send_review.REJECTED_ERROR_PREFIX}{decision['reason']}"
                 session.commit()
+                # Same rule as send_review.reject(): a rejected sequence step
+                # advances the sequence (not counted as sent), so it is never
+                # left stalled for the follow-up sweep to re-create.
+                if message.origin is None:
+                    send_review.advance_after_reject(session, message, now)
                 return "rejected_in_review"
             # A reviewer may have EDITED the copy. Their words are what sends,
             # and they are persisted so the sent row matches what went out.
@@ -692,8 +739,9 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     session.commit()
 
     # F04: an answer to a reply is not a sequence step -- the stopped
-    # sequence is neither advanced nor completed by it.
-    if not is_reply_copilot:
+    # sequence is neither advanced nor completed by it. Nor is a "not now"
+    # re-engagement touch (Part 1 Feature 7).
+    if not (is_reply_copilot or is_notnow_touch):
         engine.schedule_next_step(session, message, now=now)
     return "sent"
 
@@ -1661,6 +1709,39 @@ def _has_pending_message(session: Session, enrollment: SequenceEnrollment) -> bo
     ).scalars().first() is not None
 
 
+def _rejected_steps(session: Session, enrollment: SequenceEnrollment) -> set[int]:
+    """Step numbers of this enrollment that a reviewer REJECTED in the send
+    review queue (CANCELLED + send_review.REJECTED_ERROR_PREFIX). A rejected
+    step is decided: the sweep must never create it again."""
+    from app.services.send_review import REJECTED_ERROR_PREFIX  # noqa: PLC0415
+
+    return set(session.execute(
+        select(Message.step_no).where(
+            Message.sequence_id == enrollment.sequence_id,
+            Message.lead_id == enrollment.lead_id,
+            Message.status == MessageStatus.CANCELLED,
+            Message.error.like(f"{REJECTED_ERROR_PREFIX}%"),
+        )
+    ).scalars())
+
+
+def _next_followup_step(session: Session, enrollment: SequenceEnrollment,
+                        last: Message) -> int | None:
+    """The step the follow-up should send: last sent + 1, moved past every
+    step a reviewer rejected. None when that walks past the sequence's last
+    step -- no generated auto-DM stands in for a step a human just rejected.
+    (send_review.reject now advances the sequence itself; this is the guard
+    for enrollments rejected before that, and for a paused enrollment that was
+    not advanced.)"""
+    rejected = _rejected_steps(session, enrollment)
+    step_no = last.step_no + 1
+    if step_no not in rejected:
+        return step_no
+    while step_no in rejected:
+        step_no += 1
+    return step_no if _step_for(session, enrollment.sequence_id, step_no) is not None else None
+
+
 def _replied_since(session: Session, lead_id, since: datetime | None) -> bool:
     """Has this lead replied since the last message went out?
 
@@ -1734,7 +1815,9 @@ def check_followup_due_impl(session: Session, now: datetime | None = None,
         if strategy is None or strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
             continue
 
-        next_step_no = last.step_no + 1
+        next_step_no = _next_followup_step(session, enrollment, last)
+        if next_step_no is None:
+            continue
         enqueue(str(enrollment.id), next_step_no)
         due.append((str(enrollment.id), next_step_no))
 
@@ -1764,6 +1847,10 @@ def send_followup_impl(session: Session, enrollment_id: uuid.UUID, step_no: int,
     if _has_pending_message(session, enrollment):
         # The engine scheduled something between the sweep and now.
         return "skipped_already_pending"
+    if step_no in _rejected_steps(session, enrollment):
+        # A reviewer rejected this step in the send-review queue: decided,
+        # never re-created.
+        return "skipped_rejected_in_review"
 
     if not _acquire_followup_lock(enrollment_id, step_no):
         return "locked"

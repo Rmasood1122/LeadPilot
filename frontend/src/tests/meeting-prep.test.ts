@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   OUTCOME_OPTIONS,
+  canRecheck,
   draftStatusInfo,
   isBriefInFlight,
   meetingWhen,
@@ -13,7 +14,7 @@ describe("draftStatusInfo", () => {
   it("only a saved draft can be sent", () => {
     const sendable = (
       ["pending", "draft_saved", "sent", "not_connected", "reauth_required",
-       "suppressed", "no_address", "generation_failed", "failed"] as const
+       "suppressed", "blocked", "no_address", "generation_failed", "failed"] as const
     ).filter((s) => draftStatusInfo(s).canSend);
     expect(sendable).toEqual(["draft_saved"]);
   });
@@ -23,6 +24,22 @@ describe("draftStatusInfo", () => {
     expect(info.canSend).toBe(false);
     expect(info.canEdit).toBe(false);
     expect(info.tone).toBe("destructive");
+  });
+
+  it("a contact blocked by another guard can be neither edited nor sent, and says why", () => {
+    const info = draftStatusInfo("blocked", "this person has left Acme; this address is closed");
+    expect(info.canSend).toBe(false);
+    expect(info.canEdit).toBe(false);
+    expect(info.tone).toBe("destructive");
+    expect(info.message).toContain("has left Acme");
+  });
+
+  it("only a blocked or suppressed follow-up offers Check again", () => {
+    const recheckable = (
+      ["pending", "draft_saved", "sent", "not_connected", "reauth_required",
+       "suppressed", "blocked", "no_address", "generation_failed", "failed"] as const
+    ).filter((s) => canRecheck(s));
+    expect(recheckable).toEqual(["suppressed", "blocked"]);
   });
 
   it("surfaces the Gmail error text", () => {

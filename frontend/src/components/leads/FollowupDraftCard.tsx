@@ -13,11 +13,12 @@ import { Copy, ExternalLink, RefreshCw, Send } from "lucide-react";
 
 import {
   editFollowupDraft,
+  recheckFollowup,
   regenerateFollowupDraft,
   sendFollowup,
   type MeetingOutcome,
 } from "@/lib/api/meetingPrep";
-import { draftStatusInfo } from "@/lib/meeting-prep";
+import { canRecheck, draftStatusInfo } from "@/lib/meeting-prep";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
@@ -59,6 +60,11 @@ export function FollowupDraftCard({
   const regenerate = useMutation({
     mutationFn: () => regenerateFollowupDraft(outcome.id),
     onSuccess: (u) => done(u, "Follow-up rewritten"),
+    onError: fail,
+  });
+  const recheck = useMutation({
+    mutationFn: () => recheckFollowup(outcome.id),
+    onSuccess: (u) => done(u, canRecheck(u.draft_status) ? "Still blocked" : "Checks passed"),
     onError: fail,
   });
   const send = useMutation({
@@ -122,7 +128,14 @@ export function FollowupDraftCard({
               {save.isPending ? "Saving…" : "Save changes"}
             </Button>
           )}
-          {outcome.draft_status !== "suppressed" && (
+          {canRecheck(outcome.draft_status) && (
+            <Button size="sm" variant="outline" disabled={recheck.isPending}
+                    onClick={() => recheck.mutate()}>
+              <RefreshCw size={14} aria-hidden="true" />
+              {recheck.isPending ? "Checking…" : "Check again"}
+            </Button>
+          )}
+          {!canRecheck(outcome.draft_status) && (
             <Button size="sm" variant="ghost" disabled={regenerate.isPending}
                     onClick={() => regenerate.mutate()}>
               <RefreshCw size={14} aria-hidden="true" />

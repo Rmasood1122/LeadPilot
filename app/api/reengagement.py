@@ -162,10 +162,12 @@ def reschedule_plan(plan_id: uuid.UUID, body: RescheduleIn,
 def cancel_plan(plan_id: uuid.UUID, body: CancelIn, db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user)) -> dict:
     """Never come back to this one. A reason is required — a cancelled promise
-    is worth understanding later."""
+    is worth understanding later. Also works after the sweep scheduled the
+    return message, until that message goes out (it is cancelled too)."""
     plan = _owned_plan(db, plan_id, current_user)
-    if plan.status in ("sent", "cancelled"):
-        raise HTTPException(status_code=409,
-                            detail=f"this plan is already {plan.status}")
+    if not reengagement_memory.can_cancel(db, plan):
+        detail = (f"this plan is already {plan.status}" if plan.status != "sent"
+                  else "the return message has already gone out")
+        raise HTTPException(status_code=409, detail=detail)
     reengagement_memory.cancel(db, plan, body.reason)
     return reengagement_memory.plan_out(db, plan)

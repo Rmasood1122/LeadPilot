@@ -303,6 +303,17 @@ def regenerate_followup_draft(outcome_id: uuid.UUID, db: Session = Depends(get_d
         return meeting_followup.draft_followup(db, row, user=current_user)
 
 
+@router.post("/meeting-outcomes/{outcome_id}/recheck", response_model=OutcomeOut)
+def recheck_followup(outcome_id: uuid.UUID, db: Session = Depends(get_db),
+                     current_user: User = Depends(get_current_user)) -> MeetingOutcome:
+    """"Check again" on a blocked follow-up (after the cause was removed)."""
+    row = _owned_outcome(db, outcome_id, current_user)
+    try:
+        return meeting_followup.recheck(db, row, user=current_user)
+    except meeting_followup.FollowupNotSendable as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
 @router.post("/meeting-outcomes/{outcome_id}/send", response_model=OutcomeOut)
 def send_followup(outcome_id: uuid.UUID, db: Session = Depends(get_db),
                   current_user: User = Depends(get_current_user)) -> MeetingOutcome:

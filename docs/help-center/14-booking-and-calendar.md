@@ -2,7 +2,7 @@
 id: booking-and-calendar
 title: Booking meetings and your calendar
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/api/calendar.py
@@ -67,7 +67,7 @@ Public bookings are limited to 30 per IP address per hour.
 
 A time is not offered if it overlaps anything already on your calendar: a live booking on **any** of your booking pages, or any meeting that is not cancelled. Times in the past, inside the minimum notice period, or on a day that has reached the page's daily cap are also hidden.
 
-If two people try to book the same time on the same booking page at the same moment, the database allows only one of them; the second gets an error. A cancelled booking frees its time so it can be booked again.
+If two people try to book overlapping times at the same moment, even on two different booking pages of yours, only the first is accepted; the second gets an error asking them to pick another time. Bookings for the same person are checked one at a time against everything already on the calendar. A cancelled booking frees its time so it can be booked again; turning a cancelled booking back to confirmed is refused if that time has since been taken. One gap remains: a meeting you add by hand at the very same moment as a booking is not checked against it.
 
 LeadPilot's calendar does **not** read your Google Calendar or any other external calendar. Busy times there are not blocked unless they are also in LeadPilot.
 

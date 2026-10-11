@@ -23,7 +23,9 @@ Headers:
 Verify v1 and reject timestamps older than five minutes (verify_signature
 below is the reference implementation).
 
-RETRIES: 5 attempts, backing off 30s, 2m, 10m, 30m, 2h. Any 2xx is success.
+RETRIES: the first attempt, then 5 retries backing off 30s, 2m, 10m, 30m and
+2h -- 6 attempts in all (MAX_ATTEMPTS). Any 2xx is success. (It used to stop
+after 5 attempts in all, so the 2-hour retry was never reached.)
 A 410 Gone deactivates the target -- the Zapier REST-hook convention for "this
 Zap was turned off" -- and stops retrying.
 
@@ -68,6 +70,16 @@ EVENT_DESCRIPTIONS: dict[str, str] = {
     "deal_won": "A deal was marked closed-won.",
     "call_completed": "An AI call ended and was analysed.",
     "objection_spike": "A campaign's objection rate spiked week over week.",
+    # Alerts that always built a payload but could not be subscribed to.
+    "domain_blacklisted": "A sending domain was newly listed on a blocklist "
+                          "(its campaigns were paused).",
+    "deliverability_warning": "A sending domain's health fell below the threshold, "
+                              "or a mailbox's spam-rate brake engaged.",
+    "mailbox_paused": "A sending mailbox was paused for poor deliverability health.",
+    "send_needs_review": "A message was held in the send-review queue for approval.",
+    "reengagement_due": "A 'not now' prospect's return date arrived.",
+    "reply_draft_approved": "A suggested reply to a prospect was approved "
+                            "(carries the approved draft text).",
 }
 # The four the spec names for Zapier / Make.
 ZAPIER_EVENTS = ("meeting_booked", "reply_received", "lead_sourced", "campaign_paused")
@@ -76,6 +88,8 @@ LEGACY_EVENTS = frozenset({"strategy_complete", "variant_promoted"})
 EVENT_TYPES = frozenset(EVENT_DESCRIPTIONS) | LEGACY_EVENTS | frozenset(ALIASES)
 
 RETRY_DELAYS_SECONDS = [30, 120, 600, 1800, 7200]
+#: The first attempt plus one retry per delay above.
+MAX_ATTEMPTS = 1 + len(RETRY_DELAYS_SECONDS)
 TIMEOUT_SECONDS = 10
 SIGNATURE_TOLERANCE_SECONDS = 300
 MAX_TARGETS_PER_USER = 25
@@ -110,6 +124,23 @@ SAMPLES: dict[str, dict] = {
     "objection_spike": {"strategy_id": _SAMPLE_LEAD["strategy_id"],
                         "week_start": "2026-09-07", "objection_rate": 0.6,
                         "previous_objection_rate": 0.2, "replies": 10},
+    # The payload shapes the emitting code builds (keep in step with it).
+    "domain_blacklisted": {"domain": "carterandco.example",
+                           "listed_on": ["zen.spamhaus.org"], "campaigns_paused": 2},
+    "deliverability_warning": {"domain": "carterandco.example", "score": 62,
+                               "reasons": ["DMARC record missing"]},
+    "mailbox_paused": {"mailbox_ref": "00000000-0000-4000-8000-000000000006",
+                       "address": "sam@carterandco.example", "score": 35,
+                       "reasons": ["bounce rate 6.1% over 7 days"]},
+    "send_needs_review": {"review_id": "00000000-0000-4000-8000-000000000007",
+                          "lead_id": _SAMPLE_LEAD["lead_id"], "triggers": ["vip_title"]},
+    "reengagement_due": {"plan_id": "00000000-0000-4000-8000-000000000008",
+                         "lead_id": _SAMPLE_LEAD["lead_id"], "reason_kind": "contract",
+                         "status": "due"},
+    "reply_draft_approved": {"reply_id": "00000000-0000-4000-8000-000000000009",
+                             "lead_id": _SAMPLE_LEAD["lead_id"], "category": "question",
+                             "next_action": "Answer the pricing question",
+                             "draft_response": "Hi Sam, happy to share pricing..."},
 }
 
 
@@ -367,7 +398,7 @@ def deliver(db: Session, delivery_id, *, now: datetime | None = None) -> str:
         error = f"{type(exc).__name__}: {exc}"[:1000]
 
     delivery.last_error = error
-    if delivery.attempts >= len(RETRY_DELAYS_SECONDS):
+    if delivery.attempts >= MAX_ATTEMPTS:
         delivery.status = "exhausted"
         delivery.next_attempt_at = None
         db.commit()

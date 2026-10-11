@@ -484,6 +484,11 @@ def public_book(
         )
     start_at = start_at.astimezone(timezone.utc)
 
+    # Per-HOST double-booking guard: lock the host's calendar BEFORE checking
+    # the slot, so a concurrent booking on another of the host's pages either
+    # committed already (and the check below sees it) or waits for this one.
+    # See calendar_service "Per-HOST double-booking guard".
+    cal.lock_host_calendar(db, page.user_id)
     if not cal.slot_is_offered(db, page, start_at):
         raise HTTPException(
             status_code=409,
@@ -628,6 +633,21 @@ def update_booking(
         setattr(booking, field, value)
 
     if new_status is not None and new_status != booking.status:
+        live = (BookingStatus.PENDING, BookingStatus.CONFIRMED)
+        if new_status in live and booking.status not in live:
+            # Re-activating a cancelled / no-show booking takes its time back:
+            # refuse when another live booking (any of the host's pages) or a
+            # meeting now overlaps it -- same per-host lock and check as a
+            # public booking.
+            page = db.get(CalendarBookingPage, booking.booking_page_id)
+            cal.lock_host_calendar(db, page.user_id)
+            if cal.host_conflict(db, page.user_id, booking.start_at, booking.end_at,
+                                 exclude_booking_id=booking.id):
+                db.rollback()
+                raise HTTPException(
+                    status_code=409,
+                    detail="another live booking or meeting already holds that time",
+                )
         booking.status = new_status
         # slot_key tracks whether the slot is HELD, so it has to move with the
         # status: a cancelled or no-show booking releases its time (NULL), and

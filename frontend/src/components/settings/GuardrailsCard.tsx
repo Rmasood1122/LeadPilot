@@ -97,7 +97,9 @@ function ExclusionsSection({ enabled, onChange }: { enabled: boolean; onChange: 
     mutationFn: () => addExclusion({ kind, value, reason }),
     onSuccess: (row) => {
       setValue("");
-      setMessages([row.status === "exists" ? "Already on the list." : "Added."]);
+      setMessages([row.status === "exists" ? "Already on the list."
+        : row.status === "updated" ? "Already on the list. Updated to the reason you chose."
+        : "Added."]);
       onChange();
     },
   });
