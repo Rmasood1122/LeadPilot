@@ -37,6 +37,7 @@ sources:
   - app/services/admin_service.py
   - app/workers/outreach_tasks.py
   - frontend/src/lib/api/billing.ts
+  - frontend/src/components/billing/PlanCard.tsx
   - frontend/src/lib/api/clients.ts
   - frontend/capacitor.config.ts
   - docs/program/STAR_PROMPT.md
@@ -56,7 +57,8 @@ This is an honest list of what LeadPilot does not do, does not do yet, or has no
 
 ## What are the billing limitations?
 
-- The web app has no billing screen for cancelling a plan or disputing a pay-per-meeting charge. These exist in the LeadPilot API only; otherwise contact support.
+- The web app has no screen for disputing a pay-per-meeting charge. Disputes exist in the LeadPilot API only; otherwise contact support. (Cancelling a plan is in **Profile → Plan**.)
+- A paid annual plan cannot be changed to another plan online before its year ends, because there is no partial refund yet. Contact support.
 - The payment connection to Stripe is still marked in the code as waiting for live keys, so it has not been proven against the live payment service. A production deployment without Stripe set up cannot change plans.
 - The Pricing page shows an analytics history length per plan; the product does not enforce it. Multi-variate results are available on every plan that includes A/B testing, even though the Pricing page lists multi-variate testing only for some plans.
 - The daily AI limit amounts per plan may still change.

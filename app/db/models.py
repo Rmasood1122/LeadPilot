@@ -4017,6 +4017,87 @@ class BillingSubscription(TimestampMixin, Base):
     is_stub: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="0", nullable=False
     )
+    # Migration 0081 (docs/features/annual-billing.md). When the current trial
+    # began (Stripe `trial_start`; stub checkout time) -- a trial longer than
+    # billing_catalog.LONG_TRIAL_DAYS gets a trial-ending notice.
+    trial_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Set once the account has had ANY trial, so a replaced subscription (whose
+    # trial dates are cleared) never earns a second one.
+    trial_used: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    # Affirmative auto-renewal consent, recorded when the checkout that carried
+    # it COMPLETES (never on an abandoned one): when, which disclosure wording
+    # (billing_catalog.DISCLOSURE_VERSION), the price and interval agreed to,
+    # and the Stripe Checkout session (NULL for a stub checkout).
+    renewal_consent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    consent_disclosure_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    consent_price_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    consent_interval: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    consent_checkout_session_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
+    )
+    # What Stripe actually bills (items.data[0].price from the subscription
+    # webhook) -- the amount every renewal notice states. NULL until known.
+    price_unit_amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    price_interval: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    price_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    # Something a person must resolve (e.g. a second subscription completed
+    # while an annual year was paid: both are kept). Also a task_errors row.
+    support_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class BillingRenewalNotice(TimestampMixin, Base):
+    """One auto-renewal notice to an account owner (migration 0081).
+
+    kind: acknowledgment (an annual plan started) | trial_end (a trial that
+    ends in a charge, 7 days ahead) | renewal (an annual renewal, 30 days
+    ahead). UNIQUE (subscription_id, kind, period_key) is the idempotency key:
+    the sweep INSERTs the row (status `sending`) BEFORE it sends, exactly like
+    pilot_scorecards, so a renewal is noticed once however often the sweep
+    runs. The row is also the record that the notice went out (no body kept).
+    """
+
+    __tablename__ = "billing_renewal_notices"
+    __table_args__ = (
+        UniqueConstraint("subscription_id", "kind", "period_key",
+                         name="uq_billing_renewal_notice"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # Explicit name: the naming convention's
+    # fk_billing_renewal_notices_subscription_id_billing_subscriptions is 64
+    # characters, one over PostgreSQL's 63-byte identifier limit.
+    subscription_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("billing_subscriptions.id", ondelete="CASCADE",
+                   name="fk_billing_renewal_notices_subscription_id")
+    )
+    kind: Mapped[str] = mapped_column(String(20))
+    period_key: Mapped[str] = mapped_column(String(120))
+    charge_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    amount_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    days_before: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # sending | sent | failed
+    status: Mapped[str] = mapped_column(
+        String(20), default="sending", server_default=text("'sending'"), nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # When a stuck (`sending`) or given-up notice was raised to the admins
+    # (ERROR log + a task_errors row) -- once, not every sweep.
+    escalated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class BillableMeeting(TimestampMixin, Base):
@@ -5173,9 +5254,10 @@ class ReplyDraft(TimestampMixin, Base):
 
 
 class ReplyCopilotSettings(TimestampMixin, Base):
-    """F04 -- one row per account: the per-account auto-send opt-in.
+    """F04 -- one row per account: the per-account auto-send opt-in and the
+    stop-attribution strictness (`answer_earlier_replies`).
 
-    No row = the defaults (auto-send OFF). Auto-send additionally needs the
+    No row = the defaults (auto-send OFF, answer_earlier_replies ON). Auto-send additionally needs the
     deployment switch `reply_copilot_auto_send_allowed` (system settings)."""
 
     __tablename__ = "reply_copilot_settings"
@@ -5189,6 +5271,12 @@ class ReplyCopilotSettings(TimestampMixin, Base):
     )
     auto_send_meeting_time: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=false(), nullable=False
+    )
+    # Migration 0081. True (the default, the original behaviour): an answer to
+    # a prospect's LATER reply may pass the stop their EARLIER reply caused.
+    # False (strict): an answer passes only the stop its own reply caused.
+    answer_earlier_replies: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default=true(), nullable=False
     )
     updated_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True

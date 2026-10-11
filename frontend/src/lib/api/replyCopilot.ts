@@ -39,5 +39,12 @@ export const setReplyCopilotAutoSend = (on: boolean) =>
     method: "PUT", body: { auto_send_meeting_time: on },
   });
 
+/** Per-account: may an answer to a later reply pass the stop an earlier
+ *  reply caused? (default true; false = strict). */
+export const setReplyCopilotAnswerEarlier = (on: boolean) =>
+  api<CopilotSettings>("/reply-copilot/settings", {
+    method: "PUT", body: { answer_earlier_replies: on },
+  });
+
 export const getReplyCopilotMetrics = (days = 30) =>
   api<CopilotMetrics>(`/reply-copilot/metrics?days=${days}`);

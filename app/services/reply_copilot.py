@@ -28,7 +28,8 @@ SAFETY GUARDS (each tested in tests/test_reply_copilot.py)
   * at send time, a reply_copilot message is cancelled when the lead moved on
     (status / archive), wrote again, or opted out (send_time_hold), and may
     pass a stopped enrollment ONLY when its own conversation caused the stop
-    (answers_the_stop);
+    (answers_the_stop) -- or, with the account's `answer_earlier_replies`
+    setting off (strict), only when its OWN reply caused it;
   * every decision leaves "pending" through one conditional UPDATE (_claim):
     a stale second approval is 409 and never queues a second message.
 
@@ -797,9 +798,31 @@ def set_auto_send(session: Session, user_id, on: bool, *, actor_user_id=None) ->
     return row
 
 
+def answer_earlier_replies(session: Session, user_id) -> bool:
+    """The account's stop-attribution setting. No row = True (the behaviour
+    before the setting existed)."""
+    row = account_settings(session, user_id)
+    return True if row is None else bool(row.answer_earlier_replies)
+
+
+def set_answer_earlier_replies(session: Session, user_id, on: bool, *,
+                               actor_user_id=None) -> ReplyCopilotSettings:
+    """Founder decision 2026-10-11 ("User decide this"): the account chooses.
+    Either value is always allowed -- strict only ever cancels more."""
+    row = account_settings(session, user_id)
+    if row is None:
+        row = ReplyCopilotSettings(user_id=user_id)
+        session.add(row)
+    row.answer_earlier_replies = bool(on)
+    row.updated_by_user_id = actor_user_id
+    session.commit()
+    return row
+
+
 def settings_out(session: Session, user_id) -> dict:
     return {"auto_send_meeting_time": auto_send_opted_in(session, user_id),
             "auto_send_allowed": auto_send_allowed(session),
+            "answer_earlier_replies": answer_earlier_replies(session, user_id),
             "enabled": enabled(session)}
 
 
@@ -827,6 +850,10 @@ def auto_send_decision(session: Session, draft: ReplyDraft, generated: dict) -> 
     # stop would cancel the queued message. A person approves instead.
     if enrollment is None or enrollment.stop_reason not in REPLY_STOP_REASONS:
         return "routing_not_finished"
+    # Strict accounts: an answer the send path would cancel is not queued.
+    if (not answer_earlier_replies(session, draft.user_id)
+            and not stop_explained_by(session, reply, enrollment, strict=True)):
+        return "stop_not_from_this_reply"
     return None
 
 
@@ -1055,17 +1082,56 @@ def _said_at(reply: InboundReply) -> datetime | None:
     return _aware(reply.received_at or reply.created_at)
 
 
+def stop_explained_by(session: Session, answered: InboundReply,
+                      enrollment: SequenceEnrollment | None, *, strict: bool) -> bool:
+    """Is the enrollment's reply-class stop explained by the conversation of
+    `answered`?
+
+    The stop must be "replied_<class>", have a stopped_at, and be at or after
+    the explaining reply was stored. Lenient (strict=False): the explaining
+    reply is `answered` OR an earlier reply of the same lead (a prospect who
+    wrote twice: the first reply stopped the sequence, the second is not
+    re-stopped). Strict: only `answered` itself, and only if no other reply
+    of the lead stored at or before it could have caused the same stop -- a
+    reply-class stop is written ONCE, by the first reply that stops, so an
+    earlier matching reply means the stop was that reply's (and a tie is
+    ambiguous, so it fails closed)."""
+    if (enrollment is None or enrollment.status is not EnrollmentStatus.STOPPED
+            or enrollment.stop_reason not in REPLY_STOP_REASONS
+            or enrollment.stopped_at is None or answered is None):
+        return False
+    stopped = _aware(enrollment.stopped_at)
+    answered_at = _stored_at(answered)
+    if answered_at is None:
+        return False
+
+    def _matches(reply: InboundReply) -> bool:
+        at = _stored_at(reply)
+        return (at is not None and at <= answered_at and at <= stopped
+                and f"replied_{(reply.classification or '').lower()}" == enrollment.stop_reason)
+
+    if strict:
+        if not _matches(answered):
+            return False
+        others = session.execute(
+            select(InboundReply).where(InboundReply.lead_id == answered.lead_id,
+                                       InboundReply.id != answered.id)).scalars()
+        return not any(_matches(other) for other in others)
+    return any(_matches(reply) for reply in session.execute(
+        select(InboundReply).where(InboundReply.lead_id == answered.lead_id)).scalars())
+
+
 def answers_the_stop(session: Session, message: Message,
                      enrollment: SequenceEnrollment | None) -> bool:
     """May this message pass a STOPPED enrollment?
 
     Only a Reply Copilot answer, and only when the stop is attributable to the
-    conversation it answers: stop_reason is "replied_<class>" of THIS draft's
-    reply -- or of an earlier reply of the same lead (a prospect who wrote
-    twice: the first reply stopped the sequence, the second is not re-stopped)
-    -- and the stop happened after that reply was stored. A stop for any other
-    reason, or one that cannot be tied to such a reply (no stopped_at), keeps
-    the message cancelled. Newer replies are handled by send_time_hold."""
+    conversation it answers (stop_explained_by). Which replies count is the
+    account's `answer_earlier_replies` setting (default on = this draft's
+    reply OR an earlier reply of the same lead; off = only THIS draft's
+    reply). A stop for any other reason, or one that cannot be tied to such a
+    reply (no stopped_at), keeps the message cancelled. Newer replies are
+    handled by send_time_hold."""
     if (message.origin != ORIGIN or enrollment is None
             or enrollment.status is not EnrollmentStatus.STOPPED
             or enrollment.stop_reason not in REPLY_STOP_REASONS
@@ -1075,16 +1141,8 @@ def answers_the_stop(session: Session, message: Message,
     answered = session.get(InboundReply, draft.reply_id) if draft else None
     if answered is None:
         return False
-    stopped = _aware(enrollment.stopped_at)
-    answered_at = _stored_at(answered)
-    for reply in session.execute(
-            select(InboundReply).where(InboundReply.lead_id == answered.lead_id)).scalars():
-        at = _stored_at(reply)
-        if (at is not None and answered_at is not None and at <= answered_at
-                and at <= stopped
-                and f"replied_{(reply.classification or '').lower()}" == enrollment.stop_reason):
-            return True
-    return False
+    strict = not answer_earlier_replies(session, draft.user_id)
+    return stop_explained_by(session, answered, enrollment, strict=strict)
 
 
 def send_time_hold(session: Session, message: Message, lead: Lead) -> str | None:

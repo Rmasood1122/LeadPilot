@@ -1,8 +1,10 @@
 import { api } from "./client";
-import type { Catalog } from "../pricing";
+import {
+  checkoutPayload, type Catalog, type CheckoutModel, type CheckoutTerms,
+} from "../pricing";
 
 export interface Subscription {
-  billing_model: "monthly" | "pay_per_meeting";
+  billing_model: CheckoutModel;
   tier: string;
   status: "incomplete" | "trialing" | "active" | "past_due" | "canceled";
   grants_plan: boolean;
@@ -11,12 +13,18 @@ export interface Subscription {
   cancel_at_period_end: boolean;
   canceled_at: string | null;
   is_stub: boolean;
+  /** What the next renewal charges (null for pay per meeting). */
+  price_cents?: number | null;
+  interval?: "month" | "year" | null;
+  /** A billing state a person must resolve (e.g. two subscriptions). */
+  needs_support?: boolean;
 }
 
 export interface BillingOverview {
   plan: string;
   subscription: Subscription | null;
   stub_mode: boolean;
+  checkout_terms?: CheckoutTerms;
   usage: {
     period_start: string;
     meetings_booked: number;
@@ -52,8 +60,11 @@ export interface BillableMeetingRow {
 export const billingApi = {
   catalog: () => api<Catalog>("/billing/catalog", { auth: false }),
   overview: () => api<BillingOverview>("/billing"),
-  checkout: (billing_model: "monthly" | "pay_per_meeting", tier?: string) =>
-    api<CheckoutResult>("/billing/checkout", { body: { billing_model, tier } }),
+  /** The trial a checkout started now would get (the backend decides). */
+  checkoutTerms: () => api<CheckoutTerms>("/billing/checkout-terms"),
+  checkout: (billing_model: CheckoutModel, tier?: string, acceptRenewalTerms = false) =>
+    api<CheckoutResult>("/billing/checkout",
+      { body: checkoutPayload(billing_model, tier, acceptRenewalTerms) }),
   cancel: () => api<Subscription>("/billing/cancel", { method: "POST" }),
   meetings: () => api<BillableMeetingRow[]>("/billing/meetings"),
   dispute: (id: string, reason: string) =>

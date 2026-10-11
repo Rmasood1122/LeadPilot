@@ -14,7 +14,8 @@ What must hold (the STAR success metric is the first block):
     row, retries capped), only the current week, only to the account owner,
     never through the outreach path, never with the flag off;
   * NO AUTOMATIC CONVERSION: nothing a pilot does changes users.plan or the
-    billing subscription, and there is no annual plan to convert to;
+    billing subscription; an annual plan exists (2026-10-11) but only as a
+    checkout the account makes, and the monthly checkout still bills monthly;
   * tenancy, RBAC, flag off, export headers, GDPR export completeness, Celery
     routing.
 """
@@ -578,10 +579,15 @@ class TestNoAutomaticConversion:
         assert pilot.plan_at_start == pilot.plan_at_end == expected
         assert pilot.verdict_json["billing_statement"] == pilot_mode.BILLING_STATEMENT
 
-    def test_there_is_no_annual_plan_to_convert_to(self, monkeypatch):
-        """The spec says LeadPilot has no annual plan. If someone adds one,
-        this fails and sends them to docs/features/f09-pilot-mode.md first."""
-        assert billing_catalog.BILLING_MODELS == ("monthly", "pay_per_meeting")
+    def test_annual_exists_only_as_an_explicit_checkout(self, monkeypatch):
+        """Was `test_there_is_no_annual_plan_to_convert_to`: it pinned the
+        absence of an annual plan so whoever added one met the F09 spec first.
+        The founders added one on 2026-10-11 (docs/features/annual-billing.md),
+        so the invariant it protected is now stated directly: the monthly
+        checkout still bills monthly, an annual price exists only for an
+        explicit annual checkout, and the verdict no longer says "no annual
+        plan" (which would now be false)."""
+        assert billing_catalog.BILLING_MODELS == ("monthly", "annual", "pay_per_meeting")
         sent = []
         monkeypatch.setattr(stripe_billing, "_request",
                             lambda method, path, data=None, **kw: sent.append(data) or {})
@@ -590,6 +596,9 @@ class TestNoAutomaticConversion:
             trial_days=0, success_url="https://x/s", cancel_url="https://x/c")
         recurring = sent[0]["line_items"][0]["price_data"]["recurring"]
         assert recurring == {"interval": "month"}
+        assert sent[0]["metadata"]["billing_model"] == "monthly"
+        assert "no annual plan" not in pilot_mode.BILLING_STATEMENT
+        assert "never starts, renews, upgrades or converts" in pilot_mode.BILLING_STATEMENT
 
     def test_the_pilot_module_never_writes_billing(self):
         import inspect

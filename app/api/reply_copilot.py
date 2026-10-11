@@ -6,8 +6,9 @@ POST  /reply-copilot/drafts/{id}/approve    EMAIL: approve (optionally edited) -
                                             send chokepoint; nothing is sent here
 POST  /reply-copilot/drafts/{id}/copy       LINKEDIN: record the copy; nothing is sent
 POST  /reply-copilot/drafts/{id}/discard    discard (the reply stays "needs reply")
-GET   /reply-copilot/settings               the account's auto-send opt-in
-PUT   /reply-copilot/settings
+GET   /reply-copilot/settings               the account's auto-send opt-in and
+PUT   /reply-copilot/settings               stop-attribution setting
+                                            (answer_earlier_replies)
 GET   /reply-copilot/metrics?days=30        the success metric, measured
 
 Behind `reply_copilot_enabled` (System Settings, default off): every route is
@@ -57,7 +58,9 @@ class CopyIn(BaseModel):
 
 
 class SettingsIn(BaseModel):
-    auto_send_meeting_time: bool
+    """Either field may be sent alone; at least one is required."""
+    auto_send_meeting_time: bool | None = None
+    answer_earlier_replies: bool | None = None
 
 
 def _owned(db: Session, draft_id: uuid.UUID, current_user: User):
@@ -154,11 +157,22 @@ def get_settings(db: Session = Depends(get_db),
 def put_settings(body: SettingsIn, db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user)):
     """Turning auto-send ON needs the deployment switch
-    `reply_copilot_auto_send_allowed` (409 otherwise). OFF always works."""
+    `reply_copilot_auto_send_allowed` (409 otherwise). OFF always works.
+    `answer_earlier_replies` (default true) is the account's own choice:
+    false = an answer passes only the stop its own reply caused. A body with
+    neither field is 422."""
     enforce_rate_limit(str(current_user.id), "crm_write", "RATE_LIMIT_CRM_WRITE")
+    if body.auto_send_meeting_time is None and body.answer_earlier_replies is None:
+        return JSONResponse(status_code=422, content={
+            "detail": "send auto_send_meeting_time and/or answer_earlier_replies"})
     try:
-        reply_copilot.set_auto_send(db, current_user.id, body.auto_send_meeting_time,
-                                    actor_user_id=current_user.id)
+        if body.auto_send_meeting_time is not None:
+            reply_copilot.set_auto_send(db, current_user.id, body.auto_send_meeting_time,
+                                        actor_user_id=current_user.id)
+        if body.answer_earlier_replies is not None:
+            reply_copilot.set_answer_earlier_replies(db, current_user.id,
+                                                     body.answer_earlier_replies,
+                                                     actor_user_id=current_user.id)
     except reply_copilot.CopilotError as exc:
         return _error(exc)
     return reply_copilot.settings_out(db, current_user.id)

@@ -23,6 +23,9 @@ from app.services import billing, rbac, revenue_analytics
 from tests.conftest import auth_headers
 
 WHSEC = "whsec_test_secret"
+# Every auto-renewing checkout carries the account's consent to the current
+# disclosure (docs/features/annual-billing.md, added 2026-10-11).
+CONSENT = {"accept_renewal_terms": True, "disclosure_version": catalog.DISCLOSURE_VERSION}
 
 
 # --------------------------------------------------------------------------
@@ -65,6 +68,18 @@ def live_stripe(monkeypatch):
 
     monkeypatch.setattr(stripe_billing, "cancel_subscription_at_period_end", _cancel_at_end)
     monkeypatch.setattr(stripe_billing, "cancel_subscription_now", _cancel_now)
+    # Added with annual billing: the completed-checkout handler reads the
+    # subscription from Stripe ({} = unknown -> placeholder status), a new
+    # checkout expires the previous session, a past-due cancel voids invoices.
+    monkeypatch.setattr(stripe_billing, "retrieve_subscription",
+                        lambda subscription_id: calls.setdefault("retrieve", []).append(
+                            subscription_id) or {})
+    monkeypatch.setattr(stripe_billing, "expire_checkout_session",
+                        lambda session_id: calls.setdefault("expire", []).append(
+                            session_id) or {})
+    monkeypatch.setattr(stripe_billing, "void_open_invoices",
+                        lambda subscription_id: calls.setdefault("void", []).append(
+                            subscription_id) or [])
     calls["install"] = install  # tests can swap a result
     return calls
 
@@ -164,7 +179,7 @@ class TestCatalog:
 class TestStubCheckout:
     def test_monthly_starts_a_trial_and_grants_the_tier(self, client, db_session, test_user):
         resp = client.post("/billing/checkout", json={"billing_model": "monthly",
-                                                      "tier": "growth"})
+                                                      "tier": "growth", **CONSENT})
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["mode"] == "stub" and body["checkout_url"] is None
@@ -177,12 +192,12 @@ class TestStubCheckout:
         assert timedelta(days=13) < trial <= timedelta(days=14)
 
     def test_the_same_plan_twice_is_a_conflict(self, client):
-        body = {"billing_model": "monthly", "tier": "starter"}
+        body = {"billing_model": "monthly", "tier": "starter", **CONSENT}
         assert client.post("/billing/checkout", json=body).status_code == 200
         assert client.post("/billing/checkout", json=body).status_code == 409
 
     def test_switching_to_pay_per_meeting(self, client, db_session, test_user):
-        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "scale"})
+        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "scale", **CONSENT})
         resp = client.post("/billing/checkout", json={"billing_model": "pay_per_meeting"})
         assert resp.status_code == 200
         db_session.refresh(test_user)
@@ -190,9 +205,9 @@ class TestStubCheckout:
         assert resp.json()["subscription"]["status"] == "active"
 
     def test_a_second_monthly_plan_gets_no_second_trial(self, client, db_session, test_user):
-        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "starter"})
+        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "starter", **CONSENT})
         resp = client.post("/billing/checkout", json={"billing_model": "monthly",
-                                                      "tier": "growth"})
+                                                      "tier": "growth", **CONSENT})
         assert resp.json()["subscription"]["status"] == "active"
 
     @pytest.mark.parametrize("body", [{"billing_model": "monthly", "tier": "platinum"},
@@ -208,7 +223,7 @@ class TestStubCheckout:
         assert resp.status_code == 403 and resp.json()["detail"] == "PHONE_NOT_VERIFIED"
 
     def test_cancel_in_stub_mode_downgrades_now(self, client, db_session, test_user):
-        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "starter"})
+        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "starter", **CONSENT})
         resp = client.post("/billing/cancel")
         assert resp.status_code == 200 and resp.json()["status"] == "canceled"
         db_session.refresh(test_user)
@@ -232,7 +247,7 @@ class TestLiveCheckoutAndWebhooks:
     def test_monthly_checkout_returns_a_stripe_url_and_changes_nothing_yet(
             self, client, db_session, test_user, live_stripe):
         resp = client.post("/billing/checkout", json={"billing_model": "monthly",
-                                                      "tier": "growth"})
+                                                      "tier": "growth", **CONSENT})
         assert resp.status_code == 200, resp.text
         assert resp.json()["checkout_url"].startswith("https://checkout.stripe.com/")
         (call,) = live_stripe["create_subscription_checkout"]
@@ -250,12 +265,12 @@ class TestLiveCheckoutAndWebhooks:
     def test_stripe_outage_is_a_502(self, client, live_stripe):
         live_stripe["install"]("create_customer", stripe_billing.StripeError("down"))
         resp = client.post("/billing/checkout", json={"billing_model": "monthly",
-                                                      "tier": "starter"})
+                                                      "tier": "starter", **CONSENT})
         assert resp.status_code == 502
 
     def test_the_webhook_lifecycle(self, client, db_session, test_user, live_stripe,
                                    webhook_secret):
-        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "growth"})
+        client.post("/billing/checkout", json={"billing_model": "monthly", "tier": "growth", **CONSENT})
         meta = {"user_id": str(test_user.id), "billing_model": "monthly", "tier": "growth"}
 
         resp = _post_webhook(client, _event("checkout.session.completed", {

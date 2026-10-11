@@ -20,11 +20,13 @@ import {
   copyReplyDraft,
   discardReplyDraft,
   getReplyCopilotSettings,
+  setReplyCopilotAnswerEarlier,
   listReplyDrafts,
   setReplyCopilotAutoSend,
 } from "@/lib/api/replyCopilot";
 import {
   approveLabel,
+  answersEarlierReplies,
   autoSendBlockedReason,
   deliveryLabel,
   intentLabel,
@@ -72,7 +74,10 @@ export function ReplyCopilotPanel({ leadId }: { leadId: string }) {
             your booking link, then claim-checked. Nothing is sent until you approve it.
           </p>
         </div>
-        <AutoSendToggle settings={settings.data} />
+        <div className="flex flex-col gap-2">
+          <AutoSendToggle settings={settings.data} />
+          <AnswerEarlierToggle settings={settings.data} />
+        </div>
       </CardHeader>
       <CardContent className="space-y-4 p-gutter pt-0">
         {pending.map((draft) => <PendingDraft key={draft.id} draft={draft} leadId={leadId} />)}
@@ -165,6 +170,33 @@ function PendingDraft({ draft, leadId }: { draft: ReplyDraft; leadId: string }) 
         )}
       </div>
     </div>
+  );
+}
+
+/** Founder decision 2026-10-11: the account decides whether an answer to a
+ *  prospect's LATER reply may still go out when their EARLIER reply is what
+ *  stopped the sequence (on, the default) or only answers to the reply that
+ *  stopped it (off, strict). A newer reply always cancels a queued answer. */
+function AnswerEarlierToggle({ settings }: { settings: CopilotSettings | undefined }) {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const toggle = useMutation({
+    mutationFn: (on: boolean) => setReplyCopilotAnswerEarlier(on),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["reply-copilot-settings"] }),
+    onError: (e) => toast((e as Error).message, "error"),
+  });
+  if (!settings) return null;
+  return (
+    <label className="flex max-w-xs items-start gap-2 text-xs text-muted-foreground">
+      <input type="checkbox" className="mt-0.5"
+             checked={answersEarlierReplies(settings)}
+             disabled={toggle.isPending}
+             onChange={(e) => toggle.mutate(e.target.checked)} />
+      <span>
+        When a prospect wrote twice, still send an approved answer to the later reply
+        (on by default). Off: only answers to the reply that stopped the sequence are sent.
+      </span>
+    </label>
   );
 }
 

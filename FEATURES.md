@@ -441,8 +441,10 @@ replies and queues it in the inbox for approve / edit / discard (LinkedIn:
 copy-only); never for opt-outs, suppressed or excluded contacts. An approved
 email goes through the ordinary send chokepoint. The only automatic answer is
 the opt-in "send me a time" email reply, off at two levels (admin
-`reply_copilot_auto_send_allowed` and the account's own opt-in)
-(`docs/features/f04-reply-copilot.md`).
+`reply_copilot_auto_send_allowed` and the account's own opt-in). Each account
+also decides whether an answer to a prospect's later reply may still go out
+when their earlier reply stopped the sequence (`answer_earlier_replies`, on
+by default) (`docs/features/f04-reply-copilot.md`).
 
 ### The cross-tenant bug this code is built around
 
@@ -794,7 +796,9 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Reply Copilot (F04, flag `reply_copilot_enabled`, off by default): grounded,
   claim-verified answer drafts queued in the inbox (approve / edit / discard;
   LinkedIn copy-only), sent only through the send chokepoint; opt-in
-  "send me a time" auto-send, off at two levels
+  "send me a time" auto-send, off at two levels; per-account
+  `answer_earlier_replies` (on by default; off = an answer passes only the
+  stop its own reply caused)
 - Automated follow-up with per-step delay and enable/disable
 - Opt-in post-sequence re-engagement: one email per completed, neutral
   enrollment, per-campaign toggle (off by default), own daily/weekly caps under
@@ -862,6 +866,12 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 
 - JWT auth with refresh; email verification with a kill switch
 - Plan tiers (free / starter / pro / enterprise) with limits and feature gates
+- Billing (Stripe): monthly subscriptions, pay per meeting, and an **annual
+  subscription** (flag `annual_billing_enabled`, off by default; monthly price
+  x `ANNUAL_MONTHS_CHARGED` = 10, same limits) with a pre-checkout auto-renewal
+  disclosure + consent, acknowledgment / trial-ending / 30-day renewal emails
+  to the owner, an online **Cancel plan** button in Profile, and trials that
+  never end before an active pilot's verdict (`docs/features/annual-billing.md`)
 - Spend Guard (F07, flag `spend_guard_enabled`, off by default): a cost
   forecast before every strategy, lead-sourcing and Quickstart run, an
   account-set monthly cap (on top of the plan's daily AI limit) enforced
@@ -884,7 +894,8 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - 30-Day Pilot Mode (F09, flag `pilot_mode_enabled`, off by default): success
   criteria locked on day 1, weekly scorecard email to the owner, day-30 verdict
   from the meetings-per-dollar ledger, verdict PDF/CSV + full account export;
-  never changes a plan or billing (`docs/features/f09-pilot-mode.md`)
+  never changes a plan or billing, and a plan bought during a pilot is not
+  charged before the verdict (`docs/features/f09-pilot-mode.md`)
 </details>
 
 **Totals:** 166 API routes · 24 migrations · ~30,000 lines of backend Python

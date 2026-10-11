@@ -1,8 +1,13 @@
 """Billing endpoints (Section E).
 
-GET  /billing/catalog                  PUBLIC. Both pricing options, with the
+GET  /billing/catalog                  PUBLIC. The pricing options (monthly,
+                                       annual when `annual_billing_enabled`,
+                                       pay per meeting), with the
                                        entitlements each tier grants
-GET  /billing                          the account's plan, subscription, usage
+GET  /billing                          the account's plan, subscription, usage,
+                                       and the trial a checkout would get now
+GET  /billing/checkout-terms           just that trial decision (the pricing
+                                       page's disclosure is driven by it)
 POST /billing/checkout                 choose a plan -> Stripe Checkout URL (or,
                                        in stub mode, the plan activated locally)
 POST /billing/cancel
@@ -43,8 +48,13 @@ router = APIRouter(tags=["billing"])
 
 
 class CheckoutIn(BaseModel):
-    billing_model: str = Field(pattern="^(monthly|pay_per_meeting)$")
+    billing_model: str = Field(pattern="^(monthly|annual|pay_per_meeting)$")
     tier: str | None = Field(default=None, max_length=20)
+    # Monthly and annual: the account ticked "I agree to these renewal terms"
+    # next to the auto-renewal disclosure whose version it echoes back
+    # (docs/features/annual-billing.md). Not needed for pay per meeting.
+    accept_renewal_terms: bool = False
+    disclosure_version: str | None = Field(default=None, max_length=40)
 
 
 class DisputeIn(BaseModel):
@@ -61,14 +71,20 @@ def _raise(exc: billing.BillingError) -> HTTPException:
 
 
 @router.get("/billing/catalog")
-def get_catalog() -> dict:
-    return billing_catalog.catalog()
+def get_catalog(db: Session = Depends(get_db)) -> dict:
+    return billing_catalog.catalog(annual_enabled=billing.annual_enabled(db))
 
 
 @router.get("/billing")
 def get_billing(db: Session = Depends(get_db),
                 current_user: User = Depends(get_current_user)) -> dict:
     return billing.overview(db, current_user)
+
+
+@router.get("/billing/checkout-terms")
+def get_checkout_terms(db: Session = Depends(get_db),
+                       current_user: User = Depends(get_current_user)) -> dict:
+    return billing.checkout_terms(db, current_user)
 
 
 @router.post("/billing/checkout")
@@ -84,7 +100,9 @@ def checkout(body: CheckoutIn, db: Session = Depends(get_db),
                             detail="payments are not configured; plans cannot be changed right now")
     try:
         return billing.start_checkout(db, current_user, billing_model=body.billing_model,
-                                      tier=body.tier)
+                                      tier=body.tier,
+                                      accept_renewal_terms=body.accept_renewal_terms,
+                                      disclosure_version=body.disclosure_version)
     except billing.BillingError as exc:
         raise _raise(exc)
 

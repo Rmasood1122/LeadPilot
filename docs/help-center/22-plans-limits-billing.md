@@ -2,7 +2,7 @@
 id: plans-limits-billing
 title: Plans, limits and billing
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/core/plans.py
@@ -24,6 +24,9 @@ sources:
   - app/services/rbac.py
   - frontend/src/app/pricing/page.tsx
   - frontend/src/app/(app)/profile/page.tsx
+  - frontend/src/components/billing/PlanCard.tsx
+  - app/services/pilot_mode.py
+  - docs/features/annual-billing.md
   - frontend/src/lib/pricing.ts
   - frontend/src/lib/post-login.ts
   - frontend/src/lib/api/client.ts
@@ -70,6 +73,19 @@ There are two ways to pay. Prices are in US dollars.
 
 Each monthly tier starts with a 14-day free trial. An account gets the trial only once: if you have had a trial before, a later monthly checkout starts without one.
 
+**Annual subscription** (only where your deployment offers it; it is switched off by default): the same four tiers, paid once a year at the price of 10 months, so two months are free:
+
+- Starter: $1,490 per year
+- Growth: $3,490 per year
+- Scale: $6,990 per year
+- Enterprise: $14,990 per year
+
+An annual plan has exactly the same limits as the monthly plan of the same tier, and the same once-per-account 14-day free trial. It renews automatically every year at the same price until you cancel.
+
+Monthly and annual plans both renew automatically, so before you go to payment the Pricing page shows the amount, the date of the first charge (worked out for your account: after your free trial, after your pilot's verdict, or today if you have already had a trial), how often it renews and how to cancel. You tick "I agree to these renewal terms" before the button works.
+
+**Running a 30-day pilot?** If your account has a pilot running when you start a monthly or annual plan, the free trial lasts until the pilot's verdict, so nothing is charged during the pilot, even if you have had a trial before.
+
 **Pay per meeting:** no monthly fee ($0) and $179 for each prospect who books a meeting through LeadPilot.
 
 The Free plan has no price. Free accounts are limited by the table above.
@@ -86,13 +102,16 @@ A meeting charge can be disputed only while it is still inside its 48-hour windo
 
 ## How do I choose or change a plan?
 
-Go to the **Pricing** page. You can also reach it from **Profile**, in the **Plan** card, with the **Upgrade plan** button. On Pricing you pick a monthly tier and press the trial button, or press **Pay per meeting**.
+Go to the **Pricing** page. You can also reach it from **Profile**, in the **Plan** card, with the **Upgrade plan** button. On Pricing you pick a tier (and, where offered, **Monthly** or **Annual**) and press the trial button, or press **Pay per meeting**.
 
 - You must be signed in. If you are not, the button takes you to sign-up.
 - Your phone number must be verified first (unless your production deployment deliberately has no text-message service, in which case the check is skipped). If it is not, you see "Verify your phone to choose a plan." and you are sent to the verification screen.
 - You finish on a checkout page run by Stripe, the payment provider. For pay per meeting, this step saves your card for later charges. When checkout finishes you return to Settings.
 - Choosing a different plan replaces your current one. The subscription being replaced is cancelled so you are not billed twice.
 - Leaving checkout without finishing does not change or downgrade your current plan.
+- LeadPilot never moves you to an annual plan by itself. Only you can choose annual, at checkout.
+- Once an annual year has been paid, it cannot be changed to another plan online before the year ends, because that would need a partial refund. Contact support, or cancel it and choose a new plan when the year ends. During the free trial of an annual plan you can still switch.
+- If a checkout you started earlier is completed after your annual year was paid, LeadPilot keeps both: your annual plan stays, the new subscription will not renew, and our team contacts you about a refund. Starting a new checkout closes any earlier unfinished one.
 
 If you sign in and your account has no paid plan, LeadPilot takes you to the Pricing page once, right after sign-in. You can still go back to the app; the Free limits then apply.
 
@@ -122,12 +141,15 @@ The cost is an estimate calculated from model prices set by your administrator. 
 
 ## How do I cancel?
 
-Cancellation exists in the product, but the web app does not currently have a billing screen with a cancel button. If you need to cancel, contact support. This is how cancellation works:
+Go to **Profile**, find the **Plan** card and press **Cancel plan**, then confirm. The card shows how you pay and when your plan renews or ends. This is how cancellation works:
 
-- **Monthly:** the plan is cancelled at the end of the current billing period, and you keep access until then.
+- **Monthly and annual:** the plan does not renew. You keep it until the end of the period you have paid for (or the end of the free trial), and the card shows "Cancelled — access until" that date. A year that has already been paid is not refunded.
+- **If your last payment failed** (the card shows "Payment failed"): cancelling ends the plan straight away and cancels the unpaid invoice, so nothing more is charged.
 - **Pay per meeting:** stops immediately. Meetings already booked are still billed.
 
 When a subscription ends, the account returns to the Free plan and its limits.
+
+Before you are charged for an annual plan, LeadPilot emails the account owner: once when the plan starts (with the renewal terms), 7 days before an annual free trial ends, and 30 days before each yearly renewal. Each email states the amount Stripe will actually charge, the date (in UTC) and how to cancel. A monthly trial that a pilot made longer than 31 days also gets the 7-day email.
 
 ## What if a payment fails?
 

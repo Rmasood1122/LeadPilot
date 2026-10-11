@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   approveLabel,
+  answersEarlierReplies,
   autoSendBlockedReason,
   deliveryLabel,
   formatDuration,
@@ -115,5 +116,15 @@ describe("flag and settings", () => {
     // Already on: turning it OFF must stay possible even if the admin switch moved.
     expect(autoSendBlockedReason({ auto_send_meeting_time: true, auto_send_allowed: false,
                                    enabled: true })).toBeNull();
+  });
+});
+
+describe("answer earlier replies (per-account setting)", () => {
+  it("defaults to on, including for an older API without the field", () => {
+    expect(answersEarlierReplies(undefined)).toBe(true);
+    expect(answersEarlierReplies({ auto_send_meeting_time: false, auto_send_allowed: false,
+                                   enabled: true })).toBe(true);
+    expect(answersEarlierReplies({ auto_send_meeting_time: false, auto_send_allowed: false,
+                                   answer_earlier_replies: false, enabled: true })).toBe(false);
   });
 });

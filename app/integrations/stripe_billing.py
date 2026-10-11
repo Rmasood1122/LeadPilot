@@ -109,24 +109,75 @@ def create_customer(*, email: str, user_id: str) -> dict:
 
 def create_subscription_checkout(*, customer_id: str, user_id: str, tier: dict,
                                  trial_days: int, success_url: str, cancel_url: str,
-                                 price_id: str | None = None) -> dict:
-    """Checkout Session in subscription mode for one monthly tier."""
+                                 price_id: str | None = None,
+                                 billing_model: str = "monthly",
+                                 interval: str = "month",
+                                 unit_amount_cents: int | None = None,
+                                 trial_end: int | None = None,
+                                 session_metadata: dict | None = None) -> dict:
+    """Checkout Session in subscription mode for one monthly or annual tier.
+
+    `interval` is the Stripe recurring interval ("month" | "year") and
+    `unit_amount_cents` the per-interval amount (defaults to the tier's
+    monthly price). `trial_end` (unix seconds) -- set when an active pilot
+    pushes the trial past its verdict -- replaces `trial_period_days`; Stripe
+    accepts one or the other. With no trial (an account that already had
+    one) NEITHER is sent: Stripe's trial_period_days minimum is 1.
+    `session_metadata` (the consent record) goes on the Checkout Session
+    only; the webhook reads it back when the checkout completes."""
+    if interval not in ("month", "year"):
+        raise ValueError(f"unsupported interval {interval!r}")
+    amount = int(unit_amount_cents if unit_amount_cents is not None else tier["price_cents"])
     if price_id:
         line_item: dict[str, Any] = {"price": price_id, "quantity": 1}
     else:
+        suffix = " (annual)" if interval == "year" else ""
         line_item = {"quantity": 1, "price_data": {
-            "currency": "usd", "unit_amount": tier["price_cents"],
-            "recurring": {"interval": "month"},
-            "product_data": {"name": f"LeadPilot {tier['name']}"},
+            "currency": "usd", "unit_amount": amount,
+            "recurring": {"interval": interval},
+            "product_data": {"name": f"LeadPilot {tier['name']}{suffix}"},
         }}
-    metadata = {"user_id": user_id, "billing_model": "monthly", "tier": tier["id"]}
+    metadata = {"user_id": user_id, "billing_model": billing_model, "tier": tier["id"]}
+    subscription_data: dict[str, Any] = {"metadata": metadata}
+    if trial_end is not None:
+        subscription_data["trial_end"] = int(trial_end)
+    elif trial_days and int(trial_days) > 0:
+        subscription_data["trial_period_days"] = int(trial_days)
     return _request("POST", "/v1/checkout/sessions", {
         "mode": "subscription", "customer": customer_id,
         "line_items": [line_item],
-        "subscription_data": {"trial_period_days": trial_days, "metadata": metadata},
-        "metadata": metadata, "client_reference_id": user_id,
+        "subscription_data": subscription_data,
+        "metadata": {**(session_metadata or {}), **metadata},
+        "client_reference_id": user_id,
         "success_url": success_url, "cancel_url": cancel_url,
     })
+
+
+def retrieve_subscription(subscription_id: str) -> dict:
+    """The subscription object itself (status, trial, period, price). The
+    checkout-completed event does not carry it, and events can arrive in any
+    order, so the handler reads Stripe's current state instead of guessing."""
+    return _request("GET", f"/v1/subscriptions/{subscription_id}")
+
+
+def expire_checkout_session(session_id: str) -> dict:
+    """Close an OPEN Checkout Session so it can no longer complete. Stripe
+    refuses (400) a session that is already complete or expired; callers
+    treat that as nothing to do."""
+    return _request("POST", f"/v1/checkout/sessions/{session_id}/expire")
+
+
+def void_open_invoices(subscription_id: str) -> list[str]:
+    """Void every OPEN invoice of a subscription, so a cancelled past-due
+    period is never collected later. Returns the voided invoice ids."""
+    listing = _request("GET", f"/v1/invoices?subscription={subscription_id}&status=open")
+    voided = []
+    for invoice in listing.get("data") or []:
+        if invoice.get("id") and invoice.get("status") == "open":
+            _request("POST", f"/v1/invoices/{invoice['id']}/void",
+                     idempotency_key=f"void-{invoice['id']}")
+            voided.append(invoice["id"])
+    return voided
 
 
 def create_setup_checkout(*, customer_id: str, user_id: str, success_url: str,
