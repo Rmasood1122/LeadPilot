@@ -1,16 +1,20 @@
 /**
- * The public status page (status.calendarharvest.com — a separate Vercel
- * project in /status-page; docs/program/STATUS_PAGE.md).
+ * Link to the public status page: /status on this site
+ * (www.calendarharvest.com/status/, src/app/status/page.tsx;
+ * docs/program/STATUS_PAGE.md).
  *
- * SHOW_STATUS_LINK stays false until the founders have added the DNS record
- * and the page loads on its domain ("Go-live" in STATUS_PAGE.md). A link to
- * a domain that does not resolve yet would look like an outage of its own.
- * Flipping it to true shows "Status" in the marketing footer and in the
- * support widget header.
+ * The page is part of this static export on Vercel, so it needs no DNS record
+ * and keeps loading when the API on Render is down. Trailing slash because the
+ * export uses `trailingSlash: true` (next.config.js), so the file is
+ * status/index.html.
+ *
+ * SHOW_STATUS_LINK shows "Status" in the marketing footer (Company column)
+ * and an icon link in the support widget header. The optional subdomain app
+ * in /status-page is no longer what this link points to.
  */
-export const STATUS_PAGE_URL = "https://status.calendarharvest.com";
+export const STATUS_PAGE_URL = "/status/";
 
-export const SHOW_STATUS_LINK = false;
+export const SHOW_STATUS_LINK = true;
 
 export interface StatusPageLink {
   href: string;

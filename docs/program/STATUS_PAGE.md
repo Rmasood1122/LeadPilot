@@ -1,13 +1,151 @@
-# status.calendarharvest.com — Phase 3
+# LeadPilot status page — Phase 3
 
-Status: built and drilled locally on branch `claude/status-page` (2026-10-11).
-**Not live.** The founders still have to do D6 (UptimeRobot read-only key and the DNS
-record) and decide D2 (the production worker). The CI job must land in its own
-`gate/` PR (section 9). Spec: `STAR_PROMPT.md` §A.5.
+**Primary location (2026-10-11): https://www.calendarharvest.com/status/** — a public page
+inside the main frontend (`frontend/src/app/status/`), deployed by the existing Vercel project
+"lead-pilot" that builds `frontend/` as a static export. `calendarharvest.com` 308-redirects to
+`www`, so both reach it. No DNS record, no second Vercel project, no secret is needed.
 
-Principle: the page must not depend on what it reports on. If the API is down,
-the page still loads and says so. If it cannot check something, it says "No data",
-never "Operational".
+The separate `status-page/` app for `status.calendarharvest.com` (Part B below) is now
+**optional**. It is built and drilled but not deployed (no DNS). It adds what the primary page
+does not have: UptimeRobot data (90-day uptime bars, an independent "Website & app" check),
+RSS/Atom feeds and per-incident pages. Deploy it only if the founders want those.
+
+Principle (both pages): the page must not depend on what it reports on. If the API is down,
+the page still loads and says so. If it cannot check something, it says "No data", never
+"Operational".
+
+# Part A — www.calendarharvest.com/status (primary)
+
+## A1. How it works
+
+```
+ browser ──► www.calendarharvest.com/status/   (Vercel project "lead-pilot", static export:
+               │                                out/status/index.html, no server code)
+               │  on load, then every 30 s while the tab is visible; 8 s timeout
+               └─► LeadPilot API  GET ${NEXT_PUBLIC_API_URL}/status/public   (Render)
+                     the same checks as GET /health (app/services/health_checks.py)
+```
+
+- The HTML is static and served by Vercel's CDN, independent of Render. The live part
+  (`frontend/src/components/status/StatusBoard.tsx`) runs in the visitor's browser.
+- **Polling:** once on load, then every 30 s; paused while the tab is hidden; when the tab
+  comes back it checks at once if 30 s have passed, otherwise waits only the remainder.
+  A "Check now" button forces a check. One request in flight at a time.
+- **Unreachable:** network error, CORS rejection, 8 s timeout, any non-2xx other than 429
+  (for example the host's error page while the service is down), or a body that is not the expected
+  JSON → headline **"LeadPilot API unreachable — major outage"**, API shown as Major outage,
+  the other components "No data", plus one plain sentence (e.g. "did not answer within 8
+  seconds"). Earlier good data is dropped, never shown as current.
+- **429** (rate limited) is not an outage: the last good result stays, marked with its time,
+  and the next check waits 2 minutes. With no earlier result the headline is "Some systems
+  could not be checked".
+- **Never Operational for something unchecked:** an unknown status value, or a known component
+  missing from the answer, shows "No data", and the headline then reads "Some systems could not
+  be checked" rather than "All systems operational".
+- **Nothing internal reaches the page:** only `id`, `name` and `status` are read from the
+  response; no status codes, hostnames or error text are rendered (tests below).
+- Shows: overall headline, the 4 components from `/status/public`, "Last checked <local
+  time>", active incidents, past incidents ("No incidents reported." when empty).
+- **Accessibility:** the summary is a polite live region; every state has a text label and its
+  own icon shape (check, triangle, minus-circle, octagon, wrench, question mark, wifi-off), never
+  colour alone; status colours are tested ≥ 4.5:1 on the page background. Layout is one column,
+  `max-w-3xl` with a 16 px gutter on phones; component rows wrap.
+- **Styling:** follows the marketing pages (about, how-it-works), which are dark-only
+  (`bg-[#0a0a0a]`); there is no light variant of the marketing site to follow.
+- **Without JavaScript:** a `<noscript>` line says JavaScript is needed for the live check.
+- Links: footer "Status" (Company column) and the support widget's "Service status" icon, both
+  `/status/` (`frontend/src/lib/statusPage.ts`, `SHOW_STATUS_LINK = true`). The widget link
+  opens in the same tab (a relative `target="_blank"` link is unreliable in the Capacitor app).
+- The Android app bundles the same export, so `/status/` also works inside the app; its origin
+  (`https://localhost`) is always allowed by CORS (`app/main.py`).
+
+| File | What |
+|---|---|
+| `frontend/src/app/status/page.tsx` | The route (outside the authenticated `(app)` group), nav, footer |
+| `frontend/src/components/status/StatusBoard.tsx` | Fetching schedule and rendering only |
+| `frontend/src/lib/statusBoard.ts` | Pure logic: parsing, overall state, unreachable/429 handling, refresh decisions, colours |
+| `frontend/src/lib/statusIncidents.ts` | The incident list and its validator |
+| `frontend/src/tests/statusBoard.test.ts`, `statusBoardPage.test.tsx`, `statusIncidents.test.ts`, `statusPageLink.test.tsx` | vitest |
+| `tests/test_status_page_frontend_contract.py` | Component ids/names and status vocabulary in `statusBoard.ts` must equal `app/api/status_public.py`; CORS answers a configured origin and no other |
+
+## A2. CORS and rate limit (backend, unchanged)
+
+- The browser calls the API cross-origin from `https://www.calendarharvest.com`. No backend
+  change was made: `CORSMiddleware` in `app/main.py` allows the comma-separated `CORS_ORIGINS`
+  env var, which must already contain the frontend origin or the signed-in app could not call
+  the API at all. The page sends a CORS "simple" GET (no credentials, no custom headers), so
+  there is no preflight. **Founder check (not verifiable from the repo):** Render →
+  leadpilot-api → Environment → `CORS_ORIGINS` contains `https://www.calendarharvest.com`
+  exactly (scheme, `www`, no trailing slash). Quick check from any terminal:
+  `curl -s -o /dev/null -D - -H "Origin: https://www.calendarharvest.com" https://leadpilot-api-ph3t.onrender.com/status/public | grep -i access-control-allow-origin`
+  must print that origin. If it prints nothing, add the origin to `CORS_ORIGINS` and redeploy.
+- `RATE_LIMIT_PUBLIC_STATUS` (default 600/hour per client IP). One open tab makes 120
+  requests/hour, so about 5 tabs behind one shared address (office NAT, carrier-grade NAT) reach
+  the limit; the page then backs off as described above. Raise the env var on Render if that
+  happens in practice; no code change is needed.
+
+## A3. Posting an incident (primary page)
+
+A pull request that edits one file: `frontend/src/lib/statusIncidents.ts`.
+
+1. Branch, add an object to `INCIDENTS` (the commented example in the file shows the shape):
+   `id` = `YYYY-MM-DD-<slug>` (UTC date of the first update), `title` (≤ 120 characters, what
+   customers noticed), `impact` (`none | minor | major | critical | maintenance`), `components`
+   (`website`, `api`, `background-processing`, `ai-features`, `booking-pages`), `updates`
+   oldest first, each `{status, at, text}` with `status` one of
+   `investigating | identified | monitoring | resolved` and `at` in UTC ending in `Z`.
+2. `cd frontend && npx vitest run src/tests/statusIncidents.test.ts` — every entry must pass
+   `validateIncident` (UTC times, not in the future, in order, at most one `resolved` and only
+   last, id date = first update's date, known components).
+3. Open the PR, merge with `scripts/gate/safe_merge.sh <PR>`. Vercel redeploys `frontend/`; the
+   incident is live when the deploy finishes.
+4. For each new update, append to `updates` in the same object. Resolve with a final
+   `resolved` update. Never change a published `id`.
+
+While unresolved, an incident shows each listed component at least as bad as its impact
+(minor → Degraded, major → Partial outage, critical → Major outage, maintenance → Under
+maintenance only while the checks say Operational); it never makes a component look better.
+Writing rules as in `status-page/incidents/README.md`: facts only, UTC times, no internal
+hostnames, error messages, queue names, customer names or counts.
+
+A typo in a field value fails `tsc`, which `next build` runs, so Vercel will not deploy it. The
+validator runs in `npm test`, which the `verify-frontend` CI job runs on PRs touching
+`frontend/`; that job is **not** in `scripts/gate/required_checks.txt`, so check it is green
+before merging. Same limitation as Part B: the sealed `gate` job (~9 minutes) runs on every PR.
+If the optional subdomain app is ever deployed, post the incident there too (Part B §7); the
+two lists are separate.
+
+## A4. Verification done (2026-10-11, build sandbox)
+
+- vitest: the four files above, including malformed JSON, timeout (fake timers, 8 s), network
+  failure, 5xx page, 429, degraded component, all ok, missing/unknown component, tab hidden →
+  no polling → visible → immediate check.
+- `NEXT_PUBLIC_API_URL=https://api.example.test npm run build`: the export contains
+  `out/status/index.html` (title "LeadPilot Status | Calendarharvest", static "Checking
+  status…" and "No incidents reported."), the API origin is compiled into the page chunk, and
+  `out/about/index.html` links `href="/status/"`. (Google Fonts is blocked in the sandbox; the
+  build used Next's `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` test hook for the Inter font.)
+- **Not done (needs a browser and production):** opening the page on the Vercel preview or
+  production, the CORS founder check above, a real outage drill (stop the API, watch the page
+  switch within one 30 s cycle + 8 s timeout), and a Lighthouse accessibility score.
+
+## A5. Go-live checklist (primary)
+
+- [ ] Merge; Vercel deploys `frontend/`; https://www.calendarharvest.com/status/ loads.
+- [ ] CORS founder check (A2) prints the www origin; the page shows the four components.
+- [ ] UptimeRobot clean-up and keyword fix (section 4) — independent of this page but it is the
+      only thing that alerts the founders; this page alerts nobody.
+- [ ] Lighthouse accessibility ≥ 95 on the live URL, recorded here.
+- [x] `SHOW_STATUS_LINK = true` (footer + support widget link to `/status/`).
+- [x] Help-center articles 30 and 29 describe this page.
+
+# Part B — optional: status.calendarharvest.com (`status-page/` app)
+
+Status: built and drilled locally on branch `claude/status-page` (2026-10-11). **Not live,
+and no longer required.** To deploy it the founders would still have to do D6 (UptimeRobot
+read-only key and the DNS record) and decide D2 (the production worker), and the CI job must
+land in its own `gate/` PR (section 9). Spec: `STAR_PROMPT.md` §A.5. If it is deployed, the
+site links can stay on `/status/` (Part A) or point at the subdomain; decide then.
 
 ## 1. Architecture
 
@@ -82,8 +220,9 @@ labelled), because the independent check says it answers.
 ## 3. `GET /status/public` (backend)
 
 `app/api/status_public.py`, registered in `app/main.py`. Unauthenticated. No auth middleware
-exists in this app (auth is per-route), so nothing needed allow-listing; CORS is not widened
-because only the status site's server calls it.
+exists in this app (auth is per-route), so nothing needed allow-listing. Callers: visitors'
+browsers on www.calendarharvest.com/status/ (Part A; CORS via the existing `CORS_ORIGINS`, see
+A2) and, if deployed, this app's server (no CORS involved).
 
 ```json
 {"components":[
@@ -106,7 +245,7 @@ because only the status site's server calls it.
   response bytes are pinned by `TestHealthUnchanged` (9 tests), which passed against the original
   `health.py` before the move and again after.
 
-## 4. UptimeRobot — what the founders do (D6)
+## 4. UptimeRobot — what the founders do (D6; worth doing for either page)
 
 Names must match exactly (case ignored): the site finds monitors by name.
 
@@ -130,6 +269,16 @@ the healthy body, which only the top-level status produces:
 `tests/test_status_public.py` pins that prefix (healthy body starts with it; degraded body does
 not contain it).
 
+This keyword belongs to the **`/health`** monitor. `GET /status/public` never contains it: its
+body is `{"components":[...]}` with no top-level `status`, so a keyword monitor on
+`/status/public` set to `{"status":"ok","components"` would be permanently DOWN. Keep the
+keyword monitor on `/health` (steps below). If a monitor on `/status/public` is wanted too,
+make it a plain HTTP(s) monitor (it answers 200 whenever the API is up; component detail is
+for the status page, not for alerting).
+
+Monitors run independently of both status pages, and they are the only thing that **alerts**
+the founders: the Part A page only shows status to whoever opens it.
+
 Steps:
 1. **Delete** the two paused duplicates (804162778, 804162687).
 2. **Edit** 804163676: rename to `LeadPilot - API healthy`; keyword value
@@ -145,12 +294,14 @@ Steps:
 | `LeadPilot - API` | HTTP(s) | `https://leadpilot-api-ph3t.onrender.com/health` | Down on 503 (DB/Redis down) or no answer. 200 for "degraded", so this means "API answers" |
 | `LeadPilot - Worker` | HTTP(s) | `https://leadpilot-worker-708k.onrender.com/health` | **Needs D2 first.** The worker does expose HTTP: `render.yaml` runs it as a free web service, `scripts/render_worker_entrypoint.sh` starts `app/worker_health.py`, which answers 503 when a Celery child died. A 5-minute ping keeps the free worker awake (D2 option A) but uses ~730 of the 750 free instance-hours per month shared with the API (`BASELINE.md` §6, unverified against Render's current terms). If D2 = paid Background Worker, the service has no HTTP; skip this monitor and the page derives background status from the keyword monitor. |
 
-4. **Read-only API key:** UptimeRobot dashboard → Integrations & API (older dashboards: My
+4. **Read-only API key** (only needed for the optional Part B app; Part A does not use UptimeRobot): UptimeRobot dashboard → Integrations & API (older dashboards: My
    Settings → API Settings) → Read-Only API Key → create. Menu labels unverified; the key type is
    "read-only" (it can call `get*` methods only). Do not use the main or a monitor-specific key.
-5. Do **not** create an UptimeRobot public status page; this site replaces it.
+5. Do **not** create an UptimeRobot public status page; www.calendarharvest.com/status/ replaces it.
+6. Optional: an HTTP(s) monitor `LeadPilot - Status page` on `https://www.calendarharvest.com/status/`
+   (proves the page itself is served; it is static, so it does not test the API).
 
-## 5. Vercel — what the founders do (D6)
+## 5. Vercel — what the founders do (D6; optional Part B only)
 
 1. vercel.com → Add New → Project → import `Rmasood1122/LeadPilot` (same repo as the frontend;
    a second project).
@@ -172,21 +323,19 @@ Steps:
 6. Optional: Settings → Git → Ignored Build Step so only `status-page/` changes rebuild it.
    (Incident files are inside `status-page/`, so they still deploy.)
 
-## 6. Go-live checklist
+## 6. Go-live checklist (optional Part B)
 
 - [ ] D2 decided; worker monitor created or deliberately skipped (section 4).
 - [ ] Monitors renamed/created, duplicates deleted, keyword fixed.
 - [ ] Vercel project, env vars, domain, DNS (section 5); page loads on its domain.
 - [ ] Lighthouse accessibility ≥ 95 on the live URL recorded here.
 - [ ] `gate/` PR with the `verify-status-page` job merged (section 9).
-- [ ] Then set `SHOW_STATUS_LINK = true` in `frontend/src/lib/statusPage.ts`: shows "Status" in
-      the marketing footer (Company column) and an icon link in the support widget header.
-      It is `false` now so nobody is sent to a domain that does not resolve.
-- [ ] Help-center article 30 links here (Phase 2; `docs/help-center/` does not exist on this branch).
+- [ ] Decide whether the site links (`frontend/src/lib/statusPage.ts`, now `/status/`) stay on
+      Part A or move to the subdomain, and update help-center article 30 to match.
 
-## 7. Posting an incident
+## 7. Posting an incident (optional Part B)
 
-A pull request that adds or edits one file. Format and rules: `status-page/incidents/README.md`.
+For the primary page see A3. For this app: a pull request that adds or edits one file. Format and rules: `status-page/incidents/README.md`.
 
 1. Branch, add `status-page/incidents/YYYY-MM-DD-<slug>.md` (date = UTC date of the first update).
 2. `cd status-page && npm run incident-lint` (≈1 s).
