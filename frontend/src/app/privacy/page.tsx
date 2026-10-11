@@ -11,7 +11,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Clanderharvest",
+  title: "Privacy Policy | Calendarharvest",
   description: "How LeadPilot Enterprise collects, uses, and protects your data.",
   robots: "index, follow",
 };
@@ -30,7 +30,7 @@ export default function PrivacyPage() {
 
           <Section title="1. Who we are and what this policy covers">
             <p>
-              LeadPilot Enterprise is operated by Clanderharvest (&quot;we&quot;, &quot;us&quot;, or
+              LeadPilot Enterprise is operated by Calendarharvest (&quot;we&quot;, &quot;us&quot;, or
               &quot;our&quot;). We run done-with-you outbound pipeline campaigns for businesses. This policy
               explains how we collect, use, store, and protect personal data when you visit
               calendarharvest.com, use the LeadPilot dashboard, or engage us to run outreach on your behalf.
@@ -136,9 +136,14 @@ export default function PrivacyPage() {
           <Section title="8. Data retention">
             <p>
               We keep account data for as long as your account is active and for as long as needed to meet
-              legal, tax, and accounting obligations. When you ask us to delete your data, we will delete it
-              within 30 days, except for records we are legally required to keep. Prospect data collected for
-              a client campaign is deleted when that client&apos;s engagement ends or on request.
+              legal, tax, and accounting obligations. We do not run an automatic deletion schedule for account or
+              prospect data: it stays in your account until it is deleted. You can erase an individual
+              prospect&apos;s personal data from the dashboard at any time; their email address, phone number, and
+              LinkedIn profile are then added to a do-not-contact list that is checked before every send, and a
+              record that the erasure took place is kept. Deleting a campaign strategy deletes its research,
+              prospects, sequences, and messages with it. You can download a copy of the data in your account from
+              your profile page. To ask us to delete your account or any other data, contact us at the address
+              below.
             </p>
           </Section>
 

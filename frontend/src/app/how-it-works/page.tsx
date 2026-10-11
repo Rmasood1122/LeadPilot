@@ -10,7 +10,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
-  title: "How LeadPilot Works | Clanderharvest",
+  title: "How LeadPilot Works | Calendarharvest",
   description: "LeadPilot builds and runs your outbound pipeline. Here is exactly how it works.",
 };
 
@@ -18,17 +18,17 @@ const STEPS = [
   {
     number: "01",
     title: "Research",
-    body: "We run a 72-step research pipeline on every prospect. Real LinkedIn profile analysis. Pain signals sourced from actual posts and activity — not guessed. No fabricated data. Every prospect is scored before we write a single word.",
+    body: "Each campaign starts with a 72-step research pipeline (144 steps if you have no past clients yet) covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses go through a verification check, undeliverable ones are dropped, and the prospects that remain are scored for fit. Right before an email is written, LeadPilot can pull the prospect's recent LinkedIn posts and company news so the first line references something real, and the AI is instructed never to invent a detail.",
   },
   {
     number: "02",
     title: "Outreach",
-    body: "Personalised LinkedIn DMs and emails written in your voice. Sent by human senders — not bots. LinkedIn compliance maintained. A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call.",
+    body: "Personalised emails and LinkedIn messages, written in your voice when you add writing samples. Sequences send automatically from the Gmail and LinkedIn accounts you connect, only during permitted sending hours in the prospect's own time zone and within daily sending limits. Opt-outs are re-checked immediately before every send. By default, messages to senior decision-makers, to prospects whose last reply was an objection, or whose copy trips our tone checks are held for your approval before they go. A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call.",
   },
   {
     number: "03",
     title: "Learning",
-    body: "Every reply makes the next campaign smarter. Reply rates tracked. ICP refined. The system compounds over time. You get a Pipeline Health Score updated every 6 hours and a monthly ROI report.",
+    body: "Every reply makes the next campaign smarter. Reply rates tracked. ICP refined. The system compounds over time. A Revenue & ROI dashboard shows what each campaign has won, what it cost, and your cost per booked meeting.",
   },
 ];
 

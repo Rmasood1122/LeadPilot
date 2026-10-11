@@ -6,7 +6,7 @@ Help-center articles and specs may cite this file as a source.
 
 | ID | Decision | Date decided | Recorded | Consequences |
 |---|---|---|---|---|
-| D1 | Website copy vs. what the code does | — | — | **Unanswered.** Blocks Phase 2 articles 01, 09, 10, 11. |
+| D1 | Website copy vs. what the code does | **Code is the truth**, 2026-10-10 | 2026-10-10 | Public website copy must describe what the code actually does; where copy and code disagree, the copy is corrected, not the other way round. Applied to `/how-it-works`, `/about`, `/terms`, `/privacy` and the footer: outreach is sent automatically (Gmail, LinkedIn via Unipile, WhatsApp) within compliance limits, with the send-review queue holding high-risk messages for human approval; research runs per campaign strategy (72 steps, or 144 for the no-clients flow), not per prospect; brand spelled "Calendarharvest". `frontend/src/tests/websiteClaims.test.ts` fails if the removed claims return. Terms and Privacy wording changes need founder/legal review before merge. Unblocks Phase 2 articles 01, 09, 10, 11. |
 | D2 | Production worker hosting | **Deferred to Phase 3** | 2026-10-10 | No production requests in Phase 0 follow-up sessions. Options A/B/C stay as written in `BASELINE.md` §6. |
 | D3 | Repository visibility | **Private**, 2026-10-10 | 2026-10-10 | `BASELINE.md` may be pushed. On GitHub Free, rulesets and branch protection are not available on private repositories (see GH-PRO). |
 | D4 | "70% better than competitors" | n/a | — | Not a decision; replaced by the R.3 scorecard. Do not publish the claim. |
@@ -18,6 +18,8 @@ Help-center articles and specs may cite this file as a source.
 | GH-PRO | Buy GitHub Pro | **No**, 2026-10-10 | 2026-10-10 | Will not be purchased. The Layer 4 ruleset (`STAR_PROMPT.md` §A.3: `ruleset_master.json`, `apply_ruleset.sh`, required status checks and approvals on `master`) is **dropped**. Phase 1 will use a replacement design the founders supply in the next session. Actions budget stays at 2,000 min/month (Free); see `BASELINE.md` §11.2. |
 | P0-D | Deployment model | **Self-hosted, single-tenant**, 2026-10-04 | 2026-10-10 | See below. |
 | P0-5-CAPS | Daily AI spend cap per plan (USD per UTC day) | — | — | **Unanswered.** `app/core/plans.py` ships placeholders so no plan is unlimited: free 10, starter 25, growth 60, pay_per_meeting 60, scale 150, pro 150, enterprise 400. Founders confirm or replace the numbers, and say whether a monthly cap is wanted as well (`BASELINE.md` §12 item 3 proposed monthly). Detail: `plans/p0-5-account-spend-cap.md`. |
+| FEATURE-SPECS | Feature specs and code ship together | **Same PR**, 2026-10-10 | 2026-10-10 | A feature's spec (`docs/features/*.md` or equivalent) and its code change land in the same PR, so the spec always describes merged behaviour. Founders review the spec and code together at merge (post-merge review under MERGE-B). |
+| AUTHOR | Commit author identity | **`Ahmad317-Engineer <devsahmad37@gmail.com>`**, 2026-10-10 | 2026-10-10 | New commits are authored as `Ahmad317-Engineer <devsahmad37@gmail.com>`. Existing open PRs are **not** rewritten to change their author. |
 
 ## P0-D — self-hosted, single-tenant (decided 2026-10-04)
 

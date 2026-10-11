@@ -73,7 +73,7 @@ EXISTING PAGES TO LINK TO:
 
 BRAND CONTEXT:
 Product: LeadPilot Enterprise
-Also known as: Clanderharvest
+Also known as: Calendarharvest
 Founder: Rehan Masood
 ICP: Boutique agency founders, 3-30 staff
 Markets: US, UK, Canada, Australia, New Zealand, Ireland, Singapore

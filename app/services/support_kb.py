@@ -91,9 +91,14 @@ FAQ: tuple[FaqEntry, ...] = (
         id="how-outreach-works",
         question="How does outreach work?",
         answer=(
-            "LeadPilot produces draft messages only. A human clicks send every "
-            "time. Nothing is automated on LinkedIn. Gmail and WhatsApp "
-            "outreach runs automatically within compliance limits."
+            "Once you launch a campaign, LeadPilot sends its sequences "
+            "automatically from the Gmail, LinkedIn and WhatsApp accounts you "
+            "connect, within compliance limits: only in permitted sending "
+            "hours in the prospect's time zone, within daily per-account "
+            "limits, and with an opt-out check right before every send. By "
+            "default, messages to senior decision-makers, to prospects whose "
+            "last reply was an objection, or whose copy trips the tone checks "
+            "are held in the review queue for your approval first."
         ),
         keywords=("outreach", "send", "linkedin", "automation", "automated",
                   "email", "whatsapp", "draft", "compliance"),
