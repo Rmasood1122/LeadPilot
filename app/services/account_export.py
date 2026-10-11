@@ -66,6 +66,8 @@ OWNERSHIP: dict[str, list[str]] = {
     "external_crm_connections": ["user_id"],
     "external_crm_links": ["user_id"],
     "gmail_accounts": ["user_id"],
+    "guardrail_exclusions": ["user_id"],
+    "guardrail_library": ["user_id"],
     "integration_tokens": ["user_id"],
     "linkedin_accounts": ["user_id"],
     "linkedin_connection_matches": ["user_id"],

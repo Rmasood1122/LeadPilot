@@ -27,6 +27,7 @@ import { oauthResultMessage } from "@/lib/api/ecosystem";
 import { ComplianceAuditCard, DeliverabilityCard } from "@/components/settings/DeliverabilityCard";
 import { MailboxHealthCard } from "@/components/settings/MailboxHealthCard";
 import { AuditTrailCard } from "@/components/settings/AuditTrailCard";
+import { GuardrailsCard } from "@/components/settings/GuardrailsCard";
 import { ShareLinksCard } from "@/components/settings/ShareLinksCard";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -537,6 +538,8 @@ export default function SettingsPage() {
           <MailboxHealthCard />
           <DeliverabilityCard />
           <ComplianceAuditCard />
+          {/* F05: exclusion lists + approved-claims / forbidden-phrases library. */}
+          <GuardrailsCard />
           {/* Feature A2: the hash-chained activity trail + signed export. */}
           <AuditTrailCard />
         </div>

@@ -11,6 +11,8 @@ Guarantees (mirroring the M1 engine's resumability rule):
   stage re-runs and continues with whatever leads are still behind.
 - Suppression list is checked at sourcing time AND again whenever a new
   email/phone is discovered. No exceptions — compliance rule.
+- F05 Guardrails Studio (system setting guardrails_enabled): the owning
+  account's exclusion lists are checked at the same three points.
 
 Each task body is a plain `_impl` function taking a Session, so the test
 suite exercises the real logic with SQLite + fake adapters and zero
@@ -213,13 +215,26 @@ def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
     # an account can be downgraded between the request and this task.
     remaining = strategy_lead_room(session, batch.strategy_id)
 
-    added = skipped_duplicate = skipped_suppressed = skipped_plan_limit = 0
+    # F05 Guardrails Studio: the account's own exclusion lists (customers, open
+    # deals, churned, do-not-contact). None when the feature is off, and then
+    # nothing below changes -- not even the shape of the result.
+    from app.services import guardrails  # noqa: PLC0415
+
+    guard_owner = guardrails.active_owner(session, batch.strategy_id)
+
+    added = skipped_duplicate = skipped_suppressed = skipped_plan_limit = skipped_excluded = 0
     for raw in raw_leads:
         if remaining is not None and remaining <= 0:
             skipped_plan_limit += 1
             continue
         if is_suppressed(session, raw.email, raw.phone):
             skipped_suppressed += 1
+            continue
+        if guard_owner is not None and guardrails.find_match(
+                session, guard_owner, email=raw.email, phone=raw.phone,
+                linkedin=_linkedin_url(raw.raw), company=raw.company,
+                domains=[raw.company_domain]) is not None:
+            skipped_excluded += 1
             continue
         if _lead_exists(session, batch, raw):
             skipped_duplicate += 1
@@ -249,6 +264,8 @@ def source_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
 
     counts = {"added": added, "duplicates": skipped_duplicate, "suppressed": skipped_suppressed,
               "plan_limit": skipped_plan_limit}
+    if guard_owner is not None:
+        counts["excluded"] = skipped_excluded
     logger.info("batch %s sourced: %s", batch_id, counts)
     return counts
 
@@ -261,6 +278,10 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
     leads = session.execute(
         select(Lead).where(Lead.batch_id == batch_id, Lead.status == LeadStatus.SOURCED)
     ).scalars().all()
+
+    from app.services import guardrails  # noqa: PLC0415
+
+    guard_owner = guardrails.active_owner(session, batch.strategy_id)
 
     processed = 0
     for lead in leads:
@@ -280,9 +301,21 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
 
         new_email = lead.email or enriched.email
         new_phone = lead.phone or enriched.phone
+        # F05: enrichment can reveal who this really is (the company domain,
+        # an email) -- an excluded identity is dropped here, before any
+        # sequence can be built on it.
+        excluded = None if guard_owner is None else guardrails.find_match(
+            session, guard_owner, email=new_email, phone=new_phone,
+            linkedin=lead.linkedin_url or _linkedin_url(enriched.enrichment),
+            company=lead.company or enriched.company,
+            domains=[enriched.company_domain, stored.get("company_domain")])
         if is_suppressed(session, new_email, new_phone):
             lead.status = LeadStatus.DROPPED
             lead.enrichment_json = {**stored, "dropped_reason": "suppressed"}
+        elif excluded is not None:
+            lead.status = LeadStatus.DROPPED
+            lead.enrichment_json = {**stored, "dropped_reason": "excluded",
+                                    "excluded_by": str(excluded.id)}
         else:
             lead.email = new_email
             lead.phone = new_phone
@@ -326,6 +359,10 @@ def find_missing_emails_impl(
         select(Lead).where(Lead.batch_id == batch_id, Lead.status == LeadStatus.ENRICHED)
     ).scalars().all()
 
+    from app.services import guardrails  # noqa: PLC0415
+
+    guard_owner = guardrails.active_owner(session, batch.strategy_id)
+
     found = already_had = dropped = 0
     for lead in leads:
         if lead.email:
@@ -343,6 +380,17 @@ def find_missing_emails_impl(
                 **(lead.enrichment_json or {}),
                 "dropped_reason": "no_email_found" if not email else "suppressed",
             }
+            session.commit()
+            dropped += 1
+            continue
+        excluded = None if guard_owner is None else guardrails.find_match(
+            session, guard_owner, email=email)
+        if excluded is not None:
+            # F05: the found address is on this account's exclusion list.
+            lead.status = LeadStatus.DROPPED
+            lead.enrichment_json = {**(lead.enrichment_json or {}),
+                                    "dropped_reason": "excluded",
+                                    "excluded_by": str(excluded.id)}
             session.commit()
             dropped += 1
             continue

@@ -319,6 +319,14 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.crm_tasks.sync_all",
         "schedule": 900.0,
     },
+    # F05 Guardrails Studio: customers / open deals / churned from the CRM
+    # (and LeadPilot's own deals) into each account's exclusion lists. Daily:
+    # a customer list changes slowly, and the send-time check reads whatever
+    # is there. A no-op while guardrails_enabled is off.
+    "guardrails-crm-sync": {
+        "task": "app.workers.crm_tasks.guardrails_crm_sync_all",
+        "schedule": crontab(hour=6, minute=35),
+    },
     # Feature Group 9: daily blacklist + health check of every sending
     # domain. A new listing pauses the user's campaigns immediately.
     # Part 1 Feature 7: dated return visits from "not now" replies. Daily at

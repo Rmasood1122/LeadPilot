@@ -163,6 +163,27 @@ class HubSpotClient:
                          params={"properties": ",".join(DEAL_PROPERTIES),
                                  "associations": "contacts"})
 
+    # ---- search (F05 Guardrails Studio: customers / open deals / churned) ---
+    def search(self, object_type: str, filter_groups: list[dict], properties: list[str],
+               *, max_pages: int = 50) -> list[dict]:
+        """[{id, properties}] matching `filter_groups`, following the `after`
+        cursor 100 at a time, at most `max_pages` pages.
+        # TODO: verify against current HubSpot docs (CRM v3 search: paging,
+        # the 10,000-result ceiling, and the companies read scope)"""
+        out: list[dict] = []
+        after: str | None = None
+        for _ in range(max_pages):
+            payload: dict = {"filterGroups": filter_groups, "properties": properties,
+                             "limit": 100}
+            if after:
+                payload["after"] = after
+            data = self._req("POST", f"/crm/v3/objects/{object_type}/search", json=payload)
+            out.extend(data.get("results") or [])
+            after = (((data.get("paging") or {}).get("next") or {}).get("after"))
+            if not after:
+                break
+        return out
+
     # ---- pull ---------------------------------------------------------------
     def batch_read(self, object_type: str, ids: list[str], properties: list[str]) -> list[dict]:
         """[{id, properties, updatedAt}] for up to 100 ids per call."""

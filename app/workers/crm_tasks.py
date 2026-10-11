@@ -7,6 +7,8 @@ the learning loop -- so it runs with the other integration work.
   sync_connection             push-changed + pull for one connection
                               ("Sync now", and right after connecting)
   sync_all                    the 15-minute Beat sweep over every connection
+  guardrails_crm_sync_all     F05: daily customers/open deals/churned ->
+                              exclusion lists (no-op while the flag is off)
   import_hubspot_deal         a deal created in HubSpot on a linked contact
 """
 
@@ -74,6 +76,42 @@ def sync_all_impl(session) -> dict:
 @celery_app.task(name="app.workers.crm_tasks.sync_all")
 def sync_all() -> dict:
     return _session_call(sync_all_impl)
+
+
+def guardrails_crm_sync_all_impl(session) -> dict:
+    """F05 Guardrails Studio: once a day, pull customers / open deals /
+    churned into every account's exclusion lists. Does nothing while the
+    system setting guardrails_enabled is off. One account's failure never
+    stops the others."""
+    from app.db.models import Deal, Lead, LeadStatus, Product, Strategy  # noqa: PLC0415
+    from app.services import guardrails  # noqa: PLC0415
+
+    if not guardrails.enabled(session):
+        return {"status": "disabled"}
+    # Accounts with something to sync: a CRM connection, or local won leads /
+    # deals. Each account is then synced with its OWN user_id only.
+    owners = set(session.execute(select(CrmConnection.user_id)
+                                 .where(CrmConnection.status != "revoked")).scalars())
+    owners |= set(session.execute(select(Deal.user_id)).scalars())
+    owners |= set(session.execute(
+        select(Product.user_id).join(Strategy, Strategy.product_id == Product.id)
+        .join(Lead, Lead.strategy_id == Strategy.id)
+        .where(Lead.status == LeadStatus.CLOSED_WON)).scalars())
+    ok = failed = 0
+    for user_id in sorted(owners, key=str):
+        try:
+            guardrails.sync_from_crm(session, user_id)
+            ok += 1
+        except Exception:
+            session.rollback()
+            failed += 1
+            logger.exception("guardrails CRM sync failed for account %s", user_id)
+    return {"status": "ok", "accounts": len(owners), "ok": ok, "failed": failed}
+
+
+@celery_app.task(name="app.workers.crm_tasks.guardrails_crm_sync_all")
+def guardrails_crm_sync_all() -> dict:
+    return _session_call(guardrails_crm_sync_all_impl)
 
 
 @celery_app.task(name="app.workers.crm_tasks.import_hubspot_deal")

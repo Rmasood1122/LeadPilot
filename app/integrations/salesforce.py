@@ -114,6 +114,21 @@ class SalesforceClient:
         data = self._req("GET", "/query", params={"q": soql})
         return list(data.get("records") or [])
 
+    def query_all(self, soql: str, *, max_pages: int = 50) -> list[dict]:
+        """Every record of a query, following `nextRecordsUrl` (2,000 per page by
+        default), at most `max_pages` pages. F05 Guardrails Studio.
+        # TODO: verify against current Salesforce REST docs (query locator paging)"""
+        data = self._req("GET", "/query", params={"q": soql})
+        records = list(data.get("records") or [])
+        prefix = f"/services/data/{API_VERSION}"
+        for _ in range(max_pages - 1):
+            next_url = data.get("nextRecordsUrl")
+            if data.get("done", True) or not next_url:
+                break
+            data = self._req("GET", next_url.split(prefix, 1)[-1])
+            records.extend(data.get("records") or [])
+        return records
+
     def find_lead_by_email(self, email: str) -> str | None:
         rows = self.query(f"SELECT Id FROM Lead WHERE Email = {soql_quote(email)} "
                           "ORDER BY CreatedDate DESC LIMIT 1")

@@ -223,6 +223,15 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                     "before its rates count toward it."),
     "benchmark_window_days": (90, "Trailing window, in days, benchmarks are "
                               "computed over (7-365)."),
+    # F05 -- Guardrails Studio. Off by default: turning it on enforces each
+    # account's exclusion lists (domain / company / contact) at sourcing,
+    # enrollment and the send chokepoint, its forbidden phrases in the
+    # pre-launch review and at send, and its approved claims in claim
+    # verification. Opt-outs (the suppression list) are enforced either way.
+    "guardrails_enabled": (False, "Enforce each account's exclusion lists "
+                           "(customers, open deals, churned, do-not-contact) "
+                           "at sourcing and at send time, and its approved-"
+                           "claims / forbidden-phrases library."),
 }
 
 
