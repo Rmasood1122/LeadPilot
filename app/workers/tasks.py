@@ -135,7 +135,14 @@ def run_pipeline(self, strategy_id: str) -> str:
                 extract_icp_criteria,
             )
 
-            ensure_pattern_key(session, strategy, extract_icp_criteria(session, strategy))
+            from app.services import usage_meter  # noqa: PLC0415
+
+            # P0-5b: two model calls after the pipeline scope closed -- metered
+            # to the owner (on its daily AI limit; a refusal only defers the
+            # bucket binding to lead sourcing, which retries it).
+            with usage_meter.owner_scope(session, strategy, "icp"):
+                ensure_pattern_key(session, strategy,
+                                   extract_icp_criteria(session, strategy))
         except Exception:
             logger.exception("strategy %s: pattern_key assignment failed", strategy_id)
             session.rollback()

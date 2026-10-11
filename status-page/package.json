@@ -1,0 +1,35 @@
+{
+  "name": "leadpilot-status-page",
+  "version": "1.0.0",
+  "private": true,
+  "description": "status.calendarharvest.com - public status page for LeadPilot (docs/program/STATUS_PAGE.md)",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "type-check": "next typegen && tsc --noEmit",
+    "lint": "npm run type-check && npm run incident-lint",
+    "incident-lint": "node scripts/incident-lint.ts",
+    "test": "node --test --test-reporter=spec \"tests/**/*.test.ts\"",
+    "drill": "node scripts/drill.ts"
+  },
+  "dependencies": {
+    "next": "15.5.27",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "postcss": "8.5.29"
+  }
+}

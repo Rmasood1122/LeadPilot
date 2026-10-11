@@ -84,6 +84,7 @@ from app.api.devices import router as devices_router
 
 # M8 (prefixed routers)
 from app.api.health import router as health_router
+from app.api.status_public import router as status_public_router  # Phase 3
 from app.api.admin import router as admin_router
 from app.api.playbook import router as playbook_router
 from app.api.onboarding import router as onboarding_router
@@ -210,6 +211,9 @@ app.mount("/media", StaticFiles(directory=str(_MEDIA_DIR)), name="media")
 # ── Routers ───────────────────────────────────────────────────────────────────
 # M8 health router (prefix=/health) replaces the M1 inline /health endpoint.
 app.include_router(health_router)
+# Phase 3: GET /status/public, unauthenticated, for status.calendarharvest.com.
+# Built from the same checks as /health (app/services/health_checks.py).
+app.include_router(status_public_router)
 app.include_router(auth_router)
 app.include_router(analytics_router)
 app.include_router(ui_support_router)

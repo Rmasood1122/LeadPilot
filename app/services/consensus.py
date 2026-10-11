@@ -36,6 +36,7 @@ consensus, so the pipeline's retry/resume semantics are unchanged.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -166,7 +167,12 @@ def run_step(session: Session, strategy: Strategy, spec, *, system: str,
         return claude.complete(system=system, prompt=prompt)
 
     with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(_timed, openai.complete, system, prompt)
+        # A worker thread does not inherit context variables, so without
+        # copy_context() the usage scope was None there and GPT-4o spend was
+        # never recorded, even inside the pipeline scope (P0-5b). The copy
+        # holds the SAME scope object, so the thread's notes land in it.
+        future = pool.submit(contextvars.copy_context().run,
+                             _timed, openai.complete, system, prompt)
         started = time.monotonic()
         claude_text = claude.complete(system=system, prompt=prompt)  # may raise: pipeline retries
         claude_ms = int((time.monotonic() - started) * 1000)

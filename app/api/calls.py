@@ -37,7 +37,7 @@ from app.core.plans import PlanLimitExceeded, check_send_channel, plan_limit_res
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
 from app.db.models import Call, CallOutcome, CrmActivityKind, Lead, ProcessedWebhook, Strategy, User
-from app.services import credentials, crm_events, phone_calls, system_settings
+from app.services import credentials, crm_events, phone_calls, system_settings, usage_meter
 from app.workers import call_tasks
 
 router = APIRouter(tags=["calls"])
@@ -185,8 +185,10 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
 
     strategy = db.get(Strategy, lead.strategy_id)
     try:
-        call, meta = phone_calls.prepare_call(db, strategy, lead, body.brief,
-                                              owner_id=current_user.id)
+        # P0-5b: the call script is a model call, counted to the account.
+        with usage_meter.user_scope(db, current_user.id, "outreach"):
+            call, meta = phone_calls.prepare_call(db, strategy, lead, body.brief,
+                                                  owner_id=current_user.id)
         db.commit()
         result = PhoneChannel(session=db, vapi=vapi, eleven=eleven).send(OutboundMessage(
             message_id=str(uuid.uuid4()), lead_id=str(lead.id), to_address=call.to_number,

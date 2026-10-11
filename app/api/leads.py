@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.core.rate_limiting import enforce_rate_limit
 from app.api.schemas import (
     LeadBatchOut,
@@ -102,12 +103,14 @@ def source_leads_for_strategy(
         except PlanLimitExceeded as exc:
             raise HTTPException(status_code=402, detail=plan_limit_response(exc))
 
-    criteria = body.icp_criteria or extract_icp_criteria(db, strategy)
+    # P0-5b: both extractions are model calls on the account's daily limit.
+    with metered(db, current_user, "icp"):
+        criteria = body.icp_criteria or extract_icp_criteria(db, strategy)
 
-    # Bind this strategy to its playbook bucket. Sourcing is the first moment
-    # the ICP is concrete, and every learning-loop query filters on
-    # pattern_key -- see icp_extraction.ensure_pattern_key.
-    ensure_pattern_key(db, strategy, criteria)
+        # Bind this strategy to its playbook bucket. Sourcing is the first moment
+        # the ICP is concrete, and every learning-loop query filters on
+        # pattern_key -- see icp_extraction.ensure_pattern_key.
+        ensure_pattern_key(db, strategy, criteria)
 
     batch = LeadBatch(
         strategy_id=strategy.id,
@@ -244,9 +247,10 @@ def rescore_lead_fpta(
     written and `method` says `heuristic`, which is a usable score."""
     enforce_rate_limit(str(current_user.id), "fpta_rescore", "RATE_LIMIT_AI_ACTION")
     lead = _owned_lead(db, lead_id, current_user)
-    fpta_scoring.score_lead(db, lead)
-    return {"lead_id": str(lead.id), **fpta_scoring.detail(lead),
-            "engagement": fpta_scoring.engagement_note(db, lead)}
+    with metered(db, current_user, "lead_scoring", refuse_after=False):
+        fpta_scoring.score_lead(db, lead)
+        return {"lead_id": str(lead.id), **fpta_scoring.detail(lead),
+                "engagement": fpta_scoring.engagement_note(db, lead)}
 
 
 @router.post("/strategies/{strategy_id}/leads/fpta/rescore")
@@ -267,9 +271,10 @@ def rescore_strategy_fpta(
     if only_unscored:
         where.append(Lead.fpta_scored_at.is_(None))
     leads = db.execute(select(Lead).where(*where).limit(limit)).scalars().all()
-    scored = fpta_scoring.score_leads(db, strategy, list(leads))
-    return {"strategy_id": str(strategy_id), "scored": scored,
-            "only_unscored": only_unscored}
+    with metered(db, current_user, "lead_scoring", refuse_after=False):
+        scored = fpta_scoring.score_leads(db, strategy, list(leads))
+        return {"strategy_id": str(strategy_id), "scored": scored,
+                "only_unscored": only_unscored}
 
 
 @router.delete("/leads/{lead_id}", status_code=204)

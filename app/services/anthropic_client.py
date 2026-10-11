@@ -212,6 +212,7 @@ class ClaudeClient:
         # strategy's budget. No-op outside a budgeted scope.
         from app.services import usage_meter  # noqa: PLC0415
 
+        usage_meter.warn_if_unscoped("anthropic")
         usage_meter.check_budget(
             input_chars=len(system) + len(prompt), max_output_tokens=limit
         )

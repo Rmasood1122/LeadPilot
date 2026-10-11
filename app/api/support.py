@@ -1,6 +1,6 @@
 """AI customer support chat + ticket fallback (Feature 3).
 
-GET    /support/faq                 the curated knowledge base (suggested questions)
+GET    /support/faq                 suggested starter questions (answers from the help center)
 POST   /support/chat                ask a question, get a grounded answer
 GET    /support/chat/sessions       this user's conversations
 GET    /support/chat/sessions/{id}  one conversation with its messages
@@ -27,11 +27,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.config import settings
 from app.core.rate_limiting import client_ip, enforce_rate_limit
 from app.db.base import get_db
 from app.db.models import ChatMessage, ChatSession, SupportTicket, User
-from app.services import support_chat, support_kb
+from app.services import help_center, support_chat, support_kb
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,10 @@ def _message_out(message: ChatMessage) -> dict:
         "reason": message.reason,
         "confidence": message.confidence,
         "faq_ids": message.faq_ids or [],
+        # Phase 2: the help-center articles behind faq_ids, for "Sources:"
+        # under the answer. Resolved at read time, so rows stored with the
+        # old FAQ ids show sources too (help_center.LEGACY_FAQ_ALIASES).
+        "sources": help_center.sources_for(message.faq_ids or []),
         "suggest_ticket": message.suggest_ticket,
         "created_at": _iso(message.created_at),
     }
@@ -175,16 +180,40 @@ def _derive_title(text: str) -> str:
 # --------------------------------------------------------------------------
 
 
+def _faq_entry_out(entry: support_kb.FaqEntry) -> dict:
+    """One starter question. Shape unchanged (id, question, answer) plus two
+    additive fields; consumers: frontend ChatWidget (uses id + question).
+
+    `answer` now comes from the help center -- the alias target's opening
+    paragraph -- because several of the nine original answers are
+    contradicted by the code (see help_center.LEGACY_FAQ_ALIASES). The old
+    text is kept in support_kb.py for the record, never served."""
+    chunk = help_center.resolve_citation(entry.id)
+    if chunk is None:
+        # The corpus failed to load (logged by help_center). Serve the
+        # question without an answer rather than a stale one.
+        return {"id": entry.id, "question": entry.question, "answer": "",
+                "chunk_id": None, "source_title": None}
+    return {
+        "id": entry.id,
+        "question": entry.question,
+        "answer": help_center.opening_paragraph(
+            help_center.best_section(chunk, entry.question)),
+        "chunk_id": chunk.id,
+        "source_title": chunk.article_title,
+    }
+
+
 @router.get("/faq")
 def get_faq(user: User = Depends(get_current_user)) -> dict:
-    """The curated knowledge base.
+    """Starter questions for the widget.
 
     Exposed so the widget can offer real starter questions instead of an empty
-    box. It is also the honest answer to "what can this thing actually help
-    with?" — the same list the model is restricted to.
+    box. The ids are the permanent legacy FAQ ids; each resolves to the
+    help-center chunk that now answers it.
     """
     return {
-        "faq": [entry.as_dict() for entry in support_kb.FAQ],
+        "faq": [_faq_entry_out(entry) for entry in support_kb.FAQ],
         "chat_enabled": settings.support_chat_enabled,
     }
 
@@ -248,7 +277,10 @@ def chat(request: Request, body: ChatIn, db: Session = Depends(get_db),
     # answer_question NEVER raises — every failure path returns a ticket
     # suggestion rather than propagating, so a model outage degrades the reply
     # instead of 500-ing the request.
-    answer = support_chat.answer_question(question, history=history)
+    # P0-5b: counted toward the account's day, never refused -- help must stay
+    # reachable even when the day's AI limit is used up.
+    with metered(db, user, "support_chat"):
+        answer = support_chat.answer_question(question, history=history)
 
     assistant = ChatMessage(
         session_id=session.id,

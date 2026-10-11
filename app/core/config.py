@@ -317,6 +317,17 @@ class Settings(BaseSettings):
     NOTE: read from app/core/config.py, not app/config.py.
     """
 
+    RATE_LIMIT_PUBLIC_STATUS: int = 600
+    """Max GET /status/public calls per client IP per hour (Phase 3,
+    status.calendarharvest.com). Unauthenticated by design: the status site's
+    server fetches it every 60 s from Vercel, whose egress IPs vary and can be
+    shared. Each call is cheap (a 30 s in-process response cache sits behind
+    the limiter), so the limit only stops a flood from one address; 600/h is
+    ten a minute.
+
+    NOTE: read from app/core/config.py, not app/config.py.
+    """
+
     RATE_LIMIT_AUTH: int = 10
     # Feature 3: AI support chat messages per user per DAY. Every message
     # spends the account's Anthropic key, so this is a cost ceiling as much as

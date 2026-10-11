@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_EXPORT_DIR = "/tmp/leadpilot_site_export"
 
 
-def generate_page_impl(session: Session, page_id) -> dict:
+def generate_page_impl(session: Session, page_id, user_id=None) -> dict:
     """Generate and store the HTML for one page.
 
     WHAT IT RETURNS. {"status": "generated"|"not_found"|"failed",
@@ -69,18 +69,25 @@ def generate_page_impl(session: Session, page_id) -> dict:
     existing_pages = [{"slug": slug, "title": title, "target_keyword": keyword}
                       for slug, title, keyword in existing]
 
+    from app.services import usage_meter  # noqa: PLC0415
+
+    # P0-5b: the largest model call in the system (8,000 output tokens),
+    # metered to the account that asked for it (the workspace owner when the
+    # task predates this argument) and on its daily AI limit.
+    owner = user_id or _workspace_owner(session, page.workspace_id)
     try:
-        result = website_builder.generate_page_html(
-            page_type=page.page_type.value if page.page_type else "blog",
-            title=page.title,
-            target_keyword=page.target_keyword,
-            secondary_keywords=list(page.secondary_keywords or []),
-            brief=page.brief or "",
-            existing_pages=existing_pages,
-            slug=page.slug or "",
-            meta_title=page.meta_title,
-            meta_description=page.meta_description,
-        )
+        with usage_meter.user_scope(session, owner, "website"):
+            result = website_builder.generate_page_html(
+                page_type=page.page_type.value if page.page_type else "blog",
+                title=page.title,
+                target_keyword=page.target_keyword,
+                secondary_keywords=list(page.secondary_keywords or []),
+                brief=page.brief or "",
+                existing_pages=existing_pages,
+                slug=page.slug or "",
+                meta_title=page.meta_title,
+                meta_description=page.meta_description,
+            )
     except Exception:  # noqa: BLE001 -- see the docstring
         logger.exception("website builder: generation failed for page %s (%s)",
                          page.id, page.slug)
@@ -115,6 +122,15 @@ def generate_page_impl(session: Session, page_id) -> dict:
     return {"status": "generated", "page_id": str(page.id), "seo_score": page.seo_score}
 
 
+def _workspace_owner(session: Session, workspace_id):
+    if workspace_id is None:
+        return None
+    from app.db.models import Workspace  # noqa: PLC0415
+
+    workspace = session.get(Workspace, workspace_id)
+    return workspace.owner_user_id if workspace is not None else None
+
+
 def export_site_impl(session: Session, output_dir: str) -> dict:
     """Export every published page. Never raises — see export_static_site."""
     from app.services import website_builder  # noqa: PLC0415
@@ -125,11 +141,11 @@ def export_site_impl(session: Session, output_dir: str) -> dict:
 
 
 @celery_app.task(name="workers.site_tasks.generate_page_task")
-def generate_page_task(page_id: str) -> dict:
+def generate_page_task(page_id: str, user_id: str | None = None) -> dict:
     """Celery entry point for one page's generation. Safe to retry."""
     session = SessionLocal()
     try:
-        return generate_page_impl(session, page_id)
+        return generate_page_impl(session, page_id, user_id)
     finally:
         session.close()
 
@@ -144,7 +160,7 @@ def export_site_task(output_dir: str = DEFAULT_EXPORT_DIR) -> dict:
         session.close()
 
 
-def enqueue_generation(page_id) -> bool:
+def enqueue_generation(page_id, user_id=None) -> bool:
     """Publish generate_page_task. Never raises; False when the broker refused.
 
     A page whose generation could not be QUEUED still exists as a draft with
@@ -152,7 +168,8 @@ def enqueue_generation(page_id) -> bool:
     so a broker outage costs a retry, not the page.
     """
     try:
-        generate_page_task.apply_async(args=[str(page_id)], retry=False)
+        args = [str(page_id)] + ([str(user_id)] if user_id is not None else [])
+        generate_page_task.apply_async(args=args, retry=False)
         return True
     except Exception:  # noqa: BLE001 -- see the docstring
         logger.exception("website builder: could not enqueue page %s", page_id)

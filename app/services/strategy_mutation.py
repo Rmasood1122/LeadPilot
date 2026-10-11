@@ -353,8 +353,13 @@ def run_idle_sweep(session: Session, now: datetime | None = None) -> dict:
     mutated = failed = 0
     for strategy, snap in idle:
         try:
-            version = mutate(session, strategy, trigger="idle_no_replies",
-                             snapshot=snap, now=now)
+            from app.services import usage_meter  # noqa: PLC0415
+
+            # P0-5b: metered to the owner, on its daily AI limit (an account
+            # past its limit is simply retried by tomorrow's sweep).
+            with usage_meter.owner_scope(session, strategy, "mutation"):
+                version = mutate(session, strategy, trigger="idle_no_replies",
+                                 snapshot=snap, now=now)
             notify(session, strategy, version)
             mutated += 1
         except Exception as exc:  # noqa: BLE001 -- one strategy never stops the sweep
