@@ -21,6 +21,10 @@ sources:
   - frontend/src/app/(app)/team/page.tsx
   - docs/features/send-review-queue.md
   - docs/features/workspaces.md
+  - app/services/daily_send_approval.py
+  - app/api/send_approval.py
+  - frontend/src/app/(app)/send-approval/page.tsx
+  - docs/features/daily-send-approval.md
 ---
 
 # The send-review queue and approvals
@@ -37,6 +41,16 @@ A message is checked after its text has been written and right before it would b
 - **Tone or spam check flagged the copy** – the written message trips LeadPilot's tone or spam rules (the same rules used in the pre-launch review).
 
 The queue covers email, WhatsApp and LinkedIn messages. AI phone calls are not held, because a live call cannot be read and approved in advance.
+
+## Do I approve automatic sending every day?
+
+Yes. On top of the review queue, LeadPilot asks the account owner (or a workspace owner or manager) to approve its **automatic** sending once per day, per channel: email, LinkedIn, WhatsApp and AI phone calls. Until today's approval exists, automatic messages are not sent. They wait in the queue, they are not failed or deleted, and they go out after approval through every normal check.
+
+Automatic means anything LeadPilot sends on its own schedule: sequence steps, automatic follow-ups, re-engagement and "not now" return messages, and Reply Copilot answers sent by auto-send. A message a person already approved one by one, in this review queue or as an approved Reply Copilot answer, is not held again.
+
+When the first automatic message of the day is ready to go and nobody has decided yet, LeadPilot emails the account owner and sends a push notification to the phone app, once per day. Every page of the app also shows a banner with today's queued counts. Open **Today's automatic sending** (`/send-approval`), tick the channels you approve and click **Approve selected channels for today**, or click **Decline for today**. You can still approve later the same day after declining.
+
+An approval lasts until midnight in your account's time zone. That time zone comes from your calendar availability; if none is set, the day is counted in UTC and the page says so. Approving LinkedIn is a separate choice with its own warning: LinkedIn may restrict or suspend accounts that use automation, so you are asked to confirm you want to proceed. Every decision is recorded with who made it, when, which channels, the queued counts, and the version of the LinkedIn warning that was shown. Your administrator can turn this requirement off in System Settings (`daily_send_approval_enabled`, on by default).
 
 ## Can the queue or a rule be turned off?
 

@@ -367,9 +367,35 @@ Every single send runs this gauntlet, in this order:
    since scheduling is refused.
 6. **Send window.** Business hours in the *lead's own* timezone, weekends
    skipped, with a configurable fallback zone.
-7. **Daily cap and warm-up ramp**, per channel. Over the allowance, the message
+7. **Daily send approval** (safety guard, every channel, flag
+   `daily_send_approval_enabled` **on by default** — founder decision
+   2026-10-11). An *automatic* send (sequence step, automatic follow-up,
+   re-engagement, "not now" return, Reply Copilot auto-send) goes out only on a
+   day the account owner or a workspace owner/manager approved automatic
+   sending **for that channel** (`daily_send_approval_channels`, default
+   email, LinkedIn, WhatsApp, phone). Otherwise it stays `SCHEDULED`, moved to
+   the next local midnight with a `daily_send_approval: …` reason — never
+   failed, never dropped — and approval releases it back through every gate.
+   Messages a person approved one by one (send-review queue, approved Reply
+   Copilot answers) are not gated. The LinkedIn network **bulk** send (queued
+   Celery jobs through Unipile) is automatic LinkedIn sending and waits for the
+   same LinkedIn approval; a single interactive send, "Call now" and the
+   meeting follow-up email are a person's action. Only a person decides: a
+   personal API key cannot approve (403). A decision is valid until its stored
+   `valid_until` instant (a later timezone change cannot stretch it). The first due send of the day with no
+   decision notifies the owner once — transactional email (never the outreach
+   path), FCM push, and an in-app banner on every page (there is no web push).
+   LinkedIn approval is a separate, never-pre-ticked choice with an explicit
+   acknowledgement that LinkedIn may restrict or suspend accounts that use
+   automation (422 without it); every decision is audited in
+   `compliance_audit_log` with approver, time, channels, counts and the warning
+   version and text. The day is the account's local day (calendar-availability
+   timezone, else UTC). Lookup error fails closed (deferred an hour). Spec:
+   `docs/features/daily-send-approval.md` (`app/services/daily_send_approval.py`,
+   `/send-approval/*`, page `/send-approval`).
+8. **Daily cap and warm-up ramp**, per channel. Over the allowance, the message
    is **deferred to tomorrow's window — never dropped**.
-8. **Render, persist, then transmit.** In that order.
+9. **Render, persist, then transmit.** In that order.
 
 ### Compliance that is structural, not procedural
 

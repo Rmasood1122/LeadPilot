@@ -54,7 +54,7 @@ On a verified strategy's page, after finding leads, use the **2. Write the email
 
 In the app today, this creates an email-only sequence with one or two steps. Longer sequences, and steps on other channels, are created through the LeadPilot API, which accepts up to 20 steps numbered 1, 2, 3 and so on with no gaps.
 
-## How many steps can a sequence have?
+## How many steps can I put in a sequence?
 
 | Plan | Steps per sequence | Channels |
 |---|---|---|

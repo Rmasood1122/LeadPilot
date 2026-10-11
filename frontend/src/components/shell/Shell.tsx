@@ -15,6 +15,7 @@ import { useBranding } from "@/lib/branding";
 import { isPhoneDeferred, needsVerification } from "@/lib/identity";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { InboxBadge } from "./InboxBadge";
+import { SendApprovalBanner } from "@/components/campaigns/SendApprovalBanner";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
@@ -159,7 +160,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </span>
           <WorkspaceSwitcher />
         </header>
-        <main className="flex-1 p-gutter pb-20 md:pb-gutter">{children}</main>
+        <main className="flex-1 p-gutter pb-20 md:pb-gutter">
+          {/* Daily send approval: shown on every page while today's automatic
+              sending is waiting for a decision (mounted once, like the chat). */}
+          <SendApprovalBanner />
+          {children}
+        </main>
       </div>
 
       {/* AI support chat (Feature 3).

@@ -372,6 +372,25 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                        "tracker may spend per account in a "
                                        "rolling 30 days (role checks + email "
                                        "lookups at the new company)."),
+    # Daily send approval (docs/features/daily-send-approval.md). ON by
+    # default: a founder decision (2026-10-11), not an optional feature.
+    # Automatic sends wait (deferred, never dropped) until the account owner or
+    # a workspace owner/manager approves today's automatic sending, per
+    # channel; LinkedIn needs an explicit acknowledgement that LinkedIn may
+    # restrict accounts that use automation. Off = the previous behaviour.
+    "daily_send_approval_enabled": (True, "Hold every AUTOMATIC send until the "
+                                    "account owner (or a workspace owner/"
+                                    "manager) approves today's automatic "
+                                    "sending for that channel. Approval is "
+                                    "valid until the end of the account's "
+                                    "local day. Held messages wait; they are "
+                                    "never dropped."),
+    "daily_send_approval_channels": ("email,linkedin,whatsapp,phone",
+                                     "Comma-separated channels whose automatic "
+                                     "sends need today's approval (email, "
+                                     "linkedin, whatsapp, phone). A value with "
+                                     "no valid channel name gates every "
+                                     "channel."),
 }
 
 

@@ -5447,6 +5447,56 @@ class ChampionMove(TimestampMixin, Base):
     dismiss_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
+
+
+
+class DailySendApproval(TimestampMixin, Base):
+    """Daily send approval (migration 0081) -- one row per account per LOCAL
+    calendar day: has a person approved today's AUTOMATIC sending, and for
+    which channels?
+
+    Founder decision 2026-10-11 (docs/features/daily-send-approval.md): the
+    send chokepoint defers every automatic message on a gated channel until
+    today's row says `approved` and lists that channel. The row is also the
+    once-per-day notification claim (`notified_at`, set by a conditional
+    UPDATE so concurrent workers notify once). Every decision is ALSO written
+    to compliance_audit_log, which is the durable record.
+    """
+
+    __tablename__ = "daily_send_approvals"
+    __table_args__ = (
+        UniqueConstraint("user_id", "local_date", name="uq_daily_send_approval_user_date"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    # The account OWNER (workspace owner), never a member.
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    local_date: Mapped[date] = mapped_column(Date)
+    timezone: Mapped[str] = mapped_column(String(64))
+    # pending | approved | declined
+    status: Mapped[str] = mapped_column(String(20))
+    channels_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    linkedin_risk_acknowledged: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    linkedin_warning_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    queued_counts_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The UTC instant a decision stops counting: the next local midnight in
+    # the timezone in force WHEN it was decided. The send path checks this
+    # instant, never a re-derived local date, so changing the account's
+    # timezone later cannot stretch an approval.
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The person who decided (owner or manager), not necessarily the owner.
+    decided_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    notify_result_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
 # Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new
 # Outcome (the learning loop and A/B promotion read those columns). Imported
 # last so the listener module can import the classes above.

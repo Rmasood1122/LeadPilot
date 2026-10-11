@@ -453,6 +453,61 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         session.commit()
         return "deferred_window"
 
+    # ---- Daily send approval (SAFETY GUARD, every channel, flag default ON) --
+    # Founder decision 2026-10-11: an AUTOMATIC send goes out only on a day the
+    # account owner (or a workspace owner/manager) approved automatic sending
+    # for this channel; LinkedIn needs an explicit acknowledgement of
+    # LinkedIn's restriction risk. Placed after every cancel/skip gate and the
+    # send window (so "due" means it could go out now) and before caps, the
+    # LinkedIn slot, the claim and the render (so a held message spends
+    # nothing). Held = still SCHEDULED, moved to the next local midnight,
+    # error prefixed -- never failed, never dropped; approval releases it
+    # through every gate again. Human-approved messages (send review, Reply
+    # Copilot approvals) are not gated. Lookup error fails CLOSED: deferred an
+    # hour. Flag off: one settings read. See docs/features/daily-send-approval.md.
+    from app.services import daily_send_approval  # noqa: PLC0415
+
+    try:
+        approval_hold = daily_send_approval.send_hold(session, message, strategy, now)
+    except Exception:
+        logger.exception("daily send approval check failed for message %s -- deferred",
+                         message_id)
+        session.rollback()
+        message = session.get(Message, message_id)
+        message.scheduled_at = now + daily_send_approval.UNAVAILABLE_RETRY
+        message.error = (f"{daily_send_approval.ERROR_PREFIX}approval could not be "
+                         "checked -- deferred (fails closed)")
+        session.commit()
+        return daily_send_approval.SEND_RESULT_UNAVAILABLE
+    if approval_hold is not None:
+        before = (message.scheduled_at, message.error)
+        message.scheduled_at = approval_hold.until
+        message.error = approval_hold.error
+        session.flush()
+        # Race guard: an approval may have committed (and run its release)
+        # after the hold was computed but before this tag is committed. Re-read
+        # today's decision under its row lock (approve/decline take the same
+        # lock); if this channel is approved now, do not park the message.
+        try:
+            still_held = daily_send_approval.confirm_hold(
+                session, approval_hold, message.channel.value, now)
+        except Exception:
+            logger.exception("daily send approval re-check failed for message %s -- held",
+                             message_id)
+            session.rollback()
+            message = session.get(Message, message_id)
+            message.scheduled_at = approval_hold.until
+            message.error = approval_hold.error
+            still_held = True
+        if still_held:
+            session.commit()
+            daily_send_approval.notify_if_needed(session, approval_hold, now)
+            return approval_hold.result
+        message.scheduled_at, message.error = before
+        session.commit()      # releases the row lock before the slow part
+    if (message.error or "").startswith(daily_send_approval.ERROR_PREFIX):
+        message.error = None   # an earlier hold's reason no longer applies
+
     # ---- daily cap + warm-up (per channel; deferred, never dropped) ---------
     li_account = li_action = None
     autopilot = False          # F03, set in the email branch below

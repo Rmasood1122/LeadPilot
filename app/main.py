@@ -98,6 +98,7 @@ from app.api.bounce_shield import router as bounce_shield_router
 from app.api.spend_guard import router as spend_guard_router  # F07
 from app.api.signals import router as signals_router                   # F02 Signal Radar
 from app.api.champions import router as champions_router               # F10 Champion Tracker
+from app.api.send_approval import router as send_approval_router       # daily send approval
 
 # M9: registers the SQLAlchemy session listeners that publish CRM events
 # to Redis. Imported for its SIDE EFFECT -- install() is a no-op marker so
@@ -340,6 +341,7 @@ app.include_router(spend_guard_router)           # F07: /spend-guard/* (flag: sp
 app.include_router(pilots_router)                # F09: /pilots* (flag: pilot_mode_enabled)
 # F10. /champions is a new prefix; /leads/{id}/role-check* are new sub-paths.
 app.include_router(champions_router)             # F10: /leads/{id}/role-check*, /champions/*
+app.include_router(send_approval_router)         # daily send approval: /send-approval/*
 
 
 # ---------------------------------------------------------------------------
