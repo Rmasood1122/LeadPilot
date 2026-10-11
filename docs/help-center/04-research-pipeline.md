@@ -54,7 +54,7 @@ The GTM pipeline's 8 phases are: Positioning, Pricing, Launch sequencing, Channe
 
 ## How long does it take?
 
-There is no fixed duration; it depends on the AI service's response times. The research runs on LeadPilot's servers, so you can close the browser tab. The strategy page shows progress for each pipeline (the strategy pipeline, and the GTM pipeline when it runs) as steps done out of the total. In the current release these progress cards are labelled "Phase pending" rather than with phase names, and they do not break progress down by phase. When verification finishes, LeadPilot sends a push notification ("Your strategy is ready" or "Strategy needs review") to devices registered for notifications.
+There is no fixed duration; it depends on the AI service's response times. The research runs on LeadPilot's servers, so you can close the browser tab. The strategy page shows one progress card for each pipeline (the strategy pipeline, and the GTM pipeline when it runs) with the steps done out of the total, and under it each of the 8 phases by name with its own steps done out of the total. When verification finishes, LeadPilot sends a push notification ("Your strategy is ready" or "Strategy needs review") to devices registered for notifications.
 
 Each pipeline run has a time limit of 2 hours. If a run is interrupted, for example by that limit or a temporary error, LeadPilot retries it automatically up to 3 times, 30 seconds apart, and each retry continues from the last finished step. If the error cannot succeed on retry, or the retries run out, the strategy is marked `failed` and the reason is shown on the strategy page.
 
@@ -101,7 +101,7 @@ When the limit is used up:
 
 - Starting a new strategy is refused with a message like "Your Free plan's daily AI limit ($10.00) is used up. It resets at 00:00 UTC."
 - A strategy that is already running stops as `budget_exhausted`. Resume it after the reset, or upgrade your plan.
-- Resuming is refused until the reset. In the current app, the **Resume** button may show only "Too many requests. Wait a few minutes and try again." in this case.
+- Resuming (and re-verifying) is refused until the reset, with the same message.
 
 ## How do I resume a strategy that stopped?
 
@@ -118,7 +118,7 @@ Yes. By default you can start at most 2 strategies per hour; this is a deploymen
 
 ## Can I read the research?
 
-You can read the finished documents. The outputs of individual research steps are not shown in the current release: opening a progress card only shows "Step outputs appear here as they complete." When the documents are ready, **View documents** opens the strategy document (and the GTM document for 144-step strategies).
+You can read the finished documents. The outputs of individual research steps are not shown on the strategy page; they are compiled into the documents. When the documents are ready, **View documents** opens the strategy document (and the GTM document for 144-step strategies).
 
 ## Related
 - [Getting started](03-getting-started.md)

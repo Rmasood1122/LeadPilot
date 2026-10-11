@@ -544,6 +544,18 @@ def dashboard_campaigns(db: Session, current_user: User,
     for variant, sent in variant_sent.items():
         slot = variants.setdefault(variant, {"variant": variant})
         slot["sent"] = int(sent)
+    # strategies.default_variant is set by A/B auto-promotion
+    # (learning_tasks.auto_promote_winners). It does not change what is sent
+    # (one variant per step; see docs/help-center/17); it is shown here so a
+    # promotion is visible. Only meaningful for one strategy's view.
+    promoted_variant = None
+    if strategy_id is not None:
+        promoted_variant = db.execute(
+            select(Strategy.default_variant)
+            .join(Product, Product.id == Strategy.product_id)
+            .where(Strategy.id == strategy_id, Product.user_id == current_user.id)
+        ).scalar()
+
     variant_list = []
     for slot in variants.values():
         sent = int(slot.get("sent", 0))
@@ -556,6 +568,7 @@ def dashboard_campaigns(db: Session, current_user: User,
             "booked": booked,
             "reply_rate": round(replied / sent, 4) if sent else None,
             "booking_rate": round(booked / sent, 4) if sent else None,
+            "promoted": promoted_variant is not None and slot["variant"] == promoted_variant,
         })
     variant_list.sort(key=lambda v: v["variant"])
 
@@ -563,6 +576,19 @@ def dashboard_campaigns(db: Session, current_user: User,
     total_sent = sum(c["sent"] for c in channels)
     total_bounced = sum(c["bounced"] for c in channels)
     threshold = float(getattr(settings, "bounce_rate_pause_threshold", 0.03))
+    # Product defect #21: a workspace compliance rule can lower the threshold
+    # the auto-pause uses; show that one. Every strategy of this account shares
+    # the account's workspace, so one strategy answers for all.
+    any_strategy = db.execute(
+        select(Strategy).join(Product, Product.id == Strategy.product_id)
+        .where(Product.user_id == current_user.id,
+               *([Strategy.id == strategy_id] if strategy_id is not None else []))
+        .limit(1)
+    ).scalars().first()
+    if any_strategy is not None:
+        from app.services import compliance_rules  # noqa: PLC0415
+
+        threshold = float(compliance_rules.bounce_threshold(db, any_strategy))
     bounce_rate = (total_bounced / total_sent) if total_sent else 0.0
 
     paused = db.execute(

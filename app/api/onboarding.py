@@ -56,14 +56,16 @@ STEP_DESCRIPTIONS = {
     "first_meeting_booked": "Book your first meeting",
 }
 
+# Product defect #22: every href is a real page of the web app (four used to
+# point at routes that do not exist; tests/test_onboarding_step_links.py).
 STEP_ACTIONS = {
-    "product_created":    {"label": "Create Product", "href": "/products/new"},
-    "gmail_connected":    {"label": "Connect Gmail", "href": "/settings/integrations"},
+    "product_created":    {"label": "Create Product", "href": "/strategies/new"},
+    "gmail_connected":    {"label": "Connect Gmail", "href": "/settings?tab=integrations"},
     "first_strategy_run": {"label": "Run Strategy", "href": "/strategies/new"},
-    "first_lead_sourced": {"label": "Source Leads", "href": "/leads"},
+    "first_lead_sourced": {"label": "Source Leads", "href": "/strategies"},
     "first_email_sent":   {"label": "View Campaigns", "href": "/campaigns"},
-    "first_reply_received": {"label": "View Replies", "href": "/leads?filter=replied"},
-    "first_meeting_booked": {"label": "View Bookings", "href": "/leads?filter=booked"},
+    "first_reply_received": {"label": "View Replies", "href": "/inbox"},
+    "first_meeting_booked": {"label": "View Bookings", "href": "/meetings"},
 }
 
 

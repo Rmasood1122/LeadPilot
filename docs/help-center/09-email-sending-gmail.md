@@ -40,7 +40,7 @@ LeadPilot sends outreach email from the Gmail account you connect, automatically
 1. Go to **Settings** and open the **Integrations** tab.
 2. On the **Gmail** card, press **Connect**.
 3. Google asks you to approve access. LeadPilot requests permission to send email, read email (to detect replies and bounces), create calendar events (used to create Google Meet links), and create drafts (used for post-meeting follow-up drafts).
-4. After you approve, Google sends you to LeadPilot's server, which records the connection. Go back to **Settings**: the Gmail card should say "Connected:" followed by your address.
+4. After you approve, Google sends you back to LeadPilot, which records the connection and returns you to **Settings → Integrations** with the message "Gmail connected". The Gmail card says "Connected:" followed by your address. If the connection failed, you see "Gmail connection failed" with the reason instead.
 
 LeadPilot keeps one Gmail connection per user account. Connecting again updates that same connection. Your Google access tokens are stored encrypted and refreshed automatically.
 
@@ -69,7 +69,7 @@ These are the deployment's default settings. Reconnecting the same account does 
 - your workspace's **compliance rules**, set by an administrator;
 - **mailbox health**: a Gmail account with poor deliverability health can be throttled to a lower cap, or paused.
 
-When the day's allowance is used up, or the mailbox is paused, the remaining emails move to the next day's send window. They are deferred, never dropped. On **Campaigns**, the **Overview** tab's **Gmail** card shows "Today / cap".
+When the day's allowance is used up, or the mailbox is paused, the remaining emails move to the next day's send window. They are deferred, never dropped. On **Campaigns**, the **Overview** tab's **Gmail** card shows "Today / cap". The cap shown includes a lower cap set by your workspace's compliance rules for all regions and a lower cap from mailbox health; a rule for one region can lower it further for the leads in that region.
 
 ## When are emails sent?
 
@@ -96,7 +96,7 @@ LeadPilot checks each connected inbox for replies every 5 minutes by default. A 
 
 After each bounce, LeadPilot checks the campaign's bounce rate (bounces divided by messages sent across the strategy). Once at least 10 messages have been sent, a bounce rate above **3%** pauses the whole campaign automatically. Your workspace's compliance rules may set a lower threshold, never a higher one. You get a notification, and nothing more is sent until a person resumes the campaign.
 
-To resume, go to **Campaigns**, open the **Overview** tab, and press **Resume** in the "Campaign paused" notice, which asks you to fix deliverability issues before resuming. The notice always shows the default 3% figure, even if your workspace uses a lower threshold.
+To resume, go to **Campaigns**, open the **Overview** tab, and press **Resume** in the "Campaign paused" notice, which asks you to fix deliverability issues before resuming. The notice shows the campaign's bounce rate and the threshold that applies to it, for example "Bounce rate auto-pause: 2.5% is above the 2% limit."
 
 ## What if a send fails?
 

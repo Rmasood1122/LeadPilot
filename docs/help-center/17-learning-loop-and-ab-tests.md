@@ -10,6 +10,7 @@ sources:
   - app/services/ab_testing.py
   - app/services/multi_variate.py
   - app/services/score_decay.py
+  - app/db/outcome_attribution.py
   - app/services/playbook_service.py
   - app/pipeline/engine.py
   - app/services/strategy_mutation.py
@@ -34,7 +35,7 @@ LeadPilot records what happens to every message it sends (sent, replied, booked 
 
 ## What does LeadPilot learn from?
 
-Every send, reply, booking and similar event is stored as an outcome record. Every night (by default at 02:05 UTC, configurable by your deployment), LeadPilot rolls these records up into scores for each strategy pattern: reply rate and booking rate, per variant.
+Every send, reply, booking and similar event is stored as an outcome record, tagged with its strategy and, when the event is linked to a specific message, with that message's variant. An event that is not linked to a message (for example a reply matched only by the sender's address) counts for the strategy but not for any variant. Every night (by default at 02:05 UTC, configurable by your deployment), LeadPilot rolls these records up into scores for each strategy pattern: reply rate and booking rate, per variant.
 
 Older results count for less. A result from 90 days ago counts half as much as one from today (the default half-life, configurable). LeadPilot also counts how much recent evidence there is, so a pattern with many old results can still count as "not enough data".
 
@@ -52,7 +53,7 @@ The **A/B variants** table on the CRM campaigns dashboard shows each variant's s
 
 ## When is a winning variant promoted?
 
-A nightly sweep (30 minutes after the nightly roll-up, at 02:35 UTC by default) checks strategies that have at least two variants and at least 30 sends in total. The measure is **meetings booked per send**.
+Automatic promotion is **off by default**; an administrator turns it on with the `ab_auto_promotion_enabled` system setting. It is off because a promotion is permanent (at most once per strategy) and variants are labels on different sequences, not randomly assigned groups, so a "winner" can reflect which leads were enrolled where rather than the message itself. When it is on, a nightly sweep (30 minutes after the nightly roll-up, at 02:35 UTC by default) checks strategies that have at least two variants and at least 30 sends in total. The measure is **meetings booked per send**.
 
 For exactly two variants, a winner is only promoted if **all four** checks pass:
 
@@ -67,7 +68,7 @@ For three or more variants, a different test is used: the variants must differ s
 
 If any check fails, nothing is promoted. Each strategy is promoted at most once. Messages that have already been sent are never changed.
 
-**Important limitation:** promotion records the winning variant on the strategy. In the current version, nothing reads that record when writing or scheduling future messages, so a promotion does not by itself change what your campaign sends. To act on a result, change your sequences yourself.
+**Important limitation:** promotion records the winning variant on the strategy, and the **A/B variants** table marks it "promoted winner" when the CRM campaigns dashboard is filtered to that strategy. A promotion does not by itself change what your campaign sends. To act on a result, change your sequences yourself.
 
 ## What happens when a campaign gets no replies?
 
@@ -83,7 +84,7 @@ With it on, a step is moved to the next of the top 3 windows at or after its nor
 
 ## Which plans include these features?
 
-The learning-loop insights pages (send-time recommendations, subject-line patterns and playbook scores) need a plan with **playbook access**, and the multi-variant results page needs a plan with **A/B testing**. Both are included in Starter, Growth, Scale, Pay per meeting, Pro and Enterprise, and not in Free. Other accounts get an upgrade message (HTTP 402).
+The learning-loop insights pages (send-time recommendations, subject-line patterns and playbook scores) need a plan with **playbook access**, included in Starter, Growth, Scale, Pay per meeting, Pro and Enterprise, and not in Free. Multi-variant results (three or more variants compared at once, available through the LeadPilot API) need a plan with **multi-variate testing**: Growth, Scale, Pro and Enterprise. Other accounts get an upgrade message (HTTP 402).
 
 ## Related
 - [The research pipeline](04-research-pipeline.md)

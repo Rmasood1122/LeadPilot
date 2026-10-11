@@ -1,4 +1,4 @@
-import { ApiError, api } from "./client";
+import { ApiError, api, tooManyRequestsMessage } from "./client";
 import type { AnalyticsOut, StrategyOut } from "./types";
 
 /** Mirrors INVALID_PASSWORD in app/api/strategies.py. */
@@ -97,7 +97,9 @@ export function resumeStrategyErrorMessage(err: unknown): string {
   }
   if (err.status === 409) return err.detail || "This strategy cannot be resumed right now.";
   if (err.status === 422) return err.detail || "That budget is not valid.";
-  if (err.status === 429) return "Too many requests. Wait a few minutes and try again.";
+  if (err.status === 429) {
+    return tooManyRequestsMessage(err, "Too many requests. Wait a few minutes and try again.");
+  }
   if (err.status === 404) return "This strategy no longer exists.";
   return err.detail || "Could not resume the strategy.";
 }

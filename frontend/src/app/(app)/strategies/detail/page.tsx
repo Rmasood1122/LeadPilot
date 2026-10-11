@@ -11,82 +11,53 @@ import { ResumeStrategyButton } from "@/components/strategy/ResumeStrategyButton
 import { ReverifyStrategyButton } from "@/components/strategy/ReverifyStrategyButton";
 import { OverridePassesPanel } from "@/components/strategy/OverridePassesPanel";
 import { OutreachPanel } from "@/components/strategy/OutreachPanel";
+import { PipelineHealthCard } from "@/components/strategy/PipelineHealthCard";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Markdown } from "@/components/strategy/Markdown";
-import type { PhaseProgress } from "@/lib/api/types";
-
-const PHASE_NAMES: Record<string, string[]> = {
-  strategy: [
-    "Product decomposition", "ICP definition", "Market sizing",
-    "Competitor analysis", "Channel analysis", "Messaging & offer",
-    "Objections & proof", "Execution plan",
-  ],
-  gtm: [
-    "Positioning", "Pricing", "Launch sequencing", "Channel budget",
-    "Content plan", "Partnerships", "Sales motion", "Funnel metrics",
-  ],
-};
+import type { PhaseProgress, PipelineProgress } from "@/lib/api/types";
+import { verificationSummary } from "@/lib/strategyDetail";
 
 function Phase({ phase }: { phase: PhaseProgress }) {
-  const [open, setOpen] = useState(false);
-  // A pipeline that errors before progress data populates sends entries
-  // with no phase/done/total - render a neutral label rather than
-  // "undefined. Phase undefined".
-  const numbered = Number.isFinite(phase.phase);
-  const name = numbered
-    ? PHASE_NAMES[phase.pipeline]?.[phase.phase - 1] ?? `Phase ${phase.phase}`
-    : "Phase pending";
-  const done = Number.isFinite(phase.done) ? phase.done : 0;
-  const total = Number.isFinite(phase.total) ? phase.total : 0;
-  const complete = total > 0 && done >= total;
+  const complete = phase.total > 0 && phase.done >= phase.total;
+  return (
+    <li className="flex items-center justify-between gap-3 py-1.5 text-sm">
+      <span>{phase.phase}. {phase.title}</span>
+      <span className="flex shrink-0 items-center gap-2">
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {phase.done}/{phase.total}
+        </span>
+        <span className="h-2 w-24 overflow-hidden rounded bg-muted" role="progressbar"
+              aria-valuenow={phase.done} aria-valuemax={phase.total} aria-label={phase.title}>
+          <span
+            className={complete ? "block h-full bg-success" : "block h-full bg-primary"}
+            style={{ width: `${(phase.done / Math.max(phase.total, 1)) * 100}%` }}
+          />
+        </span>
+      </span>
+    </li>
+  );
+}
+
+function Pipeline({ pipeline }: { pipeline: PipelineProgress }) {
   return (
     <Card>
-      <button
-        className="w-full text-left"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle className="text-sm">
-            {phase.pipeline === "gtm" ? "GTM - " : ""}
-            {numbered ? `${phase.phase}. ` : ""}{name}
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              {done}/{total}
-            </span>
-            <div className="h-2 w-24 overflow-hidden rounded bg-muted" role="progressbar"
-                 aria-valuenow={done} aria-valuemax={total} aria-label={name}>
-              <div
-                className={complete ? "h-full bg-success" : "h-full bg-primary"}
-                style={{ width: `${(done / Math.max(total, 1)) * 100}%` }}
-              />
-            </div>
-          </div>
-        </CardHeader>
-      </button>
-      {open && (
-        <CardContent className="space-y-3">
-          {(phase.steps ?? []).length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Step outputs appear here as they complete.
-            </p>
-          )}
-          {(phase.steps ?? []).map((step) => (
-            <details key={step.step_id} className="rounded border border-border p-2">
-              <summary className="cursor-pointer text-sm font-medium">
-                {step.step_id} - {step.name}
-              </summary>
-              <div className="mt-2">
-                <Markdown source={step.output} />
-              </div>
-            </details>
+      <CardHeader className="flex-row items-center justify-between">
+        <CardTitle className="text-sm">
+          {pipeline.pipeline === "gtm" ? "GTM pipeline" : "Strategy pipeline"}
+        </CardTitle>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {pipeline.done}/{pipeline.total} steps
+        </span>
+      </CardHeader>
+      <CardContent>
+        <ul className="divide-y divide-border">
+          {pipeline.phases.map((phase) => (
+            <Phase key={phase.phase} phase={phase} />
           ))}
-        </CardContent>
-      )}
+        </ul>
+      </CardContent>
     </Card>
   );
 }
@@ -158,6 +129,9 @@ export default function StrategyDetailPage() {
                                    log={data.verification} />
             )}
             <OutreachPanel strategy={data} />
+            {(data.status === "verified" || data.status === "executing") && (
+              <PipelineHealthCard strategyId={id} />
+            )}
             {data.error && (
               <div role="alert" className="rounded border border-destructive p-4 text-sm">
                 {data.error}
@@ -165,9 +139,13 @@ export default function StrategyDetailPage() {
             )}
 
             <section aria-label="Pipeline progress" className="space-y-2">
-              {data.progress.map((phase) => (
-                <Phase key={`${phase.pipeline}-${phase.phase}`} phase={phase} />
+              {data.progress.map((pipeline) => (
+                <Pipeline key={pipeline.pipeline} pipeline={pipeline} />
               ))}
+              <p className="text-xs text-muted-foreground">
+                The outputs of individual research steps are not shown here; they
+                are compiled into the strategy and GTM documents.
+              </p>
             </section>
 
             <section aria-label="Verification loop">
@@ -184,24 +162,29 @@ export default function StrategyDetailPage() {
                     </p>
                   ) : (
                     <ul className="space-y-2">
-                      {data.verification.map((pass) => (
+                      {verificationSummary(data.verification).map((pass) => (
                         <li key={pass.pass_no}
                             className="flex flex-wrap items-center justify-between gap-2 text-sm">
                           <span>
                             #{pass.pass_no} {pass.name}
-                            {pass.manual_override && (
+                            {pass.note?.kind === "manual" && (
                               <span className="block text-xs text-muted-foreground">
-                                passed manually by {pass.overridden_by_email}: {pass.reason}
+                                passed manually by {pass.note.text}
                               </span>
                             )}
-                            {pass.fix && (
+                            {pass.note?.kind === "fix" && (
                               <span className="block text-xs text-muted-foreground">
-                                fix applied: {pass.fix}
+                                fix applied: {pass.note.text}
+                              </span>
+                            )}
+                            {pass.note?.kind === "failure" && (
+                              <span className="block text-xs text-muted-foreground">
+                                why it failed: {pass.note.text}
                               </span>
                             )}
                           </span>
                           <Badge tone={pass.result === "PASS" ? "success" : "destructive"}>
-                            {pass.manual_override ? "PASS (manual)" : pass.result}
+                            {pass.manual ? "PASS (manual)" : pass.result}
                             {pass.attempts > 1 ? ` x${pass.attempts}` : ""}
                           </Badge>
                         </li>

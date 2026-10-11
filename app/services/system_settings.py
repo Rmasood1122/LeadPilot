@@ -202,6 +202,15 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                        "automatically instead of waiting for a "
                                        "person (never for WhatsApp, which needs "
                                        "an approved template)."),
+    # Product defects #2 / review M5 -- A/B auto-promotion. Off by default:
+    # a promotion writes a permanent marker (once per strategy, never
+    # revisited) and step variants are labels on separate sequences, not
+    # randomised arms, so a "winner" can reflect who was enrolled where.
+    "ab_auto_promotion_enabled": (False, "Nightly A/B auto-promotion: mark a "
+                                  "winning variant on the strategy (permanent, "
+                                  "once per strategy). Variants are not "
+                                  "randomised arms; read results before "
+                                  "turning this on."),
     # Feature A2 -- audit trail
     "click_tracking_enabled": (False, "Route links in outreach email through a "
                                "click redirect so clicks reach the audit trail. "

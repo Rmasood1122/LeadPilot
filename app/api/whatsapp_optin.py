@@ -242,12 +242,6 @@ def optin_submit(token: str, phone: str = Form(...),
     return HTMLResponse(_DONE_HTML)
 
 
-def optin_url(lead_id: uuid.UUID) -> str:
-    """Public URL of a lead's opt-in page (used by email footers/Chunk 3)."""
-    from app.config import settings
-    token = svc.make_optin_token(lead_id)
-    return f"{settings.public_base_url.rstrip('/')}/optin/whatsapp/{token}"
-
 
 # --------------------------------------------------------------------------
 # Bulk import — honest by construction

@@ -14,7 +14,6 @@ export interface PlanLimits {
   website_builder: boolean;
   max_site_pages: number;
   analytics_history_days: number;
-  api_rate_limit_multiplier: number;
 }
 
 export interface MonthlyTier {

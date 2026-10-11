@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listStrategies } from "@/lib/api/strategies";
 import { useCampaign, useSequences, useTemplates } from "@/lib/api/hooks";
 import { pauseCampaign, resumeCampaign, generateTemplates,
-         submitTemplate, syncTemplate, createTemplate, updateTemplate,
+         submitTemplate, syncTemplate,
          updateFollowupSettings } from "@/lib/api/campaigns";
 import type { SequenceOut, SequenceStepOut, StrategyOut, TemplateOut } from "@/lib/api/types";
 import { AsyncState } from "@/components/ui/skeleton";
@@ -20,10 +20,12 @@ import { StrategyCalls } from "@/components/calls/CallHistory";
 import { FunnelHeatmap } from "@/components/campaigns/FunnelHeatmap";
 import { ReengagementPanel } from "@/components/campaigns/ReengagementPanel";
 import { SendTimePanel } from "@/components/campaigns/SendTimePanel";
+import { TemplateEditor } from "@/components/campaigns/TemplateEditor";
 import { SentimentTrend } from "@/components/campaigns/SentimentTrend";
 import { SequenceReviewPanel } from "@/components/campaigns/SequenceReviewPanel";
 import { ReviewQueuePanel } from "@/components/campaigns/ReviewQueuePanel";
 import { pct } from "@/lib/utils";
+import { bounceOverThreshold, bouncePauseText } from "@/lib/campaignBounce";
 
 // --------------------------------------------------------------------------
 // Strategy selector
@@ -84,63 +86,6 @@ function ChannelCard({ label, stats }: {
 // --------------------------------------------------------------------------
 // WhatsApp template manager
 // --------------------------------------------------------------------------
-function TemplateEditor({ initial, onSave, onClose }: {
-  initial?: TemplateOut | null;
-  onSave: (t: TemplateOut) => void;
-  onClose: () => void;
-}) {
-  const toast = useToast();
-  const [name, setName] = useState(initial?.name ?? "");
-  const [body, setBody] = useState(initial?.body ?? "");
-  const [busy, setBusy] = useState(false);
-
-  async function save() {
-    setBusy(true);
-    try {
-      const t = initial
-        ? await updateTemplate(initial.id, { body })
-        : await createTemplate({
-            name: name.toLowerCase().replace(/\s+/g, "_"),
-            language: "en_US", category: "marketing", body,
-            variable_descriptions: {},
-          });
-      onSave(t);
-      toast("Template saved", "success");
-    } catch (err) {
-      toast((err as Error).message, "error");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="space-y-3">
-      {!initial && (
-        <div className="space-y-1">
-          <Label htmlFor="tname">Name (snake_case)</Label>
-          <Input id="tname" value={name} onChange={e => setName(e.target.value)}
-                 placeholder="intro_offer" />
-        </div>
-      )}
-      <div className="space-y-1">
-        <Label htmlFor="tbody">Body</Label>
-        <Textarea id="tbody" rows={5} value={body}
-                  onChange={e => setBody(e.target.value)}
-                  placeholder="Hi {{1}}, Sam from LeadPilot. Reply STOP to opt out." />
-        <p className="text-xs text-muted-foreground">
-          Variables: {"{{1}}"} {"{{2}}"} etc. Include &quot;Reply STOP to opt out.&quot;
-        </p>
-      </div>
-      <div className="flex justify-end gap-2">
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={save} disabled={busy || !body.trim()}>
-          {busy ? "Saving…" : "Save draft"}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 function TemplatesPanel({ strategyId }: { strategyId: string }) {
   const toast = useToast();
   const qc = useQueryClient();
@@ -498,8 +443,7 @@ export default function CampaignsPage() {
                     <p className="font-medium">Campaign paused</p>
                     <p className="text-muted-foreground">
                       {campaign.campaign_state === "paused_bounce_rate"
-                        ? `Bounce rate auto-pause: ${(campaign.bounce_rate * 100).toFixed(1)}% ≥ 3%.
-                           Fix deliverability issues, then resume.`
+                        ? bouncePauseText(campaign)
                         : campaign.campaign_pause_reason ?? "Manually paused"}
                     </p>
                   </div>
@@ -522,7 +466,7 @@ export default function CampaignsPage() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Bounce rate</p>
-                    <p className={`font-semibold ${campaign.bounce_rate >= 0.03 ? "text-destructive" : ""}`}>
+                    <p className={`font-semibold ${bounceOverThreshold(campaign) ? "text-destructive" : ""}`}>
                       {pct(campaign.bounce_rate)}
                     </p>
                   </div>

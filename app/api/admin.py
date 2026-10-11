@@ -834,3 +834,13 @@ async def rotate_encryption_key(
     result = rotate_all_secrets(db)
     logger.info("admin.encryption_key_rotation_completed", **result, by=admin.email)
     return {**result, "status": "ok"}
+
+
+@router.get("/config-warnings")
+def config_warnings(_admin: User = Depends(require_admin)) -> list[dict]:
+    """Deployment misconfigurations an admin must act on (product defect #5:
+    phone verification required but undeliverable). Shown as a banner on every
+    admin page."""
+    from app.services import identity  # noqa: PLC0415
+
+    return identity.config_warnings()

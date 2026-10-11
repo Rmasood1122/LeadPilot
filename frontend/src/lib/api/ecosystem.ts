@@ -130,7 +130,9 @@ export const revokeApiKey = (id: string): Promise<void> =>
 /** A settings-page query string like `?tab=integrations&hubspot=connected`
  *  turned into a user-facing toast, or null. */
 export function oauthResultMessage(params: URLSearchParams): { text: string; ok: boolean } | null {
-  const names: Record<string, string> = { slack: "Slack", hubspot: "HubSpot", salesforce: "Salesforce" };
+  const names: Record<string, string> = {
+    gmail: "Gmail", slack: "Slack", hubspot: "HubSpot", salesforce: "Salesforce",
+  };
   for (const [key, label] of Object.entries(names)) {
     const value = params.get(key);
     if (value === "connected") return { text: `${label} connected`, ok: true };

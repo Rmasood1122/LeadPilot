@@ -367,6 +367,15 @@ def _gdpr_erase_lead(db: Session, lead: Lead, current_user: User) -> None:
     lead.loom_video_json = None
     lead.ai_score_reason = None
     lead.ai_score_factors = None
+    # Product defect #11: scores and their reasons are derived from the
+    # person's data, so they go too.
+    lead.ai_booking_likelihood = None
+    lead.conversion_factors_json = None
+    lead.fpta_fit = lead.fpta_problem = lead.fpta_timing = None
+    lead.fpta_access = lead.fpta_overall = None
+    lead.fpta_reasons_json = None
+    lead.fpta_method = None
+    lead.fpta_scored_at = None
     lead.status = LeadStatus.DROPPED
     # F02 Signal Radar: signals hold post excerpts and headlines derived from
     # the fields erased above. The lead row is a tombstone, not a delete, so

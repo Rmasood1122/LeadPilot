@@ -93,9 +93,11 @@ export function deferPhone(): void {
 /** Should the Shell send this user to /onboarding/verify? Pre-0039 accounts
  *  (identity_required false or absent) never are. */
 export function needsVerification(user: Pick<UserOut,
-  "identity_required" | "identity_complete" | "phone_verified">, phoneDeferred = false): boolean {
+  "identity_required" | "identity_complete" | "phone_verified" | "phone_required">,
+  phoneDeferred = false): boolean {
   if (!user.identity_required) return false;
   if (!user.identity_complete) return true;
+  if (user.phone_required === false) return false;
   return !user.phone_verified && !phoneDeferred;
 }
 

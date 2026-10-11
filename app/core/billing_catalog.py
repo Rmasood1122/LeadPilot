@@ -107,8 +107,7 @@ def catalog() -> dict[str, Any]:
         return {key: plan[key] for key in (
             "max_strategies", "max_leads_per_strategy", "max_sequence_steps",
             "channels", "ab_testing", "multi_variate", "playbook_access",
-            "website_builder", "max_site_pages", "analytics_history_days",
-            "api_rate_limit_multiplier")}
+            "website_builder", "max_site_pages", "analytics_history_days")}
 
     return {
         "currency": CURRENCY,

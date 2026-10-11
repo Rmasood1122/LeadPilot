@@ -489,7 +489,7 @@ function SuppressionViewer() {
 // -------------------------------------------------------------------  Main
 
 export default function SettingsPage() {
-  // Feature Group 4: the Slack / HubSpot / Salesforce OAuth callbacks land on
+  // Feature Group 4: the Gmail / Slack / HubSpot / Salesforce OAuth callbacks land on
   // /settings?tab=integrations&<provider>=connected|error.
   const params = useSearchParams();
   const toast = useToast();

@@ -159,7 +159,13 @@ class TestAnalyticsAndControls:
         db.commit()
 
     def test_analytics_series_and_variants(self, leads_client, db_session,
-                                           verified_strategy):
+                                           verified_strategy, test_user):
+        # Product defect #18: the series is limited to the plan's
+        # analytics_history_days (Free: 30). The fixed NOW these outcomes use
+        # falls outside that window as real time passes, so this shape test
+        # runs on a plan with unlimited history; the window itself is tested
+        # in tests/test_plan_advertising.py.
+        test_user.plan = m.PlanTier.SCALE
         lead = m.Lead(strategy_id=verified_strategy.id, source="manual",
                       email="a@b.com", status=m.LeadStatus.VERIFIED)
         db_session.add(lead)

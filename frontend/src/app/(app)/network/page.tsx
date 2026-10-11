@@ -230,6 +230,16 @@ export default function NetworkPage() {
                 Your export is more than a few weeks old. Upload a fresh one to see new connections.
               </p>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Outside the plan gate on purpose: deleting your own uploaded data is
+          never plan-gated (DELETE /linkedin-network), so a downgraded account
+          must still be able to do it here. */}
+      {(eligible || s.connection_count > 0) && (
+        <Card>
+          <CardContent className="space-y-3 pt-6 text-sm">
             <p className="text-muted-foreground">
               {s.connection_count} connection{s.connection_count === 1 ? "" : "s"} stored.
             </p>

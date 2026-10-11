@@ -1,13 +1,19 @@
 """Integration endpoints — Gmail OAuth connect flow (M3 Chunk 1)."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.base import get_db
 from app.db.models import GmailAccount, User
-from app.integrations.gmail import get_oauth, make_state, parse_state, store_tokens
+from app.integrations.gmail import (GmailNotConnected, get_oauth, make_state, parse_state,
+                                    store_tokens)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/integrations/gmail", tags=["integrations"])
 
@@ -38,13 +44,13 @@ def gmail_auth_url(
     return {"auth_url": get_oauth().build_auth_url(state), "state": state}
 
 
-@router.get("/callback")
+@router.get("/callback", include_in_schema=False)
 def gmail_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
     db: Session = Depends(get_db),
-) -> dict:
+) -> RedirectResponse:
     """Step 2: Google redirects here; we exchange the code and store
     ENCRYPTED tokens. Never logs or returns the tokens themselves.
 
@@ -53,33 +59,43 @@ def gmail_callback(
     encrypted `state` value (created in gmail_auth_url from the JWT
     holder's id) is what proves which user this callback belongs to —
     tamper it and parse_state raises, so this is not an auth bypass.
+
+    Product defect #16: this is a browser tab, so every outcome redirects to
+    /settings?tab=integrations&gmail=connected|error[&reason=...] like the
+    Slack / HubSpot / Salesforce callbacks, instead of showing raw JSON.
     """
+    from app.api.crm_integrations import frontend_redirect  # noqa: PLC0415
+
     if error:
-        raise HTTPException(status_code=400, detail=f"Google returned an error: {error}")
+        return frontend_redirect("gmail", "error", f"Google returned an error: {error}")
     if not code or not state:
-        raise HTTPException(status_code=400, detail="missing code or state")
+        return frontend_redirect("gmail", "error", "missing code or state")
 
     try:
         user_id = parse_state(state)
     except ValueError:
-        raise HTTPException(status_code=400, detail="invalid or tampered state")
+        return frontend_redirect("gmail", "error", "invalid or tampered state")
 
     user = db.get(User, user_id)
     if user is None:
-        raise HTTPException(status_code=404, detail="user for this state not found")
+        return frontend_redirect("gmail", "error", "user for this state not found")
 
     oauth = get_oauth()
     try:
         tokens = oauth.exchange_code(code)
     except Exception:
-        raise HTTPException(status_code=502, detail="token exchange with Google failed")
+        logger.warning("gmail token exchange failed for user %s", user_id)
+        return frontend_redirect("gmail", "error", "token exchange with Google failed")
 
-    account = store_tokens(db, user, tokens, oauth=oauth)
-    return {
-        "connected": True,
-        "email_address": account.email_address,
-        "scopes": account.scopes,
-    }
+    try:
+        store_tokens(db, user, tokens, oauth=oauth)
+    except GmailNotConnected as exc:
+        return frontend_redirect("gmail", "error", str(exc))
+    except Exception:  # noqa: BLE001 -- review L6: never a 500 page in the user's tab
+        db.rollback()
+        logger.exception("storing Gmail tokens failed for user %s", user_id)
+        return frontend_redirect("gmail", "error", "could not save the Gmail connection")
+    return frontend_redirect("gmail", "connected")
 
 
 @router.get("/status")

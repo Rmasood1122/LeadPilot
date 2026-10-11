@@ -1,0 +1,176 @@
+{
+  "id": "11111111-2222-3333-4444-555555555555",
+  "flow_type": "no_clients",
+  "status": "needs_human_review",
+  "progress": [
+    {
+      "pipeline": "strategy",
+      "done": 5,
+      "total": 72,
+      "phases": [
+        {
+          "phase": 1,
+          "title": "Product/skill decomposition, value prop, differentiators",
+          "done": 5,
+          "total": 9
+        },
+        {
+          "phase": 2,
+          "title": "ICP: firmographics, personas, pain points, buying triggers",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 3,
+          "title": "Market sizing, segmentation, prioritized segments",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 4,
+          "title": "Competitors, alternatives, positioning gaps",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 5,
+          "title": "Channel analysis: email, WhatsApp, LinkedIn, referral, inbound",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 6,
+          "title": "Messaging, offer design, hooks per persona",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 7,
+          "title": "Objection mapping, proof assets, case-study angles",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 8,
+          "title": "Execution plan: sequences, cadence, KPIs, budget",
+          "done": 0,
+          "total": 9
+        }
+      ]
+    },
+    {
+      "pipeline": "gtm",
+      "done": 2,
+      "total": 72,
+      "phases": [
+        {
+          "phase": 1,
+          "title": "Positioning",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 2,
+          "title": "Pricing",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 3,
+          "title": "Launch sequencing",
+          "done": 2,
+          "total": 9
+        },
+        {
+          "phase": 4,
+          "title": "Channel budget",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 5,
+          "title": "Content plan",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 6,
+          "title": "Partnerships",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 7,
+          "title": "Sales motion",
+          "done": 0,
+          "total": 9
+        },
+        {
+          "phase": 8,
+          "title": "Funnel metrics & dashboards",
+          "done": 0,
+          "total": 9
+        }
+      ]
+    }
+  ],
+  "verification": [
+    {
+      "pass_no": 1,
+      "key": "factual_accuracy",
+      "name": "Factual accuracy",
+      "attempt": 1,
+      "result": "PASS",
+      "fix_description": null,
+      "fix_applied": false,
+      "ts": "2026-10-11T12:00:00+00:00"
+    },
+    {
+      "pass_no": 2,
+      "key": "icp_fit",
+      "name": "ICP fit",
+      "attempt": 1,
+      "result": "FAIL",
+      "fix_description": "Market size cites no source",
+      "fix_applied": true,
+      "ts": "2026-10-11T12:00:00+00:00"
+    },
+    {
+      "pass_no": 2,
+      "key": "icp_fit",
+      "name": "ICP fit",
+      "attempt": 2,
+      "result": "PASS",
+      "fix_description": null,
+      "fix_applied": false,
+      "ts": "2026-10-11T12:00:00+00:00"
+    },
+    {
+      "pass_no": 3,
+      "key": "channel_message_fit",
+      "name": "Channel\u2013message fit",
+      "attempt": 1,
+      "result": "FAIL",
+      "fix_description": "Competitor pricing is a guess",
+      "fix_applied": true,
+      "ts": "2026-10-11T12:00:00+00:00"
+    },
+    {
+      "pass_no": 3,
+      "key": "channel_message_fit",
+      "name": "Channel\u2013message fit",
+      "attempt": 2,
+      "result": "FAIL",
+      "fix_description": "Competitor pricing still unsourced",
+      "fix_applied": false,
+      "ts": "2026-10-11T12:00:00+00:00"
+    }
+  ],
+  "strategy_document_ready": false,
+  "gtm_document_ready": false,
+  "error": null,
+  "budget_usd": 25.0,
+  "spent_usd": 0.0,
+  "steps_per_phase": null,
+  "planned_steps": 144
+}

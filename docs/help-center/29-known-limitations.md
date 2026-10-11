@@ -76,7 +76,7 @@ In particular:
 - **One Gmail mailbox per account.** You cannot connect several mailboxes to one account.
 - **One WhatsApp number per deployment.** Every account and every agency client on a deployment sends WhatsApp from the same business number.
 - **No cold WhatsApp without consent.** A cold WhatsApp message needs an approved Meta template and a recorded opt-in. There is no free-form cold path.
-- **Workspace compliance rules apply at the moment of sending.** Scheduling still uses the standard send window, and a message a rule forbids is rescheduled when it comes due. Rule caps apply to Gmail and WhatsApp; LinkedIn and phone keep their own limits. Some dashboards show the standard 3% bounce threshold even when a workspace has set a lower one; the pause itself uses the lower one.
+- **Workspace compliance rules apply at the moment of sending.** Scheduling still uses the standard send window, and a message a rule forbids is rescheduled when it comes due. Rule caps apply to Gmail and WhatsApp; LinkedIn and phone keep their own limits. The campaign page and the CRM campaigns dashboard show the lowered bounce threshold; the email-verification bounce report still shows the standard 3% figure.
 - **Region detection** depends on the country or time zone found for a lead. Leads with neither are treated as "unknown".
 - **Re-engagement** after a finished sequence is email only, is off until an owner or manager turns it on for a campaign, and is capped.
 - **Assigning a lead to a teammate** does not change who sends: outreach still goes from the workspace owner's accounts. Assignees are not notified.

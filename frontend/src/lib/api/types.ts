@@ -17,6 +17,9 @@ export interface UserOut {
   identity_required?: boolean;
   identity_complete?: boolean;
   phone_verified?: boolean;
+  /** False when this deployment does not require phone verification (switched
+   *  off, or no SMS transport that can deliver a code). Absent = required. */
+  phone_required?: boolean;
   /** Whether the account has a purchased (or trialing) plan, read from the
    *  database on every sign-in, refresh and /auth/me. False routes the user
    *  to /pricing. Optional for the same backward-compat reason as
@@ -268,7 +271,8 @@ export interface StrategyOut {
     | "executing"
     | "failed"
     | "budget_exhausted";
-  progress: PhaseProgress[];
+  /** GET /strategies/{id} only (StrategyStatusOut); list/create responses omit it. */
+  progress: PipelineProgress[];
   verification: VerificationPass[];
   strategy_document_ready: boolean;
   gtm_document_ready: boolean;
@@ -281,31 +285,34 @@ export interface StrategyOut {
  *  which was never exported -- the one pre-existing `tsc --noEmit` error. */
 export type Strategy = StrategyOut;
 
+/** Mirrors app/api/schemas.py PhaseProgress. */
 export interface PhaseProgress {
-  pipeline: "strategy" | "gtm";
   phase: number;
+  title: string;
   done: number;
   total: number;
-  steps?: StepOut[];
 }
 
-export interface StepOut {
-  step_no: number;
-  step_id: string;
-  name: string;
-  output: string;
+/** Mirrors app/api/schemas.py PipelineProgress: one per pipeline in the flow. */
+export interface PipelineProgress {
+  pipeline: "strategy" | "gtm";
+  done: number;
+  total: number;
+  phases: PhaseProgress[];
 }
 
+/** One row of the verification log the server sends (one row per attempt,
+ *  app/verification/loop.py::_log_attempt). */
 export interface VerificationPass {
   pass_no: number;
   name: string;
   result: "PASS" | "FAIL";
-  attempts: number;
-  fix?: string | null;
-  /** Raw log fields the server sends (one row per attempt). */
   key?: string;
   attempt?: number;
   fix_description?: string | null;
+  fix_applied?: boolean;
+  outcome?: string;
+  ts?: string;
   /** Set when a person, not the judge, passed it. */
   manual_override?: boolean;
   reason?: string;
@@ -394,6 +401,9 @@ export interface CampaignOverview {
   sent_total: number;
   reply_rate: number;
   bounce_rate: number;
+  /** The auto-pause fires when bounce_rate is above this (a workspace
+   *  compliance rule can lower it below the 3% baseline). */
+  bounce_pause_threshold?: number;
   meetings_booked?: number;
   channels: { email: ChannelStats; whatsapp: ChannelStats };
 }
@@ -420,6 +430,8 @@ export interface AnalyticsPoint {
 export interface AnalyticsOut {
   strategy_id: string;
   granularity: string;
+  /** Days of history in `series` (the plan's window); null = all history. */
+  history_days?: number | null;
   series: AnalyticsPoint[];
   variants: Record<string, Record<string, number>>;
   learning_insights: unknown | null;
@@ -550,6 +562,8 @@ export interface CrmVariantPerformance {
   booked: number;
   reply_rate: number | null;
   booking_rate: number | null;
+  /** The strategy's A/B auto-promoted winner (strategy-filtered view only). */
+  promoted?: boolean;
 }
 
 export interface CrmCampaignsDashboard {

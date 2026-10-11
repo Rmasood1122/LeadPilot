@@ -102,7 +102,7 @@ Work through this from top to bottom before going live. Every item has a verific
 ## 9. Frontend + Mobile
 
 - [ ] `npm run build` in `frontend/` completes with no TypeScript errors
-- [ ] Login → Dashboard: OnboardingChecklist visible for new user
+- [x] ~~Login → Dashboard: OnboardingChecklist visible for new user~~ — SUPERSEDED 2026-10-11: the OnboardingChecklist component was never mounted (no dashboard route exists) and nothing marks onboarding steps complete, so it was deleted (docs/program/fixes/product-defects.md #22). Nothing to verify.
 - [ ] Analytics page: SendTimeCard and SubjectLineCard render (even if "No data yet")
 - [ ] Settings page: PlanCard shows current plan limits
 - [ ] Campaign page: PersonalizationHealth and MultiVariateResults sections visible

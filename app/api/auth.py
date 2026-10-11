@@ -177,6 +177,9 @@ def _user_out(user: User, db: Session) -> dict:
         "identity_required": bool(getattr(user, "identity_required", False)),
         "identity_complete": identity_svc.identity_complete(user),
         "phone_verified": bool(getattr(user, "phone_verified", False)),
+        # Product defect #5: false when the deployment does not require a
+        # verified phone (switched off, or no SMS transport that can deliver).
+        "phone_required": identity_svc.phone_verification_required(),
     }
 
 

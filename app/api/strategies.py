@@ -28,9 +28,9 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.db.models import (
-    FlowType, GmailAccount, Lead, LeadStatus, Message, MessageStatus,
-    Outcome, OutcomeEvent, PastClient, Product, ResearchStep, Strategy,
-    StrategyStatus, User,
+    EnrollmentStatus, FlowType, GmailAccount, Lead, LeadStatus, Message, MessageStatus,
+    Outcome, OutcomeEvent, PastClient, Product, ResearchStep, Sequence as SequenceModel,
+    SequenceEnrollment, Strategy, StrategyStatus, User,
 )
 from app.api import spend_guard as spend_guard_api
 from app.pipeline import budget_plan
@@ -99,6 +99,25 @@ def _owned_strategy(db: Session, strategy_id: uuid.UUID, current_user: User) -> 
     if product is None or product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="strategy not found")
     return strategy
+
+
+def _campaign_is_sending(db: Session, strategy: Strategy) -> bool:
+    """The campaign is active and someone is still enrolled in one of its
+    sequences (active, or paused for an out-of-office and due to resume).
+
+    Product defect #19: the delete guard used to key on StrategyStatus
+    .EXECUTING, which nothing assigns (a strategy stays `verified` while its
+    outreach runs), so a sending strategy could be deleted."""
+    if strategy.campaign_state != "active":
+        return False
+    return db.execute(
+        select(SequenceEnrollment.id)
+        .join(SequenceModel, SequenceModel.id == SequenceEnrollment.sequence_id)
+        .where(SequenceModel.strategy_id == strategy.id,
+               SequenceEnrollment.status.in_((EnrollmentStatus.ACTIVE,
+                                              EnrollmentStatus.PAUSED)))
+        .limit(1)
+    ).first() is not None
 
 
 def _refuse_if_daily_ai_limit_reached(db: Session, user: User) -> None:
@@ -307,15 +326,10 @@ def resume_strategy(
             detail=f"strategy status is '{strategy.status.value}' - the pipeline "
                    "has already finished; there is nothing to resume",
         )
-    # EXECUTING means outreach is live off a finished strategy. Re-running the
-    # pipeline would reset status to 'researching' underneath a running
-    # campaign, so refuse instead.
-    if strategy.status is StrategyStatus.EXECUTING:
-        raise HTTPException(
-            status_code=409,
-            detail="strategy is executing - pause the campaign before resuming "
-                   "the pipeline",
-        )
+    # A strategy whose outreach is live stays `verified` (StrategyStatus
+    # .EXECUTING is never assigned -- product defect #19), so the terminal-state
+    # check above is what keeps a resume from resetting a running campaign's
+    # strategy to 'researching'. The old EXECUTING guard here never fired.
 
     # F-AI-01: a run that stopped on its budget resumes with a larger one.
     if body is not None and body.max_budget_usd is not None:
@@ -479,7 +493,19 @@ def delete_strategy(
 
     strategy = _owned_strategy(db, strategy_id, current_user)
 
-    if strategy.status is StrategyStatus.EXECUTING and strategy.campaign_state == "active":
+    # Review L3: a send task has claimed a message and is transmitting it now.
+    in_flight = db.execute(
+        select(Message.id).join(Lead, Lead.id == Message.lead_id)
+        .where(Lead.strategy_id == strategy.id, Message.status == MessageStatus.SENDING)
+        .limit(1)
+    ).first()
+    if in_flight is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="A message of this strategy is being sent right now. Try the "
+                   "delete again in a minute.",
+        )
+    if _campaign_is_sending(db, strategy):
         raise HTTPException(
             status_code=409,
             detail="This strategy's campaign is still sending. Pause the campaign "
@@ -564,13 +590,24 @@ def campaign_overview(
     account = db.execute(
         select(GmailAccount).where(GmailAccount.user_id == product.user_id)
     ).scalar_one_or_none()
+    # Product defect #21: the caps and the bounce threshold the send path and
+    # the auto-pause really use -- a workspace compliance rule can lower them.
+    from app.services import compliance_rules  # noqa: PLC0415
+
     if account is not None:
         sends_today = engine.sends_today(db, str(account.id), now)
         # F03: the same cap the send path enforces (stepped ramp when the
-        # Deliverability Autopilot is on; unchanged when it is off).
-        from app.services import deliverability_autopilot  # noqa: PLC0415
+        # Deliverability Autopilot is on; unchanged when it is off), with the
+        # rule cap and the mailbox-health cap applied the way
+        # outreach_tasks.send_message_impl applies them.
+        from app.services import deliverability_autopilot, mailbox_health  # noqa: PLC0415
 
-        cap_today = engine.ramp_allowance(db, account, now.date(),
+        effective_cap = compliance_rules.campaign_daily_cap(db, strategy, "email")
+        health_cap = mailbox_health.gate(db, account.user_id, str(account.id))["cap"]
+        if health_cap is not None:
+            effective_cap = (health_cap if effective_cap is None
+                             else min(effective_cap, health_cap))
+        cap_today = engine.ramp_allowance(db, account, now.date(), effective_cap,
                                           autopilot=deliverability_autopilot.enabled(db))
 
     # ---- per-channel stats (M4 Chunk 3) ---------------------------------
@@ -608,7 +645,8 @@ def campaign_overview(
 
     wa_stats = _channel_block(ChannelType.WHATSAPP)
     wa_stats["sends_today"] = engine.whatsapp_sends_today(db, now)
-    wa_stats["daily_cap_today"] = engine.whatsapp_daily_allowance(db, now.date())
+    wa_stats["daily_cap_today"] = engine.whatsapp_daily_allowance(
+        db, now.date(), compliance_rules.campaign_daily_cap(db, strategy, "whatsapp"))
     wa_stats["window_open_count"] = sum(
         1 for lead_row in db.execute(
             select(Lead).where(Lead.strategy_id == strategy_id,
@@ -647,7 +685,8 @@ def campaign_overview(
         "channels": {"email": email_stats, "whatsapp": wa_stats},
         "reply_rate": round(replied / sent, 4) if sent else 0.0,
         "bounce_rate": round(bounced / sent, 4) if sent else 0.0,
-        "bounce_pause_threshold": settings.bounce_rate_pause_threshold,
+        # The auto-pause fires when the bounce rate is ABOVE this.
+        "bounce_pause_threshold": compliance_rules.bounce_threshold(db, strategy),
         "meetings_booked": booked,
         "unsubscribed": unsubscribed,
     }

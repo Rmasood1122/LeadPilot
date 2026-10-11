@@ -313,6 +313,10 @@ class TestABPromotionIdempotency:
         admin_headers = _auth_headers(admin_tokens)
         # /playbook/* is plan-gated; a free user gets 402.
         set_plan(db_session, user_a_tokens, "pro")
+        # Auto-promotion is opt-in since product defect #2.
+        from app.services import system_settings  # noqa: PLC0415
+
+        system_settings.set(db_session, "ab_auto_promotion_enabled", True)
 
         # Run aggregation + promotion twice
         for _ in range(2):

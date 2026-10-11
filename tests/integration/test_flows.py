@@ -621,6 +621,12 @@ class TestFlow3LearningLoop:
         admin_headers = _auth_headers(admin_tokens)
         # /playbook/* is plan-gated; a free user gets 402.
         set_plan(db_session, user_a_tokens, "pro")
+        # Auto-promotion is opt-in since product defect #2 (promotion markers
+        # are permanent; docs/program/fixes/product-defects.md). On here so the
+        # significance rule itself is what is tested.
+        from app.services import system_settings  # noqa: PLC0415
+
+        system_settings.set(db_session, "ab_auto_promotion_enabled", True)
         await api_client.post("/playbook/aggregate", headers=admin_headers)
         await api_client.post("/playbook/promote-winners", headers=admin_headers)
 
@@ -659,6 +665,12 @@ class TestFlow3LearningLoop:
         admin_headers = _auth_headers(admin_tokens)
         # /playbook/* is plan-gated; a free user gets 402.
         set_plan(db_session, user_a_tokens, "pro")
+        # Auto-promotion is opt-in since product defect #2 (promotion markers
+        # are permanent; docs/program/fixes/product-defects.md). On here so the
+        # significance rule itself is what is tested.
+        from app.services import system_settings  # noqa: PLC0415
+
+        system_settings.set(db_session, "ab_auto_promotion_enabled", True)
         await api_client.post("/playbook/aggregate", headers=admin_headers)
         await api_client.post("/playbook/promote-winners", headers=admin_headers)
 

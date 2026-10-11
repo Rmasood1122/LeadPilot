@@ -19,6 +19,7 @@ live on the same row and every gated caller already imports this module.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from fastapi import HTTPException
@@ -28,6 +29,8 @@ from app.config import settings
 from app.db.models import AccountSecurityEvent, User
 from app.integrations import geolocation
 from app.services.countries import normalize_country
+
+logger = logging.getLogger(__name__)
 
 ACCOUNT_TYPES = ("individual", "company")
 GEO_MATCH, GEO_MISMATCH, GEO_UNKNOWN = "match", "mismatch", "unknown"
@@ -71,8 +74,102 @@ def identity_complete(user: User) -> bool:
     return user.account_type == "company" and bool(normalize_country(user.company_country))
 
 
+# How SMS_PROVIDER is configured (product defect #5, review M6).
+SMS_DELIVERS = "delivers"            # twilio with all keys; memory outside production
+SMS_OFF = "off"                      # console or empty: deliberately no transport
+SMS_MISCONFIGURED = "misconfigured"  # set but broken: typo, incomplete twilio, memory in prod
+
+
+def sms_transport_state() -> str:
+    from app.core.production_guard import is_production  # noqa: PLC0415
+
+    provider = (settings.sms_provider or "").strip().lower()
+    if provider == "twilio":
+        complete = bool(settings.twilio_account_sid and settings.twilio_auth_token
+                        and settings.twilio_from_number)
+        return SMS_DELIVERS if complete else SMS_MISCONFIGURED
+    if provider == "memory":
+        return SMS_MISCONFIGURED if is_production(settings.app_env) else SMS_DELIVERS
+    if provider in ("", "console"):
+        return SMS_OFF
+    return SMS_MISCONFIGURED
+
+
+def phone_verification_required() -> bool:
+    """Is the phone gate enforced?
+
+    Product defect #5: SMS_PROVIDER defaulted to "console" (delivers nothing)
+    while REQUIRE_PHONE_VERIFICATION defaulted to true, so no new account could
+    ever pass the gate. Review M6: no silent fail-open --
+      * the gate is OFF only when verification is switched off, or when a
+        PRODUCTION deployment has deliberately no transport (console/empty);
+        that is reported loudly (config_warnings);
+      * a transport that is set but broken (a typo, Twilio missing a key, the
+        in-process transport in production) keeps the gate ON and is a
+        startup ERROR plus an admin warning: fix the configuration, don't
+        open the gate;
+      * outside production, console keeps the gate on (local development
+        turns verification off with REQUIRE_PHONE_VERIFICATION=false).
+    """
+    from app.core.production_guard import is_production  # noqa: PLC0415
+
+    if not settings.require_phone_verification:
+        return False
+    return not (sms_transport_state() == SMS_OFF and is_production(settings.app_env))
+
+
+def config_warnings() -> list[dict]:
+    """Deployment problems an admin must see. Shown in the admin panel
+    (GET /admin/config-warnings) and logged at startup."""
+    from app.core.production_guard import is_production  # noqa: PLC0415
+
+    warnings: list[dict] = []
+    if not settings.require_phone_verification:
+        return warnings
+    provider = (settings.sms_provider or "").strip().lower() or "(unset)"
+    state = sms_transport_state()
+    if state == SMS_MISCONFIGURED:
+        warnings.append({
+            "key": "sms_provider_misconfigured",
+            "severity": "high",
+            "level": "error",
+            "message": (
+                f"SMS_PROVIDER={provider} is set but cannot deliver a verification "
+                "code (unknown provider, Twilio missing TWILIO_ACCOUNT_SID / "
+                "TWILIO_AUTH_TOKEN / TWILIO_FROM_NUMBER, or the test-only 'memory' "
+                "transport in production). Phone verification stays REQUIRED, so new "
+                "accounts cannot start outreach, buy a plan or create share links "
+                "until this is fixed. Set SMS_PROVIDER=twilio with all three "
+                "TWILIO_* values, or (founder decision) REQUIRE_PHONE_VERIFICATION=false."
+            ),
+        })
+    elif state == SMS_OFF and is_production(settings.app_env):
+        warnings.append({
+            "key": "phone_verification_undeliverable",
+            "severity": "high",
+            "level": "warning",
+            "message": (
+                f"REQUIRE_PHONE_VERIFICATION is on but SMS_PROVIDER={provider} "
+                "cannot deliver a verification code, so phone verification is "
+                "NOT being enforced: new accounts can start outreach, buy a plan "
+                "and create share links without a verified phone. To enforce it, "
+                "set SMS_PROVIDER=twilio with TWILIO_ACCOUNT_SID, "
+                "TWILIO_AUTH_TOKEN and TWILIO_FROM_NUMBER. To turn it off "
+                "deliberately, set REQUIRE_PHONE_VERIFICATION=false."
+            ),
+        })
+    return warnings
+
+
+def log_config_warnings() -> None:
+    for warning in config_warnings():
+        log = logger.error if warning.get("level") == "error" else logger.warning
+        log("CONFIG %s [%s]: %s", warning.get("level", "warning").upper(),
+            warning["key"], warning["message"])
+
+
 def phone_gate_applies(user: User) -> bool:
-    return bool(settings.require_phone_verification
+    return bool(phone_verification_required()
                 and getattr(user, "identity_required", False)
                 and not getattr(user, "phone_verified", False))
 
@@ -81,16 +178,17 @@ def status(user: User) -> dict:
     """What the onboarding verification screen renders and routes on."""
     complete = identity_complete(user)
     phone_ok = bool(user.phone_verified)
+    phone_required = phone_verification_required()
     next_step = None
     if not complete:
         next_step = "identity"
-    elif not phone_ok:
+    elif not phone_ok and phone_required:
         next_step = "phone"
     return {
         "identity_required": bool(user.identity_required),
         "identity_complete": complete,
         "phone_verified": phone_ok,
-        "phone_required": bool(settings.require_phone_verification),
+        "phone_required": phone_required,
         "next_step": next_step,
         "personal_country": user.personal_country,
         "account_type": user.account_type,

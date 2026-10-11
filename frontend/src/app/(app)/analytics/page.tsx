@@ -16,6 +16,7 @@ import { ReplyQualityPanel } from "@/components/analytics/ReplyQualityPanel";
 import { CompletionPanel } from "@/components/analytics/CompletionPanel";
 import { AttributionPanel } from "@/components/analytics/AttributionPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { historyLabel } from "@/lib/analyticsHistory";
 import { Badge } from "@/components/ui/badge";
 
 // CSS-variable-aware recharts theme: reads the current primary/accent
@@ -45,6 +46,8 @@ export default function AnalyticsPage() {
   const effectiveId = strategyId || (strats?.[0]?.id ?? "");
   const { data, isLoading, error } = useAnalytics(effectiveId, granularity);
 
+  // Product defect #18 / review L5: the series covers only the plan's window.
+  const historyWindow = historyLabel(data?.history_days);
   const replySeries = data ? buildSeries(data.series, "replied") : [];
   const sentSeries  = data ? buildSeries(data.series, "sent")    : [];
   const variants    = data?.variants ?? {};
@@ -98,7 +101,7 @@ export default function AnalyticsPage() {
         <AttributionPanel strategyId={effectiveId || undefined} />
 
         <Card aria-label="Volume over time">
-          <CardHeader><CardTitle className="text-sm">Messages sent over time</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Messages sent over time{historyWindow ? ` (${historyWindow})` : ""}</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={sentSeries}>
@@ -116,7 +119,7 @@ export default function AnalyticsPage() {
         </Card>
 
         <Card aria-label="Replies over time">
-          <CardHeader><CardTitle className="text-sm">Replies over time</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Replies over time{historyWindow ? ` (${historyWindow})` : ""}</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={replySeries}>

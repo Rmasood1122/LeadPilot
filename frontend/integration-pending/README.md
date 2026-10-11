@@ -12,7 +12,9 @@ against a dashboard layout that does not exist in the real M5 frontend:
 
 They are parked here (outside src/, so Next.js ignores them) instead of
 deleted, as reference for wiring their delivered M8 companions —
-SendTimeCard, SubjectLineCard, MultiVariateResults, PersonalizationHealth,
-OnboardingChecklist and PlanCard DO exist under src/components/ and resolve.
+SendTimeCard, SubjectLineCard, MultiVariateResults, PersonalizationHealth
+and PlanCard DO exist under src/components/ and resolve. (OnboardingChecklist
+was deleted on 2026-10-11: never mounted, and nothing marks onboarding steps
+complete -- docs/program/fixes/product-defects.md #22.)
 
 The live M5 route groups `(app)` + `(auth)` remain the real UI.

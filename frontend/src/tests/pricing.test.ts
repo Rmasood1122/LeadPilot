@@ -15,7 +15,7 @@ const LIMITS: PlanLimits = {
   max_strategies: 25, max_leads_per_strategy: 2500, max_sequence_steps: 15,
   channels: ["gmail", "whatsapp", "linkedin"], ab_testing: true, multi_variate: true,
   playbook_access: true, website_builder: true, max_site_pages: 25,
-  analytics_history_days: 365, api_rate_limit_multiplier: 3,
+  analytics_history_days: 365,
 };
 const PPM = { monthly_fee_cents: 0, price_per_meeting_cents: 17_900 };
 

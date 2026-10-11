@@ -19,6 +19,7 @@ sources:
   - app/api/linkedin_network.py
   - app/api/playbook.py
   - app/api/strategies_advanced.py
+  - app/api/analytics.py
   - app/services/system_settings.py
   - app/services/rbac.py
   - frontend/src/app/pricing/page.tsx
@@ -43,12 +44,12 @@ These are the limits the product checks today:
 | free | 3 | 100 | 5 | gmail | 10.0 |
 | starter | 10 | 500 | 10 | gmail, whatsapp | 25.0 |
 | growth | 25 | 2500 | 15 | gmail, whatsapp, linkedin | 60.0 |
-| scale | Unlimited | 10000 | Unlimited | gmail, whatsapp, linkedin, phone | 150.0 |
+| scale | Unlimited | 10000 | 20 | gmail, whatsapp, linkedin, phone | 150.0 |
 | pay_per_meeting | 10 | 1000 | 10 | gmail, whatsapp, linkedin | 60.0 |
-| pro | Unlimited | Unlimited | Unlimited | gmail, whatsapp, linkedin, phone | 150.0 |
-| enterprise | Unlimited | Unlimited | Unlimited | gmail, whatsapp, linkedin, phone | 400.0 |
+| pro | Unlimited | Unlimited | 20 | gmail, whatsapp, linkedin, phone | 150.0 |
+| enterprise | Unlimited | Unlimited | 20 | gmail, whatsapp, linkedin, phone | 400.0 |
 
-The LeadPilot API accepts at most 20 steps per sequence, so "Unlimited" sequence steps means up to 20. The sequence form in the web app creates an opening message and an optional follow-up (up to 2 steps).
+No sequence can have more than 20 steps on any plan. The sequence form in the web app creates an opening message and an optional follow-up (up to 2 steps).
 
 In the app these plans are shown as Free, Starter, Growth, Scale, Pay per meeting, Pro and Enterprise. "gmail" means email sent through your connected Gmail account. The Pricing page calls strategies "campaigns".
 
@@ -88,7 +89,7 @@ A meeting charge can be disputed only while it is still inside its 48-hour windo
 Go to the **Pricing** page. You can also reach it from **Profile**, in the **Plan** card, with the **Upgrade plan** button. On Pricing you pick a monthly tier and press the trial button, or press **Pay per meeting**.
 
 - You must be signed in. If you are not, the button takes you to sign-up.
-- Your phone number must be verified first. If it is not, you see "Verify your phone to choose a plan." and you are sent to the verification screen.
+- Your phone number must be verified first (unless your production deployment deliberately has no text-message service, in which case the check is skipped). If it is not, you see "Verify your phone to choose a plan." and you are sent to the verification screen.
 - You finish on a checkout page run by Stripe, the payment provider. For pay per meeting, this step saves your card for later charges. When checkout finishes you return to Settings.
 - Choosing a different plan replaces your current one. The subscription being replaced is cancelled so you are not billed twice.
 - Leaving checkout without finishing does not change or downgrade your current plan.
@@ -132,11 +133,13 @@ When a subscription ends, the account returns to the Free plan and its limits.
 
 If a monthly payment fails, the subscription is marked past due. You keep your plan while Stripe retries the card. If Stripe finally cancels the subscription, the account returns to Free.
 
-## Is anything on the Pricing page not enforced?
+## What do analytics history and multi-variate testing mean?
 
-Yes, two items. The Pricing page shows an analytics history length for each plan, and it lists "multi-variate testing" for some plans. At the time of writing, the product does not enforce the analytics history length, and multi-variate results are available on any plan that includes A/B testing.
+The Pricing page shows an analytics history length for each plan: 30 days on Free, 90 days on Starter, 365 days on Growth and Pay per meeting, and unlimited on Scale, Pro and Enterprise. The day-by-day chart of a strategy's sends, replies and other events only goes back that far, and its title says so (for example "last 30 days"). Totals and the A/B variant table are not limited.
 
-Also, on a production deployment where Stripe is not set up, choosing a plan fails with "payments are not configured; plans cannot be changed right now".
+Multi-variate testing (comparing three or more variants at once; the results are available through the LeadPilot API) is included in Growth, Scale, Pro and Enterprise. Starter and Pay per meeting include A/B testing but not multi-variate results; asking for them is refused with an upgrade message.
+
+On a production deployment where Stripe is not set up, choosing a plan fails with "payments are not configured; plans cannot be changed right now".
 
 ## Related
 - [Research pipeline](04-research-pipeline.md)

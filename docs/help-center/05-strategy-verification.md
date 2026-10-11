@@ -55,7 +55,7 @@ When research phases give different values for the same fact (for example a pric
 
 ## Where do I see the results?
 
-On the strategy page, the **10x verification loop** card lists every attempt of every check, each marked PASS or FAIL. A check that took three attempts therefore appears three times (for example FAIL, FAIL, PASS), and a re-verified strategy also keeps the rows from earlier runs. The card does not show the reviewer's reasons; the reason a check failed is shown in the **Review and pass manually** form ("Why it failed").
+On the strategy page, the **10x verification loop** card lists each check once, with its latest result (PASS or FAIL). A check that needed more than one attempt shows the count, for example "PASS x2". Under the check's name the card shows the fix that was applied ("fix applied: ..."), or, for a check that still fails, the reviewer's reason ("why it failed: ..."). A check passed by a person shows "PASS (manual)" with who passed it and their reason. After a re-verify, the card shows the latest run of each check.
 
 A check can also stop early, before using all its attempts, for two reasons:
 

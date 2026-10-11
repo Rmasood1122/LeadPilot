@@ -57,11 +57,33 @@ function authRouteInit(path: string): { headers: Record<string, string>; credent
 export class ApiError extends Error {
   status: number;
   detail: string;
-  constructor(status: number, detail: string) {
+  /** The machine-readable `detail.error` of a structured refusal
+   *  (e.g. "daily_ai_limit_reached"); undefined for a plain string detail. */
+  code?: string;
+  constructor(status: number, detail: string, code?: string) {
     super(detail);
     this.status = status;
     this.detail = detail;
+    this.code = code;
   }
+}
+
+/** 429s that are a spending limit, not the request rate limiter. Their
+ *  `detail` is the server's own sentence (which limit, when it resets) and
+ *  must be shown as-is. Mirrors app/api/metering.py DAILY_LIMIT_ERROR and
+ *  app/services/spend_guard.py refusal(). */
+export const SPEND_LIMIT_CODES: readonly string[] = [
+  "daily_ai_limit_reached",
+  "monthly_spend_cap_reached",
+];
+
+/** The sentence for a 429: the server's message for a spending limit,
+ *  otherwise `fallback` (a plain rate limit). */
+export function tooManyRequestsMessage(err: ApiError, fallback: string): string {
+  if (err.code !== undefined && SPEND_LIMIT_CODES.includes(err.code) && err.detail) {
+    return err.detail;
+  }
+  return fallback;
 }
 
 /**
@@ -159,6 +181,7 @@ export async function restoreSession(): Promise<boolean> {
  *  sometimes as an object carrying a `message`). */
 export async function normalizeError(resp: Response): Promise<ApiError> {
   let detail = `${resp.status} ${resp.statusText}`;
+  let code: string | undefined;
   try {
     const data = await resp.json();
     if (typeof data.detail === "string") detail = data.detail;
@@ -177,11 +200,12 @@ export async function normalizeError(resp: Response): Promise<ApiError> {
     ) {
       // Structured refusals: 402 plan_limit_exceeded, 429 daily_ai_limit_reached.
       detail = data.detail.message;
+      if (typeof data.detail.error === "string") code = data.detail.error;
     }
   } catch {
     /* non-JSON body — keep the status line */
   }
-  return new ApiError(resp.status, detail);
+  return new ApiError(resp.status, detail, code);
 }
 
 let refreshInflight: Promise<boolean> | null = null;

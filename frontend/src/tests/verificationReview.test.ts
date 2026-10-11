@@ -6,7 +6,7 @@ import type { VerificationPass } from "@/lib/api/types";
 
 const row = (pass_no: number, result: "PASS" | "FAIL", key = `k${pass_no}`,
              extra: Partial<VerificationPass> = {}): VerificationPass => ({
-  pass_no, name: `P${pass_no}`, result, attempts: 1, key, ...extra,
+  pass_no, name: `P${pass_no}`, result, attempt: 1, key, ...extra,
 });
 
 describe("latestPerPass", () => {

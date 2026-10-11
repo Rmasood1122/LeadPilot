@@ -10,6 +10,10 @@ links).
 **Fixed since (2026-10-11, branch `claude/send-path-gaps`):** #3, #6, #7, #8,
 #9, #12, #13, #14. See `docs/program/fixes/send-path-gaps.md`; the matching
 articles were updated in the same change. The rows below are kept as found.
+**Status (2026-10-11):** #1, #2, #4, #5, #10, #11, #15, #16, #18, #19, #20,
+#21, #22, #23, #24 and #28 are fixed on branch `claude/product-defects`; see
+[`fixes/product-defects.md`](fixes/product-defects.md) for each fix, its tests
+and the articles updated with it. The rows below are the original findings.
 
 Severity: **H** = customers get wrong behaviour or a broken screen; **M** =
 wrong in some cases or misleading UI; **L** = stale doc, dead code, cosmetic.

@@ -18,6 +18,7 @@ sources:
   - app/api/share_links.py
   - app/config.py
   - frontend/src/app/(app)/analytics/page.tsx
+  - frontend/src/components/strategy/PipelineHealthCard.tsx
   - frontend/src/app/(app)/analytics/revenue/page.tsx
   - frontend/src/components/analytics/AttributionPanel.tsx
   - frontend/src/components/analytics/BenchmarkPanel.tsx
@@ -50,7 +51,7 @@ The total falls into a band with a short message:
 
 Because the reply-rate part uses the raw percentage, a campaign with a normal cold-outreach reply rate earns only a few points from it. Read the four parts, not just the total. If the calculation fails, the score shows 0 and "critical" with an error flag, so a failed measurement can be told apart from an empty pipeline.
 
-The score is refreshed every six hours for verified and running campaigns, and recalculated live when requested. It is available on every plan. **The web app does not currently display it**; it is available through the LeadPilot API.
+The score is refreshed every six hours for verified and running campaigns, and recalculated live when requested. It is available on every plan. On a verified strategy's page, the **Pipeline health** card shows the score out of 100, its band and message, and the four parts. It is also available through the LeadPilot API.
 
 ## What does the Analytics page show?
 
