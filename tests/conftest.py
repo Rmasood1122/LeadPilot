@@ -954,6 +954,24 @@ def send_review_off(monkeypatch):
                         lambda db, code=None: False)
 
 
+@pytest.fixture(autouse=True)
+def daily_send_approval_off(monkeypatch):
+    """The daily send approval gate is OFF for every suite that does not test
+    it -- the same pattern, and the same reason, as `send_review_off` above.
+
+    WHY. The gate defaults ON in production (founder decision 2026-10-11), so
+    every pre-existing send-path test -- which is about suppression, caps,
+    windows, guards, not about the daily approval -- would return
+    "deferred_awaiting_send_approval" instead of "sent". It is switched back
+    ON by tests/test_daily_send_approval.py (its `approval_on` fixture), which
+    also asserts the production DEFAULT is True, so the default cannot drift
+    while this fixture hides it from other suites.
+    """
+    from app.services import daily_send_approval
+
+    monkeypatch.setattr(daily_send_approval, "enabled", lambda db: False)
+
+
 @pytest.fixture()
 def test_user(db_session):
     """The canonical established user every object fixture builds data under.

@@ -64,6 +64,8 @@ EVENTS: dict[str, str] = {
     "mailbox_paused": "Mailbox paused",                    # mailbox_health._notify_paused
     "reengagement_due": "Time to re-engage a prospect",    # reengagement_memory._notify_due
     "reply_draft_approved": "Reply draft approved",        # api/crm.py approve draft
+    # Daily send approval: today's automatic sending is waiting for a person.
+    "send_approval_needed": "Approve today's automatic sending",
 }
 
 

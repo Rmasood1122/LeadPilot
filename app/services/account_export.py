@@ -57,6 +57,7 @@ OWNERSHIP: dict[str, list[str]] = {
     "claim_verification_log": ["user_id"],
     "compliance_audit_log": ["user_id"],
     "consent_events": ["user_id"],
+    "daily_send_approvals": ["user_id"],           # daily send approval decisions
     "champion_moves": ["user_id"],                 # F10 (address hash only)
     "crm_custom_fields": ["user_id"],
     "crm_saved_views": ["user_id"],

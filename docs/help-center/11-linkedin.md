@@ -2,7 +2,7 @@
 id: linkedin
 title: LinkedIn outreach and your LinkedIn network
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/core/plans.py
@@ -23,6 +23,9 @@ sources:
   - frontend/src/app/(app)/network/page.tsx
   - frontend/src/components/shell/nav.ts
   - docs/features/linkedin-channel.md
+  - app/services/daily_send_approval.py
+  - docs/features/daily-send-approval.md
+  - app/workers/network_tasks.py
 ---
 
 # LinkedIn outreach and your LinkedIn network
@@ -64,6 +67,10 @@ You can also set a step to **connect**, **message** or **inmail** explicitly. A 
 Before each send, LeadPilot re-reads the prospect's profile (connected, pending, Premium) from LinkedIn through Unipile. When someone accepts your connection request, the incoming webhook marks them as connected.
 
 The text is written by AI from the step brief and your messaging playbook, and it passes through the same claim check as other channels. Length limits in the code: a connection note is cut to at most 300 characters, a message to at most 1,500 characters. The writer is told to keep connection notes to 280 characters with no pitch, messages under 120 words, and InMail bodies under 150 words with a short subject.
+
+## Will LeadPilot warn me that LinkedIn can restrict my account?
+
+Yes. LinkedIn's User Agreement does not allow automated tools to send messages or connection requests, and LinkedIn may restrict or suspend LinkedIn accounts that use automation, including LeadPilot's automatic LinkedIn sending through your connected account. Because of that, automatic LinkedIn sending needs a separate approval every day. On the daily approval page the LinkedIn box is never ticked for you; ticking it shows this warning and asks "Do you want to proceed with automatic LinkedIn sending today?", and you must confirm before LinkedIn can be approved. If you approve only email, LinkedIn steps and bulk-sent network messages keep waiting and are not sent. See [The send-review queue and approvals](12-send-review-queue.md#do-i-approve-automatic-sending-every-day) for how the daily approval works.
 
 ## How many LinkedIn actions are sent per day?
 
@@ -107,7 +114,7 @@ Yes, on eligible plans, and only after you approve the text. For a matched conne
 - Then choose how to send it:
   - **Copy and open LinkedIn** copies the text and opens their profile; you send it yourself, then click **I sent it** to record it.
   - **Send now via LinkedIn** sends it through your connected LinkedIn account after you confirm.
-  - **Bulk send** sends up to 25 saved messages per batch, one at a time, about 90 seconds apart.
+  - **Bulk send** sends up to 25 saved messages per batch, one at a time, about 90 seconds apart. Because the batch then sends on its own, it counts as automatic LinkedIn sending: queued messages wait until today's LinkedIn sending is approved on the daily approval page, and go out after that. Sending one message with **Send** is your own action and is not held.
 
 Every LeadPilot send to a connection checks again at that moment that your plan still includes the feature, the person is not on the do-not-contact list, your daily LinkedIn message limit has not been reached, and the person is still a 1st-degree connection. If they are no longer connected, nothing is sent and the message is marked failed.
 

@@ -2,7 +2,7 @@
 id: mobile-app
 title: The Android app
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - frontend/capacitor.config.ts
@@ -27,6 +27,7 @@ sources:
   - docs/README_M7_MOBILE_SECTION.md
   - FEATURES.md
   - docs/program/BASELINE.md
+  - app/services/daily_send_approval.py
 ---
 
 # The Android app
@@ -69,6 +70,7 @@ After you sign in, the app asks for permission to show notifications. If you all
 - a campaign paused automatically because of a high bounce rate;
 - a mailbox paused because of poor sending health, or a sending domain found on a blocklist;
 - a message held for review;
+- today's automatic sending waiting for your approval (at most once a day, with the queued counts per channel);
 - a WhatsApp template approved or rejected (sent to administrators only);
 - an SDR launch waiting for your approval, or a decision on your own launch.
 

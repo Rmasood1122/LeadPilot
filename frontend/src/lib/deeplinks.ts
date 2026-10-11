@@ -47,6 +47,7 @@ export type DeepLinkRoute =
   | { path: '/settings'; params: { tab?: string } }
   | { path: '/team'; params: Record<string, never> }
   | { path: '/analytics'; params: Record<string, never> }
+  | { path: '/send-approval'; params: Record<string, never> }
   | null; // unrecognised link - do nothing
 
 /**
@@ -133,6 +134,9 @@ export function parseDeepLink(url: string): DeepLinkRoute {
     return { path: '/settings', params: tab ? { tab } : {} };
   }
   if (pathname === '/team') return { path: '/team', params: {} };
+  // Daily send approval: the once-a-day "approve today's automatic sending"
+  // push opens the approval page.
+  if (pathname === '/send-approval') return { path: '/send-approval', params: {} };
 
   return null;
 }

@@ -99,7 +99,7 @@ answerable:
   style: paraphrase
   question: How many follow-up steps can I put in one sequence?
   expected:
-  - sequences-and-follow-ups#how-many-steps-can-a-sequence-have
+  - sequences-and-follow-ups#how-many-steps-can-i-put-in-a-sequence
 - id: q17
   style: paraphrase
   question: Does the sequence stop once the prospect replies?
