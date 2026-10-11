@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MIN_REJECT_NOTE,
   canDecide,
+  decisionLabel,
   hasEdits,
   isStale,
   rejectNoteError,
@@ -141,5 +142,14 @@ describe("hasEdits", () => {
 
   it("treats a null original as an empty string, not as a difference", () => {
     expect(hasEdits(item({ subject: null, body: null }), "", "")).toBe(false);
+  });
+});
+
+describe("system-closed reviews (gaps-sweep-2 review L6)", () => {
+  it("a review the system closed is labelled, a person's rejection is not", () => {
+    expect(decisionLabel(item({ status: "rejected", closed_by_system: true })))
+      .toMatch(/Closed by the system/);
+    expect(decisionLabel(item({ status: "rejected", closed_by_system: false,
+                                decided_by_user_id: "u1" }))).toBeNull();
   });
 });

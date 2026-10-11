@@ -30,7 +30,10 @@ __all__ = ["SmsSendError", "SENT_SMS", "send_sms", "reset_sent_sms", "mask_phone
 
 
 class SmsSendError(ClientHunterError):
-    """The message could not be handed to the SMS transport."""
+    """The message could not be handed to the SMS transport. Can carry the
+    provider's text: never put in an API response as is."""
+
+    user_safe = False
 
 
 # In-process capture for SMS_PROVIDER=memory. Module-level on purpose: a test

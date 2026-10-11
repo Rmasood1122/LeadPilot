@@ -54,6 +54,13 @@ class InboundMessage:
     subject: str | None = None
     received_at: datetime | None = None
     raw: dict = field(default_factory=dict)
+    # Email only (RFC 5322 section 3.6.4): the message's own Message-ID and
+    # its References chain, already sanitised (angle-bracketed ids only, no
+    # CR/LF -- see email_threading.py). A reply sets In-Reply-To and
+    # References from these so it threads in every mail client, not only in
+    # Gmail (whose threadId means nothing to anyone else).
+    rfc_message_id: str | None = None
+    rfc_references: str | None = None
 
 
 # --------------------------------------------------------------------------

@@ -62,7 +62,7 @@ This is an honest list of what LeadPilot does not do, does not do yet, or has no
 - The web app has no screen for disputing a pay-per-meeting charge. Disputes exist in the LeadPilot API only; otherwise contact support. (Cancelling a plan is in **Profile → Plan**.)
 - A paid annual plan cannot be changed to another plan online before its year ends, because there is no partial refund yet. Contact support.
 - The payment connection to Stripe is still marked in the code as waiting for live keys, so it has not been proven against the live payment service. A production deployment without Stripe set up cannot change plans.
-- The Pricing page shows an analytics history length per plan; the product does not enforce it. Multi-variate results are available on every plan that includes A/B testing, even though the Pricing page lists multi-variate testing only for some plans.
+- The analytics history length per plan limits only the day-by-day chart on the Analytics page; totals and the A/B variant table are not limited (see the plans article).
 - The daily AI limit amounts per plan may still change.
 
 ## Which integrations have not been verified against the live services?
@@ -80,7 +80,7 @@ In particular:
 - **One Gmail mailbox per account.** You cannot connect several mailboxes to one account.
 - **One WhatsApp number per deployment.** Every account and every agency client on a deployment sends WhatsApp from the same business number.
 - **No cold WhatsApp without consent.** A cold WhatsApp message needs an approved Meta template and a recorded opt-in. There is no free-form cold path.
-- **Workspace compliance rules apply at the moment of sending.** Scheduling still uses the standard send window, and a message a rule forbids is rescheduled when it comes due. Rule caps apply to Gmail and WhatsApp; LinkedIn and phone keep their own limits. The campaign page and the CRM campaigns dashboard show the lowered bounce threshold; the email-verification bounce report still shows the standard 3% figure.
+- **Workspace compliance rules apply at the moment of sending.** Scheduling still uses the standard send window, and a message a rule forbids is rescheduled when it comes due. Rule caps apply to Gmail and WhatsApp; LinkedIn and phone keep their own limits. The campaign page, the CRM campaigns dashboard and the email-verification (Bounce Shield) report all show the lowered bounce threshold.
 - **Region detection** depends on the country or time zone found for a lead. Leads with neither are treated as "unknown".
 - **Re-engagement** after a finished sequence is email only, is off until an owner or manager turns it on for a campaign, and is capped.
 - **Assigning a lead to a teammate** does not change who sends: outreach still goes from the workspace owner's accounts. Assignees are not notified.

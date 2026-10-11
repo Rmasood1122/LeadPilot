@@ -84,8 +84,10 @@ class TestIdempotenceAndSafety:
         assert env_admin.is_admin is True
 
     def test_missing_user_is_reported_not_invented(self, db_session, caplog):
-        """No password-reset flow exists, so an account created here could
-        never be logged into. It reports instead — loudly."""
+        """An account conjured at startup would hold a password nobody knows
+        (or one written to the logs), for an address nobody proved they
+        control -- a password reset exists now, but that is still the wrong
+        default (app/core/admin_bootstrap.py). It reports instead — loudly."""
         import logging
 
         with caplog.at_level(logging.ERROR):

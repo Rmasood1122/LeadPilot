@@ -44,6 +44,9 @@ class ThreadItem(BaseModel):
     opened: bool | None = None
     open_count: int | None = None
     error: str | None = None
+    # {"kind", "label", "reason"} when the message is held, not failed
+    # (send_holds.hold_of): a guard hold, daily approval, or the review queue.
+    hold: dict | None = None
     classification: str | None = None
     authenticity: dict | None = None
     outcome: str | None = None

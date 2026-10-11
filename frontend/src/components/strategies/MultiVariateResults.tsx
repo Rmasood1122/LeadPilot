@@ -2,25 +2,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
+import { mvFailure, mvFailureText, mvShouldRetry } from "@/lib/multiVariate";
 
 interface MultiVariateResultsProps {
   strategyId: string;
   metric?: string;
 }
 
+/** Ranked multi-variate (3+ variant) results for one campaign. Mounted on the
+ *  Analytics page under the A/B variant comparison (gaps-sweep-2 #9). The
+ *  plan gate is the endpoint's (402 when the plan lacks multi_variate). */
 export function MultiVariateResults({
   strategyId,
   metric = "meeting_rate",
 }: MultiVariateResultsProps) {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["mv-results", strategyId, metric],
     queryFn: () =>
       apiClient
         .get(`/strategies/${strategyId}/mv-results?metric=${metric}`)
         ,
+    retry: mvShouldRetry,
   });
 
   if (isLoading) return <div className="text-sm text-muted-foreground">Loading test results…</div>;
+
+  const failure = mvFailure(error);
+  if (failure) {
+    return <div className="text-sm text-muted-foreground">{mvFailureText(failure)}</div>;
+  }
 
   if (!data || data.message) {
     return (
@@ -39,7 +49,7 @@ export function MultiVariateResults({
       {/* Winner banner */}
       {data.winner && (
         <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-800">
-          🏆 <strong>{data.winner}</strong> is the winner. {data.recommendation}
+          <strong>{data.winner}</strong> is the winner. {data.recommendation}
         </div>
       )}
 
@@ -56,7 +66,7 @@ export function MultiVariateResults({
               <span className="text-xs text-muted-foreground font-mono w-4">#{v.rank}</span>
               <span className="font-medium text-sm">{v.variant}</span>
               {data.harm_flags?.[v.variant] && (
-                <Badge variant="destructive" className="text-[10px]">⚠ harm</Badge>
+                <Badge variant="destructive" className="text-[10px]">harm</Badge>
               )}
             </div>
             <div className="flex items-center gap-4 text-sm">
@@ -71,7 +81,7 @@ export function MultiVariateResults({
       <div className="text-xs text-muted-foreground flex items-center gap-2">
         <span>
           Kruskal-Wallis p={data.overall_p_value?.toFixed(4)}{" "}
-          {data.overall_significant ? "✓ significant" : "✗ not significant"}
+          {data.overall_significant ? "significant" : "not significant"}
         </span>
         {data.pairwise_results?.length > 0 && (
           <span>

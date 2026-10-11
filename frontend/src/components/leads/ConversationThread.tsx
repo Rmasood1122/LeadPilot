@@ -18,6 +18,7 @@ import {
   dayLabel,
   formatDuration,
   groupByDay,
+  holdBadge,
   itemTitle,
   openSuggestions,
   type ThreadItem,
@@ -115,12 +116,14 @@ function Entry({ item }: { item: ThreadItem }) {
           <Icon size={14} aria-hidden="true" />
           <span className="font-medium text-foreground">{itemTitle(item)}</span>
           {item.at && <span>{new Date(item.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
+          {item.hold && <Badge tone="warning" title={item.hold.reason}>{holdBadge(item.hold)}</Badge>}
           {item.opened && <Badge tone="accent">opened{item.open_count && item.open_count > 1 ? ` ×${item.open_count}` : ""}</Badge>}
           {item.authenticity && (
             <Badge tone={kindTone(item.authenticity.kind as never)}>{kindLabel(item.authenticity.kind as never)}</Badge>
           )}
           {item.duration_seconds ? <span>{formatDuration(item.duration_seconds)}</span> : null}
         </div>
+        {item.hold && <p className="mt-1 text-xs text-muted-foreground">{item.hold.reason}</p>}
         {item.subject && <p className="mt-1 font-medium">{item.subject}</p>}
         {item.body && <p className="mt-1 whitespace-pre-line">{item.body}</p>}
       </div>

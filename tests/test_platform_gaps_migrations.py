@@ -268,7 +268,10 @@ class TestWebhookForeignKeysMigration:
 def test_activation_script_targets_the_new_head():
     from scripts import activate_with_keys as act
 
-    assert act.TARGET_REVISION == "0085_webhook_foreign_keys"
+    # gaps-sweep-2 added 0086_inbound_reply_threading on top of 0085; the
+    # script must target the chain's head (tests/test_activation_script.py
+    # checks the head itself).
+    assert act.TARGET_REVISION == "0086_inbound_reply_threading"
 
 
 @pytest.mark.parametrize("name", ["0084_password_reset.py", "0085_webhook_foreign_keys.py"])

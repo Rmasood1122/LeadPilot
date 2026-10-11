@@ -1765,6 +1765,13 @@ class InboundReply(TimestampMixin, Base):
     body: Mapped[str] = mapped_column(Text)
     classification: Mapped[str | None] = mapped_column(String(40), nullable=True)
     received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Migration 0086 (gaps-sweep-2 #6): the email's own Message-ID and its
+    # References chain (RFC 5322 3.6.4), sanitised by email_threading. An
+    # answer sets In-Reply-To / References from them so it threads in the
+    # prospect's mail client. NULL for non-email channels and for replies
+    # stored before 0086. Erased with the rest of the reply (account_erasure).
+    rfc_message_id: Mapped[str | None] = mapped_column(String(502), nullable=True)
+    rfc_references: Mapped[str | None] = mapped_column(Text, nullable=True)
     # --- Feature 2 (migration 0034): reply intelligence -------------------
     # `classification` above answers "how does the SYSTEM route this?"
     # (unsubscribe, bounce, out-of-office). These answer a different

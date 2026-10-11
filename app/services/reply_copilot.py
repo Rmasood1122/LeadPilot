@@ -1227,6 +1227,21 @@ def approved_copy(session: Session, message: Message) -> tuple[str | None, str, 
     return draft.final_subject, draft.final_body, thread
 
 
+def thread_headers(session: Session, message: Message) -> dict[str, str]:
+    """In-Reply-To / References for an approved answer: the prospect's reply
+    is the parent (RFC 5322 3.6.4), so the answer threads in THEIR mail client
+    too, not only in the sender's Gmail (threadId). {} when the reply's
+    Message-ID was never stored (replies received before migration 0086) --
+    the answer then goes out as before."""
+    from app.services import email_threading  # noqa: PLC0415
+
+    draft = draft_for_message(session, message)
+    reply = session.get(InboundReply, draft.reply_id) if draft is not None else None
+    if reply is None or reply.channel != "email":
+        return {}
+    return email_threading.reply_headers(reply.rfc_message_id, reply.rfc_references)
+
+
 #: Message states after which an approved answer is NOT on its way: held for
 #: review, cancelled, failed, skipped... The reply goes back to "needs reply".
 _STILL_QUEUED = (MessageStatus.SCHEDULED, MessageStatus.SENDING)
@@ -1288,9 +1303,14 @@ _DELIVERY = {
 def delivery(message: Message | None) -> dict | None:
     if message is None:
         return None
+    from app.services import send_holds  # noqa: PLC0415
+
     state = _DELIVERY.get(message.status, "blocked")
     return {"state": state, "status": message.status.value,
             "error": message.error if state == "blocked" else None,
+            # A guard HOLD (Bounce Shield, plan limit...) is not a failure:
+            # the UI shows "on hold: <label>" (send_holds.hold_of).
+            "hold": send_holds.hold_of(message.status, message.error),
             "sent_at": _aware(message.sent_at).isoformat() if message.sent_at else None}
 
 

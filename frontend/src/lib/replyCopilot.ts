@@ -39,7 +39,9 @@ export interface ReplyDraft {
   decided_at: string | null;
   created_at: string | null;
   delivery: { state: DeliveryState; status: string; error: string | null;
-              sent_at: string | null } | null;
+              sent_at: string | null;
+              /** Held by a guard, not failed (backend send_holds.hold_of). */
+              hold?: { kind: string; label: string; reason: string } | null } | null;
   send_result: string | null;
 }
 
@@ -126,7 +128,9 @@ export function deliveryLabel(draft: Pick<ReplyDraft, "status" | "delivery" | "a
     case "sent": return `${prefix}sent`;
     case "queued": return `${prefix}queued (waits for the send window and daily cap)`;
     case "held_for_review": return `${prefix}held in the send-review queue`;
-    default: return `${prefix}not sent${delivery.error ? ` — ${delivery.error}` : ""}`;
+    default:
+      if (delivery.hold) return `${prefix}on hold: ${delivery.hold.label} — ${delivery.hold.reason}`;
+      return `${prefix}not sent${delivery.error ? ` — ${delivery.error}` : ""}`;
   }
 }
 

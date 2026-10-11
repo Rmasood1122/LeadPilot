@@ -122,7 +122,14 @@ Unchanged by Feature 1 — see `.env.example` for the full annotated list:
 `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `APOLLO_API_KEY`, `HUNTER_API_KEY`,
 `GMAIL_CLIENT_ID` / `GMAIL_CLIENT_SECRET` / `GMAIL_REDIRECT_URI`,
 `CALENDLY_WEBHOOK_SECRET`, `WHATSAPP_*`, `FIREBASE_*`, `SENDER_IDENTITY`,
-`GMAIL_DAILY_SEND_CAP`, `SEND_WINDOW_*`.
+`SEND_WINDOW_*`.
+
+Sending limits (`app/config.py`): `GMAIL_DAILY_CAP` (default 100 per mailbox per
+day), `GMAIL_WARMUP_START_SENDS` (10) and `GMAIL_WARMUP_DAILY_INCREMENT` (10 per
+day since the mailbox was connected, up to the cap), `BOUNCE_RATE_PAUSE_THRESHOLD`
+(0.03; a workspace compliance rule can only lower it) and `BOUNCE_MIN_SENDS` (10).
+`GMAIL_DAILY_SEND_CAP`, `GMAIL_BOUNCE_PAUSE_THRESHOLD` and `GMAIL_WARMUP_START_DAILY`
+are not settings: nothing reads them (removed from the examples 2026-10-11).
 
 > `SENDER_IDENTITY` is the CAN-SPAM physical postal address in **outreach**
 > mail. It is unrelated to `EMAIL_FROM`, which is the From address on

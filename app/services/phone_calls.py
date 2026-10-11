@@ -61,13 +61,11 @@ from app.db.models import (
     Call,
     CallOutcome,
     CrmActivityKind,
-    EnrollmentStatus,
     Lead,
     LeadStatus,
     Message,
     Outcome,
     OutcomeEvent,
-    SequenceEnrollment,
     Strategy,
 )
 from app.services import anthropic_client, prompt_safety
@@ -361,11 +359,7 @@ def analyze(session: Session, call: Call) -> dict:
         return analysis
 
     if call.outcome in (CallOutcome.INTERESTED, CallOutcome.NOT_INTERESTED):
-        for enrollment in session.execute(
-            select(SequenceEnrollment).where(SequenceEnrollment.lead_id == lead.id)
-        ).scalars():
-            if enrollment.status is not EnrollmentStatus.STOPPED:
-                engine.stop_enrollment(session, enrollment, reason=f"call_{call.outcome.value}")
+        engine.stop_live_enrollments(session, lead.id, reason=f"call_{call.outcome.value}")
         lead.status = LeadStatus.REPLIED
         session.add(Outcome(lead_id=lead.id, strategy_id=lead.strategy_id,
                             event=OutcomeEvent.REPLIED, channel="phone",
@@ -385,10 +379,16 @@ def analyze(session: Session, call: Call) -> dict:
                                  "channel": "phone", "classification": "interested"},
             )
     if call.user_id:
+        # The webhook payload is the documented shape (webhook_delivery.SAMPLES
+        # ["call_completed"]). Without it emit() skipped webhooks entirely, so
+        # a target subscribed to call_completed never received anything.
         event_bus.emit(session, call.user_id, "call_completed",
                        title=f"Call ended: {lead.full_name or 'lead'} — {call.outcome.value.replace('_', ' ')}",
                        body=analysis["summary"][:300], deep_link=f"/leads/detail?id={lead.id}&tab=calls",
-                       push=False)
+                       push=False,
+                       webhook_payload={"call_id": str(call.id), "lead_id": str(lead.id),
+                                        "outcome": call.outcome.value,
+                                        "duration_seconds": call.duration_seconds})
     return analysis
 
 

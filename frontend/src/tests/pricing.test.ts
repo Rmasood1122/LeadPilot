@@ -10,6 +10,7 @@ import {
   featureList,
   checkoutButtonLabel,
   newAccountTerms,
+  planSwitchNotice,
   RENEWAL_DISCLOSURE_VERSION,
   formatDate,
   formatLimit,
@@ -182,5 +183,26 @@ describe("plan card", () => {
       "invoice, so nothing more is charged. The account returns to Free.");
     expect(subscriptionSummary({ ...base, status: "past_due" }))
       .toBe("Annual · $3,490 per year · Payment failed — the card is being retried");
+  });
+});
+
+describe("plan switch notice (gaps-sweep-2 #15)", () => {
+  const sub = (o: Partial<{ billing_model: string; tier: string; status: string; is_stub: boolean }>) =>
+    ({ billing_model: "monthly", tier: "growth", status: "active", is_stub: false, ...o });
+  it("says a paid monthly plan is cancelled with no refund before checkout", () => {
+    const text = planSwitchNotice(sub({}));
+    expect(text).toMatch(/cancels it as soon as the new checkout is completed/);
+    expect(text).toMatch(/not refunded or credited/);
+  });
+  it("a trial ends; nothing was paid so nothing is said about refunds", () => {
+    const text = planSwitchNotice(sub({ status: "trialing" }));
+    expect(text).toMatch(/free trial/);
+    expect(text).not.toMatch(/refund/);
+  });
+  it("nothing to say without a live subscription", () => {
+    expect(planSwitchNotice(null)).toBeNull();
+    expect(planSwitchNotice(sub({ billing_model: "pay_per_meeting" }))).toBeNull();
+    expect(planSwitchNotice(sub({ status: "canceled" }))).toBeNull();
+    expect(planSwitchNotice(sub({ is_stub: true }))).toBeNull();
   });
 });

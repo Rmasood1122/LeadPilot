@@ -31,7 +31,6 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.db.models import (
     ChannelType,
     EnrichmentAttempt,
@@ -269,6 +268,12 @@ def _owned_lead_ids(user_id):
             .where(Product.user_id == user_id))
 
 
+def _account_threshold(db: Session, user_id: uuid.UUID) -> float:
+    from app.services import compliance_rules  # noqa: PLC0415
+
+    return compliance_rules.account_bounce_threshold(db, user_id)
+
+
 def metrics(db: Session, user_id: uuid.UUID, *, days: int = 30,
             now: datetime | None = None, verifier=None) -> dict:
     """Bounces on email sends in the window, split by the verdict tag the
@@ -339,7 +344,10 @@ def metrics(db: Session, user_id: uuid.UUID, *, days: int = 30,
         "bounces_counted": "every recorded email bounce (hard and soft are not "
                            "distinguished) - an upper bound on hard bounces",
         "sends": by_tag,
-        "campaign_pause_threshold": settings.bounce_rate_pause_threshold,
+        # The threshold the auto-pause really uses: the workspace compliance
+        # rule may lower the 3% baseline (gaps-sweep-2 #11; the campaign page
+        # and CRM dashboard already showed the lowered one).
+        "campaign_pause_threshold": _account_threshold(db, user_id),
         "ledger": {
             "attempts": len(attempts),
             "paid_attempts": sum(b["paid"] for b in by_provider.values()),

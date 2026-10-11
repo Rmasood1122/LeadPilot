@@ -288,8 +288,8 @@ def check_one_click(from_address: str | None) -> dict:
         outbound = OutboundMessage(message_id="preflight", lead_id=str(probe.id),
                                    to_address=probe.email, subject=subject, body=body,
                                    headers=headers)
-        parsed = email.message_from_bytes(build_mime(from_address, outbound).as_bytes(),
-                                          policy=email.policy.default)
+        raw = build_mime(from_address, outbound).as_bytes()
+        parsed = email.message_from_bytes(raw, policy=email.policy.default)
     except Exception as exc:  # noqa: BLE001 -- a probe that cannot run fails closed
         logger.exception("one-click unsubscribe probe failed")
         return {"name": "one_click_unsubscribe", "ok": False,
@@ -316,6 +316,18 @@ def check_one_click(from_address: str | None) -> dict:
             problems.append("the unsubscribe link carries a token the endpoint cannot read")
         if "/unsubscribe/" not in https[0]:
             problems.append("the unsubscribe link does not point at /unsubscribe/<token>")
+    # The PARSED headers above are decoded, so an RFC 2047 encoded or folded
+    # header used to pass here while receivers could not use it (gaps-sweep-2
+    # review). RFC 2369 / 8058: the transmitted value must be the raw <URI>
+    # and the exact Post value, each on one line.
+    from app.core.mime_policy import raw_header_lines  # noqa: PLC0415
+
+    for name in ("List-Unsubscribe", "List-Unsubscribe-Post"):
+        for block in raw_header_lines(raw, name):
+            if any("=?" in line for line in block):
+                problems.append(f"{name} is RFC 2047 encoded in the transmitted bytes")
+            if len(block) > 1:
+                problems.append(f"{name} is folded across lines in the transmitted bytes")
     if not _one_click_route_registered():
         problems.append("POST /unsubscribe/{token} (the one-click endpoint) is not registered")
     if problems:

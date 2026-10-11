@@ -57,6 +57,14 @@ describe("edit detection mirrors the backend", () => {
 });
 
 describe("delivery", () => {
+  it("shows a guard hold as on hold, not as a failure (gaps-sweep-2 #8)", () => {
+    expect(deliveryLabel(draft({
+      status: "approved",
+      delivery: { state: "blocked", status: "failed", error: "bounce_shield: unverified",
+                  sent_at: null,
+                  hold: { kind: "bounce_shield", label: "Bounce Shield", reason: "unverified" } },
+    }))).toBe("on hold: Bounce Shield — unverified");
+  });
   it("says what happened to a decision", () => {
     expect(deliveryLabel(draft())).toBe("Waiting for you");
     expect(deliveryLabel(draft({ status: "discarded" }))).toBe("Discarded");

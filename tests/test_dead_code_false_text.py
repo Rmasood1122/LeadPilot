@@ -28,11 +28,16 @@ def test_dead_modules_are_gone():
     assert not (FRONTEND / "components" / "kanban" / "LeadDrawer.tsx").exists()
     assert not (FRONTEND / "components" / "ui" / "PullToRefresh.tsx").exists()
     assert not hasattr(whatsapp_optin_api, "optin_url")
+    # gaps-sweep-2 #10: no importer, no dynamic import, no string reference,
+    # no test, no doc (proved before deleting; see docs/program/fixes/gaps-sweep-2.md).
+    assert not (FRONTEND / "lib" / "api" / "onboarding.ts").exists()
+    assert not (FRONTEND / "components" / "kanban" / "StrategyPicker.tsx").exists()
 
 
 REPO = Path(__file__).resolve().parents[1]
 DELETED = ("components/onboarding/OnboardingChecklist", "components/ui/PullToRefresh",
-           "components/kanban/LeadDrawer")
+           "components/kanban/LeadDrawer", "lib/api/onboarding", "kanban/StrategyPicker",
+           "onboardingApi")
 
 
 def test_no_stale_reference_to_a_deleted_module():

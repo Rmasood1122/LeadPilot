@@ -81,7 +81,7 @@ Follow-up decisions, same day (`DECISIONS.md`): GitHub Pro will not be bought, s
 
 Open questions for the founders:
 
-1. D1 (website copy vs. code) and D6 (status page key and DNS) are unanswered.
+1. D1 (website copy vs. code) and D6 (status page key and DNS) are unanswered. *(Superseded: D1 was decided 2026-10-10 and D6 resolved 2026-10-11 by the /status page on the main site -- `DECISIONS.md`.)*
 2. Is sign-up open on the current Render production? (UNVERIFIED: no production requests were made in this session.)
 
 Next:

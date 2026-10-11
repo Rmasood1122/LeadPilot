@@ -192,8 +192,13 @@ def mutate_strategy(strategy_id: uuid.UUID, db: Session = Depends(get_db),
                                             actor_user_id=current_user.id)
         except Exception as exc:  # noqa: BLE001
             db.rollback()
+            from app.core.errors import public_detail  # noqa: PLC0415
+
+            why = public_detail(exc, "the AI service returned an error",
+                                event="api.strategy_mutation_failed",
+                                strategy_id=str(strategy.id))
             raise HTTPException(status_code=502,
-                                detail=f"the mutation could not be generated: {exc}") from exc
+                                detail=f"the mutation could not be generated: {why}") from exc
 
 
 @router.post("/strategies/{strategy_id}/versions/{version_id}/apply",

@@ -22,6 +22,7 @@ WEBHOOK AUTHENTICATION (fail closed -- no secret configured, no delivery accepte
 import hashlib
 import hmac
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -40,6 +41,7 @@ from app.db.models import Call, CallOutcome, CrmActivityKind, Lead, ProcessedWeb
 from app.services import credentials, crm_events, phone_calls, system_settings, usage_meter
 from app.workers import call_tasks
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["calls"])
 
 
@@ -208,10 +210,18 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
     except Exception as exc:  # noqa: BLE001
         db.rollback()
         phone_calls.release_call_slot(current_user.id)
-        raise HTTPException(status_code=502, detail=f"the call could not be placed: {exc}") from exc
+        from app.core.errors import public_detail  # noqa: PLC0415
+
+        why = public_detail(exc, "the voice provider returned an error",
+                            event="api.call_now_failed", lead_id=str(lead.id))
+        raise HTTPException(status_code=502, detail=f"the call could not be placed: {why}") from exc
     if not result.ok:
         phone_calls.mark_send_failed(db, call, result.error or "call failed", current_user.id)
-        raise HTTPException(status_code=502, detail=f"the call could not be placed: {result.error}")
+        # The provider's own error text stays on the call record and in the
+        # log; the response says what happened, not the provider's body.
+        logger.warning("call_now: provider refused call %s: %s", call.id, result.error)
+        raise HTTPException(status_code=502, detail="the call could not be placed: the voice "
+                                                    "provider refused it (see the call record)")
     call.provider_call_id = result.provider_message_id
     call.provider = (result.raw or {}).get("provider") or call.provider
     call.status = "ringing"

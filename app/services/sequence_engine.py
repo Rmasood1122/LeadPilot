@@ -55,6 +55,27 @@ CAMPAIGN_PAUSED_BOUNCE = "paused_bounce_rate"
 STOP_LEAD_REMOVED = "lead_removed"          # the account removed the lead
 STOP_NO_ADDRESS = "no_address_for_channel"  # nothing to send this step to
 
+#: Lead statuses that END every sequence the lead is in, whoever sets them:
+#: removed (DROPPED), and the closed outcomes. A status writer calls
+#: stop_for_status() after setting one of these (app/api/ui_support.py,
+#: app/api/crm.py single and bulk patch, crm_sync.apply_lead_status), and the
+#: send chokepoint refuses a sequence step to any of them (outreach_tasks), so
+#: a writer that forgets cannot send. Before this only DROPPED was stopped by
+#: the Pipeline board and blocked at send time; a lead closed or disqualified
+#: from the CRM grid kept receiving its sequence.
+CLOSED_STATUSES: frozenset[LeadStatus] = frozenset({
+    LeadStatus.CLOSED_WON, LeadStatus.CLOSED_LOST, LeadStatus.DISQUALIFIED})
+STOPPING_STATUSES: frozenset[LeadStatus] = CLOSED_STATUSES | {LeadStatus.DROPPED}
+
+
+def status_stop_reason(status: LeadStatus) -> str:
+    """The stop reason for a status in STOPPING_STATUSES set inside
+    LeadPilot: "lead_removed" for DROPPED, "crm_<status>" for a close (both
+    categorised by sequence_completion: lead_removed / crm_closed)."""
+    if status is LeadStatus.DROPPED:
+        return STOP_LEAD_REMOVED
+    return f"crm_{status.value}"
+
 #: The lead statuses a sequence may enroll. VERIFIED only: the address passed
 #: verification and nobody has decided otherwise. Deliberately NOT
 #:   flagged   -- a risky / unknown verdict. The product leaves it to a person
@@ -349,7 +370,7 @@ def enroll_leads(
 
 
 def stop_enrollment(session: Session, enrollment: SequenceEnrollment, reason: str,
-                    now: datetime | None = None) -> None:
+                    now: datetime | None = None, *, commit: bool = True) -> None:
     """HARD STOP. Cancels every pending message. Irreversible by design —
     a stopped enrollment can never send again.
 
@@ -358,24 +379,45 @@ def stop_enrollment(session: Session, enrollment: SequenceEnrollment, reason: st
     invents a new reason lands in `other` and is logged — rather than
     silently widening the "dropped without a decision" bucket that the
     completion metric reports.
+
+    "Pending" is send_holds.pending_clause(): scheduled, being sent, waiting
+    in the human review queue (AWAITING_REVIEW) or held by a send-time guard.
+    A held message used to survive the stop: it was never sent (approval or
+    release re-runs the gates, which refuse a stopped enrollment), but it sat
+    in the review queue as if a decision were still needed. Its review is
+    closed here too (send_review.close_for_cancelled).
     """
     from app.services import sequence_completion  # noqa: PLC0415
 
+    now = now or _now()
     enrollment.status = EnrollmentStatus.STOPPED
     enrollment.stop_reason = reason
-    enrollment.stopped_at = now or _now()
+    enrollment.stopped_at = now
     enrollment.stop_category = sequence_completion.categorize(reason)
+    _cancel_pending(session, enrollment, f"enrollment stopped: {reason}", now)
+    if commit:   # commit=False: the caller commits it with its own change
+        session.commit()
+
+
+def _cancel_pending(session: Session, enrollment: SequenceEnrollment, note: str,
+                    now: datetime) -> int:
+    """Cancel this enrollment's pending messages (send_holds.pending_clause:
+    scheduled, sending, in the review queue, or guard-held) and close their
+    pending reviews. Changes nothing else. Does not commit. Returns the count."""
+    from app.services import send_holds, send_review  # noqa: PLC0415
+
     pending = session.execute(
         select(Message).where(
             Message.sequence_id == enrollment.sequence_id,
             Message.lead_id == enrollment.lead_id,
-            Message.status.in_([MessageStatus.SCHEDULED, MessageStatus.SENDING]),
+            send_holds.pending_clause(),
         )
     ).scalars().all()
     for msg in pending:
         msg.status = MessageStatus.CANCELLED
-        msg.error = f"enrollment stopped: {reason}"
-    session.commit()
+        msg.error = note
+    send_review.close_for_cancelled(session, [msg.id for msg in pending], note=note, now=now)
+    return len(pending)
 
 
 def pause_enrollment(session: Session, enrollment: SequenceEnrollment,
@@ -583,6 +625,46 @@ def _enrollments_for_lead(session: Session, lead_id: uuid.UUID) -> list[Sequence
     return session.execute(
         select(SequenceEnrollment).where(SequenceEnrollment.lead_id == lead_id)
     ).scalars().all()
+
+
+def stop_live_enrollments(session: Session, lead_id: uuid.UUID, reason: str,
+                          now: datetime | None = None, *, commit: bool = True) -> int:
+    """stop_enrollment() every LIVE (active or paused) enrollment of
+    `lead_id`. Returns how many were stopped. Commits unless commit=False
+    (then the caller commits it in the same transaction as its own change --
+    the CRM bulk patch, gaps-sweep-2 review L4).
+
+    A COMPLETED enrollment keeps its status: it received every step, and
+    overwriting it as STOPPED would move it from "completed" to "stopped
+    early" in the completion metric (gaps-sweep-2 review M2). Anything still
+    pending on it (a Reply Copilot answer, a re-engagement touch, a held
+    message) is cancelled all the same, with the reason. STOPPED ones are left
+    as they are."""
+    now = now or _now()
+    stopped = 0
+    for enrollment in _enrollments_for_lead(session, lead_id):
+        if enrollment.status in (EnrollmentStatus.ACTIVE, EnrollmentStatus.PAUSED):
+            stop_enrollment(session, enrollment, reason=reason, now=now, commit=False)
+            stopped += 1
+        elif enrollment.status is EnrollmentStatus.COMPLETED:
+            _cancel_pending(session, enrollment, f"lead status: {reason}", now)
+    if commit:
+        session.commit()
+    return stopped
+
+
+def stop_for_status(session: Session, lead: Lead, *, reason: str | None = None,
+                    now: datetime | None = None, commit: bool = True) -> int:
+    """The ONE rule every lead-status writer applies after setting a status:
+    a status in STOPPING_STATUSES stops every live enrollment of the lead (and
+    so cancels its pending messages). Any other status is a no-op. `reason`
+    overrides status_stop_reason() (crm_sync passes "crm_<provider>").
+    Returns how many enrollments were stopped."""
+    if lead.status not in STOPPING_STATUSES:
+        return 0
+    return stop_live_enrollments(session, lead.id,
+                                 reason or status_stop_reason(lead.status), now=now,
+                                 commit=commit)
 
 
 def _outcome(session: Session, lead: Lead, event: OutcomeEvent,

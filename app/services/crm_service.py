@@ -430,8 +430,6 @@ def dashboard_campaigns(db: Session, current_user: User,
     message was dispatched, and excluding it from the denominator would
     flatter the reply rate exactly when deliverability is worst.
     """
-    from app.config import settings
-
     owned = owned_leads_subquery(current_user, strategy_id)
     dispatched = [MessageStatus.SENT, MessageStatus.BOUNCED]
 
@@ -575,20 +573,13 @@ def dashboard_campaigns(db: Session, current_user: User,
     # ---- bounce vs the auto-pause threshold ------------------------------
     total_sent = sum(c["sent"] for c in channels)
     total_bounced = sum(c["bounced"] for c in channels)
-    threshold = float(getattr(settings, "bounce_rate_pause_threshold", 0.03))
     # Product defect #21: a workspace compliance rule can lower the threshold
     # the auto-pause uses; show that one. Every strategy of this account shares
-    # the account's workspace, so one strategy answers for all.
-    any_strategy = db.execute(
-        select(Strategy).join(Product, Product.id == Strategy.product_id)
-        .where(Product.user_id == current_user.id,
-               *([Strategy.id == strategy_id] if strategy_id is not None else []))
-        .limit(1)
-    ).scalars().first()
-    if any_strategy is not None:
-        from app.services import compliance_rules  # noqa: PLC0415
+    # the account's workspace, so the account's threshold answers for all --
+    # the same helper the Bounce Shield report uses (gaps-sweep-2 #11).
+    from app.services import compliance_rules  # noqa: PLC0415
 
-        threshold = float(compliance_rules.bounce_threshold(db, any_strategy))
+    threshold = float(compliance_rules.account_bounce_threshold(db, current_user.id))
     bounce_rate = (total_bounced / total_sent) if total_sent else 0.0
 
     paused = db.execute(

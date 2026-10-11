@@ -330,6 +330,42 @@ class TestAnalysis:
         enrollment = db_session.query(m.SequenceEnrollment).one()
         assert enrollment.status is m.EnrollmentStatus.ACTIVE
 
+    def test_call_completed_reaches_a_webhook_subscriber(self, db_session, placed_call,
+                                                         fake_claude, test_user, monkeypatch):
+        """gaps-sweep-2 #1: call_completed is subscribable and documented, but
+        was emitted without a webhook payload, so emit() never delivered it."""
+        from app.core.crypto import encrypt
+        from app.services import event_bus
+        from app.services import webhook_delivery as wd
+
+        monkeypatch.setattr(event_bus, "_push", lambda *a, **k: 0)
+        monkeypatch.setattr(event_bus, "_slack", lambda *a, **k: False)
+        monkeypatch.setattr(wd, "public_destination", lambda url: True)
+        db_session.add(m.WebhookTarget(user_id=test_user.id, url="https://hooks.example.com/c",
+                                       event_types=["call_completed"], active=True,
+                                       secret_encrypted=encrypt("s")))
+        placed_call.duration_seconds = 184
+        placed_call.transcript = "User: busy now"
+        db_session.commit()
+        fake_claude.call_analysis_response = {"outcome": "answered", "summary": "Call back"}
+        results = []
+        real_emit = event_bus.emit
+
+        def spy(db, uid, event, **kw):
+            out = real_emit(db, uid, event, **kw)
+            results.append((event, kw.get("webhook_payload"), out))
+            return out
+
+        monkeypatch.setattr(event_bus, "emit", spy)
+        phone_calls.analyze(db_session, placed_call)
+        (event, payload, out), = [r for r in results if r[0] == "call_completed"]
+        assert out["webhooks"] == 1
+        assert set(payload) == set(wd.SAMPLES["call_completed"])
+        assert payload == {"call_id": str(placed_call.id), "lead_id": str(placed_call.lead_id),
+                           "outcome": "answered", "duration_seconds": 184}
+        delivery = db_session.query(m.WebhookDelivery).filter_by(event_type="call_completed").one()
+        assert delivery.payload_json["data"]["call_id"] == str(placed_call.id)
+
 
 class TestApi:
     def test_consent_and_listing(self, client, db_session, phone_lead, placed_call):

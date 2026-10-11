@@ -26,7 +26,16 @@ export interface SendReviewItem {
   decision_note: string | null;
   decided_at: string | null;
   decided_by_user_id: string | null;
+  /** Closed by the system when the sequence stopped -- not a person's
+   *  rejection (backend send_review.close_for_cancelled). */
+  closed_by_system?: boolean;
   created_at: string | null;
+}
+
+/** "Closed by the system" for a review the system closed, else null. */
+export function decisionLabel(item: Pick<SendReviewItem, "status" | "closed_by_system">):
+  string | null {
+  return item.closed_by_system ? "Closed by the system (the sequence stopped)" : null;
 }
 
 /** The API refuses a shorter one — a rejected message is never sent, and the

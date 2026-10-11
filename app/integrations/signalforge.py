@@ -71,7 +71,9 @@ def _post_command(
         with httpx.Client(timeout=timeout) as client:
             r = client.post(url, json=payload, headers={CONTROL_KEY_HEADER: operator_key})
     except httpx.RequestError as exc:
-        raise SignalForgeError(f"Network error reaching SIGNALFORGE: {exc}") from exc
+        logger.warning("SIGNALFORGE request failed: %s", exc)
+        raise SignalForgeError(
+            f"Network error reaching SIGNALFORGE ({type(exc).__name__}).") from exc
 
     try:
         envelope = r.json()

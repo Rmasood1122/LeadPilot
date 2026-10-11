@@ -84,7 +84,7 @@ With it on, a step is moved to the next of the top 3 windows at or after its nor
 
 ## Which plans include these features?
 
-The learning-loop insights pages (send-time recommendations, subject-line patterns and playbook scores) need a plan with **playbook access**, included in Starter, Growth, Scale, Pay per meeting, Pro and Enterprise, and not in Free. Multi-variant results (three or more variants compared at once, available through the LeadPilot API) need a plan with **multi-variate testing**: Growth, Scale, Pro and Enterprise. Other accounts get an upgrade message (HTTP 402).
+The learning-loop insights pages (send-time recommendations, subject-line patterns and playbook scores) need a plan with **playbook access**, included in Starter, Growth, Scale, Pay per meeting, Pro and Enterprise, and not in Free. Multi-variant results (three or more variants compared at once) are shown on the **Analytics** page, in the **Multi-variate test results** card under the variant comparison, and are also available through the LeadPilot API. They need a plan with **multi-variate testing**: Growth, Scale, Pro and Enterprise. On other plans the card says "Multi-variate test results are included from the Growth plan." (the API answers HTTP 402).
 
 ## Related
 - [The research pipeline](04-research-pipeline.md)

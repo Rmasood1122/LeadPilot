@@ -74,8 +74,12 @@ def put_style_profile(body: StyleProfileIn, db: Session = Depends(get_db),
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
             db.rollback()
+            from app.core.errors import public_detail  # noqa: PLC0415
+
+            why = public_detail(exc, "the AI service returned an error",
+                                event="api.style_profile_failed")
             raise HTTPException(status_code=502,
-                                detail=f"the style analysis failed: {exc}") from exc
+                                detail=f"the style analysis failed: {why}") from exc
     return StyleProfileOut(profile=profile, samples=current_user.style_samples_json or [],
                            updated_at=current_user.style_profile_updated_at)
 
@@ -172,8 +176,12 @@ def write_loom_script(lead_id: uuid.UUID, db: Session = Depends(get_db),
         try:
             script = loom_video.write_script(lead)
         except Exception as exc:  # noqa: BLE001
+            from app.core.errors import public_detail  # noqa: PLC0415
+
+            why = public_detail(exc, "the AI service returned an error",
+                                event="api.loom_script_failed", lead_id=str(lead.id))
             raise HTTPException(status_code=502,
-                                detail=f"the script could not be written: {exc}") from exc
+                                detail=f"the script could not be written: {why}") from exc
     current = loom_video.state(lead)
     status = current.get("status") if current.get("status") == "recorded" else "suggested"
     lead.loom_video_json = {**current, **script, "status": status}

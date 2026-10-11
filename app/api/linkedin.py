@@ -179,8 +179,12 @@ def link_account(body: LinkAccountIn, db: Session = Depends(get_db),
     except HTTPException:
         raise
     except Exception as exc:  # noqa: BLE001
+        from app.core.errors import public_detail  # noqa: PLC0415
+
+        why = public_detail(exc, "check the account id in Unipile",
+                            event="api.linkedin_account_lookup_failed")
         raise HTTPException(status_code=422,
-                            detail=f"Unipile does not recognise that account: {exc}") from exc
+                            detail=f"Unipile does not recognise that account: {why}") from exc
     return _out(db, account)
 
 
@@ -341,16 +345,22 @@ async def unipile_webhook(request: Request, db: Session = Depends(get_db)) -> di
             lead.linkedin_connection_status = "connected"
             lead.linkedin_connected_at = datetime.now(timezone.utc)
         db.commit()
-        # Feature 2: classify what the human does next. After the commit, and
-        # off-thread -- two model calls inside this handler would have Unipile
-        # retrying the delivery on timeout and creating a duplicate reply.
         from app.workers import reply_tasks  # noqa: PLC0415
-
-        reply_tasks.enqueue(reply.id)
-
         from app.workers.outreach_tasks import route_linkedin_inbound_impl  # noqa: PLC0415
 
-        classification = route_linkedin_inbound_impl(db, lead, reply)
+        # Route FIRST (it sets and commits reply.classification and applies
+        # the stop rules), THEN publish the reply-intelligence job -- the email
+        # path's order. Publishing first let the job read the row while
+        # classification was still NULL: reply_intent, reengagement_memory and
+        # Reply Copilot all branch on it (gaps-sweep-2 #7). The job stays off
+        # this thread (two model calls here would have Unipile retry on
+        # timeout); `finally` so a routing error cannot leave the reply
+        # unclassified for the human as well.
+        reply_id = reply.id   # read now: a failed routing may leave the session unusable
+        try:
+            classification = route_linkedin_inbound_impl(db, lead, reply)
+        finally:
+            reply_tasks.enqueue(reply_id)
         return {"ok": True, "matched": True, "classification": classification}
 
     if event in ("account_status", "credentials", "restricted"):

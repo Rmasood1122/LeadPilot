@@ -345,9 +345,15 @@ def _provision_link(db: Session, user: User, meeting: Meeting,
             # the same thing here: the user supplies the URL.
             return None, None, None, None
     except Exception as exc:  # noqa: BLE001 — see the module docstring
-        logger.warning("meetings.platform_link_failed",
-                       platform=meeting.platform.value, error=str(exc))
-        return None, None, f"{type(exc).__name__}: {exc}", getattr(exc, "action", None)
+        # Our own errors (Google not authorised, Zoom not configured) are
+        # written for the user and kept; a provider/HTTP error's text is
+        # logged, never returned (gaps-sweep-2 #17).
+        from app.core.errors import public_detail  # noqa: PLC0415
+
+        why = public_detail(exc, "the meeting provider did not create a link",
+                            event="meetings.platform_link_failed",
+                            platform=meeting.platform.value)
+        return None, None, why, getattr(exc, "action", None)
 
     return (result.get("join_url") or None,
             result.get("external_event_id") or None, None, None)

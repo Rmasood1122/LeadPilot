@@ -502,12 +502,17 @@ Neither number is measured yet — see Unverified.
   produced drafts). The repair/reject rules are tested; tone is not.
 - Gmail threading: the reply is sent with `threadId` = the stored thread ref;
   the Gmail adapter itself marks `threadId` "TODO: verify against current Gmail
-  API docs". No `In-Reply-To` / `References` header is set (the adapter has no
-  support for them), so non-Gmail clients may not thread it.
+  API docs". Since 2026-10-11 (gaps-sweep-2 #6, migration 0086) the answer
+  also carries `In-Reply-To` / `References` built from the reply's own
+  Message-ID and References (RFC 5322 3.6.4, `app/services/email_threading.py`),
+  so other clients can thread it. Replies stored before 0086 have no stored
+  Message-ID and their answers still thread by `threadId` only. Not yet
+  verified against live Gmail / Outlook / Apple Mail.
 - The success metric — no pilot data.
 - The cost estimate (prices are admin estimates; token counts are estimated).
-- Race on the LinkedIn webhook (reply enqueued before routing classifies it):
-  handled by the Feature 1 fallback, verified only offline.
+- Race on the LinkedIn webhook: fixed 2026-10-11 (gaps-sweep-2 #7) -- the
+  reply job is now published after routing has set the classification (same
+  for WhatsApp); verified offline only.
 - Whether the send-review queue's `prior_objection` trigger (if an admin turns
   it on) holding objection answers a second time is the desired UX.
 - With F01 Bounce Shield on, an answer to a lead whose address has no fresh

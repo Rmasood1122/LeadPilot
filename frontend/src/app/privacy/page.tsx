@@ -10,6 +10,14 @@
  * what it keeps: docs/features/gdpr-erasure.md, decisions E1-E3) were
  * rewritten to match the code (founder decision D1). The retention periods in
  * §8 are defaults awaiting confirmation. Keep docs/PRIVACY_POLICY.md in step.
+ *
+ * NEEDS FOUNDER/LEGAL REVIEW (gaps-sweep-2 #13, 2026-10-11): §2 claimed usage
+ * data on which pages and features are used. No page or feature tracking
+ * exists in the code; §2 now lists what IS kept (auth_sessions ip +
+ * user_agent, security_audit_events, the network_guard IP country/VPN check,
+ * usage_meter AI spend, tutorial progress, device_tokens, host request logs).
+ * Relied on: the GDPR Art. 13(1) information duty (say what is collected) --
+ * a reading, not settled legal advice.
  */
 
 import type { Metadata } from "next";
@@ -48,9 +56,15 @@ export default function PrivacyPage() {
             <p>
               When you become a client we collect <strong className="text-white">account data</strong>: your
               name, email address, company name, and the details you share about your business and ideal
-              client profile. As you use the dashboard we collect <strong className="text-white">usage
-              data</strong>, such as the pages and features you use, along with basic technical information
-              like browser type and device.
+              client profile. As you use the dashboard we keep <strong className="text-white">technical and
+              security data</strong>: for each signed-in session, the IP address and the browser and device
+              description your browser sends; a log of sign-ins, refused attempts, data exports, deletions and
+              other security-relevant account changes; the country and VPN check made on the IP address you
+              sign up or sign in from; how much AI processing your account uses, so plan limits can be
+              applied; your progress through the in-app tutorials; and, in the mobile app, a push-notification
+              token for your device. Our servers&apos; request logs record the time, IP address and address
+              requested for each request, for operation and security. We do not use analytics or tracking
+              tools to record which pages you view or how you move through the dashboard.
             </p>
             <p>
               To run campaigns we collect <strong className="text-white">prospect data</strong> on behalf of

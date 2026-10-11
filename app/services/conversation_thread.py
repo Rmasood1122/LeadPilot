@@ -36,6 +36,7 @@ from app.db.models import (
     Message,
     MessageStatus,
 )
+from app.services import send_holds
 
 _SKIP_STATUSES = {MessageStatus.CANCELLED}
 _NOT_A_REAL_REPLY = {"automated_response", "out_of_office", "bounce"}
@@ -70,6 +71,8 @@ def build_thread(session: Session, lead: Lead, limit: int = 500) -> dict:
             "subject": msg.subject, "body": None if scheduled else (msg.body or "")[:4000],
             "step_no": msg.step_no, "opened": msg.opened_at is not None,
             "open_count": msg.open_count or 0, "error": msg.error if not scheduled else None,
+            # Held by a guard or waiting for a person, NOT failed (send_holds).
+            "hold": send_holds.hold_of(msg.status, msg.error),
         }))
 
     for reply in session.execute(

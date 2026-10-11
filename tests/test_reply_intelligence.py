@@ -273,8 +273,11 @@ class TestDispatch:
         from app.api import webhooks_whatsapp
 
         source = webhooks_whatsapp.__file__
+        # gaps-sweep-2 #7: the id is read before routing and the job is
+        # published after it, in a `finally` (behaviour tested in
+        # tests/test_gaps_sweep_2.py::TestWhatsAppInboundOrdering).
         with open(source, encoding="utf-8") as handle:
-            assert "reply_tasks.enqueue(reply_row.id)" in handle.read()
+            assert "reply_tasks.enqueue(reply_id)" in handle.read()
 
     def test_the_email_poller_dispatches_classification(self):
         from app.workers import outreach_tasks
@@ -285,8 +288,10 @@ class TestDispatch:
     def test_the_linkedin_webhook_dispatches_classification(self):
         from app.api import linkedin
 
+        # gaps-sweep-2 #7: published after routing, from an id read before it
+        # (behaviour tested in tests/test_linkedin_channel.py::TestWebhook).
         with open(linkedin.__file__, encoding="utf-8") as handle:
-            assert "reply_tasks.enqueue(reply.id)" in handle.read()
+            assert "reply_tasks.enqueue(reply_id)" in handle.read()
 
 
 class TestEndpoints:

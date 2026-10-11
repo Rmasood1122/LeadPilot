@@ -6,6 +6,11 @@ Every sequence message goes through outreach_tasks.send_message_impl, which
 re-checks, at send time and in this order:
 
     0. a removed lead       lead.status DROPPED (blocked_lead_removed)
+       (a CLOSED lead -- won / lost / disqualified -- is refused SEQUENCE
+       steps (blocked_lead_closed), and Reply Copilot answers to it are
+       cancelled by reply_copilot.send_time_hold; neither is a person-level
+       guard, so not here: the post-meeting follow-up is exactly a message
+       to a closed lead)
     1. suppression          email, phone AND LinkedIn (lead_tasks.is_suppressed)
     2. F05 exclusions       the account's do-not-contact / customer / ... lists
                             (guardrails.send_block)
