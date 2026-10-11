@@ -75,6 +75,8 @@ celery_app = Celery(
         "app.workers.benchmark_tasks",
         # F06: Quickstart (website + offer -> review-only drafts).
         "app.workers.quickstart_tasks",
+        # F07: Spend Guard 50/80/100% alert sweep.
+        "app.workers.spend_guard_tasks",
     ],
 )
 
@@ -169,6 +171,9 @@ celery_app.conf.task_routes = {
     # Section E: one Stripe call per due meeting -- integration I/O, like CRM
     # sync and webhook delivery.
     "app.workers.billing_tasks.*": {"queue": "default"},
+    # F07: the spend-alert sweep -- a few sums per capped account and at most
+    # one transactional email; not outreach, not the learning loop.
+    "app.workers.spend_guard_tasks.*": {"queue": "default"},
     # Feature A2: short per-account database work.
     "app.workers.audit_tasks.*": {"queue": "default"},
     # Feature A4: may re-channel a scheduled send -- runs beside the sends.
@@ -414,6 +419,11 @@ celery_app.conf.beat_schedule = {
     "rescore-conversion-probability": {
         "task": "app.workers.conversion_tasks.rescore_conversion_probability",
         "schedule": crontab(minute=40),
+    },
+    # F07: Spend Guard alerts (no-op while spend_guard_enabled is off).
+    "sweep-spend-alerts": {
+        "task": "app.workers.spend_guard_tasks.sweep_spend_alerts",
+        "schedule": 900.0,
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

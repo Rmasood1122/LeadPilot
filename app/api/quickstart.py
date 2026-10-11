@@ -87,6 +87,10 @@ def create_quickstart(body: QuickstartIn, db: Session = Depends(get_db),
     # is written, so a refusal leaves no orphan product behind.
     check_new_strategy_allowed(db, current_user)
     budget_micros, steps_per_phase = plan_budget(db, FlowType.NO_CLIENTS, None)
+    # F07: pipeline + lead batch + drafts, forecast together; 429 before any row.
+    from app.api import spend_guard as spend_guard_api  # noqa: PLC0415
+
+    forecast = spend_guard_api.guard_quickstart(db, current_user, steps_per_phase)
 
     product = Product(user_id=current_user.id,
                       name=quickstart.product_name_for(url, body.product_name),
@@ -106,6 +110,7 @@ def create_quickstart(body: QuickstartIn, db: Session = Depends(get_db),
     db.add(run)
     db.commit()
     db.refresh(run)
+    spend_guard_api.link(db, forecast, strategy_id=strategy.id)  # F07
 
     # The full pipeline: unchanged, and what supersedes the drafts.
     from app.workers import quickstart_tasks, tasks as worker_tasks  # noqa: PLC0415

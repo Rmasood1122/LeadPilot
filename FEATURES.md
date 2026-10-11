@@ -823,6 +823,11 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 
 - JWT auth with refresh; email verification with a kill switch
 - Plan tiers (free / starter / pro / enterprise) with limits and feature gates
+- Spend Guard (F07, flag `spend_guard_enabled`, off by default): a cost
+  forecast before every strategy, lead-sourcing and Quickstart run, an
+  account-set monthly cap (on top of the plan's daily AI limit) enforced
+  before each run and before every paid AI or data call, 50/80/100% alerts,
+  and a usage page with forecast vs actual (`docs/features/f07-spend-guard.md`)
 - Per-endpoint rate limiting, applied **inside** handlers so a malformed
   payload cannot burn a slot
 - Encrypted-at-rest OAuth tokens and API keys (Fernet, with key rotation)

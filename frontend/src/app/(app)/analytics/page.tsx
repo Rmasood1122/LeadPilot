@@ -77,6 +77,11 @@ export default function AnalyticsPage() {
               className="ml-auto text-sm font-medium text-[rgb(var(--primary))] hover:underline">
           Revenue &amp; ROI →
         </Link>
+        {/* F07 Spend Guard */}
+        <Link href="/analytics/usage"
+              className="text-sm font-medium text-[rgb(var(--primary))] hover:underline">
+          Usage &amp; spend →
+        </Link>
       </div>
 
       <AsyncState isLoading={isLoading} error={error}

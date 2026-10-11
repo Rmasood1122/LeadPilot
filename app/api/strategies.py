@@ -32,6 +32,7 @@ from app.db.models import (
     Outcome, OutcomeEvent, PastClient, Product, ResearchStep, Strategy,
     StrategyStatus, User,
 )
+from app.api import spend_guard as spend_guard_api
 from app.pipeline import budget_plan
 from app.services import auth as auth_svc
 from app.services import security_audit, usage_meter, verification_override
@@ -159,11 +160,14 @@ def create_strategy(
         )
 
     budget_micros, steps_per_phase = plan_budget(db, flow_type, body.max_budget_usd)
+    # F07: forecast first; refused (429) before anything is created.
+    forecast = spend_guard_api.guard_new_strategy(db, current_user, flow_type, steps_per_phase)
     strategy = Strategy(product_id=product.id, flow_type=flow_type,
                         budget_micros=budget_micros, steps_per_phase=steps_per_phase)
     db.add(strategy)
     db.commit()
     db.refresh(strategy)
+    spend_guard_api.link(db, forecast, strategy_id=strategy.id)  # F07
 
     worker_tasks.run_pipeline.delay(str(strategy.id))
     return _strategy_out(db, strategy)
@@ -325,6 +329,8 @@ def resume_strategy(
             )
         strategy.budget_micros = new_micros
     _refuse_if_daily_ai_limit_reached(db, current_user)
+    # F07: forecast the rest of the run; a refusal (429) leaves nothing changed.
+    spend_guard_api.guard_strategy_resume(db, current_user, strategy)
     if strategy.status is StrategyStatus.BUDGET_EXHAUSTED:
         strategy.status = StrategyStatus.PENDING
         strategy.error = None
@@ -374,6 +380,8 @@ def reverify_strategy(
             )
         strategy.budget_micros = new_micros
 
+    # F07: forecast the verification run; a refusal (429) leaves nothing changed.
+    spend_guard_api.guard_strategy_reverify(db, current_user, strategy)
     strategy.status = StrategyStatus.VERIFYING
     strategy.error = None
     db.commit()

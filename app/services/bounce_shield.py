@@ -313,7 +313,10 @@ def metrics(db: Session, user_id: uuid.UUID, *, days: int = 30,
     verified = by_tag[wf.VALID]
     attempts = db.execute(
         select(EnrichmentAttempt).where(EnrichmentAttempt.user_id == user_id,
-                                        EnrichmentAttempt.created_at >= since)
+                                        EnrichmentAttempt.created_at >= since,
+                                        # F07 meters non-waterfall calls into the
+                                        # same ledger; they are not waterfall attempts.
+                                        EnrichmentAttempt.step != "spend_guard")
     ).scalars().all()
     by_provider: dict = {}
     verdicts: dict = {}

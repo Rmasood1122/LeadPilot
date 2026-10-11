@@ -112,11 +112,16 @@ def source_leads_for_strategy(
         # pattern_key -- see icp_extraction.ensure_pattern_key.
         ensure_pattern_key(db, strategy, criteria)
 
+    requested = min(body.max_leads or settings.leads_max_per_run,
+                    settings.leads_max_per_run,
+                    room if room is not None else settings.leads_max_per_run)
+    # F07: forecast the enrichment run; refused (429) before the batch exists.
+    from app.api import spend_guard as spend_guard_api  # noqa: PLC0415
+
+    forecast = spend_guard_api.guard_enrichment_run(db, current_user, strategy, requested)
     batch = LeadBatch(
         strategy_id=strategy.id,
-        requested_leads=min(body.max_leads or settings.leads_max_per_run,
-                            settings.leads_max_per_run,
-                            room if room is not None else settings.leads_max_per_run),
+        requested_leads=requested,
         icp_criteria_json=criteria,
         source_provider=settings.lead_source_provider,
         verifier_provider=settings.email_verifier_provider,
@@ -124,6 +129,7 @@ def source_leads_for_strategy(
     db.add(batch)
     db.commit()
     db.refresh(batch)
+    spend_guard_api.link(db, forecast, batch_id=batch.id)  # F07
 
     lead_tasks.start_lead_chain(str(batch.id))
     return batch

@@ -87,6 +87,9 @@ OWNERSHIP: dict[str, list[str]] = {
     "roleplay_sessions": ["user_id"],
     "security_audit_events": ["user_id"],          # no FK by design
     "share_links": ["user_id"],
+    "spend_alerts": ["user_id"],                   # F07 Spend Guard (no PII)
+    "spend_caps": ["user_id"],                     # F07
+    "spend_forecasts": ["user_id"],                # F07
     "support_tickets": ["user_id"],
     "tool_integration_settings": ["user_id"],
     "tutorial_progress": ["user_id"],

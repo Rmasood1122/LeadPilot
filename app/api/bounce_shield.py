@@ -99,12 +99,22 @@ def refresh_email_verdict(lead_id: uuid.UUID, request: Request,
     if not (bounce_shield.enabled(db) or wf.enabled(db)):
         raise HTTPException(status_code=409,
                             detail="Waterfall enrichment and Bounce Shield are both off.")
+    from app.services import spend_guard  # noqa: PLC0415  (F07)
+
+    verifier = _get_verifier()
     try:
-        record = bounce_shield.refresh(db, lead, _get_verifier(),
-                                       actor_id=_actor_id(request, current_user),
-                                       owner_id=current_user.id)
+        # F07: the paid verifier call is checked against the monthly cap (F01
+        # ledgers it itself, so it is not metered twice).
+        with spend_guard.data_scope(db, current_user.id, strategy_id=lead.strategy_id,
+                                    self_ledgered={getattr(verifier, "provider", "")}):
+            record = bounce_shield.refresh(db, lead, verifier,
+                                           actor_id=_actor_id(request, current_user),
+                                           owner_id=current_user.id)
     except bounce_shield.OverrideRefused as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    except spend_guard.MonthlySpendCapReached as exc:
+        raise HTTPException(status_code=429, detail={"error": "monthly_spend_cap_reached",
+                                                     "message": str(exc)})
     released = 0
     if bounce_shield.decide(db, lead).allowed:
         released = bounce_shield.requeue_blocked(db, lead)

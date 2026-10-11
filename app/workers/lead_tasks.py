@@ -651,9 +651,21 @@ def _emit_lead_sourced(session: Session, batch: LeadBatch) -> None:
 
 
 def _run_stage(impl, batch_id: str, task) -> dict | int:
+    from app.services import spend_guard  # noqa: PLC0415  (F07)
+
     session = SessionLocal()
     try:
-        return impl(session, uuid.UUID(batch_id))
+        # F07 Spend Guard: every paid provider call in a stage is checked and
+        # metered; a batch the monthly cap stopped runs no further stage.
+        with spend_guard.batch_scope(session, uuid.UUID(batch_id)) as guard:
+            if guard is not None and guard.stopped:
+                return {"skipped": spend_guard.STOP_PREFIX}
+            return impl(session, uuid.UUID(batch_id))
+    except spend_guard.MonthlySpendCapReached as exc:
+        # A clean stop, not a failure: no retry (nothing was spent on the
+        # refused call), and the later stages skip.
+        spend_guard.stop_batch(session, uuid.UUID(batch_id), exc)
+        return {"stopped": spend_guard.STOP_PREFIX}
     except Exception as exc:
         session.rollback()
         batch = session.get(LeadBatch, uuid.UUID(batch_id))
