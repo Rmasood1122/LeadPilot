@@ -101,12 +101,24 @@ def extract_icp_criteria(session: Session, strategy: Strategy) -> dict:
         f"[Phase {r.phase} / Step {r.step_no}: {r.name}]\n{r.output}" for r in rows
     ) or "(no ICP research found — derive nothing, return empty lists)"
 
+    criteria = criteria_from_research(research)
+    logger.info("ICP criteria extracted for strategy %s: %s", strategy.id, criteria)
+    return criteria
+
+
+def criteria_from_research(research: str) -> dict:
+    """The model call + normalisation behind extract_icp_criteria, for any
+    research text.
+
+    F06 (Quickstart) calls this with the user's one-line offer and the text
+    of their website instead of pipeline research, so both paths share one
+    prompt, one output schema and one normalisation. Untrusted text inside
+    `research` must already be delimited by the caller (prompt_safety)."""
     data = get_client().complete_json(system=_SYSTEM, prompt=_PROMPT.format(research=research))
     criteria = {}
     for key in CRITERIA_KEYS:
         value = data.get(key)
         criteria[key] = [str(v) for v in value] if isinstance(value, list) else []
-    logger.info("ICP criteria extracted for strategy %s: %s", strategy.id, criteria)
     return criteria
 
 

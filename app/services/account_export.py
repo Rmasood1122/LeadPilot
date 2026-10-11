@@ -80,6 +80,8 @@ OWNERSHIP: dict[str, list[str]] = {
     "meeting_prep_briefs": ["user_id"],
     "meetings": ["host_user_id"],
     "products": ["user_id"],
+    "quickstart_drafts": ["user_id"],              # F06
+    "quickstart_runs": ["user_id"],                # F06
     "roleplay_sessions": ["user_id"],
     "security_audit_events": ["user_id"],          # no FK by design
     "share_links": ["user_id"],

@@ -712,6 +712,10 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Truncation detection on every model call
 - Full strategy document, viewable and exportable
 - Similar-strategy search (TF-IDF, user-scoped)
+- Quickstart (F06, flag `quickstart_enabled`, off by default): website URL +
+  one-line offer → ICP → up to 25 verified leads and **review-only** first
+  drafts while the full pipeline runs; nothing is sent from it
+  (`docs/features/f06-quickstart.md`)
 </details>
 
 <details open>

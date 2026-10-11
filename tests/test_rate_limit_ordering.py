@@ -30,6 +30,7 @@ RATE_LIMITED_ROUTES = [
     ("/strategies/{strategy_id}/leads/source", "POST"),
     # F01: re-verifying an address can spend a paid Hunter verification.
     ("/leads/{lead_id}/email-verdict/refresh", "POST"),
+    ("/quickstart", "POST"),  # F06
 ]
 
 

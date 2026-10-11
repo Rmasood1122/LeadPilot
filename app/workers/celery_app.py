@@ -73,6 +73,8 @@ celery_app = Celery(
         "app.workers.conversion_tasks",
         # Feature 6: nightly anonymised benchmark snapshot.
         "app.workers.benchmark_tasks",
+        # F06: Quickstart (website + offer -> review-only drafts).
+        "app.workers.quickstart_tasks",
     ],
 )
 
@@ -175,6 +177,11 @@ celery_app.conf.task_routes = {
     "app.workers.conversion_tasks.*": {"queue": "learning"},
     # Feature 6: read-only aggregation over outcomes, with the nightly jobs.
     "app.workers.benchmark_tasks.*": {"queue": "learning"},
+    # F06 Quickstart: a user is waiting for the first draft, so NOT `pipeline`
+    # (concurrency 2, occupied by the very strategy run the same request
+    # starts). Its lead chain is published to `default` per signature -- see
+    # app/workers/quickstart_tasks.py.
+    "leadpilot.quickstart.*": {"queue": "default"},
 }
 
 celery_app.conf.update(

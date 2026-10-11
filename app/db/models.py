@@ -4988,3 +4988,102 @@ class LeadSignal(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+
+class QuickstartRun(TimestampMixin, Base):
+    """F06 (migration 0072) -- one Quickstart request: website URL + one-line
+    offer -> ICP -> a small verified lead batch -> review-only drafts, while
+    the strategy's full pipeline runs beside it.
+
+    The run OWNS nothing that can send. Its drafts (quickstart_drafts) are not
+    `messages` rows, so the dispatcher and the send chokepoint never see them.
+    See docs/features/f06-quickstart.md.
+
+    status: queued -> fetching -> extracting -> sourcing -> drafting -> ready,
+    or failed (with `error`). Superseded is a separate fact (`superseded_at`):
+    the strategy reached verification, so the run's own outcome stays readable.
+    The stage timestamps are the success metric's instrumentation (time to
+    first reviewable draft = first_draft_at - created_at).
+    """
+
+    __tablename__ = "quickstart_runs"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE")
+    )
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE"), index=True
+    )
+    lead_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lead_batches.id", ondelete="SET NULL"), nullable=True
+    )
+    website_url: Mapped[str] = mapped_column(String(2048))
+    offer: Mapped[str] = mapped_column(String(300))
+    status: Mapped[str] = mapped_column(
+        String(20), default="queued", server_default=text("'queued'"),
+        nullable=False, index=True
+    )
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    icp_criteria_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # {final_url, status_code, content_type, bytes, truncated, title}
+    website_meta_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # The page's visible text (<= 20 000 chars), kept so the ICP stays
+    # explainable. UNTRUSTED: never put into a prompt unwrapped.
+    website_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    lead_target: Mapped[int] = mapped_column(Integer, default=25)
+    budget_micros: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # {requested, verified, drafted, skipped_suppressed, budget_reached, ...}
+    detail_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    icp_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sourcing_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    first_draft_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+
+class QuickstartDraft(TimestampMixin, Base):
+    """F06 -- one review-only first-touch draft for one lead of a Quickstart
+    run. Never sent: there is no path from this table to `messages`.
+
+    `user_id` is denormalised so every read filters on the owner directly.
+    Deleted with the lead (GDPR erasure deletes it explicitly as well, since
+    erasure tombstones the lead row rather than deleting it)."""
+
+    __tablename__ = "quickstart_drafts"
+    __table_args__ = (
+        UniqueConstraint("run_id", "lead_id", name="uq_quickstart_draft_run_lead"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("quickstart_runs.id", ondelete="CASCADE"), index=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    lead_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    )
+    subject: Mapped[str] = mapped_column(String(500))
+    body: Mapped[str] = mapped_column(Text)
+    # draft | discarded
+    status: Mapped[str] = mapped_column(
+        String(20), default="draft", server_default=text("'draft'"), nullable=False
+    )
+    # How many claim-verification decisions changed the copy (stripped/rewritten).
+    claims_changed: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
