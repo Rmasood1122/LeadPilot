@@ -61,7 +61,7 @@ The same research lists clear non-fits:
 
 - **A product or service you can describe in writing.** The new-strategy form asks for a name and a description, and optionally details of past clients and how you won them.
 - **A Google (Gmail) account to send from.** Email outreach is sent through the Gmail account you connect in Settings. LeadPilot stores one Gmail connection per user account.
-- **A lawful basis to contact each person.** Before you launch, LeadPilot asks you to confirm that you may lawfully email each person on the list. It applies compliance checks at send time, but it does not give legal advice.
+- **A lawful basis to contact each person.** Before you launch, LeadPilot asks you to confirm that you may lawfully contact each person on the list, and records your confirmation. It applies compliance checks at send time, but it does not give legal advice.
 - **For WhatsApp:** a plan that includes WhatsApp, a WhatsApp Business number configured on your LeadPilot deployment, Meta-approved message templates, and a recorded opt-in for each contact.
 
 ## Can I upload my own list of contacts?

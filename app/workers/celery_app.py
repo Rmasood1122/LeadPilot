@@ -84,6 +84,9 @@ celery_app = Celery(
         # Plan holds: release messages a downgrade held once the plan covers
         # them again (app/services/plan_holds.py).
         "app.workers.plan_hold_tasks",
+        # Autopilot launch: advance a strategy's automatic launch + the
+        # 15-minute resume sweep (app/services/autopilot.py).
+        "app.workers.autopilot_tasks",
     ],
 )
 
@@ -202,6 +205,9 @@ celery_app.conf.task_routes = {
     "leadpilot.champion.*": {"queue": "default"},
     # Plan-hold release: short database work; a held campaign waits on it.
     "leadpilot.plan_holds.*": {"queue": "default"},
+    # Autopilot launch: short database work (its sourcing chain is published
+    # to `default` explicitly, see app/workers/autopilot_tasks.py).
+    "leadpilot.autopilot.*": {"queue": "default"},
 }
 
 celery_app.conf.update(
@@ -475,6 +481,20 @@ celery_app.conf.beat_schedule = {
     "plan-hold-release": {
         "task": "leadpilot.plan_holds.release",
         "schedule": crontab(minute="11,26,41,56"),
+    },
+    # Autopilot launch (app/services/autopilot.py): every 15 minutes at
+    # :03/:18/:33/:48, clear of the other quarter-hour sweeps. Resumes a
+    # waiting channel once its prerequisite appears; enrolls newly verified
+    # leads of strategies with Autopilot on. Nothing here sends.
+    "autopilot-sweep": {
+        "task": "leadpilot.autopilot.sweep",
+        "schedule": crontab(minute="3,18,33,48"),
+    },
+    # Best time to send: the accounts' learned rates into Redis every 6 hours
+    # (app/services/send_time.py refresh_learning) -- the send path only reads.
+    "send-time-learning-refresh": {
+        "task": "leadpilot.autopilot.refresh_learning",
+        "schedule": crontab(minute=29, hour="*/6"),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

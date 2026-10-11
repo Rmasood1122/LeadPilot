@@ -139,6 +139,7 @@ def _refuse_if_daily_ai_limit_reached(db: Session, user: User) -> None:
 def create_strategy(
     product_id: uuid.UUID,
     body: StrategyCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StrategyOut:
@@ -156,6 +157,12 @@ def create_strategy(
     product = db.get(Product, product_id)
     if product is None or product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="product not found")
+
+    # Autopilot launch: an opt-in is validated (lawful basis, role, flag)
+    # BEFORE anything is created, so a refused opt-in leaves no strategy.
+    from app.api import autopilot as autopilot_api  # noqa: PLC0415
+
+    autopilot_api.validate_opt_in(db, request, body.autopilot)
 
     # After the ownership check, so a foreign product id is 404 whatever the
     # count.
@@ -187,6 +194,8 @@ def create_strategy(
     db.commit()
     db.refresh(strategy)
     spend_guard_api.link(db, forecast, strategy_id=strategy.id)  # F07
+    if body.autopilot is not None and body.autopilot.enabled:
+        autopilot_api.record_opt_in(db, request, strategy, current_user, body.autopilot)
 
     worker_tasks.run_pipeline.delay(str(strategy.id))
     return _strategy_out(db, strategy)
@@ -452,6 +461,10 @@ def override_failed_passes(
         details={"passes": overridden, "reason": body.reason.strip()})
     db.commit()
     db.refresh(strategy)
+    # Autopilot launch: a person's sign-off is what Autopilot was waiting for.
+    from app.workers import autopilot_tasks  # noqa: PLC0415
+
+    autopilot_tasks.enqueue_advance(db, strategy.id)
     return _strategy_out(db, strategy)
 
 

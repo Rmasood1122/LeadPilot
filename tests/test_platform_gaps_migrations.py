@@ -266,12 +266,19 @@ class TestWebhookForeignKeysMigration:
 
 
 def test_activation_script_targets_the_new_head():
+    # 0085 was the head when this test was written; later migrations move the
+    # target on (0087_autopilot_launch). What must hold is that 0085 is in the
+    # chain the target reaches -- the exact head is pinned by
+    # tests/test_annual_billing_migration.py (heads == [TARGET_REVISION]).
     from scripts import activate_with_keys as act
 
-    # gaps-sweep-2 added 0086_inbound_reply_threading on top of 0085; the
-    # script must target the chain's head (tests/test_activation_script.py
-    # checks the head itself).
-    assert act.TARGET_REVISION == "0086_inbound_reply_threading"
+    from alembic.config import Config  # noqa: PLC0415
+    from alembic.script import ScriptDirectory  # noqa: PLC0415
+
+    script = ScriptDirectory.from_config(Config("alembic.ini"))
+    assert script.get_heads() == [act.TARGET_REVISION]
+    chain = {r.revision for r in script.walk_revisions("base", act.TARGET_REVISION)}
+    assert "0085_webhook_foreign_keys" in chain
 
 
 @pytest.mark.parametrize("name", ["0084_password_reset.py", "0085_webhook_foreign_keys.py"])

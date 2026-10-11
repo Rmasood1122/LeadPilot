@@ -12,6 +12,9 @@ import { ReverifyStrategyButton } from "@/components/strategy/ReverifyStrategyBu
 import { OverridePassesPanel } from "@/components/strategy/OverridePassesPanel";
 import { OutreachPanel } from "@/components/strategy/OutreachPanel";
 import { PipelineHealthCard } from "@/components/strategy/PipelineHealthCard";
+import { AutopilotCard } from "@/components/strategy/AutopilotCard";
+import { BestTimeCard } from "@/components/strategy/BestTimeCard";
+import { SendDiagnosticsPanel } from "@/components/strategy/SendDiagnosticsPanel";
 import { AsyncState } from "@/components/ui/skeleton";
 import { Badge, statusTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,9 +131,16 @@ export default function StrategyDetailPage() {
               <OverridePassesPanel strategyId={id} status={data.status}
                                    log={data.verification} />
             )}
+            {/* Autopilot launch (docs/features/autopilot-launch.md): offered on
+                every strategy; it waits for research and verification itself. */}
+            {data.status !== "failed" && <AutopilotCard strategyId={id} />}
             <OutreachPanel strategy={data} />
             {(data.status === "verified" || data.status === "executing") && (
-              <PipelineHealthCard strategyId={id} />
+              <>
+                <BestTimeCard strategyId={id} />
+                <SendDiagnosticsPanel strategyId={id} />
+                <PipelineHealthCard strategyId={id} />
+              </>
             )}
             {data.error && (
               <div role="alert" className="rounded border border-destructive p-4 text-sm">

@@ -55,6 +55,16 @@ class PastClientOut(BaseModel):
 # --- Strategies --------------------------------------------------------
 
 
+class AutopilotOptIn(BaseModel):
+    """Autopilot launch opt-in (docs/features/autopilot-launch.md). Turning it
+    on needs `lawful_basis_confirmed: true` and the CURRENT text version
+    (GET /strategies/{id}/autopilot or GET /autopilot/lawful-basis) -- 422
+    otherwise, and nothing is stored."""
+    enabled: bool = False
+    lawful_basis_confirmed: bool = False
+    lawful_basis_text_version: str | None = Field(default=None, max_length=60)
+
+
 class StrategyCreate(BaseModel):
     flow_type: FlowType | None = Field(
         default=None,
@@ -71,6 +81,12 @@ class StrategyCreate(BaseModel):
             "on model calls, in US dollars (e.g. 3 or 5). Omit for the server "
             "default. Bounded by the server's minimum ($0.50) and ceiling."
         ),
+    )
+    autopilot: AutopilotOptIn | None = Field(
+        default=None,
+        description=("Autopilot launch: when research finishes and verification passes, "
+                     "find leads, write the sequence and start outreach automatically. "
+                     "Off unless enabled with the lawful-basis confirmation."),
     )
 
 

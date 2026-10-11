@@ -1,4 +1,5 @@
 import { ApiError, api, tooManyRequestsMessage } from "./client";
+import type { AutopilotOptIn } from "../autopilot";
 import type { AnalyticsOut, StrategyOut } from "./types";
 
 /** Mirrors INVALID_PASSWORD in app/api/strategies.py. */
@@ -49,9 +50,14 @@ export async function addPastClients(
 export async function createStrategy(
   productId: string,
   hasPastClients: boolean,
+  autopilot?: AutopilotOptIn,
 ): Promise<{ id: string }> {
   return api(`/products/${productId}/strategies`, {
-    body: { flow_type: hasPastClients ? "with_clients" : "no_clients" },
+    body: {
+      flow_type: hasPastClients ? "with_clients" : "no_clients",
+      // Autopilot launch: sent only when turned on WITH the confirmation.
+      ...(autopilot?.enabled ? { autopilot } : {}),
+    },
   });
 }
 

@@ -21,7 +21,7 @@ deterministic and fully testable.
 import logging
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -100,14 +100,12 @@ def _now() -> datetime:
 
 
 def lead_timezone(lead: Lead) -> str:
-    tz = (lead.enrichment_json or {}).get("timezone")
-    if tz:
-        try:
-            ZoneInfo(tz)
-            return tz
-        except (ZoneInfoNotFoundError, ValueError):
-            pass
-    return settings.send_window_timezone
+    """The lead's IANA zone: recorded, else resolved from its own location,
+    else the strategy's region / the account's zone / the deployment default
+    (app/services/lead_timezone.py -- never written back on read)."""
+    from app.services import lead_timezone as lead_tz  # noqa: PLC0415
+
+    return lead_tz.resolve(lead)[0]
 
 
 def next_window_slot(dt: datetime, tz_name: str,
@@ -293,9 +291,14 @@ def enroll_leads(
     sequence: Sequence,
     lead_statuses: list[LeadStatus] | None = None,
     now: datetime | None = None,
+    lead_ids=None,
 ) -> int:
     """Enroll matching leads and schedule their step-1 message. Idempotent:
-    already-enrolled leads are skipped (unique constraint backs this)."""
+    already-enrolled leads are skipped (unique constraint backs this).
+
+    `lead_ids` (Autopilot launch) narrows the candidates to those leads; every
+    other rule below still applies to them. None = every matching lead, as
+    before."""
     now = now or _now()
     lead_statuses = lead_statuses or [LeadStatus.VERIFIED]
     not_enrollable = sorted(LeadStatus(s).value for s in lead_statuses
@@ -320,13 +323,17 @@ def enroll_leads(
         address = Lead.phone.isnot(None)
     else:
         address = Lead.email.isnot(None)
-    leads = session.execute(
-        select(Lead).where(
-            Lead.strategy_id == sequence.strategy_id,
-            Lead.status.in_(lead_statuses),
-            address,
-        )
-    ).scalars().all()
+    query = select(Lead).where(
+        Lead.strategy_id == sequence.strategy_id,
+        Lead.status.in_(lead_statuses),
+        address,
+    )
+    if lead_ids is not None:
+        wanted = list(lead_ids)
+        if not wanted:
+            return 0
+        query = query.where(Lead.id.in_(wanted))
+    leads = session.execute(query).scalars().all()
 
     enrolled = 0
     enrolled_ids: list = []
@@ -465,18 +472,29 @@ def _schedule_step_message(
     time; the send task persists it before transmitting)."""
     when = next_window_slot(base_time + timedelta(days=step.delay_days if step.step_no > 1 else 0),
                             lead_timezone(lead))
-    # Feature Group 3: with smart send time on, hold the step for the
-    # campaign's next top engagement window (bounded; a no-op otherwise).
-    from app.services import send_windows  # noqa: PLC0415
+    channel = step.effective_channel(sequence)
+    # Autopilot launch / best time to send (docs/features/autopilot-launch.md):
+    # with best_time_scheduling_enabled on (default), move the step to the best
+    # slot in the prospect's local time at or after `when` -- never earlier,
+    # bounded by the send-time horizon. Flag off: `when` unchanged.
+    from app.services import send_time, send_windows  # noqa: PLC0415
 
-    when = send_windows.next_smart_slot(session, sequence.strategy, when,
-                                        lead_timezone(lead), spread_key=lead.id)
+    when = send_time.place(session, sequence.strategy, lead, channel, when,
+                           window=send_time.resolved_window(session, lead, channel,
+                                                            sequence.strategy),
+                           spread_key=lead.id, now=base_time)
+    # Feature Group 3: with smart send time on, hold the step for the
+    # campaign's next top engagement window (bounded; a no-op otherwise). A
+    # person's own override window wins over it.
+    if not send_time.override_windows(sequence.strategy):
+        when = send_windows.next_smart_slot(session, sequence.strategy, when,
+                                            lead_timezone(lead), spread_key=lead.id)
     msg = Message(
         sequence_id=sequence.id,
         lead_id=lead.id,
         # M4 Chunk 3: the step's channel wins; NULL falls back to the
         # sequence's channel (all M3 sequences behave exactly as before).
-        channel=step.effective_channel(sequence),
+        channel=channel,
         step_no=step.step_no,
         template=step.template,
         variant=step.variant,

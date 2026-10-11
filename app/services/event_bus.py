@@ -66,6 +66,9 @@ EVENTS: dict[str, str] = {
     "reply_draft_approved": "Reply draft approved",        # api/crm.py approve draft
     # Daily send approval: today's automatic sending is waiting for a person.
     "send_approval_needed": "Approve today's automatic sending",
+    # Autopilot launch (docs/features/autopilot-launch.md): launched, waiting
+    # for a prerequisite (connect Gmail / LinkedIn, plan), or waiting for review.
+    "autopilot_update": "Autopilot update",
 }
 
 

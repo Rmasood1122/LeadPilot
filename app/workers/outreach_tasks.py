@@ -504,8 +504,29 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         return "deferred_no_send_window"
     if not engine.in_send_window(now, tz, rules.window):
         message.scheduled_at = engine.next_window_slot(now, tz, rules.window)
+        # Best time to send (docs/features/autopilot-launch.md): a message
+        # deferred to the next window (e.g. after a daily-approval hold to
+        # local midnight) goes to that day's best slot inside the SAME
+        # resolved window, not to its first minute. Only ever later; flag off
+        # = unchanged. Placement only -- nothing here sends.
+        from app.services import send_time  # noqa: PLC0415
+
+        message.scheduled_at = send_time.place(
+            session, strategy, lead, message.channel, message.scheduled_at,
+            window=rules.window, spread_key=lead.id, now=now)
         session.commit()
         return "deferred_window"
+    # The person's OWN sending window (PUT /best-time) is hard at send time
+    # too: inside the permitted window but outside theirs -> placed at the
+    # next slot inside both, never sent. No override = no SQL, unchanged.
+    from app.services import send_time  # noqa: PLC0415
+
+    override_slot = send_time.override_hold(session, strategy, message, lead, now,
+                                            window=rules.window)
+    if override_slot is not None:
+        message.scheduled_at = override_slot
+        session.commit()
+        return "deferred_override_window"
 
     # ---- Daily send approval (SAFETY GUARD, every channel, flag default ON) --
     # Founder decision 2026-10-11: an AUTOMATIC send goes out only on a day the
@@ -561,6 +582,30 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         session.commit()      # releases the row lock before the slow part
     if (message.error or "").startswith(daily_send_approval.ERROR_PREFIX):
         message.error = None   # an earlier hold's reason no longer applies
+
+    # ---- Autopilot's promise (docs/features/autopilot-launch.md 3.1) --------
+    # The person who turned Autopilot on confirmed "nothing it schedules is
+    # sent on a day I have not approved". If daily approval is switched off,
+    # or no longer covers this channel, a message of an Autopilot sequence
+    # waits (deferred an hour, never failed, never dropped). Normal config:
+    # two settings reads, nothing else. Lookup error fails CLOSED like the
+    # gate above.
+    from app.services import autopilot as autopilot_svc  # noqa: PLC0415
+
+    try:
+        ap_hold = autopilot_svc.send_hold(session, message, strategy, now)
+    except Exception:
+        logger.exception("autopilot hold check failed for message %s -- deferred", message_id)
+        session.rollback()
+        message = session.get(Message, message_id)
+        ap_hold = (now + autopilot_svc.HOLD_RETRY,
+                   f"{autopilot_svc.HOLD_PREFIX}check could not run -- deferred (fails closed)")
+    if ap_hold is not None:
+        message.scheduled_at, message.error = ap_hold
+        session.commit()
+        return "deferred_autopilot_needs_daily_approval"
+    if (message.error or "").startswith(autopilot_svc.HOLD_PREFIX):
+        message.error = None
 
     # ---- daily cap + warm-up (per channel; deferred, never dropped) ---------
     li_account = li_action = None

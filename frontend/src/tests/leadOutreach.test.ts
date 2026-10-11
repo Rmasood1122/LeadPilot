@@ -69,12 +69,16 @@ describe("wire format", () => {
     expect(r.body.steps).toHaveLength(1);
   });
 
-  it("enrollSequence enrolls verified leads only", async () => {
-    await enrollSequence("q1");
+  it("enrollSequence enrolls verified leads only, with the lawful-basis confirmation", async () => {
+    await enrollSequence("q1", "launch-lawful-basis-2026-10-11");
     const r = last();
     expect(r.url).toContain("/sequences/q1/enroll");
     expect(r.method).toBe("POST");
-    expect(r.body).toEqual({ lead_statuses: ["verified"] });
+    expect(r.body).toEqual({
+      lead_statuses: ["verified"],
+      lawful_basis_confirmed: true,
+      lawful_basis_text_version: "launch-lawful-basis-2026-10-11",
+    });
   });
 });
 

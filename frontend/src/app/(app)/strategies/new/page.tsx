@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { getLawfulBasis } from "@/lib/api/autopilot";
+import { intakeCanLaunch, optInBody } from "@/lib/autopilot";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   canAdvance,
   INITIAL_INTAKE,
@@ -25,6 +29,10 @@ export default function IntakeWizard() {
   const toast = useToast();
   const [state, setState] = useState<IntakeState>(INITIAL_INTAKE);
   const [busy, setBusy] = useState(false);
+  // Autopilot launch: both boxes start UNTICKED (never pre-ticked).
+  const [autopilot, setAutopilot] = useState(false);
+  const [lawful, setLawful] = useState(false);
+  const basis = useQuery({ queryKey: ["autopilot-lawful-basis"], queryFn: getLawfulBasis });
 
   async function launch() {
     setBusy(true);
@@ -33,7 +41,8 @@ export default function IntakeWizard() {
       if (state.hasPastClients && state.clients.length) {
         await addPastClients(product.id, state.clients);
       }
-      const strategy = await createStrategy(product.id, !!state.hasPastClients);
+      const strategy = await createStrategy(
+        product.id, !!state.hasPastClients, optInBody(autopilot, lawful, basis.data));
       toast("Strategy created — research pipeline started", "success");
       router.push(`/strategies/detail?id=${strategy.id}`);
     } catch (err) {
@@ -156,6 +165,25 @@ export default function IntakeWizard() {
               The pipeline runs in the cloud — you can close this tab; progress
               streams to the strategy page.
             </p>
+            {basis.data?.available && (
+              <div className="space-y-2 rounded border border-border p-3">
+                <label className="flex items-start gap-2">
+                  <Checkbox checked={autopilot}
+                            onCheckedChange={(on) => { setAutopilot(on); if (!on) setLawful(false); }}
+                            aria-label="Turn on Autopilot" />
+                  <span>
+                    <span className="font-medium">Autopilot:</span> {basis.data.label}.
+                  </span>
+                </label>
+                {autopilot && (
+                  <label className="flex items-start gap-2">
+                    <Checkbox checked={lawful} onCheckedChange={setLawful}
+                              aria-label="Confirm I have a lawful basis to contact the people Autopilot finds" />
+                    <span>{basis.data.text}</span>
+                  </label>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -166,7 +194,7 @@ export default function IntakeWizard() {
           Back
         </Button>
         {state.step === "review" ? (
-          <Button onClick={launch} disabled={busy}>
+          <Button onClick={launch} disabled={busy || !intakeCanLaunch(autopilot, lawful)}>
             {busy ? "Launching…" : "Launch pipeline"}
           </Button>
         ) : (

@@ -427,6 +427,16 @@ answerable:
   expected:
   - lead-sourcing-and-email-verification#how-many-leads-can-a-strategy-hold
   - plans-limits-billing#what-plans-are-there-and-what-are-their-limits
+- id: q71
+  style: paraphrase
+  question: After the research is done, can it find leads and start sending by itself?
+  expected:
+  - sequences-and-follow-ups#can-leadpilot-find-leads-and-start-sending-automatically-when-the-research-finishes
+- id: q72
+  style: paraphrase
+  question: What time of day do my messages go out to prospects?
+  expected:
+  - sequences-and-follow-ups#when-does-each-step-go-out
 must_refuse:
 - id: r01
   category: off_topic

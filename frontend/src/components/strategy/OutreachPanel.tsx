@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { listLeads, updateLeadStatus } from "@/lib/api/leads";
-import { createSequence, enrollSequence, sourceLeads } from "@/lib/api/outreach";
+import {
+  createSequence, enrollSequence, getLaunchLawfulBasis, sourceLeads,
+} from "@/lib/api/outreach";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +34,9 @@ export function OutreachPanel({ strategy }: { strategy: StrategyOut }) {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
+  // The confirmation text is the server's (it records the version ticked).
+  const lawfulBasis = useQuery({ queryKey: ["launch-lawful-basis"],
+                                 queryFn: getLaunchLawfulBasis, staleTime: Infinity });
   const leadsQuery = useQuery({
     queryKey: ["strategy-leads", strategyId],
     queryFn: () => listLeads(strategyId),
@@ -72,7 +77,7 @@ export function OutreachPanel({ strategy }: { strategy: StrategyOut }) {
         id = seq.id;
         setCreatedId(id);
       }
-      return enrollSequence(id);
+      return enrollSequence(id, lawfulBasis.data!.version);
     },
     onSuccess: (r) => {
       setResult(
@@ -94,7 +99,7 @@ export function OutreachPanel({ strategy }: { strategy: StrategyOut }) {
   const canLaunch = canLaunchSequence({
     status: strategy.status, contactable: contactable.length,
     openingBrief: opening, confirmed,
-  });
+  }) && !!lawfulBasis.data;
 
   return (
     <section aria-label="Find and contact leads" className="space-y-3">
@@ -197,12 +202,8 @@ export function OutreachPanel({ strategy }: { strategy: StrategyOut }) {
                 </label>
                 <label className="flex items-start gap-2">
                   <Checkbox checked={confirmed} onCheckedChange={setConfirmed}
-                            aria-label="Confirm I may lawfully email these people" />
-                  <span>
-                    I have read the list above and I confirm I may lawfully email
-                    each of these people (CAN-SPAM, GDPR, CASL, PDPA as they apply).
-                    This sends real emails from my connected Gmail.
-                  </span>
+                            aria-label="Confirm I may lawfully contact these people" />
+                  <span>{lawfulBasis.data?.text ?? "Loading the confirmation text..."}</span>
                 </label>
                 <Button size="sm" disabled={!canLaunch || launch.isPending}
                         onClick={() => launch.mutate()}>
