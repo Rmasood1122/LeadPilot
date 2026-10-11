@@ -1,6 +1,6 @@
 /**
  * components/Footer.tsx — footer for the public marketing pages
- * (/about, /contact, /how-it-works, /privacy, /terms).
+ * (/about, /contact, /how-it-works, /privacy, /terms, /status).
  *
  * Server component. Not used by the dashboard, which has its own shell.
  */
@@ -28,7 +28,7 @@ const COLUMNS = [
 ];
 
 export function Footer({ showStatusLink = SHOW_STATUS_LINK }: { showStatusLink?: boolean } = {}) {
-  // External link to status.calendarharvest.com, hidden until DNS is live.
+  // The /status page on this site (src/lib/statusPage.ts).
   const status = statusPageLink(showStatusLink);
   return (
     <footer className="border-t border-white/10 px-6 py-12">

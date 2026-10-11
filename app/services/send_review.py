@@ -384,8 +384,15 @@ def reject(db: Session, review: SendReview, *, actor_user_id=None, note: str | N
     """Reject: this message is never sent.
 
     The message is CANCELLED, not skipped, and the enrollment is left running
-    -- rejecting one badly-timed email should not end the relationship. The
-    next step is scheduled by the ordinary engine rules.
+    -- rejecting one badly-timed email should not end the relationship. For a
+    sequence step the sequence then ADVANCES to its next step exactly as a
+    skipped step does (sequence_engine.schedule_next_step with
+    counts_as_sent=False: the prospect never received it), or completes when
+    it was the last step. Before this, nothing scheduled the next step, the
+    enrollment stalled with nothing pending, and the follow-up sweep re-created
+    the very step the reviewer had just rejected. Messages that are not
+    sequence steps (Reply Copilot answers, re-engagement touches) advance
+    nothing.
     """
     now = now or _now()
     review.status = REJECTED
@@ -396,12 +403,59 @@ def reject(db: Session, review: SendReview, *, actor_user_id=None, note: str | N
     review.decision_note = (note or "")[:500] or None
 
     message = db.get(Message, review.message_id)
+    advance = False
     if message is not None and message.status in (MessageStatus.AWAITING_REVIEW,
                                                   MessageStatus.SCHEDULED):
         message.status = MessageStatus.CANCELLED
-        message.error = f"rejected in review: {review.decision_note or 'no reason given'}"
+        message.error = f"{REJECTED_ERROR_PREFIX}{review.decision_note or 'no reason given'}"
+        advance = message.origin is None
     db.commit()
+    if advance:
+        advance_after_reject(db, message, now)
     return review
+
+
+#: message.error prefix of a step a reviewer rejected. The follow-up sweep
+#: reads it (outreach_tasks._rejected_steps) so it never re-creates the step.
+REJECTED_ERROR_PREFIX = "rejected in review: "
+
+
+def advance_after_reject(db: Session, message: Message, now: datetime) -> bool:
+    """Move an ACTIVE enrollment past a rejected step (see reject()). Returns
+    True when it advanced.
+
+    NOT when the sequence is already past this step -- advancing again would
+    schedule the next step a second time (a double send) and rewind
+    current_step. "Already past" = the enrollment's current_step is at or
+    beyond the rejected step, or a LATER step of this enrollment already has
+    a message that is sent or will still go out (scheduled, sending, waiting
+    in review, or held by a guard). That happens when a sweep copy of the held
+    step was sent before the review was decided (the pre-fix duplicate), or
+    when a second decision path ran first. Shared by reject() and the send
+    chokepoint's rejected-in-review branch."""
+    from sqlalchemy import or_  # noqa: PLC0415
+
+    from app.db.models import EnrollmentStatus, SequenceEnrollment  # noqa: PLC0415
+    from app.services import send_holds, sequence_engine  # noqa: PLC0415
+
+    enrollment = db.execute(select(SequenceEnrollment).where(
+        SequenceEnrollment.sequence_id == message.sequence_id,
+        SequenceEnrollment.lead_id == message.lead_id)).scalar_one_or_none()
+    if enrollment is None or enrollment.status is not EnrollmentStatus.ACTIVE:
+        return False
+    if (enrollment.current_step or 0) >= message.step_no:
+        return False
+    later = db.execute(select(Message.id).where(
+        Message.sequence_id == message.sequence_id,
+        Message.lead_id == message.lead_id,
+        Message.step_no > message.step_no,
+        or_(Message.status.in_((*send_holds.PENDING_STATUSES, MessageStatus.SENT)),
+            send_holds.held_clause()),
+    ).limit(1)).scalars().first()
+    if later is not None:
+        return False
+    sequence_engine.schedule_next_step(db, message, now=now, counts_as_sent=False)
+    return True
 
 
 # --------------------------------------------------------------------------

@@ -51,6 +51,23 @@ logger = logging.getLogger(__name__)
 CAMPAIGN_ACTIVE = "active"
 CAMPAIGN_PAUSED_BOUNCE = "paused_bounce_rate"
 
+#: Stop reasons (categorised by sequence_completion._PREFIXES).
+STOP_LEAD_REMOVED = "lead_removed"          # the account removed the lead
+STOP_NO_ADDRESS = "no_address_for_channel"  # nothing to send this step to
+
+#: The lead statuses a sequence may enroll. VERIFIED only: the address passed
+#: verification and nobody has decided otherwise. Deliberately NOT
+#:   flagged   -- a risky / unknown verdict. The product leaves it to a person
+#:                to decide, per lead, by moving it to verified (Pipeline board,
+#:                ui_support._ALLOWED_TRANSITIONS); the app's own launch form
+#:                enrolls ["verified"] only (frontend/src/lib/api/outreach.ts).
+#:   dropped   -- removed by the account, undeliverable, suppressed or erased.
+#:   contacted / replied / meeting_booked / later -- already in a conversation
+#:                or a sequence; a second sequence would double the cadence.
+#:   sourced / enriched / email_found -- not verified yet.
+#: Enforced here and at the API (app/api/sequences.EnrollRequest).
+ENROLLABLE_STATUSES: frozenset[LeadStatus] = frozenset({LeadStatus.VERIFIED})
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -260,14 +277,28 @@ def enroll_leads(
     already-enrolled leads are skipped (unique constraint backs this)."""
     now = now or _now()
     lead_statuses = lead_statuses or [LeadStatus.VERIFIED]
+    not_enrollable = sorted(LeadStatus(s).value for s in lead_statuses
+                            if LeadStatus(s) not in ENROLLABLE_STATUSES)
+    if not_enrollable:
+        raise ValueError(f"lead status(es) {', '.join(not_enrollable)} cannot be enrolled; "
+                         f"allowed: {', '.join(sorted(s.value for s in ENROLLABLE_STATUSES))}")
     steps = sorted(sequence.steps, key=lambda s: s.step_no)
     if not steps:
         raise ValueError("sequence has no steps")
 
-    # Feature Group 5: a sequence that OPENS on LinkedIn needs a profile URL,
-    # not an email -- a lead Apollo found no email for is still reachable.
-    opens_on_linkedin = steps[0].effective_channel(sequence) is ChannelType.LINKEDIN
-    address = Lead.linkedin_url.isnot(None) if opens_on_linkedin else Lead.email.isnot(None)
+    # The address the FIRST step needs. Feature Group 5: a sequence that opens
+    # on LinkedIn needs a profile URL, not an email -- a lead Apollo found no
+    # email for is still reachable. Likewise a sequence that opens on WhatsApp
+    # (or an AI call) needs a phone number: a phone-only lead is reachable
+    # there, and an email-only lead is not (it would be enrolled only to be
+    # stopped at its first send for want of an address).
+    first_channel = steps[0].effective_channel(sequence)
+    if first_channel is ChannelType.LINKEDIN:
+        address = Lead.linkedin_url.isnot(None)
+    elif first_channel in (ChannelType.WHATSAPP, ChannelType.PHONE):
+        address = Lead.phone.isnot(None)
+    else:
+        address = Lead.email.isnot(None)
     leads = session.execute(
         select(Lead).where(
             Lead.strategy_id == sequence.strategy_id,

@@ -99,6 +99,20 @@ today should be in the list before work starts):
 a nine-month-old promise before acting on it. Turn it on per deployment in
 `/admin/settings`.
 
+**At send time** (send-path-gaps fix, 2026-10-11). The message hangs on the
+sequence the "not now" reply stopped, so the stopped-enrollment gate used to
+cancel every one of them on the day it was due. The send path now lets a
+`notnow_memory` message past a STOPPED enrollment only when the stop is the
+`replied_<class>` of the plan's source reply (or an earlier reply of the same
+lead) — `reengagement_memory.answers_the_stop`, the rule Reply Copilot answers
+use. `send_time_hold` cancels it when the feature or auto-send was switched
+off since scheduling, the plan was cancelled, `still_appropriate` now objects,
+or the prospect wrote again after the source reply. The A5 conversion gate is
+not applied to it (its kill signal for this lead is the "not now" reply
+itself); suppression, exclusions, departure, compliance rules, window, caps
+and the review queue all still apply. The touch does not advance or restart
+the stopped sequence.
+
 If there is nothing to send from (no previous message, so no channel and no
 sequence), the plan still becomes `due` and the user is still told.
 

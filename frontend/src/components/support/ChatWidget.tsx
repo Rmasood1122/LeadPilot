@@ -242,11 +242,12 @@ export function ChatWidget() {
           {statusPageLink() && (
             <a
               href={statusPageLink()!.href}
-              target="_blank"
-              rel="noopener noreferrer"
+              // Same tab: /status/ is a page of this app (static export), and
+              // target="_blank" on a relative URL is unreliable inside the
+              // Capacitor WebView.
               data-testid="support-status-link"
               className="rounded p-1.5"
-              aria-label="Service status (opens in a new tab)"
+              aria-label="Service status"
               title="Service status"
             >
               <Activity size={15} aria-hidden="true" />

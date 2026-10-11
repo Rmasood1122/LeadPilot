@@ -1,9 +1,12 @@
-"""GET /status/public — component status for status.calendarharvest.com.
+"""GET /status/public — component status for the public status page.
 
-PUBLIC, unauthenticated, read-only. The status site (status-page/, a separate
-Vercel project) fetches this server-side every 60 s, alongside UptimeRobot's
-external probes. Design and the founders' setup steps:
-docs/program/STATUS_PAGE.md.
+PUBLIC, unauthenticated, read-only. Primary caller: the page at
+www.calendarharvest.com/status/ (frontend/src/app/status/, part of the
+static export on Vercel), which fetches this FROM THE VISITOR'S BROWSER on
+load and every 30 s while the tab is visible, 8 s timeout. Optional caller:
+the status-page/ app (status.calendarharvest.com, not deployed), which fetches
+it server-side every 60 s alongside UptimeRobot. Design and the founders'
+setup steps: docs/program/STATUS_PAGE.md.
 
 WHAT IT MAY SAY
 Per component: a stable id, a customer-facing name, one of
@@ -45,8 +48,12 @@ its own 5-minute cache. enforce_rate_limit is the handler's first statement
 (RATE_LIMIT_PUBLIC_STATUS per client IP per hour), the same pattern as the
 other public routes (/public/roi, /audit/verify).
 
-CORS is deliberately not widened for this route: the status site calls it from
-its server, never from a browser.
+CORS: browsers on www.calendarharvest.com call this cross-origin. No change
+was needed or made: the global CORSMiddleware in app/main.py already allows
+the CORS_ORIGINS env list, which must contain the frontend origin for the
+signed-in app to work at all, and the page sends a "simple" GET (no
+credentials, no custom headers), so no preflight is involved. The body holds
+nothing that is not meant for the public.
 """
 from __future__ import annotations
 
@@ -73,8 +80,9 @@ MAJOR_OUTAGE = "major_outage"
 MAINTENANCE = "maintenance"
 PUBLIC_STATUSES = (OPERATIONAL, DEGRADED, PARTIAL_OUTAGE, MAJOR_OUTAGE, MAINTENANCE)
 
-# (id, customer-facing name). The ids are a contract with status-page/ —
-# renaming one is a coordinated change in both places.
+# (id, customer-facing name). The ids are a contract with
+# frontend/src/lib/statusBoard.ts (KNOWN_COMPONENTS) and status-page/ —
+# renaming one is a coordinated change in all three places.
 COMPONENTS: tuple[tuple[str, str], ...] = (
     ("api", "API"),
     ("background-processing", "Background processing"),

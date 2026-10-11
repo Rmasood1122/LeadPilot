@@ -158,9 +158,12 @@ def test_delivery_retries_then_exhausts(db_session, test_user, public_dns, monke
     monkeypatch.setattr(wd, "_record_exhaustion", lambda t, d, e: exhausted.append(e))
     target = _target(db_session, test_user)
     delivery = wd.create_delivery(db_session, target, "reply_received", {}, enqueue=False)
-    outcomes = [wd.deliver(db_session, delivery.id) for _ in range(5)]
-    assert outcomes == ["retry"] * 4 + ["exhausted"]
-    assert [c for _, c in queued_jobs["webhooks"]] == ["30", "120", "600", "1800"]
+    # The first attempt + 5 retries (30s, 2m, 10m, 30m, 2h): 6 attempts. This
+    # test used to pin 5 attempts, i.e. the off-by-one that meant the
+    # documented 2-hour retry never happened (help-center discoveries #12).
+    outcomes = [wd.deliver(db_session, delivery.id) for _ in range(6)]
+    assert outcomes == ["retry"] * 5 + ["exhausted"]
+    assert [c for _, c in queued_jobs["webhooks"]] == ["30", "120", "600", "1800", "7200"]
     assert exhausted == ["HTTP 500"]
     assert wd.deliver(db_session, delivery.id) == "skipped"
 

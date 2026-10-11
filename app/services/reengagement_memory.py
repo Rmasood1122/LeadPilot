@@ -17,10 +17,23 @@ ReengagementPlan carrying:
     configured interval (90 days by default).
 
 WHEN THE DAY ARRIVES. The sweep marks the plan `due` and notifies. If
-`reengagement_memory_auto_send` is on (the default), it also schedules a real
-message through the ordinary send path -- so suppression, compliance, mailbox
-health and the human review queue all still apply. Nothing here bypasses a
-gate; it only decides WHEN to knock.
+`reengagement_memory_auto_send` is on (it is OFF by default -- an admin turns
+it on in system settings), it also schedules a real message through the
+ordinary send path -- so suppression, exclusions, compliance, mailbox health
+and the human review queue all still apply. Nothing here bypasses a gate; it
+only decides WHEN to knock.
+
+THE ONE STOPPED-ENROLLMENT EXCEPTION. The touch is attached to the sequence
+the prospect's reply stopped (that is the thread it continues). A stopped
+enrollment cancels every message at send time, so the touch used to be
+cancelled on the day it was due. send_message_impl now lets a touch of THIS
+origin pass a stopped enrollment only when answers_the_stop() below ties the
+stop to the reply the plan was made from (or an earlier reply of the same
+lead) -- the same narrow rule Reply Copilot answers use. Every other gate
+applies unchanged, and send_time_hold() adds this feature's own: the feature
+or auto-send switched off since scheduling, the plan cancelled, the
+prospect no longer appropriate (still_appropriate), or a newer reply from
+the prospect -- each cancels the touch.
 
 WHAT IT DOES NOT DO. It never resurrects a prospect who unsubscribed, bounced,
 was suppressed, or has since replied with something better. Those are checked
@@ -418,11 +431,47 @@ def due_plans(db: Session, now: datetime | None = None,
     ).scalars())
 
 
+def pending_touch(db: Session, plan: ReengagementPlan) -> Message | None:
+    """The plan's return message while it has NOT gone out yet and can still
+    be stopped: scheduled, waiting in the review queue, or held by a send-time
+    guard. Not SENDING (a worker is transmitting it now) and not sent."""
+    from app.services import send_holds  # noqa: PLC0415
+
+    if plan.message_id is None:
+        return None
+    message = db.get(Message, plan.message_id)
+    if message is None:
+        return None
+    if message.status in (MessageStatus.SCHEDULED, MessageStatus.AWAITING_REVIEW):
+        return message
+    if message.status is MessageStatus.FAILED and (message.error or "").startswith(
+            send_holds.HOLD_PREFIXES):
+        return message
+    return None
+
+
+def can_cancel(db: Session, plan: ReengagementPlan) -> bool:
+    """A plan can be cancelled while it is scheduled or due, and after the
+    sweep scheduled its return message as long as that message has not gone
+    out (pending_touch)."""
+    if plan.status in (SCHEDULED, DUE):
+        return True
+    return plan.status == SENT and pending_touch(db, plan) is not None
+
+
 def cancel(db: Session, plan: ReengagementPlan, reason: str,
            now: datetime | None = None) -> ReengagementPlan:
+    """Cancel the plan, and its return message if it has not gone out yet
+    (send_time_hold would also cancel it at send time; cancelling it here
+    takes it off the queue and the review list now)."""
+    touch = pending_touch(db, plan) if plan.status == SENT else None
     plan.status = CANCELLED
     plan.cancelled_reason = reason[:200]
     plan.completed_at = now or _now()
+    if touch is not None:
+        touch.status = MessageStatus.CANCELLED
+        touch.error = f"re-engagement: plan cancelled ({reason})"[:1000]
+        plan.outcome = "return message cancelled before sending"
     db.commit()
     return plan
 
@@ -579,6 +628,105 @@ def schedule_touch(db: Session, plan: ReengagementPlan,
     return message
 
 
+# --------------------------------------------------------------------------
+# Send time (called by outreach_tasks.send_message_impl, ON TOP of every gate)
+# --------------------------------------------------------------------------
+
+#: Routing classes whose stop is never passed: those people asked to stop or
+#: their address is gone (both also suppress, so this is belt and braces).
+_NEVER_PASS = frozenset({"unsubscribe_request", "bounce"})
+
+
+def _stored_at(reply: InboundReply) -> datetime | None:
+    return _aware(reply.created_at or reply.received_at)
+
+
+def plan_for_message(db: Session, message: Message) -> ReengagementPlan | None:
+    return db.execute(select(ReengagementPlan).where(
+        ReengagementPlan.message_id == message.id)).scalars().first()
+
+
+def answers_the_stop(db: Session, message: Message,
+                     enrollment: SequenceEnrollment | None) -> bool:
+    """May this re-engagement touch pass a STOPPED enrollment?
+
+    Only a touch of this origin, with its plan, whose enrollment was stopped
+    by a reply: stop_reason is "replied_<class>" of the plan's source reply or
+    of an earlier reply of the same lead, stored no later than the stop. An
+    enrollment that was stopped for any OTHER reason first (an unsubscribe,
+    a bounce, suppression, a removed lead, a meeting outcome, a kill
+    signal...) keeps the touch cancelled.
+
+    WHAT THIS DOES NOT SEE. stop_reason records the FIRST stop only:
+    stop_enrollment is never called on an enrollment that is already
+    STOPPED, so an unsubscribe, bounce, removal or meeting outcome that comes
+    AFTER the "not now" reply does not change it, and this function still
+    returns True. Those later events are caught by the other send-time checks
+    instead: the suppression gate (an unsubscribe, a bounce, a STOP reply and
+    an erasure all suppress), the dropped-lead gate, the F05 / F10 gates,
+    and send_time_hold below -- still_appropriate (lead status dropped,
+    disqualified, closed, meeting booked, opportunity, proposal sent; a kill
+    signal on the lead) and the newer-reply check."""
+    from app.db.models import EnrollmentStatus  # noqa: PLC0415
+
+    if (message.origin != ORIGIN or enrollment is None
+            or enrollment.status is not EnrollmentStatus.STOPPED
+            or not (enrollment.stop_reason or "").startswith("replied_")
+            or enrollment.stopped_at is None):
+        return False
+    plan = plan_for_message(db, message)
+    source = db.get(InboundReply, plan.source_reply_id) if plan and plan.source_reply_id else None
+    if source is None or source.lead_id != message.lead_id:
+        return False
+    stopped = _aware(enrollment.stopped_at)
+    source_at = _stored_at(source)
+    for reply in db.execute(select(InboundReply).where(
+            InboundReply.lead_id == message.lead_id)).scalars():
+        cls = (reply.classification or "").lower()
+        at = _stored_at(reply)
+        if (cls and cls not in _NEVER_PASS and at is not None and source_at is not None
+                and at <= source_at and at <= stopped
+                and f"replied_{cls}" == enrollment.stop_reason):
+            return True
+    return False
+
+
+def send_time_hold(db: Session, message: Message, lead: Lead,
+                   now: datetime | None = None) -> str | None:
+    """Extra send-time checks for a touch of this origin. Returns a status
+    that ends the send (the message is CANCELLED, the reason on it) or None.
+    """
+    now = now or _now()
+    plan = plan_for_message(db, message)
+    reason = status = None
+    if not enabled(db) or not auto_send(db):
+        status, reason = "cancelled_reengagement_off", "re-engagement auto-send switched off"
+    elif plan is None or plan.status == CANCELLED:
+        status, reason = "cancelled_plan_cancelled", "re-engagement plan cancelled"
+    else:
+        blocked = still_appropriate(db, plan)
+        if blocked:
+            status, reason = "cancelled_reengagement_inappropriate", blocked
+        elif plan.source_reply_id is not None:
+            source = db.get(InboundReply, plan.source_reply_id)
+            source_at = _stored_at(source) if source is not None else None
+            newer = source_at is not None and any(
+                (_stored_at(r) or source_at) > source_at
+                and (r.classification or "") != "automated_response"
+                for r in db.execute(select(InboundReply).where(
+                    InboundReply.lead_id == lead.id,
+                    InboundReply.id != source.id)).scalars())
+            if newer:
+                status, reason = ("cancelled_prospect_wrote_again",
+                                  "the prospect wrote again after the 'not now' reply")
+    if status is None:
+        return None
+    message.status = MessageStatus.CANCELLED
+    message.error = f"re-engagement: {reason}"[:1000]
+    db.commit()
+    return status
+
+
 def run_due(db: Session, now: datetime | None = None, limit: int = 200) -> dict:
     """The sweep. Marks due plans, skips the ones that stopped being
     appropriate, and (when enabled) schedules the touch.
@@ -662,6 +810,9 @@ def plan_out(db: Session, plan: ReengagementPlan) -> dict:
         "interval_days": plan.interval_days,
         "status": plan.status,
         "message_id": str(plan.message_id) if plan.message_id else None,
+        # The return message is scheduled but has not gone out: it can still
+        # be cancelled (POST /reengagement/plans/{id}/cancel).
+        "touch_pending": plan.status == SENT and pending_touch(db, plan) is not None,
         "outcome": plan.outcome,
         "cancelled_reason": plan.cancelled_reason,
         "created_at": plan.created_at.isoformat() if plan.created_at else None,

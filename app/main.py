@@ -214,7 +214,8 @@ app.mount("/media", StaticFiles(directory=str(_MEDIA_DIR)), name="media")
 # ── Routers ───────────────────────────────────────────────────────────────────
 # M8 health router (prefix=/health) replaces the M1 inline /health endpoint.
 app.include_router(health_router)
-# Phase 3: GET /status/public, unauthenticated, for status.calendarharvest.com.
+# Phase 3: GET /status/public, unauthenticated, for the public status page
+# (www.calendarharvest.com/status/, fetched from the visitor's browser).
 # Built from the same checks as /health (app/services/health_checks.py).
 app.include_router(status_public_router)
 app.include_router(auth_router)

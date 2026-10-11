@@ -2,9 +2,10 @@
 id: send-review-queue
 title: The send-review queue and approvals
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
+  - app/services/event_bus.py
   - app/services/send_review.py
   - app/api/send_reviews.py
   - app/workers/outreach_tasks.py
@@ -65,7 +66,9 @@ Approval puts the message back in the normal send queue, and it goes out on the 
 
 Click **Reject**, type a note, then click **Confirm reject**. The note must be at least 5 characters, so the reason is recorded.
 
-A rejected message is never sent. Only that one message is cancelled. The prospect stays enrolled, but rejecting does not schedule the next step. If automatic follow-up is on for the previous step (it is by default), LeadPilot later tries that same step again as a new message, by default 72 hours after the previous step was sent, and the new message is checked by the review queue again. To stop contacting the person, stop or pause them separately.
+A rejected message is never sent. Only that one message is cancelled. The prospect stays enrolled and the sequence moves on: the next step is scheduled as if the rejected step had been skipped (it does not count as sent), or, if it was the last step, the sequence is marked completed. The rejected step is never tried again, including by automatic follow-ups. To stop contacting the person, stop or pause them separately.
+
+While a message waits in the queue, LeadPilot does not create another copy of that step, so approving it later sends it once.
 
 A review can be decided only once. Trying to approve or reject an item that was already decided returns an error instead of overwriting the earlier decision.
 

@@ -2,7 +2,7 @@
 id: pause-stop-kill-switch
 title: Pausing and stopping outreach
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/api/analytics.py
@@ -68,8 +68,9 @@ There is no single "stop this contact" button for a normal user today. These are
 - **The lead goes cold.** LeadPilot estimates each lead's chance of converting before every send. After at least 4 unanswered messages, a lead below 5% is marked "cooling" and its sequence is paused for 21 days; below 1.5% it is archived and its sequence is stopped. These are deployment defaults. **Reactivate lead** on the lead's page resumes a cooling lead now, or clears an archived lead (its stopped sequence stays stopped).
 - **Your CRM closes the lead.** If a connected HubSpot or Salesforce marks the lead as won, lost or disqualified, the sequence stops.
 - **An administrator adds them to the suppression list.** In **Settings**, the **Suppression** tab is visible to administrators only. Entries cannot be removed from the Settings screen; only a platform administrator can remove one.
+- **You remove the lead.** **Remove** (or moving the lead to `dropped`) stops its sequences straight away, and a removed lead is never sent to.
 
-Changing a lead's status by hand on the Pipeline board does not by itself stop its sequence.
+Other status changes by hand on the Pipeline board do not by themselves stop a sequence.
 
 To hold individual messages for a person to check first, see the send-review queue.
 

@@ -23,9 +23,17 @@ raised. A model timeout or a Gmail grant missing the compose scope must not
 lose the outcome the user just logged -- the lead page shows what happened and
 offers a retry.
 
-SUPPRESSION
-Drafting and sending both re-check the suppression list. A person who
-unsubscribed does not get a follow-up because they took a call first.
+WHO MAY RECEIVE IT (drafting AND sending re-check, every time)
+The same person-level guards the send chokepoint applies to every sequence
+message (app/services/recipient_guards.person_block): the suppression list on
+email, phone AND LinkedIn; the account's F05 exclusion lists (except the
+`customer` / `open_deal` reasons the meeting itself creates -- see that
+module); the F10 departure block; and an opt-out recorded on the person's
+earlier record. A person who unsubscribed does not get a follow-up because
+they took a call first. A check that cannot run refuses the send (fails
+closed); it never sends unchecked. Blocked = draft_status `suppressed`
+(suppression list) or `blocked` (any other guard), with the reason in
+draft_error.
 """
 
 from __future__ import annotations
@@ -335,16 +343,26 @@ def _account_for(db: Session, user: User) -> GmailAccount | None:
 def save_gmail_draft(db: Session, row: MeetingOutcome, *, user: User) -> MeetingOutcome:
     """Create (or replace) the Gmail draft for this row's email text."""
     from app.integrations import gmail  # noqa: PLC0415
-    from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
 
     lead = db.get(Lead, row.lead_id)
+    try:
+        blocked = _recipient_block(db, lead)
+        check_error = None
+    except Exception as exc:  # noqa: BLE001 -- fails closed, recorded on the row
+        logger.warning("contact checks failed for outcome %s: %s", row.id, exc)
+        db.rollback()
+        blocked, check_error = None, exc
     if not row.followup_subject or not row.followup_body:
         row.draft_status, row.draft_error = "generation_failed", "no email text to save"
     elif not lead.email:
         row.draft_status, row.draft_error = "no_address", "this lead has no email address"
-    elif is_suppressed(db, lead.email, lead.phone):
-        row.draft_status = "suppressed"
-        row.draft_error = "this contact is on the suppression list -- no draft saved"
+    elif check_error is not None:
+        row.draft_status = "failed"
+        row.draft_error = ("the do-not-contact checks could not be run -- nothing was "
+                           "saved; try again")
+    elif blocked is not None:
+        row.draft_status = _blocked_status(blocked)
+        row.draft_error = f"{blocked.reason} -- no draft saved"
     else:
         account = _account_for(db, user)
         if account is None:
@@ -375,20 +393,68 @@ class FollowupNotSendable(Exception):
     pass
 
 
+#: draft_status values a person can ask to have re-checked.
+RECHECKABLE = ("blocked", "suppressed")
+
+
+def recheck(db: Session, row: MeetingOutcome, *, user: User) -> MeetingOutcome:
+    """"Check again" on a blocked follow-up: re-run the contact checks now
+    (the exclusion was removed, the departure dismissed, ...) and, if they pass,
+    save the draft to Gmail exactly as drafting does. Still blocked = the row
+    keeps its status with the current reason. Raises FollowupNotSendable when
+    there is nothing to re-check."""
+    if row.sent_at is not None:
+        raise FollowupNotSendable("this follow-up was already sent")
+    if row.draft_status not in RECHECKABLE:
+        raise FollowupNotSendable("this follow-up is not blocked")
+    return save_gmail_draft(db, row, user=user)
+
+
+#: F05 exclusion reasons that do not stop a post-meeting follow-up: the
+#: meeting itself puts the person on them (recipient_guards module docstring).
+FOLLOWUP_EXEMPT_EXCLUSIONS = ("customer", "open_deal")
+
+
+def _recipient_block(db: Session, lead: Lead):
+    """recipient_guards.person_block for this lead. RAISES on a lookup error."""
+    from app.services import recipient_guards  # noqa: PLC0415
+
+    strategy = db.get(Strategy, lead.strategy_id) if lead.strategy_id else None
+    return recipient_guards.person_block(
+        db, lead, strategy, exempt_exclusion_reasons=FOLLOWUP_EXEMPT_EXCLUSIONS)
+
+
+def _blocked_status(blocked) -> str:
+    from app.services import recipient_guards  # noqa: PLC0415
+
+    return "suppressed" if blocked.kind == recipient_guards.SUPPRESSED else "blocked"
+
+
 def send_followup(db: Session, row: MeetingOutcome, *, user: User,
                   now: datetime | None = None) -> MeetingOutcome:
     """Send the saved draft. Raises FollowupNotSendable with the reason."""
     from app.integrations import gmail  # noqa: PLC0415
     from app.services import crm_events  # noqa: PLC0415
-    from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
 
     lead = db.get(Lead, row.lead_id)
     if row.sent_at is not None:
         raise FollowupNotSendable("this follow-up was already sent")
-    if lead.email and is_suppressed(db, lead.email, lead.phone):
-        row.draft_status = "suppressed"
+    # The chokepoint's person-level guards, checked NOW (an unsubscribe, an
+    # exclusion or a departure recorded after the draft was saved still stops
+    # it). Fails closed: a check that cannot run is a refusal.
+    try:
+        blocked = _recipient_block(db, lead)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("contact checks failed for outcome %s: %s", row.id, exc)
+        db.rollback()
+        raise FollowupNotSendable(
+            "the do-not-contact checks could not be run -- nothing was sent; "
+            "try again") from exc
+    if blocked is not None:
+        row.draft_status = _blocked_status(blocked)
+        row.draft_error = blocked.reason
         db.commit()
-        raise FollowupNotSendable("this contact is on the suppression list")
+        raise FollowupNotSendable(blocked.reason)
     if row.draft_status != "draft_saved" or not row.gmail_draft_id:
         raise FollowupNotSendable("save the draft to Gmail first")
     account = _account_for(db, user)

@@ -43,15 +43,23 @@ export function draftStatusInfo(
       return { tone: "warning", message: "Reconnect Gmail in Settings to allow saving drafts. The email text is kept below.", canSend: false, canEdit: true };
     case "suppressed":
       return { tone: "destructive", message: "This contact is on the suppression list. No email will be drafted or sent.", canSend: false, canEdit: false };
+    case "blocked":
+      return { tone: "destructive", message: `This contact cannot be emailed${error ? `: ${error}` : "."}`, canSend: false, canEdit: false };
     case "no_address":
       return { tone: "warning", message: "This lead has no email address.", canSend: false, canEdit: true };
     case "generation_failed":
       return { tone: "warning", message: "The follow-up couldn't be written. Try Regenerate.", canSend: false, canEdit: false };
     case "failed":
-      return { tone: "destructive", message: `Gmail rejected the draft${error ? `: ${error}` : "."}`, canSend: false, canEdit: true };
+      return { tone: "destructive", message: `The draft was not saved${error ? `: ${error}` : "."}`, canSend: false, canEdit: true };
     default:
       return { tone: "default", message: "No follow-up generated.", canSend: false, canEdit: false };
   }
+}
+
+/** A follow-up the contact checks blocked can be checked again once the
+ *  cause is gone (exclusion removed, departure dismissed...). */
+export function canRecheck(status: DraftStatus): boolean {
+  return status === "blocked" || status === "suppressed";
 }
 
 /** Poll while the worker is still writing the brief; stop the moment it

@@ -120,7 +120,7 @@ def add_exclusion(body: ExclusionIn, response: Response, db: Session = Depends(g
                                                 actor_user_id=current_user.id)
     except guardrails.GuardrailValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    if status_ == "exists":
+    if status_ in ("exists", "updated"):   # an existing row: not a new resource
         response.status_code = 200
     return {**guardrails.exclusion_out(row), "status": status_}
 

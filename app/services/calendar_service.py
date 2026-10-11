@@ -67,6 +67,8 @@ __all__ = [
     "owned_booking_page",
     "resolve_timezone",
     "slot_key_for",
+    "lock_host_calendar",
+    "host_conflict",
 ]
 
 # Lowercase, digits and single hyphens. This string becomes a public URL path
@@ -386,6 +388,80 @@ def slot_is_offered(db: Session, page: CalendarBookingPage, start_at: datetime,
         slot["start_at"] == target
         for slot in available_slots(db, page, now=now)
     )
+
+
+# ---------------------------------------------------------------------------
+# Per-HOST double-booking guard
+# ---------------------------------------------------------------------------
+#
+# THE GAP. The UNIQUE (booking_page_id, slot_key) constraint stops two live
+# bookings of the same start on the SAME page. busy_intervals() already hides a
+# slot that overlaps a live booking on ANY of the host's pages -- but that is a
+# read, so two people booking overlapping times on two DIFFERENT pages (a
+# 30-minute intro at 10:30 and a 60-minute deep dive at 10:00) in the same
+# second both passed it and both inserted: the host was double-booked.
+#
+# WHY NOT A CONSTRAINT. "No two live intervals of one host overlap" is an
+# exclusion constraint (PostgreSQL `EXCLUDE USING gist (tstzrange && ...)`),
+# which SQLite -- the test suite -- does not have; a constraint the tests
+# cannot exercise is a constraint nobody has seen fire. A UNIQUE on
+# (host, start) would only catch identical starts, not overlaps of different
+# lengths. So this is a transactional check instead:
+#
+#   1. lock_host_calendar() takes a row lock on the host's users row
+#      (SELECT ... FOR NO KEY UPDATE). Every booking write for that host takes it
+#      first, so they run one at a time per host; other hosts are unaffected.
+#   2. THEN the overlap check runs (slot_is_offered / host_conflict). Under
+#      PostgreSQL's default READ COMMITTED each statement sees rows committed
+#      before it started, so the second writer -- which waited on the lock
+#      until the first committed -- sees the first booking and gets a 409.
+#   3. The commit releases the lock.
+#
+# RACE WINDOW THAT REMAINS. Meetings created by hand from a proposed time
+# (no booking behind them) do not take the lock, so one created in the same
+# instant as a booking can still overlap it; the per-page UNIQUE constraint
+# still backs same-page starts. Under REPEATABLE READ / SERIALIZABLE isolation
+# step 2 would read the transaction's first snapshot -- the app uses the
+# PostgreSQL default (READ COMMITTED). SQLite ignores FOR UPDATE but takes a
+# database-wide write lock, so writes are serialised there anyway.
+
+
+def lock_host_calendar(db: Session, host_user_id: uuid.UUID) -> None:
+    """Serialise booking writes for one host (see the section comment).
+    Held until the caller's commit or rollback."""
+    # key_share=True: PostgreSQL FOR NO KEY UPDATE. It still conflicts with
+    # itself (booking writes for one host stay serialised) but NOT with the
+    # FOR KEY SHARE lock a foreign-key insert takes, so rows referencing the
+    # user (bookings, meetings, anything with a users FK) are never blocked.
+    db.execute(select(User.id).where(User.id == host_user_id)
+               .with_for_update(key_share=True)).first()
+
+
+def host_conflict(db: Session, host_user_id: uuid.UUID, start_at: datetime,
+                  end_at: datetime, *, exclude_booking_id: uuid.UUID | None = None) -> bool:
+    """Does [start_at, end_at) overlap anything live on the host's calendar --
+    a live booking on ANY of their pages or a meeting that is not cancelled --
+    other than `exclude_booking_id` (and a meeting created from it)?"""
+    start_at, end_at = _as_utc(start_at), _as_utc(end_at)
+    pages = select(CalendarBookingPage.id).where(CalendarBookingPage.user_id == host_user_id)
+    bookings = select(CalendarBooking.start_at, CalendarBooking.end_at).where(
+        CalendarBooking.booking_page_id.in_(pages),
+        CalendarBooking.status.in_(_LIVE_BOOKING_STATUSES),
+        CalendarBooking.end_at > start_at,
+        CalendarBooking.start_at < end_at,
+    )
+    meetings = select(Meeting.start_at, Meeting.end_at).where(
+        Meeting.host_user_id == host_user_id,
+        Meeting.status != MeetingStatus.CANCELLED,
+        Meeting.end_at > start_at,
+        Meeting.start_at < end_at,
+    )
+    if exclude_booking_id is not None:
+        bookings = bookings.where(CalendarBooking.id != exclude_booking_id)
+        meetings = meetings.where(or_(Meeting.booking_id.is_(None),
+                                      Meeting.booking_id != exclude_booking_id))
+    rows = db.execute(bookings).all() + db.execute(meetings).all()
+    return _overlaps(start_at, end_at, [(_as_utc(a), _as_utc(b)) for a, b in rows])
 
 
 # ---------------------------------------------------------------------------

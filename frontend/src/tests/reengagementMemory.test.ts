@@ -24,7 +24,7 @@ function plan(overrides: Partial<ReengagementPlan> = {}): ReengagementPlan {
     reason_text: "no budget until the new fiscal year",
     date_from_prospect: false, stated_return_on: null,
     due_at: "2026-12-15T00:00:00Z", interval_days: 90, status: "scheduled",
-    message_id: null, outcome: null, cancelled_reason: null,
+    message_id: null, touch_pending: false, outcome: null, cancelled_reason: null,
     created_at: "2026-09-16T10:00:00Z",
     ...overrides,
   };

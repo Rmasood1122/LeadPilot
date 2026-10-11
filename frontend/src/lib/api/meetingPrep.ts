@@ -117,6 +117,7 @@ export type DraftStatus =
   | "not_connected"
   | "reauth_required"
   | "suppressed"
+  | "blocked"
   | "no_address"
   | "generation_failed"
   | "failed";
@@ -174,6 +175,12 @@ export function editFollowupDraft(
 
 export function regenerateFollowupDraft(outcomeId: string): Promise<MeetingOutcome> {
   return api(`/meeting-outcomes/${outcomeId}/draft/regenerate`, { method: "POST" });
+}
+
+/** "Check again" on a blocked follow-up: re-runs the contact checks and, if
+ *  they now pass, saves the Gmail draft. */
+export function recheckFollowup(outcomeId: string): Promise<MeetingOutcome> {
+  return api(`/meeting-outcomes/${outcomeId}/recheck`, { method: "POST" });
 }
 
 export function sendFollowup(outcomeId: string): Promise<MeetingOutcome> {

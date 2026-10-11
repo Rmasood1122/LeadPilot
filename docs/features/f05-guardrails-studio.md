@@ -90,6 +90,15 @@ removed value reactivates the same row and resets `active_since`.
      A person removes CRM-sourced rows by hand (the next sync re-adds them if
      the CRM still says so). A vendor error is recorded per provider and does
      not undo what the other sources added.
+   * **Reason precedence on an existing row** (send-path review, 2026-10-11;
+     `guardrails.upsert_exclusion`): `do_not_contact` is sticky (no later
+     write downgrades it); a `do_not_contact` write upgrades any row; a
+     manual write replaces a CSV- or CRM-sourced row's reason (a sync never
+     overrides a manual row); otherwise the first writer stands. The result
+     is `updated` when a row changed. The send-time block is unaffected (any
+     exclusion blocks); the precedence matters to callers that exempt reasons
+     (the meeting follow-up, which also checks EVERY matching row via
+     `guardrails.send_blocks`).
 
 **Enforcement points** (flag on):
 

@@ -71,7 +71,7 @@ Outbound webhooks for `meeting_booked`, `reply_received`, `lead_sourced` and
 `POST /webhooks/outbound/register`; the signing secret is returned once.
 Every delivery is signed:
 `X-LeadPilot-Signature: t=<unix ts>,v1=<hex HMAC-SHA256(secret, "<ts>.<body>")>`.
-Retries back off 30s → 2h over 5 attempts; a `410 Gone` unsubscribes (the
+Retries back off 30s → 2h: the first attempt plus 5 retries, 6 attempts in all (it stopped after 5 before the send-path-gaps fix, so the 2-hour retry never ran); a `410 Gone` unsubscribes (the
 Zapier REST-hook convention). Targets must be public HTTPS URLs; LeadPilot
 refuses private addresses and does not follow redirects.
 

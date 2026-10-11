@@ -85,6 +85,9 @@ function PlanRow({ plan, leadId }: { plan: ReengagementPlan; leadId: string }) {
   });
 
   const open = plan.status === "scheduled" || plan.status === "due";
+  // After the sweep scheduled the return message, it can still be stopped
+  // until it goes out -- cancel only, there is no date left to move.
+  const cancellable = open || plan.touch_pending;
   const reasonError = cancelling ? cancelReasonError(reason) : null;
 
   return (
@@ -111,17 +114,27 @@ function PlanRow({ plan, leadId }: { plan: ReengagementPlan; leadId: string }) {
         </p>
       )}
 
-      {open && (
+      {plan.touch_pending && (
+        <p className="text-xs text-muted-foreground">
+          The return message is scheduled and has not gone out yet.
+        </p>
+      )}
+
+      {cancellable && (
         <div className="flex flex-wrap items-end gap-2">
-          <div>
-            <Label htmlFor={`due-${plan.id}`}>Move to</Label>
-            <Input id={`due-${plan.id}`} type="date" value={due}
-                   onChange={(e) => setDue(e.target.value)} className="w-40" />
-          </div>
-          <Button size="sm" variant="outline" disabled={!due || reschedule.isPending}
-                  onClick={() => reschedule.mutate()}>
-            Move
-          </Button>
+          {open && (
+            <>
+              <div>
+                <Label htmlFor={`due-${plan.id}`}>Move to</Label>
+                <Input id={`due-${plan.id}`} type="date" value={due}
+                       onChange={(e) => setDue(e.target.value)} className="w-40" />
+              </div>
+              <Button size="sm" variant="outline" disabled={!due || reschedule.isPending}
+                      onClick={() => reschedule.mutate()}>
+                Move
+              </Button>
+            </>
+          )}
           <div className="flex-1">
             <Label htmlFor={`cancel-${plan.id}`}>
               {cancelling ? "Why never?" : " "}

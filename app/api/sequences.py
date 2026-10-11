@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -140,8 +140,22 @@ class SequenceOut(BaseModel):
 class EnrollRequest(BaseModel):
     lead_statuses: list[LeadStatus] = Field(
         default=[LeadStatus.VERIFIED],
-        description="Which leads to enroll; defaults to verified-only",
+        description="Which leads to enroll; only `verified` is accepted "
+                    "(sequence_engine.ENROLLABLE_STATUSES)",
     )
+
+    @field_validator("lead_statuses")
+    @classmethod
+    def _only_enrollable(cls, value: list[LeadStatus]) -> list[LeadStatus]:
+        # Dropped (removed / undeliverable / erased), flagged (risky or
+        # unknown verdict -- a person decides by moving it to verified),
+        # contacted / replied and later leads are never bulk-enrolled.
+        refused = sorted(s.value for s in value if s not in engine.ENROLLABLE_STATUSES)
+        if refused:
+            allowed = ", ".join(sorted(s.value for s in engine.ENROLLABLE_STATUSES))
+            raise ValueError(f"cannot enroll leads in status {', '.join(refused)}; "
+                             f"allowed: {allowed}")
+        return value or [LeadStatus.VERIFIED]
 
 
 @router.post("/strategies/{strategy_id}/sequences", response_model=SequenceOut, status_code=201)
@@ -420,7 +434,16 @@ def approve_sequence(
     with metered(db, current_user, "launch"):  # P0-5b: review + enrolment scoring, counted
         _review_gate(db, sequence, current_user)
         actor = _actor(request, current_user)
-        payload = EnrollRequest(**(sequence.approval_payload_json or {}))
+        try:
+            payload = EnrollRequest(**(sequence.approval_payload_json or {}))
+        except ValidationError:
+            # A request stored before enrollment was limited to verified
+            # leads may name a status that can no longer be enrolled.
+            raise HTTPException(
+                status_code=409,
+                detail="this launch request names lead statuses that can no longer "
+                       "be enrolled (only verified leads can be). Decline it and "
+                       "ask for a new launch.") from None
         sequence.approved_by_user_id = actor.id
         sequence.approved_at = datetime.now(timezone.utc)
         db.commit()

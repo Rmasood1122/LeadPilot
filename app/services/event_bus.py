@@ -57,6 +57,13 @@ EVENTS: dict[str, str] = {
     "call_completed": "AI call completed",
     "deal_won": "Deal closed-won",
     "loom_requested": "Personal video suggested",
+    # Emitted since their features shipped but missing here, so emit() raised
+    # KeyError and not one push / Slack post / webhook was ever delivered
+    # (tests/test_send_path_gaps.py scans app/ so this cannot recur).
+    "send_needs_review": "Message held for review",       # send_review._notify
+    "mailbox_paused": "Mailbox paused",                    # mailbox_health._notify_paused
+    "reengagement_due": "Time to re-engage a prospect",    # reengagement_memory._notify_due
+    "reply_draft_approved": "Reply draft approved",        # api/crm.py approve draft
 }
 
 

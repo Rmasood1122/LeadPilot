@@ -2,7 +2,7 @@
 id: replies-and-unified-inbox
 title: Replies and the unified inbox
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/workers/outreach_tasks.py
@@ -75,7 +75,7 @@ If the AI call fails, the reply is left **unclassified** instead of being guesse
 
 A reply labelled **not now** creates a re-engagement plan that records their reason in their own words and a return date. If they named a date, that date is used. Otherwise the wait depends on the reason: 60 days for timing or a project, 90 for budget or headcount, 120 for priority, 180 for a contract, and the configured default (90 days) when no reason is given.
 
-When the date arrives, LeadPilot first re-checks that coming back is still appropriate. If the lead has since been dropped (for example after a bounce), disqualified, closed as won or lost, moved on to a meeting, opportunity or proposal, or put on the suppression list, the plan is cancelled with the reason recorded. Otherwise you are notified. Sending a message automatically at that point is off by default. If your administrator turns it on, a return message is scheduled on the prospect's earlier sequence. In the current version that message is cancelled when it is due to send, because the prospect's "not now" reply already stopped that sequence. Treat the reminder as your cue to write to them yourself.
+When the date arrives, LeadPilot first re-checks that coming back is still appropriate. If the lead has since been dropped (for example after a bounce), disqualified, closed as won or lost, moved on to a meeting, opportunity or proposal, or put on the suppression list, the plan is cancelled with the reason recorded. Otherwise you are notified. Sending a message automatically at that point is off by default. If your administrator turns it on, a return message is scheduled on the prospect's earlier sequence and goes through every normal send check (suppression, exclusions, send window, daily cap and the review queue). It is allowed past the stop that the "not now" reply caused, and only that stop. It is cancelled instead if the prospect has written again since, if the plan was cancelled, if automatic sending was switched off in the meantime, or if coming back is no longer appropriate. Until the message goes out, you can still cancel the plan (**Never** on the lead's page); that cancels the message too. Sending it does not restart the old sequence.
 
 ## How does the Inbox work?
 

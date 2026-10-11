@@ -318,12 +318,16 @@ class Settings(BaseSettings):
     """
 
     RATE_LIMIT_PUBLIC_STATUS: int = 600
-    """Max GET /status/public calls per client IP per hour (Phase 3,
-    status.calendarharvest.com). Unauthenticated by design: the status site's
-    server fetches it every 60 s from Vercel, whose egress IPs vary and can be
-    shared. Each call is cheap (a 30 s in-process response cache sits behind
-    the limiter), so the limit only stops a flood from one address; 600/h is
-    ten a minute.
+    """Max GET /status/public calls per client IP per hour (Phase 3, the
+    public status page). Unauthenticated by design: the page at
+    www.calendarharvest.com/status/ calls it from each visitor's browser every
+    30 s while the tab is visible (120/h per open tab), and the optional
+    status-page/ app calls it from its server every 60 s. Each call is cheap (a
+    30 s in-process response cache sits behind the limiter), so the limit only
+    stops a flood from one address; 600/h is ten a minute. Visitors behind one
+    shared address (office NAT, carrier-grade NAT) share the budget; the page
+    treats a 429 as "slow down", keeps its last result and backs off to 2 min,
+    and never reports it as an outage.
 
     NOTE: read from app/core/config.py, not app/config.py.
     """

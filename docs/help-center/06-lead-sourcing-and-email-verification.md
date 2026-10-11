@@ -2,7 +2,7 @@
 id: lead-sourcing-and-email-verification
 title: Lead sourcing and email verification
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/api/leads.py
@@ -84,7 +84,7 @@ Later stages, after a meeting, are covered in the meetings and CRM articles.
 It means Hunter's check returned "deliverable" for that email address. It is the provider's verdict at the time of the check, not a guarantee that a future email will arrive.
 
 - **Risky** addresses, and addresses Hunter could not judge, become `flagged`. They are left for you to decide on. If you have checked a flagged address yourself, you can move the lead to `verified` (and a verified lead back to `flagged`) on the **Pipeline** board.
-- **Undeliverable** addresses become `dropped`. When you launch from the app, dropped leads are never enrolled. Through the API, an enroll request can name other statuses, including `dropped`, and those leads are enrolled unless they are suppressed.
+- **Undeliverable** addresses become `dropped`. Dropped leads are never enrolled. Only `verified` leads can be enrolled in a sequence, from the app or through the API: an API enroll request that names any other status (for example `flagged`, `dropped` or `replied`) is refused. To enroll a flagged lead, check the address and move the lead to `verified` first.
 - An address that Hunter built from a name and a company domain is recorded as found that way, separately from one a provider confirmed.
 
 By default, launching a sequence enrolls only `verified` leads that have an email address. The launch form on the strategy page says how many verified leads will be contacted.
@@ -119,7 +119,7 @@ When a strategy is full, a new sourcing request is refused with an upgrade messa
 
 ## Can I remove a lead or erase their data?
 
-- **Remove** (next to a verified or flagged lead in the **1. Find leads** list) marks the lead `dropped`, so it is not included when you launch. It does not stop a sequence the lead is already in; that sequence keeps sending to them. To stop contacting someone who is already enrolled, use **Delete (GDPR erasure)** below. A dropped lead cannot be moved back to another status.
+- **Remove** (next to a verified or flagged lead in the **1. Find leads** list) marks the lead `dropped`, so it is not included when you launch. It also stops any sequence the lead is already in, straight away: their queued messages are cancelled, and a message that is due is checked again at the moment of sending, so a removed lead is never sent to. A dropped lead cannot be moved back to another status.
 - **Delete (GDPR erasure)** (open a lead on the **Pipeline** page) permanently erases the lead's personal data and adds their email address, phone number and LinkedIn profile to the suppression list, so they are never contacted or sourced again. A record that the erasure happened is kept. You confirm with **Delete**.
 
 ## Can I upload my own contact list?

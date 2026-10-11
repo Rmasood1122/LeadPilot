@@ -2,7 +2,7 @@
 id: contact-support-and-status
 title: Contacting support and checking service status
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - frontend/src/components/support/ChatWidget.tsx
@@ -10,6 +10,13 @@ sources:
   - frontend/src/lib/support/ticketSubject.ts
   - frontend/src/app/contact/page.tsx
   - frontend/src/app/privacy/page.tsx
+  - frontend/src/app/status/page.tsx
+  - frontend/src/components/status/StatusBoard.tsx
+  - frontend/src/lib/statusBoard.ts
+  - frontend/src/lib/statusIncidents.ts
+  - frontend/src/lib/statusPage.ts
+  - frontend/src/components/Footer.tsx
+  - app/api/status_public.py
   - app/api/support.py
   - app/services/support_chat.py
   - app/services/support_kb.py
@@ -22,6 +29,7 @@ sources:
   - docs/features/ai-support-chat.md
   - docs/program/STAR_PROMPT.md
   - docs/program/BASELINE.md
+  - docs/program/STATUS_PAGE.md
 ---
 
 # Contacting support and checking service status
@@ -86,11 +94,25 @@ Yes. The public **Contact** page on the LeadPilot website offers a link to book 
 
 ## Is there a status page?
 
-Not yet. A public status page at status.calendarharvest.com is planned, designed to keep working even when LeadPilot itself is down. It is not live at the time of writing, so do not rely on that address yet.
+Yes. The LeadPilot status page is at **www.calendarharvest.com/status**. You can open it from the **Status** link in the footer of the website's About, How it works, Contact, Privacy and Terms pages, or from the "Service status" icon in the header of the support panel in the app.
 
-Until it is live:
+It shows:
 
-- If the app shows a banner or errors that suggest the server is unreachable, wait a few minutes and try again.
+- **An overall summary**, for example "All systems operational", "Degraded performance", "Partial outage" or "LeadPilot API unreachable — major outage".
+- **Four components and their state:** API, Background processing (scheduled sends and other work that runs in the background), AI features, and Booking pages. Every state is written out in words, not shown by colour alone. "No data" means a component could not be checked; it does not mean it is working.
+- **When it last checked**, in your local time. While the tab is open it checks again every 30 seconds; it pauses while the tab is in the background and checks again when you come back. There is also a **Check now** button.
+- **Incidents** the team has posted, active ones first. When there are none, it says "No incidents reported."
+
+The page is hosted separately from the LeadPilot API, so it still loads when LeadPilot itself is down. If your browser cannot get an answer from the API within 8 seconds, the page says "LeadPilot API unreachable — major outage". A problem with your own internet connection can cause the same message, so if colleagues on another network see LeadPilot working, check your connection first.
+
+What the status page does not do:
+
+- It does not send alerts. There is no email or text subscription.
+- It does not show uptime history; it shows the state right now and the incidents the team has posted.
+- If very many people check from the same network at once, the page may say it was asked to slow down. It then keeps showing the last result, with its time, and tries again after 2 minutes. That message is not an outage.
+
+If the status page shows a problem, or LeadPilot misbehaves while the page says everything is fine:
+
 - Remember that campaigns run on LeadPilot's servers, not in your browser or phone, so closing the app does not stop or pause them.
 - If messages are not going out, see the "Nothing is sending" section of the troubleshooting article, then submit a ticket.
 
