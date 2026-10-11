@@ -1,33 +1,41 @@
-"use client";
+/**
+ * app/page.tsx — "/".
+ *
+ * On the web: the public home page (founder request 2026-10-11), with the
+ * product video, the six-stage walkthrough and the shared Footer.
+ *
+ * In the Android app (Capacitor loads this same export) and an installed PWA:
+ * no marketing at all. HomeGate routes exactly as the old redirect-only page
+ * did (/login, the dashboard, /check-email or /onboarding/verify), and
+ * APP_SHELL_SCRIPT hides the marketing markup before hydration so it never
+ * flashes. See src/lib/homeEntry.ts.
+ */
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { isUnverifiedError, me } from "@/lib/api/auth";
-import { restoreSession } from "@/lib/api/client";
-import { isPhoneDeferred } from "@/lib/identity";
-import { DASHBOARD_PATH, postLoginDestination } from "@/lib/post-login";
+import type { Metadata } from "next";
+
+import { HomeGate } from "@/components/home/HomeGate";
+import { HomePage } from "@/components/home/HomePage";
+import { HOME_DESCRIPTION, HOME_TITLE } from "@/components/home/content";
+import { APP_SHELL_SCRIPT } from "@/lib/homeEntry";
+
+export const metadata: Metadata = {
+  title: "LeadPilot: from what you sell to meetings on your calendar | Calendarharvest",
+  description: HOME_DESCRIPTION,
+  openGraph: {
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    images: ["/media/leadpilot-walkthrough-poster.jpg"],
+  },
+};
 
 export default function Home() {
-  const router = useRouter();
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!(await restoreSession())) {
-        if (mounted) router.replace("/login");
-        return;
-      }
-      try {
-        const user = await me();
-        if (mounted) router.replace(postLoginDestination(user, { phoneDeferred: isPhoneDeferred() }));
-      } catch (err) {
-        // Unverified -> explain; anything else (API hiccup) -> the dashboard,
-        // whose Shell re-checks and whose pages surface the failure.
-        if (mounted) router.replace(isUnverifiedError(err) ? "/check-email" : DASHBOARD_PATH);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
-  return null;
+  return (
+    <>
+      {/* Must run before the marketing markup is painted. */}
+      <script dangerouslySetInnerHTML={{ __html: APP_SHELL_SCRIPT }} />
+      <HomeGate>
+        <HomePage />
+      </HomeGate>
+    </>
+  );
 }

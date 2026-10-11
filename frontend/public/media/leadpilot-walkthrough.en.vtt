@@ -1,0 +1,34 @@
+WEBVTT
+
+NOTE
+Captions for leadpilot-walkthrough.mp4/.webm (no sound). Rendered from
+frontend/video-src/walkthrough.html. Cue text must match VIDEO.transcript in
+frontend/src/components/home/content.ts (src/tests/homeVideo.test.ts checks it).
+
+1
+00:00:00.000 --> 00:00:03.600
+Describe what you sell: a name and a plain-language description.
+
+2
+00:00:03.600 --> 00:00:07.400
+LeadPilot researches your market once per strategy, then checks the strategy: 10 of 10 checks passed.
+
+3
+00:00:07.400 --> 00:00:11.000
+It finds business contacts and verifies each email address. Undeliverable ones are removed.
+
+4
+00:00:11.000 --> 00:00:14.800
+Each email is written for one person when it is sent, with an unsubscribe link in the footer.
+
+5
+00:00:14.800 --> 00:00:18.600
+You approve automatic sending once a day. Emails go out in business hours in each prospect's time zone.
+
+6
+00:00:18.600 --> 00:00:22.200
+Replies come to you, sorted. A reply stops the sequence. An unsubscribe suppresses the person everywhere.
+
+7
+00:00:22.200 --> 00:00:26.000
+Prospects book meetings on your LeadPilot booking page. All names shown are sample data.
