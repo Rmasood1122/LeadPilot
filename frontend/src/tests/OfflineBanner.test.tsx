@@ -16,13 +16,14 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 
 import { NetworkContext } from '@/contexts/NetworkContext';
-import { OfflineBanner } from '@/components/ui/OfflineBanner';
+import { MESSAGES, OfflineBanner } from '@/components/ui/OfflineBanner';
 
 // ── Helper: render with controlled network state ───────────────────────────────
 
 function renderWithNetwork(
   online: boolean,
   backendReachable: boolean,
+  showStatusLink?: boolean,
 ) {
   return render(
     <NetworkContext.Provider
@@ -33,7 +34,7 @@ function renderWithNetwork(
         setBackendReachable: () => {},
       }}
     >
-      <OfflineBanner />
+      <OfflineBanner showStatusLink={showStatusLink} />
     </NetworkContext.Provider>,
   );
 }
@@ -52,11 +53,37 @@ describe('OfflineBanner', () => {
     expect(screen.getByText(/No connection/i)).toBeTruthy();
   });
 
-  it('includes campaign reassurance message when offline', () => {
+  it('offline: says only what is true — this device going offline does not stop server-side sends', () => {
     renderWithNetwork(false, false);
-    expect(
-      screen.getByText(/campaigns are still running/i),
-    ).toBeTruthy();
+    expect(screen.getByText(/not on this device/i)).toBeTruthy();
+    expect(screen.getByText(/does not stop them/i)).toBeTruthy();
+  });
+
+  it('server unreachable: never claims campaigns are still running (that is unknowable)', () => {
+    renderWithNetwork(true, false);
+    const text = screen.getByRole('status').textContent ?? '';
+    expect(text).not.toMatch(/still running/i);
+    expect(text).toMatch(/can't confirm whether scheduled sends are going out/i);
+  });
+
+  it('no banner copy anywhere asserts campaigns are running', () => {
+    for (const { body } of Object.values(MESSAGES)) {
+      expect(body).not.toMatch(/still running/i);
+    }
+  });
+
+  it('server unreachable: links the status page only when the link is live', () => {
+    const { unmount } = renderWithNetwork(true, false, true);
+    expect(screen.getByTestId('offline-status-link').getAttribute('href'))
+      .toBe('/status/');
+    unmount();
+    renderWithNetwork(true, false, false);
+    expect(screen.queryByTestId('offline-status-link')).toBeNull();
+  });
+
+  it('offline: no status link (the device cannot load it anyway)', () => {
+    renderWithNetwork(false, false, true);
+    expect(screen.queryByTestId('offline-status-link')).toBeNull();
   });
 
   it('renders "Server temporarily unreachable" when online but backend is down', () => {

@@ -492,5 +492,8 @@ Remove the override when Next ships a fixed postcss.
   covers "in progress" only).
 - UptimeRobot v2 is a legacy API ("no longer receiving updates"; no end date announced). Moving
   to v3 is a contained change in `lib/uptimerobot.ts`.
-- `GET /health` exposes raw exception text in its `celery.error` field (pre-existing, unchanged
-  here on purpose; reported for triage).
+- ~~`GET /health` exposes raw exception text in its `celery.error` field (pre-existing, unchanged
+  here on purpose; reported for triage).~~ Fixed 2026-10-11 (platform-gaps item 4): the field is
+  now the fixed string `"heartbeat check failed"` and the exception is logged
+  (`app/services/health_checks.py` `check_celery_heartbeat`); two `TestHealthUnchanged` byte pins
+  were updated for that one field. See `docs/program/fixes/platform-gaps.md`.

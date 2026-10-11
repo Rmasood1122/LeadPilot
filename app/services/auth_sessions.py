@@ -166,6 +166,26 @@ def _live_user(db: Session, user_id) -> User:
     return user
 
 
+def _issued_before_password_change(user: User, claims: dict) -> bool:
+    """True when this token predates the account's last password change or
+    reset (users.password_changed_at), so it must be refused.
+
+    Compared at whole-second resolution because a JWT `iat` is an integer:
+    a token minted in the same second as the change counts as after it (a
+    sign-in straight after a reset must work). A token with no `iat` cannot
+    prove its age and is refused once a change is on record."""
+    changed = _aware(getattr(user, "password_changed_at", None))
+    if changed is None:
+        return False
+    iat = claims.get("iat")
+    if iat is None:
+        return True
+    try:
+        return int(iat) < int(changed.timestamp())
+    except (TypeError, ValueError):
+        return True
+
+
 def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
            now: datetime | None = None) -> IssuedTokens:
     """Exchange a refresh token for new tokens, or raise 401. Commits."""
@@ -178,6 +198,8 @@ def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
         if not settings.auth_accept_legacy_refresh_tokens:
             raise _unauthorized("session expired")
         user = _live_user(db, user_id)
+        if _issued_before_password_change(user, payload):
+            raise _unauthorized("session expired")
         logger.info("auth: exchanging a pre-session refresh token for user %s", user_id)
         return issue_session_tokens(db, user, persistent=True, request=request, now=now)
 
@@ -194,6 +216,8 @@ def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
         grace = timedelta(seconds=max(settings.auth_refresh_reuse_grace_seconds, 0))
         if row.revoked_reason == ROTATED and rotated_at is not None and now - rotated_at <= grace:
             user = _live_user(db, row.user_id)
+            if _issued_before_password_change(user, payload):
+                raise _unauthorized("session revoked")
             return IssuedTokens(user=user, access_token=auth_svc.issue_access_token(user.id),
                                 refresh_token=None, persistent=row.persistent)
         if row.revoked_reason == ROTATED:
@@ -211,6 +235,8 @@ def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
     if _aware(row.expires_at) <= now:
         raise _unauthorized("session expired")
     user = _live_user(db, row.user_id)
+    if _issued_before_password_change(user, payload):
+        raise _unauthorized("session revoked")
 
     # Claim the row atomically. Two concurrent requests with the same token
     # both passed the checks above; only one UPDATE can match revoked_at IS

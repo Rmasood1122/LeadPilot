@@ -274,7 +274,7 @@ the code. `EMAIL_PROVIDER=console` until real credentials exist, which means
 | 2 | **`calendarharvest.com` is not verified in Resend** (SPF + DKIM unpublished), so live mail would be spam-foldered. | **DEFERRED** — do together with #1 |
 | 3 | **The live Neon database is still at revision `0014`.** Migration 0015 has only ever run against throwaway databases. Production is untouched apart from a read-only probe. | **DEFERRED** — do not migrate until instructed |
 | 4 | Render free-tier cold starts make a clicked link take ~30–60 s to answer. | Known, documented |
-| 5 | Password reset uses none of this yet. `email_sender.py` is the natural home when it is built. | Future work |
+| 5 | Password reset now exists and sends through the same `email_sender.send_email` gateway (`app/services/password_reset.py`, `docs/features/password-reset.md`). | Done 2026-10-11 |
 
 ### Turning it on later
 

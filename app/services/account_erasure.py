@@ -158,6 +158,7 @@ ERASURE: dict[str, str] = {**{name: DELETE for name in DELETED}, **KEPT}
 EXCLUDED_USER_TABLES: dict[str, str] = {
     "email_verification_tokens": "user_id",
     "phone_verification_codes": "user_id",
+    "password_reset_tokens": "user_id",   # hashed reset links (docs/features/password-reset.md)
 }
 
 # KEEP_SCRUBBED: the columns cleared on kept security rows.

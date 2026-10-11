@@ -612,6 +612,7 @@ def campaign_overview(
 
     # ---- per-channel stats (M4 Chunk 3) ---------------------------------
     from app.db.models import ChannelType, InboundReply, WhatsAppTemplate
+    from app.services import send_holds
     from app.services.whatsapp_window import window_state_for_lead
 
     def _channel_block(channel: ChannelType) -> dict:
@@ -621,11 +622,15 @@ def campaign_overview(
                    Message.channel == channel,
                    Message.status.in_([MessageStatus.SENT, MessageStatus.BOUNCED]))
         ).scalar_one()
+        # A message a send-time guard HOLDS (bounce shield, champion tracker,
+        # plan limit: FAILED + prefix) was never attempted, so it is not a
+        # delivery failure (app/services/send_holds.py).
         failed_c = db.execute(
             select(func.count(Message.id)).join(Lead, Lead.id == Message.lead_id)
             .where(Lead.strategy_id == strategy_id,
                    Message.channel == channel,
-                   Message.status.in_([MessageStatus.FAILED, MessageStatus.BOUNCED]))
+                   Message.status.in_([MessageStatus.FAILED, MessageStatus.BOUNCED]),
+                   send_holds.not_held_clause())
         ).scalar_one()
         replied_c = db.execute(
             select(func.count(Outcome.id)).join(Lead, Lead.id == Outcome.lead_id)
@@ -674,6 +679,17 @@ def campaign_overview(
     ).scalar_one()
     wa_stats["needs_template_count"] = needs_attention
 
+    # Messages held because the owner's current plan does not cover them
+    # (app/services/plan_holds.py), with their distinct reasons, so the
+    # campaign page can say why steps are not going out.
+    plan_errors = db.execute(
+        select(Message.error).join(Lead, Lead.id == Message.lead_id)
+        .where(Lead.strategy_id == strategy_id,
+               send_holds.held_clause((send_holds.PLAN_LIMIT_PREFIX,)))
+    ).scalars().all()
+    plan_reasons = sorted({(e or "")[len(send_holds.PLAN_LIMIT_PREFIX):]
+                           for e in plan_errors})
+
     return {
         "strategy_id": str(strategy.id),
         "campaign_state": strategy.campaign_state,
@@ -689,6 +705,7 @@ def campaign_overview(
         "bounce_pause_threshold": compliance_rules.bounce_threshold(db, strategy),
         "meetings_booked": booked,
         "unsubscribed": unsubscribed,
+        "plan_holds": {"count": len(plan_errors), "reasons": plan_reasons[:5]},
     }
 
 

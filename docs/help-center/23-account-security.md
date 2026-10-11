@@ -2,12 +2,13 @@
 id: account-security
 title: Account security, sign-in and API keys
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
   - app/api/auth.py
   - app/services/auth.py
   - app/services/auth_sessions.py
+  - app/services/password_reset.py
   - app/config.py
   - app/core/config.py
   - app/core/rate_limiting.py
@@ -18,6 +19,8 @@ sources:
   - app/services/identity.py
   - app/api/billing.py
   - frontend/src/app/(auth)/login/page.tsx
+  - frontend/src/app/(auth)/forgot-password/page.tsx
+  - frontend/src/app/(auth)/reset-password/page.tsx
   - frontend/src/app/(app)/profile/page.tsx
   - frontend/src/components/settings/WebhooksCard.tsx
   - frontend/src/components/shell/Shell.tsx
@@ -27,7 +30,7 @@ sources:
 
 # Account security, sign-in and API keys
 
-This article covers how signing in works, how long you stay signed in, how to change your password, how personal API keys work, and why an account can be blocked or suspended. It describes the product as it works today, including the security features it does not have yet.
+This article covers how signing in works, how long you stay signed in, how to change or reset your password, how personal API keys work, and why an account can be blocked or suspended. It describes the product as it works today, including the security features it does not have yet.
 
 ## How does signing in work?
 
@@ -55,15 +58,24 @@ These durations are deployment settings; the numbers above are the defaults.
 ## How do I sign out or change my password?
 
 - **Sign out:** use **Log out** in the app's side menu. This ends the session on the server, not just in your browser.
-- **Change password:** open **Profile**, go to **Change password**, enter your **Current password**, your **New password** and **Repeat new password**, then press **Change password**. The new password must be different from the current one. Changing it signs you out on every device, including the one you are using, and you are taken to the sign-in page.
+- **Change password:** open **Profile**, go to **Change password**, enter your **Current password**, your **New password** and **Repeat new password**, then press **Change password**. The new password must be different from the current one. Changing it signs you out on every device, including the one you are using, and you are taken to the sign-in page. It also revokes all your personal API keys, so create new ones afterwards for any integration that needs them.
 
 Password changes are limited to 10 attempts per 15 minutes, so a stolen session cannot be used to guess your old password.
 
-There is no screen that lists your active sessions. To sign out everywhere, change your password.
+There is no screen that lists your active sessions. To sign out everywhere, change your password (or reset it, below): every session ends, and anything signed in with the old password, on any device, is refused from then on.
 
 ## Can I reset a forgotten password or turn on two-factor sign-in?
 
-Not in the app today. LeadPilot has no "forgot password" flow and no two-factor authentication. If you cannot sign in, contact support.
+You can reset a forgotten password yourself:
+
+1. On the sign-in page, press **Forgot password?**.
+2. Enter the email address you sign in with and press **Email me a reset link**.
+3. Open the link in the email, enter your **New password** and **Repeat new password** (at least 8 characters), and press **Set new password**.
+4. Sign in with the new password.
+
+The link works once and expires after 60 minutes. Asking again within a minute sends nothing and keeps your current link working; asking later sends a new link and the older one stops working. Resetting your password signs you out on every device and revokes all your personal API keys. For your security, the page shows the same message whether or not the address has an account, and nothing is sent to an address without one. Reset requests are limited to 10 per 15 minutes, counted per network address and per email address, and an account gets at most one reset email a minute and at most 5 in 24 hours (after that the page still shows the same message, but no email is sent). A suspended account cannot reset its password. The link lifetime is a deployment setting; 60 minutes is the default.
+
+Two-factor sign-in is not available.
 
 ## Why am I told I'm using a VPN?
 
@@ -97,6 +109,7 @@ Facts about keys:
 - A key starts with `lpk_`. LeadPilot stores only a fingerprint (hash) of it, so it cannot show it to you later.
 - A key acts as you on the normal API, but it never works on administrator pages, even if your account is an administrator.
 - A key cannot download your whole account's data; that needs a signed-in person and a password.
+- Changing or resetting your password revokes every key.
 - You can have at most 10 active keys. Revoke one before creating another.
 - Use **Revoke** to disable a key immediately. Revoke any key you no longer need.
 

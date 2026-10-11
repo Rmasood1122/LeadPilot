@@ -2,21 +2,27 @@
 
 ## Enforcement Architecture
 
-Compliance rules are enforced at the **adapter layer** — it is not possible to send a non-compliant message by calling the adapter. The API layer catches `ComplianceError` and returns a 422 with a `compliance_code` field.
+Compliance is enforced in two places. The **send chokepoint** (`app/workers/outreach_tasks.py` `send_message_impl`) re-checks suppression, consent, send windows and caps for every channel, and builds every email through `sequence_engine.build_compliant_email` (headers + visible unsubscribe footer). The **WhatsApp adapter** additionally refuses a non-compliant message itself (`app/integrations/whatsapp.py` raises `ComplianceError`); the Gmail adapter only transports what the send path built. The API layer catches `ComplianceError` and returns a 422 with a `compliance_code` field. *(Corrected 2026-10-11: this said every adapter enforces compliance; the Gmail adapter does not.)*
 
 ---
 
 ## Email (CAN-SPAM / GDPR)
 
+*Corrected 2026-10-11 against the code (platform-gaps item 8,
+help-center-discoveries D6). The earlier rows named a `{unsubscribe_link}`
+template token, a `GMAIL_DAILY_SEND_CAP` of 500, an HMAC token, an adapter-level
+`ComplianceError` and a 20/day warm-up start; none of those is what the code
+does. Line numbers are as of that date.*
+
 | Rule | Implementation |
 |---|---|
-| Unsubscribe header required | `GmailChannel.send()` raises `ComplianceError(MISSING_UNSUBSCRIBE)` if `List-Unsubscribe` header is absent |
-| Unsubscribe link in body | Template renderer checks for `{unsubscribe_link}` token in every email body |
-| Signed unsubscribe token | `GET /unsubscribe?token=...` uses HMAC-SHA256 signed token so non-users can unsubscribe without auth |
-| Suppression checked at send time | `outreach_tasks.send_sequence_step` queries suppression list immediately before calling Gmail API |
-| Bounce rate auto-pause | Bounce rate tracked per campaign; if `bounce_rate > GMAIL_BOUNCE_PAUSE_THRESHOLD` (default 3%), campaign status set to `paused_bounce_rate` |
-| Daily send cap | `GMAIL_DAILY_SEND_CAP` (default 500). Sends above cap are deferred, not dropped |
-| Warm-up | New accounts start at `GMAIL_WARMUP_START_DAILY` (default 20/day), ramping up over 30 days |
+| Unsubscribe headers on every email | `sequence_engine.build_compliant_email` (`app/services/sequence_engine.py:515-531`) adds `List-Unsubscribe` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058). The send path always builds the email through it (`app/workers/outreach_tasks.py` `_render_email_outbound`). `GmailChannel.send()` only transports the pre-built headers (`app/integrations/gmail.py:284-287`); it does not itself raise `MISSING_UNSUBSCRIBE` — that refusal exists only on the debug send endpoint (`app/api/debug.py:269-276`). |
+| Unsubscribe link in body | Not a template token. `build_compliant_email` appends a visible footer, `compliance_footer()` (`sequence_engine.py:507-512`): the configured `SENDER_IDENTITY` plus "Don't want these emails? Unsubscribe instantly: <url>". GDPR/UK and CASL recipients also get a region notice before it (`compliance_audit.region_notice`). |
+| Unsubscribe token | `make_unsubscribe_token` (`sequence_engine.py:496-497`) encrypts `{"lead_id", "purpose": "unsubscribe"}` with the app's Fernet key (`app/core/crypto.py`), so non-users can unsubscribe without signing in. Route: `GET`/`POST /unsubscribe/{token}` (`app/api/unsubscribe.py:54,59`), path parameter, not `?token=`. |
+| Suppression checked at send time | `send_message_impl` re-checks `is_suppressed` immediately before sending (`app/workers/outreach_tasks.py:205`), for every channel. |
+| Bounce rate auto-pause | Above `BOUNCE_RATE_PAUSE_THRESHOLD` (`bounce_rate_pause_threshold`, default 0.03, `app/config.py:113`), after `bounce_min_sends`, the campaign state becomes `paused_bounce_rate` (`sequence_engine.py:618`). A workspace compliance rule may lower the threshold, never raise it. (`GMAIL_BOUNCE_PAUSE_THRESHOLD` in `app/core/config.py` is read by nothing.) |
+| Daily send cap | `GMAIL_DAILY_CAP` (`gmail_daily_cap`, **default 100**, `app/config.py:106`), read by `daily_allowance` (`sequence_engine.py:166`), `compliance_rules` and `mailbox_health`; a compliance rule or a throttled mailbox can only lower it. Sends above the allowance are deferred to the next day's window, not dropped. (`GMAIL_DAILY_SEND_CAP`, default 500, in `app/core/config.py:392` is read by nothing.) |
+| Warm-up | `gmail_warmup_start_sends` (10) plus `gmail_warmup_daily_increment` (10) per day since the account was connected, capped at the daily cap (`sequence_engine.py:165-167`, `app/config.py:107-108`). With the Deliverability Autopilot on, a stepped ramp can lower it further. (`GMAIL_WARMUP_START_DAILY` is read by nothing.) |
 | Reply classification | "stop emailing me", "unsubscribe", "remove me" → classified `unsubscribe_request` → suppression + sequence stop |
 
 ---

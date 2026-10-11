@@ -14,7 +14,7 @@ from app.config import settings
 from app.db import models as m
 from app.services import sequence_engine as engine
 from app.workers.outreach_tasks import send_message_impl
-from tests.conftest import NOW
+from tests.conftest import NOW, entitle_owner
 
 
 def _schedule_step(db, sequence, lead, step_no, when=NOW):
@@ -67,6 +67,7 @@ class TestSkipSemantics:
     def test_all_whatsapp_no_optin_completes_all_skipped_and_flags(
             self, db_session, fake_claude, verified_strategy,
             wa_lead_no_optin, approved_template, fake_channel):
+        entitle_owner(db_session, verified_strategy, m.PlanTier.STARTER)
         seq = m.Sequence(strategy_id=verified_strategy.id,
                          channel=m.ChannelType.WHATSAPP, name="wa-only",
                          status=m.SequenceStatus.ACTIVE)

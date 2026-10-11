@@ -81,6 +81,9 @@ celery_app = Celery(
         "app.workers.pilot_tasks",
         # F10: Champion Tracker sweeps (held re-verification, champion refresh).
         "app.workers.champion_tasks",
+        # Plan holds: release messages a downgrade held once the plan covers
+        # them again (app/services/plan_holds.py).
+        "app.workers.plan_hold_tasks",
     ],
 )
 
@@ -197,6 +200,8 @@ celery_app.conf.task_routes = {
     # F10 Champion Tracker: one Apollo lookup per lead, and a held message is
     # waiting on the first sweep -- NOT behind 144-step builds on `pipeline`.
     "leadpilot.champion.*": {"queue": "default"},
+    # Plan-hold release: short database work; a held campaign waits on it.
+    "leadpilot.plan_holds.*": {"queue": "default"},
 }
 
 celery_app.conf.update(
@@ -463,6 +468,13 @@ celery_app.conf.beat_schedule = {
     "champion-refresh": {
         "task": "leadpilot.champion.refresh",
         "schedule": crontab(hour=4, minute=40),
+    },
+    # Plan holds (app/services/plan_holds.py): every 15 minutes at
+    # :11/:26/:41/:56, clear of the attribution (:05/:20/:35/:50) and champion
+    # (:07/:22/:37/:52) sweeps. Releases holds the owner's plan covers again.
+    "plan-hold-release": {
+        "task": "leadpilot.plan_holds.release",
+        "schedule": crontab(minute="11,26,41,56"),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

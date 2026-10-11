@@ -24,6 +24,7 @@ import { TemplateEditor } from "@/components/campaigns/TemplateEditor";
 import { SentimentTrend } from "@/components/campaigns/SentimentTrend";
 import { SequenceReviewPanel } from "@/components/campaigns/SequenceReviewPanel";
 import { ReviewQueuePanel } from "@/components/campaigns/ReviewQueuePanel";
+import { planHoldNotice } from "@/lib/planHolds";
 import { pct } from "@/lib/utils";
 import { bounceOverThreshold, bouncePauseText } from "@/lib/campaignBounce";
 
@@ -448,6 +449,15 @@ export default function CampaignsPage() {
                     </p>
                   </div>
                   <Button onClick={() => resume()} variant="outline">Resume</Button>
+                </div>
+              )}
+
+              {/* Messages held by the send-time plan check */}
+              {planHoldNotice(campaign.plan_holds) && (
+                <div role="status" data-testid="plan-hold-notice"
+                     className="rounded border border-warning bg-card p-4 text-sm">
+                  <p className="font-medium">Some messages are on hold</p>
+                  <p className="text-muted-foreground">{planHoldNotice(campaign.plan_holds)}</p>
                 </div>
               )}
 

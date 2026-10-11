@@ -6,8 +6,9 @@ copy that could drift. Each function returns exactly the component dict
 /health has always returned -- tests/test_status_public.py::TestHealthUnchanged
 pins /health's response bytes, and was run against the pre-extraction code.
 
-These dicts are INTERNAL. They carry exception text (`error`) and timings,
-which /health has always exposed and /status/public must not. The mapping to
+These dicts carry only fixed strings in `error` -- never exception text, which
+is logged instead (/health is public) -- plus timings, which /health exposes
+and /status/public must not. The mapping to
 the public vocabulary lives in app/api/status_public.py and never forwards a
 string from here.
 
@@ -31,6 +32,8 @@ logger = get_logger("api.health")
 # Celery heartbeat key written by app/workers/beat_heartbeat.py every 60 seconds
 CELERY_HEARTBEAT_KEY = "celery:heartbeat"
 CELERY_HEARTBEAT_TTL_SECONDS = 120  # if key is older than 2 minutes, workers are stale
+# Public text for a heartbeat read that raised (see check_celery_heartbeat).
+CELERY_CHECK_FAILED = "heartbeat check failed"
 
 
 def check_database(db) -> dict[str, Any]:
@@ -61,7 +64,10 @@ async def check_celery_heartbeat(redis) -> dict[str, Any]:
       fresh   {"status": "ok", "last_beat_seconds_ago": N}
       stale   {"status": "degraded", "reason": "heartbeat stale (Ns ago)", "last_beat_seconds_ago": N}
       missing {"status": "degraded", "reason": "no heartbeat key found"}
-      error   {"status": "degraded", "error": "<exception text>"}
+      error   {"status": "degraded", "error": "heartbeat check failed"}
+    The error shape is a FIXED string: /health is public, and exception text
+    can carry hostnames, ports or parser internals. The detail goes to the log
+    (health.celery_check_failed), never to the response.
     The writer sets the key with a 300 s TTL (beat_heartbeat.HEARTBEAT_KEY_TTL),
     so "stale" can only ever cover ages between 120 s and 300 s; older than
     that the key is gone and the result is "missing".
@@ -84,8 +90,9 @@ async def check_celery_heartbeat(redis) -> dict[str, Any]:
             "last_beat_seconds_ago": int(age_seconds),
         }
     except Exception as e:
-        logger.error("health.celery_check_failed", error=str(e))
-        return {"status": "degraded", "error": str(e)}
+        logger.error("health.celery_check_failed", error=str(e),
+                     error_type=type(e).__name__)
+        return {"status": "degraded", "error": CELERY_CHECK_FAILED}
 
 
 # ---------------------------------------------------------------------------

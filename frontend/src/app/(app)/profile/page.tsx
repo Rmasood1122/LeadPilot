@@ -140,7 +140,8 @@ export default function ProfilePage() {
                    value={again} onChange={(e) => setAgain(e.target.value)} />
           </div>
           <p className="text-xs text-muted-foreground">
-            Changing your password signs you out on every device.
+            Changing your password signs you out on every device and revokes your
+            personal API keys.
           </p>
           {pwError && <p role="alert" className="text-sm text-red-600">{pwError}</p>}
           <Button disabled={pwMut.isPending}

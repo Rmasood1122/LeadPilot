@@ -151,7 +151,8 @@ OWNERSHIP: dict[str, list[str]] = {
 }
 
 # Tables deliberately not exported, with the reason. Global tables have no
-# owner column at all; the two token tables hold nothing but one-way hashes.
+# owner column at all; the token tables hold one-way hashes (reset requests
+# are exported through security_audit_events instead).
 EXCLUDED: dict[str, str] = {
     "benchmark_buckets": "global aggregate, no owner",
     "linkedin_suppressions": "global do-not-contact list, no owner",
@@ -164,6 +165,8 @@ EXCLUDED: dict[str, str] = {
     "whatsapp_templates": "global, no owner column",
     "task_errors": "operator diagnostics, no owner column",
     "email_verification_tokens": "one-way token hashes only",
+    "password_reset_tokens": ("one-way token hashes; each request (time, IP) is "
+                              "exported as a security_audit_events row"),
     "phone_verification_codes": "one-way code hashes only",
 }
 

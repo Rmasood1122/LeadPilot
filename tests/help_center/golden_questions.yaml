@@ -206,7 +206,7 @@ answerable:
   style: paraphrase
   question: Can I turn on two-factor authentication?
   expected:
-  - account-security#why-am-i-told-im-using-a-vpn
+  - account-security#can-i-reset-a-forgotten-password-or-turn-on-two-factor-sign-in
 - id: q38
   style: paraphrase
   question: Why does the app say I'm using a VPN?
@@ -379,7 +379,7 @@ answerable:
   style: non_native
   question: i forget my password what i do now
   expected:
-  - account-security#why-am-i-told-im-using-a-vpn
+  - account-security#can-i-reset-a-forgotten-password-or-turn-on-two-factor-sign-in
 - id: s01
   style: starter
   question: What is LeadPilot?

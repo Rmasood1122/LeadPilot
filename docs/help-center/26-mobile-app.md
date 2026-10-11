@@ -54,7 +54,7 @@ The app adds a few things that only make sense on a phone:
 
 - **Push notifications** – see the next question.
 - **Back button** – the Android back button goes back one screen. On a main section (such as Strategies, Campaigns, Analytics or Settings) it asks "Exit LeadPilot?" before closing the app.
-- **Offline banner** – if your phone has no connection, a banner says "No connection" and "Campaigns are still running on the server — you'll be back in sync when connected." If the phone is online but cannot reach LeadPilot's server, it says "Server temporarily unreachable" and "Your campaigns are still running. We'll reconnect automatically."
+- **Offline banner** – if your phone has no connection, a banner says "No connection" and "Scheduled sends run on LeadPilot's servers, not on this device, so losing your connection does not stop them. You'll be back in sync when connected." If the phone is online but cannot reach LeadPilot's server, it says "Server temporarily unreachable" and "We can't reach LeadPilot's server right now, so we can't confirm whether scheduled sends are going out. We'll reconnect automatically." The same banner appears in the web app.
 - **Links** – tapping a notification opens the matching screen in the app.
 - **Status bar colour** follows your chosen theme.
 

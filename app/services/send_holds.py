@@ -1,11 +1,12 @@
 """Send-time HOLDS: one definition of "a message a guard parked for later".
 
-Two guards in the send chokepoint hold a message instead of sending or
+Three guards in the send chokepoint hold a message instead of sending or
 cancelling it: status FAILED, with the guard's prefix on `message.error`, so
 the message is kept, visible and releasable:
 
     F01 Bounce Shield    'bounce_shield: '     (app/services/bounce_shield.py)
     F10 Champion Tracker 'champion_tracker: '  (app/services/champion_tracker.py)
+    Plan entitlement     'plan_limit: '        (app/services/plan_holds.py)
 
 A held message is still the message for its step. Everything that asks "is a
 step already pending for this enrollment?" (the follow-up sweep in
@@ -31,7 +32,9 @@ from app.db.models import Message, MessageStatus
 # Each guard asserts its own ERROR_PREFIX is listed (tests/test_champion_tracker.py).
 BOUNCE_SHIELD_PREFIX = "bounce_shield: "        # F01
 CHAMPION_TRACKER_PREFIX = "champion_tracker: "  # F10
-HOLD_PREFIXES: tuple[str, ...] = (BOUNCE_SHIELD_PREFIX, CHAMPION_TRACKER_PREFIX)
+PLAN_LIMIT_PREFIX = "plan_limit: "              # plan downgrade (plan_holds.py)
+HOLD_PREFIXES: tuple[str, ...] = (BOUNCE_SHIELD_PREFIX, CHAMPION_TRACKER_PREFIX,
+                                  PLAN_LIMIT_PREFIX)
 
 # A message in one of these states IS the step: a held copy of it is redundant.
 _LIVE = (MessageStatus.SCHEDULED, MessageStatus.SENDING, MessageStatus.SENT,
@@ -49,6 +52,14 @@ def held_clause(prefixes: tuple[str, ...] = HOLD_PREFIXES):
 #: A message that is the step and will still go out (or is going out now).
 PENDING_STATUSES = (MessageStatus.SCHEDULED, MessageStatus.SENDING,
                     MessageStatus.AWAITING_REVIEW)
+
+
+def not_held_clause(prefixes: tuple[str, ...] = HOLD_PREFIXES):
+    """SQL: this message is NOT held. Spelled out instead of ~held_clause()
+    because a NULL `error` makes the negated LIKE NULL, which would drop
+    ordinary failures (error NULL) from a count."""
+    return or_(Message.status != MessageStatus.FAILED, Message.error.is_(None),
+               and_(*[~Message.error.like(f"{p}%") for p in prefixes]))
 
 
 def pending_clause():

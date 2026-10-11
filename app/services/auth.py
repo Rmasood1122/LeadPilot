@@ -196,10 +196,18 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
             raise HTTPException(status_code=401, detail="invalid or revoked API key")
         request.state.auth_via = "api_key"
     else:
-        user_id = decode_token(token, "access")
-        user = db.get(User, user_id)
+        claims = decode_token_payload(token, "access")
+        user = db.get(User, uuid.UUID(claims["sub"]))
         if user is None:
             raise HTTPException(status_code=401, detail="user not found")
+        # A password change or reset signs out every device: an access token
+        # minted before it is refused now, not when it expires.
+        from app.services.auth_sessions import (  # noqa: PLC0415
+            _issued_before_password_change,
+        )
+
+        if _issued_before_password_change(user, claims):
+            raise HTTPException(status_code=401, detail="session expired")
     # GDPR erasure (app/services/account_erasure.py): an erased account is a
     # tombstone row, not a missing one, so an access token issued before the
     # erasure would still resolve. It gets the same answer as a missing user

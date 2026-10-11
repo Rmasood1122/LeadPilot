@@ -236,6 +236,11 @@ class Settings(BaseSettings):
     # Verification token lifetime. 24h is the product requirement; it is a
     # setting so an expiry test does not have to wait a day.
     email_verification_ttl_hours: int = 24
+    # Password-reset link lifetime (app/services/password_reset.py). Short on
+    # purpose: a live reset link is an account-takeover credential sitting in
+    # an inbox. 60 minutes is long enough for a slow mail relay and a person
+    # who steps away; a setting so the expiry test does not have to wait.
+    password_reset_ttl_minutes: int = 60
 
     # --- AI support chat (Feature 3) ---------------------------------------
     # AI_MODE — console | mock | live. EMPTY MEANS AUTO, and auto is the

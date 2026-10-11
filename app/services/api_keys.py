@@ -71,6 +71,20 @@ def revoke(db: Session, user_id, key_id) -> bool:
     return True
 
 
+def revoke_all_for_user(db: Session, user_id, now: datetime | None = None) -> int:
+    """Revoke every live key of ONE account (password change / reset: a key
+    is a credential that must not outlive the password). Does not commit."""
+    from sqlalchemy import update  # noqa: PLC0415
+
+    result = db.execute(
+        update(ApiKey)
+        .where(ApiKey.user_id == user_id, ApiKey.revoked_at.is_(None))
+        .values(revoked_at=now or datetime.now(timezone.utc))
+        .execution_options(synchronize_session="fetch")
+    )
+    return int(result.rowcount or 0)
+
+
 def out(row: ApiKey) -> dict:
     return {
         "id": str(row.id), "name": row.name, "prefix": row.prefix,

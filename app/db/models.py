@@ -486,9 +486,19 @@ class User(TimestampMixin, Base):
     phone_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Migration 0081: when the password was last changed or reset. Every
+    # refresh token (and access token) issued before it is refused
+    # (auth_sessions._issued_before_password_change), legacy session-less
+    # tokens included -- "signed out on every device" is enforced, not hoped.
+    password_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     products: Mapped[list["Product"]] = relationship(back_populates="user")
     email_verification_tokens: Mapped[list["EmailVerificationToken"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    password_reset_tokens: Mapped[list["PasswordResetToken"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
     tutorial_progress: Mapped[list["TutorialProgress"]] = relationship(
@@ -785,6 +795,43 @@ class EmailVerificationToken(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="email_verification_tokens")
+
+
+class PasswordResetToken(Base):
+    """One emailed "reset your password" link (migration 0081).
+
+    Same storage rule as EmailVerificationToken, for a stronger reason: a reset
+    link sets a new password, so it is a full account-takeover credential while
+    it lives. Only sha256(token) is stored; the raw value exists in the email
+    and in the confirm request, nowhere else.
+
+    Single use and short-lived: `used_at` is stamped on a successful reset AND
+    on every outstanding link when a new one is issued or a reset succeeds, so
+    at most one link per account can ever work, and only until `expires_at`
+    (PASSWORD_RESET_TTL_MINUTES, default 60). See app/services/password_reset.py.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True,
+                                            nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Where the request came from, for the account owner's security review.
+    requested_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user: Mapped["User"] = relationship(back_populates="password_reset_tokens")
 
 
 class Product(TimestampMixin, Base):
