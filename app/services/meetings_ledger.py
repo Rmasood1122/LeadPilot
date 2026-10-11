@@ -651,6 +651,13 @@ def to_pdf(ledger: dict) -> bytes:
     """A readable one-to-several page summary. ASCII only (see _ascii)."""
     from app.services.audit_trail import render_lines_pdf  # noqa: PLC0415
 
+    return render_lines_pdf(pdf_lines(ledger))
+
+
+def pdf_lines(ledger: dict) -> list[tuple[str, str]]:
+    """The (text, style) lines of `to_pdf`. Public so F09's verdict PDF can
+    put its verdict above the same ledger body without re-deriving it. Uses
+    only the aggregate keys (not `events`), so a stored snapshot renders."""
     cur = ledger["currency"]
     t = ledger["totals"]
     rec = ledger["reconciliation"]
@@ -718,4 +725,4 @@ def to_pdf(ledger: dict) -> bytes:
                 current = "    "
             current += word + " "
         add(current.rstrip())
-    return render_lines_pdf(lines)
+    return lines

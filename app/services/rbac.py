@@ -32,9 +32,10 @@ PERSONAL_PREFIXES = ("/auth", "/me", "/devices", "/support", "/tutorials", "/onb
                      # Section E: a member buys/cancels only for their own account.
                      "/billing")
 
-# Writes an SDR may not make: account plumbing and money.
+# Writes an SDR may not make: account plumbing and money. F09: starting or
+# ending a 30-day pilot is a commercial evaluation decision (a manager's).
 SDR_BLOCKED_PREFIXES = ("/integrations", "/webhooks/outbound", "/webhooks/targets", "/costs",
-                        "/admin", "/playbook")
+                        "/admin", "/playbook", "/pilots")
 
 
 def is_personal(path: str) -> bool:
@@ -58,6 +59,6 @@ def enforce(role: str, method: str, path: str) -> None:
                                 detail="Deleting needs a manager in this workspace.")
         if any(path == p or path.startswith(p + "/") for p in SDR_BLOCKED_PREFIXES):
             raise HTTPException(status_code=403,
-                                detail="Integrations, webhooks and costs need a manager.")
+                                detail="Integrations, webhooks, costs and pilots need a manager.")
     if role not in RANK:
         raise HTTPException(status_code=403, detail="Unknown workspace role.")

@@ -152,6 +152,7 @@ ledger = meetings_ledger.build_ledger(db, user_id, date_from, date_to,
                                       strategy_ids=[...] | None)
 meetings_ledger.to_csv(ledger, view="campaigns")   # -> str
 meetings_ledger.to_pdf(ledger)                     # -> bytes
+meetings_ledger.pdf_lines(ledger)                  # -> [(text, style)], the body to_pdf renders (F09)
 ```
 
 `build_ledger` does not check the flag (F09 decides its own gating) and does

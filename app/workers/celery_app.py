@@ -77,6 +77,8 @@ celery_app = Celery(
         "app.workers.quickstart_tasks",
         # F07: Spend Guard 50/80/100% alert sweep.
         "app.workers.spend_guard_tasks",
+        # F09: 30-Day Pilot Mode -- hourly scorecard / verdict sweep.
+        "app.workers.pilot_tasks",
     ],
 )
 
@@ -187,6 +189,9 @@ celery_app.conf.task_routes = {
     # starts). Its lead chain is published to `default` per signature -- see
     # app/workers/quickstart_tasks.py.
     "leadpilot.quickstart.*": {"queue": "default"},
+    # F09 Pilot Mode: short per-pilot database work + at most one
+    # transactional email per pilot -- account mail, like invitations.
+    "app.workers.pilot_tasks.*": {"queue": "default"},
 }
 
 celery_app.conf.update(
@@ -424,6 +429,15 @@ celery_app.conf.beat_schedule = {
     "sweep-spend-alerts": {
         "task": "app.workers.spend_guard_tasks.sweep_spend_alerts",
         "schedule": 900.0,
+    },
+    # F09: end pilots whose 30 days are over (verdict), send the weekly
+    # scorecard once per pilot per week, send the verdict notice. Hourly at
+    # :55 -- clear of the :05/:20/:35/:50 attribution sweep whose entries the
+    # verdict reads, and of the :25/:40 hourly sweeps. A no-op while
+    # pilot_mode_enabled is off.
+    "pilot-mode-sweep": {
+        "task": "app.workers.pilot_tasks.run_pilot_sweep",
+        "schedule": crontab(minute=55),
     },
     # NOTE: outbound webhook retries (M8-C5) self-schedule via apply_async
     # countdown inside deliver_webhook — no beat sweep needed.

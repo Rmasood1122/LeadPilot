@@ -842,6 +842,10 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
 - Tutorial catalogue with progress tracking
 - Theme engine — every colour a CSS variable, user-configurable
 - Offline banner, pull-to-refresh, safe-area handling, deep links (mobile)
+- 30-Day Pilot Mode (F09, flag `pilot_mode_enabled`, off by default): success
+  criteria locked on day 1, weekly scorecard email to the owner, day-30 verdict
+  from the meetings-per-dollar ledger, verdict PDF/CSV + full account export;
+  never changes a plan or billing (`docs/features/f09-pilot-mode.md`)
 </details>
 
 **Totals:** 166 API routes · 24 migrations · ~30,000 lines of backend Python
