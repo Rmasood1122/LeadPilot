@@ -23,7 +23,7 @@ const STEPS = [
   },
   {
     title: "Outreach",
-    body: "Personalised sequences across email and LinkedIn send automatically from the accounts you connect, within permitted sending hours and daily per-account limits. By default, high-risk messages, such as those to senior executives or to prospects who last replied with an objection, are held for your approval before they send.",
+    body: "Personalised sequences across email and LinkedIn send automatically from the accounts you connect once you approve that day's automatic sending, within permitted sending hours and daily per-account limits. By default, high-risk messages, such as those to senior executives or to prospects who last replied with an objection, are held for your approval before they send.",
   },
   {
     title: "Learning",
