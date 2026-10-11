@@ -53,3 +53,15 @@ files:
   - tests/test_privacy_docs_truth.py
   # Account takeover recovery: reset signs out every device, single-use links
   - tests/test_password_reset.py
+  # Extended 2026-10-12 (gate PR, justification in
+  # docs/program/plans/phase5-seal-1012-guards.md).
+  # A closed lead (won/lost/disqualified/removed/erased) is never sent a sequence step
+  - tests/test_closed_lead_guard.py
+  # One-click List-Unsubscribe / List-Unsubscribe-Post reach the wire raw (RFC 8058, CAN-SPAM)
+  - tests/test_unsubscribe_headers_raw.py
+  # Launch / Autopilot opt-in need the server-side lawful-basis confirmation, audited
+  - tests/test_launch_lawful_basis.py
+  # Best-time placement never leaves the permitted / compliance-rule send window
+  - tests/test_best_time_window_guard.py
+  # Customer win-back: consent-only, never to opted-out people, never by phone, never healthcare
+  - tests/test_customer_winback_guards.py
