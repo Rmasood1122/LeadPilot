@@ -100,8 +100,17 @@ def extract_icp_criteria(session: Session, strategy: Strategy) -> dict:
     research = "\n\n".join(
         f"[Phase {r.phase} / Step {r.step_no}: {r.name}]\n{r.output}" for r in rows
     ) or "(no ICP research found — derive nothing, return empty lists)"
+    # Local business mode: the buyers are LOCAL businesses -- the extraction
+    # sees the same context block the research did, and the result is then
+    # narrowed to the service area (apply_to_criteria). No extra model call.
+    from app.services import local_business  # noqa: PLC0415
 
-    criteria = criteria_from_research(research)
+    local = local_business.block_for_strategy(session, strategy)
+    if local:
+        research = f"{local}\n\n{research}"
+
+    criteria = local_business.apply_to_criteria(
+        session, strategy, criteria_from_research(research))
     logger.info("ICP criteria extracted for strategy %s: %s", strategy.id, criteria)
     return criteria
 

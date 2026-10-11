@@ -356,6 +356,13 @@ def staleness_hold(db: Session, lead: Lead, now: datetime | None = None) -> str 
     """Why a message to this lead must wait for a role check, or None. Pure
     read: no provider call, ever, in the send path."""
     now = now or _now()
+    # Local business mode: an imported customer is a consumer, not a role at a
+    # company -- there is no role to go stale, and their data must never be
+    # sent to a provider for a role check.
+    from app.services.local_business import CUSTOMER_SOURCE  # noqa: PLC0415
+
+    if lead.source == CUSTOMER_SOURCE:
+        return None
     rc = role_check(lead)
     if rc.get("state") == TITLE_CHANGED:
         return (f"the title on record ({lead.title or 'none'}) differs from the provider's "
@@ -641,6 +648,11 @@ def reverify(db: Session, lead: Lead, source, verifier=None, *, trigger: str,
 
     Returns {"outcome", "released", "move_id"?}. Commits."""
     now = now or _now()
+    # Local business mode: a business's imported customer is never looked up.
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    if is_customer(lead):
+        return {"outcome": "customer", "released": 0}
     inactive = inactive_reason(lead)
     if inactive:
         # An erased or dropped person is never looked up and never written to.
@@ -1259,6 +1271,13 @@ def champion_lead_ids(db: Session, owner) -> set[uuid.UUID]:
     ids |= set(db.execute(select(Lead.id).where(
         Lead.id.in_(owned), Lead.source == LEAD_SOURCE)).scalars())
     ids.discard(None)
+    # Local business mode: imported customers (consumers) are never champions
+    # and are never re-checked against a provider.
+    from app.services.local_business import CUSTOMER_SOURCE  # noqa: PLC0415
+
+    if ids:
+        ids -= set(db.execute(select(Lead.id).where(
+            Lead.id.in_(ids), Lead.source == CUSTOMER_SOURCE)).scalars())
     return ids
 
 

@@ -83,6 +83,10 @@ def _strategy_out(db: Session, strategy: Strategy) -> StrategyOut:
     out.budget_usd = (strategy.budget_micros / 1_000_000
                       if strategy.budget_micros is not None else None)
     out.spent_usd = usage_meter.spent_micros(db, strategy.id) / 1_000_000
+    product = db.get(Product, strategy.product_id)
+    out.business_type = product.business_type if product is not None else None
+    out.service_area = strategy.service_area_json
+    out.local_offer = strategy.local_offer
     return out
 
 
@@ -167,6 +171,8 @@ def create_strategy(
     # After the ownership check, so a foreign product id is 404 whatever the
     # count.
     check_new_strategy_allowed(db, current_user)
+    service_area, local_offer = local_context_or_422(db, product, body.service_area,
+                                                     body.local_offer)
 
     has_clients = (
         db.execute(
@@ -189,7 +195,8 @@ def create_strategy(
     # F07: forecast first; refused (429) before anything is created.
     forecast = spend_guard_api.guard_new_strategy(db, current_user, flow_type, steps_per_phase)
     strategy = Strategy(product_id=product.id, flow_type=flow_type,
-                        budget_micros=budget_micros, steps_per_phase=steps_per_phase)
+                        budget_micros=budget_micros, steps_per_phase=steps_per_phase,
+                        service_area_json=service_area, local_offer=local_offer)
     db.add(strategy)
     db.commit()
     db.refresh(strategy)
@@ -199,6 +206,29 @@ def create_strategy(
 
     worker_tasks.run_pipeline.delay(str(strategy.id))
     return _strategy_out(db, strategy)
+
+
+def local_context_or_422(db: Session, product: Product, service_area,
+                         local_offer: str | None) -> tuple[dict | None, str | None]:
+    """Local business mode: validate a strategy's service area and offer.
+
+    422 when either is given but the flag is off or the product has no
+    business type. The ServiceArea model has already validated the area's
+    shape (country, city/postcode, radius bounds, time zone)."""
+    offer = (local_offer or "").strip() or None
+    if service_area is None and offer is None:
+        return None, None
+    from app.services import local_business  # noqa: PLC0415
+
+    if not local_business.enabled(db):
+        raise HTTPException(status_code=422, detail=local_business.LOCAL_MODE_DISABLED)
+    if product.business_type is None:
+        raise HTTPException(
+            status_code=422,
+            detail="a service area or local offer needs the product to be a local "
+                   "business first (business_type on the product)")
+    area = service_area.model_dump() if service_area is not None else None
+    return area, offer
 
 
 def check_new_strategy_allowed(db: Session, current_user: User) -> None:

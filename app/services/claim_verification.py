@@ -213,6 +213,13 @@ def _sender_vocabulary(session: Session, strategy: Strategy | None) -> str:
         product = session.get(Product, strategy.product_id)
         if product is not None:
             parts += [product.name or "", product.description or ""]
+        # Local business mode: the sender's own area and offer are facts about
+        # the SENDER, never claims about the prospect. "" for other products.
+        from app.services import local_business  # noqa: PLC0415
+
+        local = local_business.sender_vocabulary(session, strategy)
+        if local:
+            parts.append(local)
     return " ".join(parts).lower()
 
 

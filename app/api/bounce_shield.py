@@ -24,6 +24,7 @@ from app.api.deps import get_current_user
 from app.api.leads import _owned_lead
 from app.config import settings
 from app.core.rate_limiting import enforce_rate_limit
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import Lead, User
 from app.services import bounce_shield, rbac
@@ -96,6 +97,7 @@ def refresh_email_verdict(lead_id: uuid.UUID, request: Request,
     # a paid verification. FastAPI has already validated the path by now.
     enforce_rate_limit(str(current_user.id), "bounce_shield_refresh", "RATE_LIMIT_AI_ACTION")
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "Email verification at a provider")
     if not (bounce_shield.enabled(db) or wf.enabled(db)):
         raise HTTPException(status_code=409,
                             detail="Waterfall enrichment and Bounce Shield are both off.")

@@ -323,9 +323,23 @@ def enroll_leads(
         address = Lead.phone.isnot(None)
     else:
         address = Lead.email.isnot(None)
+    # Local business mode, Part B -- SAFETY GUARD: the two audiences never mix.
+    # A customer (win-back) sequence enrolls only the business's imported,
+    # opted-in customers (any status but removed/disqualified -- they are not
+    # email-verified prospects); every other sequence never enrolls them. The
+    # send path re-checks this (local_business.customer_send_block).
+    from app.services import local_business  # noqa: PLC0415
+
+    customers = getattr(sequence, "audience", None) == local_business.AUDIENCE_CUSTOMERS
+    if customers:
+        who = (Lead.source == local_business.CUSTOMER_SOURCE,
+               Lead.status.not_in((LeadStatus.DROPPED, LeadStatus.DISQUALIFIED)))
+    else:
+        who = (Lead.status.in_(lead_statuses),
+               Lead.source != local_business.CUSTOMER_SOURCE)
     query = select(Lead).where(
         Lead.strategy_id == sequence.strategy_id,
-        Lead.status.in_(lead_statuses),
+        *who,
         address,
     )
     if lead_ids is not None:
@@ -372,7 +386,10 @@ def enroll_leads(
     # already succeeded. Leads already carrying a score are left alone.
     from app.services import fpta_scoring  # noqa: PLC0415
 
-    fpta_scoring.score_for_enrollment(session, enrolled_ids, now=now)
+    # Not for customers: F-P-T-A is a B2B prospect score (a model call about
+    # the person); a consumer's own-customer record is never profiled.
+    if not customers:
+        fpta_scoring.score_for_enrollment(session, enrolled_ids, now=now)
     return enrolled
 
 

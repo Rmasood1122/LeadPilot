@@ -122,6 +122,12 @@ class SequenceCreate(BaseModel):
     channel: ChannelType = ChannelType.EMAIL
     booking_url: str | None = Field(default=None, max_length=500)
     steps: list[StepIn] = Field(min_length=1, max_length=SEQUENCE_STEP_CAP)
+    # Local business mode, Part B: "customers" = a win-back sequence for the
+    # business's own opted-in customers (flag customer_winback_enabled).
+    audience: Literal["prospects", "customers"] = Field(
+        default="prospects",
+        description="prospects (B2B leads, the default) or customers (win-back to "
+                    "the business's own opted-in customers)")
 
 
 class StepOut(StepIn):
@@ -138,6 +144,7 @@ class SequenceOut(BaseModel):
     status: SequenceStatus
     booking_url: str | None
     steps: list[StepOut]
+    audience: str = "prospects"
 
 
 class EnrollRequest(BaseModel):
@@ -283,13 +290,39 @@ def create_sequence(
                 detail=f"step {s.step_no}: variable_mapping must cover "
                        f"exactly the template's variables {sorted(expected)}") from exc
 
+    # Local business mode, Part B -- LEGAL GUARD: a customer (win-back)
+    # sequence needs the flag and a non-healthcare local business; it sends by
+    # email or approved WhatsApp template only, owner-written copy with the
+    # allowed placeholders, deterministic template variables, and no automatic
+    # no-reply follow-ups (docs/features/local-business-mode.md).
+    if body.audience == "customers":
+        from app.services import local_business  # noqa: PLC0415
+
+        product = db.get(Product, strategy.product_id)
+        try:
+            local_business.refuse_unless_import_allowed(db, product)
+        except local_business.ImportRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail)
+        problems: list[str] = []
+        for s in body.steps:
+            tmpl = (db.get(WhatsAppTemplate, s.whatsapp_template_id)
+                    if s.whatsapp_template_id else None)
+            problems += local_business.customer_step_errors(
+                s.step_no, s.channel or body.channel, s.template, s.whatsapp_kind,
+                s.variable_mapping,
+                expected_vars=(tmpl.variable_descriptions_json or {}) if tmpl else {})
+        if problems:
+            raise HTTPException(status_code=422, detail="; ".join(problems))
+        for s in body.steps:
+            s.followup_enabled = False
+
     # Plan (402) after every shape check (422), so a malformed request is told
     # what is wrong with it before being told to upgrade.
     _enforce_plan(current_user, [s.channel or body.channel for s in body.steps],
                   len(body.steps))
     sequence = Sequence(strategy_id=strategy.id, name=body.name,
                         channel=body.channel, booking_url=body.booking_url,
-                        status=SequenceStatus.DRAFT)
+                        status=SequenceStatus.DRAFT, audience=body.audience)
     db.add(sequence)
     db.flush()
     for s in body.steps:
@@ -669,13 +702,19 @@ def update_followup_settings(
     date, so shortening the delay releases messages that were already overdue
     under the new setting instead of only applying to sends from here on.
     """
-    _owned_sequence(db, sequence_id, current_user)
+    sequence = _owned_sequence(db, sequence_id, current_user)
     step = db.execute(
         select(SequenceStep).where(SequenceStep.sequence_id == sequence_id,
                                    SequenceStep.step_no == step_no)
     ).scalars().first()
     if step is None:
         raise HTTPException(status_code=404, detail="sequence step not found")
+    if sequence.audience == "customers":
+        # Local business mode: automatic (model-written) follow-ups are never
+        # sent to a business's own customers -- not even switched on later.
+        raise HTTPException(status_code=409,
+                            detail="automatic follow-ups are not available on a "
+                                   "customer (win-back) sequence")
 
     if body.enabled is not None:
         step.followup_enabled = body.enabled

@@ -380,6 +380,14 @@ Every single send runs this gauntlet, in this order:
 2. **Campaign state.** A paused campaign sends nothing.
 3. **Enrollment state.** `STOPPED` cancels the message outright. `PAUSED` defers.
 4. **Suppression, re-checked now.** Not at scheduling time. Now.
+   Right after it, **customer win-back** (local business mode, safety guard,
+   every channel): a business prospect in a customer (win-back) sequence, or an
+   imported customer in a prospect sequence, is cancelled; a customer message
+   also needs `customer_winback_enabled` (default **off**), email or WhatsApp,
+   a non-healthcare local business (HIPAA), and for email a current opt-in in
+   the consent ledger. Cancelled = audited `blocked_winback`, sequence stopped;
+   a lookup error defers an hour (fails closed)
+   (`app/services/local_business.py::customer_send_block`).
    Then, **F01 Bounce Shield** (flag `bounce_shield_enabled`, default off; a
    safety guard): an email goes only to an address verified valid within
    `bounce_shield_max_age_days`, a catch-all one under an explicit `allow`
@@ -840,6 +848,21 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
   kept in the consent ledger
 - Kanban pipeline board with validated status transitions
 - Manual lead CRUD; batch resume from any stage
+- Local business mode (flag `local_business_mode_enabled`, on by default):
+  a product can be a restaurant/café/caterer, clinic/hospital/healthcare
+  practice, retail/local shop, salon/fitness/local service or other local
+  business, and a strategy can carry a service area (city or postcode,
+  country, 0.5-50 mi / 1-80 km) and an offer. Research steps, ICP extraction
+  and outreach prompts get the local B2B plays and hard limits (business
+  buyers only, no invented distances, no patient data); lead search uses the
+  service area as the location (the radius is not sent to Apollo).
+  `strategy.business_type` and `send_time_profile()` expose recommended local
+  send windows for a scheduler. Customer win-back (flag
+  `customer_winback_enabled`, off by default): a local business's OWN
+  customers imported from CSV with a recorded opt-in per channel (email /
+  WhatsApp only; no SMS or calls; rows without consent refused; healthcare
+  refused outright), sent owner-written copy through every send gate
+  (`docs/features/local-business-mode.md`)
 </details>
 
 <details open>

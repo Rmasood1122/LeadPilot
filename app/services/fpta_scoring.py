@@ -383,6 +383,11 @@ def score_leads(session: Session, strategy: Strategy, leads: list[Lead],
     it never blocks an enrollment.
     """
     now = now or _now()
+    # Local business mode: a business's imported customers are consumers and
+    # are never scored (no model call about them, whoever calls this).
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    leads = [lead for lead in leads if not is_customer(lead)]
     if not leads:
         return 0
     icp = strategy.pattern_inputs_json or {}

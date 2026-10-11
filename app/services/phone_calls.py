@@ -124,8 +124,12 @@ def e164(phone: str | None) -> str | None:
 
 
 def consent_ok(session: Session, lead: Lead) -> bool:
-    from app.services import system_settings  # noqa: PLC0415
+    from app.services import local_business, system_settings  # noqa: PLC0415
 
+    # Local business mode: no phone consent ever counts for a business's own
+    # customer -- calls are not a customer channel (channel_refusal).
+    if local_business.channel_refusal(lead, "phone"):
+        return False
     if not system_settings.get(session, "phone_require_consent"):
         return True
     return lead.phone_consent_at is not None

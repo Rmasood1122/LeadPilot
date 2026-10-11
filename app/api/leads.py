@@ -28,6 +28,7 @@ from app.db.models import (
     StrategyStatus, SuppressionEntry, User,
 )
 from app.services import fpta_scoring
+from app.services import local_business
 from app.services.icp_extraction import ensure_pattern_key, extract_icp_criteria
 from app.workers import lead_tasks
 
@@ -105,7 +106,13 @@ def source_leads_for_strategy(
 
     # P0-5b: both extractions are model calls on the account's daily limit.
     with metered(db, current_user, "icp"):
-        criteria = body.icp_criteria or extract_icp_criteria(db, strategy)
+        if body.icp_criteria:
+            # Local business mode: explicit criteria keep their own locations;
+            # an empty list is filled from the service area (no model call).
+            criteria = local_business.apply_to_criteria(db, strategy, body.icp_criteria,
+                                                        explicit=True)
+        else:
+            criteria = extract_icp_criteria(db, strategy)
 
         # Bind this strategy to its playbook bucket. Sourcing is the first moment
         # the ICP is concrete, and every learning-loop query filters on
@@ -253,6 +260,7 @@ def rescore_lead_fpta(
     written and `method` says `heuristic`, which is a usable score."""
     enforce_rate_limit(str(current_user.id), "fpta_rescore", "RATE_LIMIT_AI_ACTION")
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "F-P-T-A scoring")
     with metered(db, current_user, "lead_scoring", refuse_after=False):
         fpta_scoring.score_lead(db, lead)
         return {"lead_id": str(lead.id), **fpta_scoring.detail(lead),
@@ -273,7 +281,9 @@ def rescore_strategy_fpta(
     score someone has already read and acted on."""
     enforce_rate_limit(str(current_user.id), "fpta_rescore", "RATE_LIMIT_AI_ACTION")
     strategy = _owned_strategy(db, strategy_id, current_user)
-    where = [Lead.strategy_id == strategy_id, Lead.status.in_(fpta_scoring.SCORABLE)]
+    where = [Lead.strategy_id == strategy_id, Lead.status.in_(fpta_scoring.SCORABLE),
+             # Imported customers are consumers: never scored (local business).
+             Lead.source != local_business.CUSTOMER_SOURCE]
     if only_unscored:
         where.append(Lead.fpta_scored_at.is_(None))
     leads = db.execute(select(Lead).where(*where).limit(limit)).scalars().all()

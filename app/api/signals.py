@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import Lead, Product, Strategy, User
 from app.services import signal_radar, system_settings
@@ -63,6 +64,7 @@ def refresh_lead_signals(lead_id: uuid.UUID, db: Session = Depends(get_db),
     """Re-derive from what is already stored on the lead and its strategy. This
     never calls a vendor -- posts and news are refreshed by the send path."""
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "Signal Radar")
     if not signal_radar.enabled(db):
         raise HTTPException(status_code=409, detail="Signal Radar is turned off")
     result = signal_radar.refresh(db, lead, owner_id=current_user.id)

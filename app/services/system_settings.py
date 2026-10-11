@@ -427,6 +427,26 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     "best_time_min_sends": (30, "Sends on a channel an account needs before "
                             "its own reply rates by hour are blended into "
                             "best-time scheduling."),
+    # Local business mode (docs/features/local-business-mode.md). ON by
+    # default: it only changes targeting and prompt context for BUSINESS
+    # buyers near a local business (no new send path, no consumer contact).
+    # Off = business type / service area are refused and ignored.
+    "local_business_mode_enabled": (True, "Let a product be a local business "
+                                    "(restaurant, clinic, shop, local service) "
+                                    "with a service area: research, lead "
+                                    "search and messages target BUSINESS "
+                                    "buyers near it. Business buyers only."),
+    # Customer win-back (same spec, Part B). OFF by default until founder/legal
+    # confirm the consent readings: it messages CONSUMERS (the business's own
+    # customers) on a recorded opt-in basis. Healthcare is refused whatever
+    # this says (HIPAA).
+    "customer_winback_enabled": (False, "Let a local business import its OWN "
+                                 "customers with recorded opt-in consent and "
+                                 "send them simple win-back email / WhatsApp "
+                                 "template campaigns through every send "
+                                 "check. Healthcare businesses are always "
+                                 "refused. Off = imports refused and queued "
+                                 "win-back messages cancelled."),
 }
 
 

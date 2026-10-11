@@ -844,6 +844,12 @@ def auto_send_decision(session: Session, draft: ReplyDraft, generated: dict) -> 
     if draft.claim_flags_json:
         return "claim_verification_changed_the_draft"
     lead = session.get(Lead, draft.lead_id)
+    # Local business mode: a business's own customer (a consumer) is only ever
+    # answered by a person -- never automatically.
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    if is_customer(lead):
+        return "customer_needs_a_person"
     reply = session.get(InboundReply, draft.reply_id)
     enrollment = _send_enrollment(session, lead, _answered_message(session, reply))
     # The routing stops the sequence for this reply; until it has, its own

@@ -206,6 +206,10 @@ def score_leads(session: Session, strategy: Strategy, leads: list[Lead],
     from app.db.models import Product  # noqa: PLC0415
 
     now = now or _now()
+    # Local business mode: imported customers (consumers) are never scored.
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    leads = [lead for lead in leads if not is_customer(lead)]
     if not leads:
         return 0
     icp = strategy.pattern_inputs_json or {}

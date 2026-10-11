@@ -19,6 +19,19 @@ import {
   createStrategy,
 } from "@/lib/api/strategies";
 import { ApiError } from "@/lib/api/client";
+import {
+  BUSINESS_TYPES,
+  INITIAL_LOCAL,
+  RADIUS_NOTE,
+  businessTypeBody,
+  businessTypeLabel,
+  describeArea,
+  localErrors,
+  strategyLocalBody,
+  type BusinessType,
+  type DistanceUnit,
+  type LocalDraft,
+} from "@/lib/localBusiness";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label, Textarea } from "@/components/ui/input";
@@ -37,12 +50,16 @@ export default function IntakeWizard() {
   async function launch() {
     setBusy(true);
     try {
-      const product = await createProduct(state.product);
+      const businessType = businessTypeBody(state.local);
+      const product = await createProduct(
+        businessType ? { ...state.product, business_type: businessType } : state.product,
+      );
       if (state.hasPastClients && state.clients.length) {
         await addPastClients(product.id, state.clients);
       }
       const strategy = await createStrategy(
-        product.id, !!state.hasPastClients, optInBody(autopilot, lawful, basis.data));
+        product.id, !!state.hasPastClients, optInBody(autopilot, lawful, basis.data),
+        strategyLocalBody(state.local));
       toast("Strategy created — research pipeline started", "success");
       router.push(`/strategies/detail?id=${strategy.id}`);
     } catch (err) {
@@ -50,6 +67,11 @@ export default function IntakeWizard() {
       setBusy(false);
     }
   }
+
+  const local = state.local ?? INITIAL_LOCAL;
+  const setLocal = (patch: Partial<LocalDraft>) =>
+    setState((s) => ({ ...s, local: { ...(s.local ?? INITIAL_LOCAL), ...patch } }));
+  const localProblems = localErrors(state.local);
 
   const setClient = (i: number, field: "details" | "acquisition_story", v: string) =>
     setState((s) => ({
@@ -85,6 +107,69 @@ export default function IntakeWizard() {
                 </label>
               ))}
             </fieldset>
+            <div className="space-y-1">
+              <Label htmlFor="business-type">Is this a local business?</Label>
+              <select id="business-type" value={local.businessType}
+                      className="flex h-10 w-full rounded border border-border bg-card px-3 py-2 text-sm text-card-foreground"
+                      onChange={(e) => setLocal({ businessType: e.target.value as BusinessType | "" })}>
+                <option value="">No</option>
+                {BUSINESS_TYPES.map((t) => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
+              {local.businessType && (
+                <p className="text-xs text-muted-foreground">
+                  {BUSINESS_TYPES.find((t) => t.key === local.businessType)?.hint}{" "}
+                  LeadPilot finds business buyers near you; it never contacts consumers.
+                </p>
+              )}
+            </div>
+            {local.businessType && (
+              <div className="space-y-3 rounded border border-border p-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="city">City or neighbourhood</Label>
+                    <Input id="city" value={local.city} placeholder="Astoria, NY"
+                           onChange={(e) => setLocal({ city: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="postal">Postcode (optional)</Label>
+                    <Input id="postal" value={local.postalCode}
+                           onChange={(e) => setLocal({ postalCode: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="country">Country (2 letters)</Label>
+                    <Input id="country" value={local.country} maxLength={2}
+                           onChange={(e) => setLocal({ country: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="radius">Radius</Label>
+                    <div className="flex gap-2">
+                      <Input id="radius" type="number" min={0.5} step={0.5} value={local.radius}
+                             onChange={(e) => setLocal({ radius: e.target.value })} />
+                      <select aria-label="Unit" value={local.unit}
+                              className="h-10 rounded border border-border bg-card px-2 text-sm"
+                              onChange={(e) => setLocal({ unit: e.target.value as DistanceUnit })}>
+                        <option value="mi">mi</option>
+                        <option value="km">km</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{RADIUS_NOTE}</p>
+                <div className="space-y-1">
+                  <Label htmlFor="offer">What you offer business buyers (optional)</Label>
+                  <Textarea id="offer" value={local.offer} maxLength={500}
+                            placeholder="Catering packages for team lunches, 10-200 people"
+                            onChange={(e) => setLocal({ offer: e.target.value })} />
+                </div>
+                {localProblems.length > 0 && (
+                  <ul className="list-disc pl-5 text-xs text-destructive">
+                    {localProblems.map((p) => <li key={p}>{p}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -155,6 +240,12 @@ export default function IntakeWizard() {
           <CardHeader><CardTitle>Ready to launch</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <p><span className="text-muted-foreground">Product:</span> {state.product.name}</p>
+            {state.local?.businessType && (
+              <p>
+                <span className="text-muted-foreground">Local business:</span>{" "}
+                {businessTypeLabel(state.local.businessType)}, {describeArea(state.local)}
+              </p>
+            )}
             <p>
               <span className="text-muted-foreground">Flow:</span>{" "}
               {state.hasPastClients

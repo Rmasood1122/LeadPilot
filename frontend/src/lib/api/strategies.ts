@@ -1,6 +1,7 @@
 import { ApiError, api, tooManyRequestsMessage } from "./client";
 import type { AutopilotOptIn } from "../autopilot";
 import type { AnalyticsOut, StrategyOut } from "./types";
+import type { BusinessType, ServiceAreaIn } from "@/lib/localBusiness";
 
 /** Mirrors INVALID_PASSWORD in app/api/strategies.py. */
 export const INVALID_PASSWORD = "INVALID_PASSWORD";
@@ -36,6 +37,8 @@ export async function createProduct(input: {
   name: string;
   description: string;
   type: "product" | "skill";
+  /** Local business mode; omit (or null) for a non-local business. */
+  business_type?: BusinessType | null;
 }): Promise<{ id: string }> {
   return api("/products", { body: input });
 }
@@ -51,12 +54,15 @@ export async function createStrategy(
   productId: string,
   hasPastClients: boolean,
   autopilot?: AutopilotOptIn,
+  local: { service_area?: ServiceAreaIn; local_offer?: string } = {},
 ): Promise<{ id: string }> {
   return api(`/products/${productId}/strategies`, {
     body: {
       flow_type: hasPastClients ? "with_clients" : "no_clients",
       // Autopilot launch: sent only when turned on WITH the confirmation.
       ...(autopilot?.enabled ? { autopilot } : {}),
+      // Local business mode: service area / offer (only for a local business).
+      ...local,
     },
   });
 }

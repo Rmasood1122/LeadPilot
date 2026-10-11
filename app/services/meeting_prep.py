@@ -553,6 +553,15 @@ def generate_brief(db: Session, brief_id: uuid.UUID, *, notify: bool = True,
     lead = db.get(Lead, brief.lead_id)
     if lead is None:
         return "missing_lead"
+    # Local business mode: no research brief about a business's own customer
+    # (a consumer) -- no model call, no LinkedIn or news lookup.
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    if is_customer(lead):
+        brief.status = MeetingPrepStatus.FAILED
+        brief.error = "not prepared: briefs are not written about a business's own customers"
+        db.commit()
+        return "refused"
 
     brief.status = MeetingPrepStatus.GENERATING
     brief.error = None

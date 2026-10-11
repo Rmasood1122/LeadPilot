@@ -36,6 +36,7 @@ from app.api.deps import get_current_user
 from app.api.leads import _owned_lead, _owned_strategy
 from app.core.plans import PlanLimitExceeded, check_send_channel, plan_limit_response
 from app.core.rate_limiting import enforce_rate_limit
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import Call, CallOutcome, CrmActivityKind, Lead, ProcessedWebhook, Strategy, User
 from app.services import credentials, crm_events, phone_calls, system_settings, usage_meter
@@ -126,6 +127,7 @@ def get_call(call_id: uuid.UUID, db: Session = Depends(get_db),
 def record_consent(lead_id: uuid.UUID, body: ConsentIn, db: Session = Depends(get_db),
                    current_user: User = Depends(get_current_user)) -> dict:
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_channel(lead, "phone")
     lead.phone_consent_at = datetime.now(timezone.utc)
     lead.phone_consent_source = body.source.strip()
     crm_events.record_activity(db, lead.id, CrmActivityKind.FIELD_CHANGED,
@@ -154,6 +156,7 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
     except the send window (the user is pressing the button, on purpose)."""
     enforce_rate_limit(str(current_user.id), "ai_action", "RATE_LIMIT_AI_ACTION")
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_channel(lead, "phone")
     from app.integrations import voice_providers  # noqa: PLC0415
     from app.integrations.outreach_base import OutboundMessage  # noqa: PLC0415
     from app.integrations.phone_channel import PhoneChannel  # noqa: PLC0415

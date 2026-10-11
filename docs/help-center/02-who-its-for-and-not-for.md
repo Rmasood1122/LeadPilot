@@ -2,9 +2,12 @@
 id: who-its-for-and-not-for
 title: Who LeadPilot is for, and who it is not for
 audience: prospect
-last_verified: 2026-10-10
+last_verified: 2026-10-11
 owner: help-center
 sources:
+  - app/services/local_business.py
+  - app/api/local_business.py
+  - docs/features/local-business-mode.md
   - docs/ICP.md
   - docs/program/DECISIONS.md
   - app/core/plans.py
@@ -66,9 +69,31 @@ The same research lists clear non-fits:
 
 ## Can I upload my own list of contacts?
 
-Not as leads. Leads for email and WhatsApp sequences come only from LeadPilot's own sourcing step, which searches for people matching your verified strategy and then checks their email addresses. There is no way to import your own contact list as leads. If your business depends on emailing or messaging a list you already have, LeadPilot does not currently support that.
+Not as leads. Leads for email and WhatsApp sequences come only from LeadPilot's own sourcing step, which searches for people matching your verified strategy and then checks their email addresses. There is no way to import your own contact list as leads. If your business depends on emailing or messaging a list you already have, LeadPilot does not currently support that. The one narrow exception, switched off by default, is a local business importing its own customers who opted in to its marketing (see "Can a local business message its own customers?" below).
 
 The one exception is LinkedIn. On the Growth, Scale, Pro and Enterprise plans, the **Network** page lets you upload your LinkedIn `Connections.csv` export and send saved messages to people who are still your 1st-degree connections. Those connections do not become leads. See the LinkedIn article.
+
+## Can a restaurant, clinic or local shop use LeadPilot?
+
+Yes, to win business customers near you. On the first step of a new strategy, answer **Is this a local business?** with your kind of business: restaurant, café or caterer; clinic, hospital or healthcare practice; retail or local shop; salon, fitness or other local service; or other local business. Then enter your service area (a city or postcode, a two-letter country code, and a radius in miles or kilometres) and, if you like, what you offer business buyers.
+
+LeadPilot then researches, searches and writes for business buyers in that area. For example: offices near a restaurant for catering, team lunches and corporate events; employers near a clinic for occupational health, screenings and staff wellness; schools, sports clubs, referring practices and insurers for a healthcare practice; offices, schools and property managers near a shop for supplies, gifting and bulk orders.
+
+What to expect:
+
+- **Business buyers only.** LeadPilot still finds people at companies. It never finds or cold-messages members of the public.
+- **The radius is not a search filter.** The lead search uses your city or postcode. The radius guides the research and the messages, but the lead provider does not apply it, so some leads can sit outside it.
+- **No invented distances.** Messages may say your business is based in or serves your area. They never claim a walking time or distance to the prospect's office, because LeadPilot does not know where it is.
+- **Healthcare is business to business.** Outreach for a clinic or hospital is about services for an organisation and never uses or mentions patient information.
+
+## Can a local business message its own customers?
+
+Only through the customer win-back feature, and it is switched off by default on every LeadPilot deployment until its legal review is complete. When an administrator turns it on, a local business can upload a CSV of its own customers and send them simple win-back or announcement messages. The rules are strict:
+
+- Every customer needs a recorded opt-in for each channel: the date they opted in and how (for example "loyalty sign-up form at the till"). Rows without that are refused and not stored, and so is anyone who unsubscribed before.
+- Email and approved WhatsApp templates only. No text messages (SMS) and no calls.
+- The emails are your own words; no AI writes to your customers, and every email carries an unsubscribe link.
+- Clinics, hospitals and other healthcare businesses cannot use it at all. Their customer list is a patient list, and using it for marketing needs each patient's written permission, which LeadPilot does not collect.
 
 ## Is LeadPilot built for high-volume sending?
 
