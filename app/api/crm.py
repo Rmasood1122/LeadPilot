@@ -38,6 +38,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.core.logging import get_logger
 from app.core.rate_limiting import enforce_rate_limit
 from app.db.base import get_db
@@ -1344,7 +1345,8 @@ def reclassify_reply_intent(reply_id: uuid.UUID, db: Session = Depends(get_db),
     it, so it is rate limited with the other write paths."""
     enforce_rate_limit(str(current_user.id), "crm_write", _WRITE_LIMIT)
     reply, _lead = _owned_reply(db, reply_id, current_user)
-    outcome = reply_intent.classify_and_apply(db, reply, force=True)
+    with metered(db, current_user, "reply_handling"):  # counted, never capped
+        outcome = reply_intent.classify_and_apply(db, reply, force=True)
     if outcome["status"] == "failed":
         raise HTTPException(status_code=503,
                             detail="the classifier could not be reached — the reply is unchanged")

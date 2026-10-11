@@ -23,8 +23,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ticketSubjectFor } from "@/lib/support/ticketSubject";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle, LifeBuoy, MessageSquare, Send, Ticket, X,
+  Activity, AlertCircle, LifeBuoy, MessageSquare, Send, Ticket, X,
 } from "lucide-react";
+import { statusPageLink } from "@/lib/statusPage";
 import {
   createSupportTicket, getSupportFaq, listChatSessions, getChatSession,
   sendChatMessage, startChatSession,
@@ -33,6 +34,7 @@ import { ApiError } from "@/lib/api/client";
 import type { ChatMessage } from "@/lib/api/types";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
+import { MessageSources } from "@/components/support/MessageSources";
 import { cn } from "@/lib/utils";
 
 type Mode = "chat" | "ticket";
@@ -237,6 +239,19 @@ export function ChatWidget() {
           >
             <Ticket size={15} aria-hidden="true" />
           </button>
+          {statusPageLink() && (
+            <a
+              href={statusPageLink()!.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="support-status-link"
+              className="rounded p-1.5"
+              aria-label="Service status (opens in a new tab)"
+              title="Service status"
+            >
+              <Activity size={15} aria-hidden="true" />
+            </a>
+          )}
           <button
             type="button"
             data-testid="support-widget-close"
@@ -289,6 +304,7 @@ export function ChatWidget() {
                 )}
               >
                 {message.content}
+                <MessageSources message={message} />
                 {message.role === "assistant" && message.suggest_ticket && (
                   <button
                     type="button"

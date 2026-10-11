@@ -262,10 +262,15 @@ class Settings(BaseSettings):
     # is offered a ticket. A wrong answer delivered confidently is the failure
     # this feature must not produce; an unnecessary ticket is an annoyance.
     support_chat_min_confidence: float = 0.5
-    # Mock mode only. The lowest keyword score that counts as "the FAQ answers
-    # this"; below it the user is offered a ticket instead. See
-    # support_kb.MIN_MOCK_MATCH_SCORE for how 4 was measured.
-    support_chat_mock_min_score: int = 4
+    # Mock mode only (Phase 2 help center). The best help-center chunk is
+    # returned verbatim only when BOTH clear; otherwise the user is offered a
+    # ticket. Defaults are help_center.MOCK_MIN_SCORE and
+    # MOCK_MIN_HEADING_COVERAGE -- see there for the golden-set measurement
+    # (tests/help_center pins that these defaults equal those constants).
+    # Replaces support_chat_mock_min_score, the keyword threshold of the old
+    # nine-entry FAQ, which no longer decides anything.
+    support_chat_mock_min_bm25: float = 6.0
+    support_chat_mock_min_heading_coverage: float = 0.55
     # Chat history is deleted after this many days by the nightly purge task.
     support_chat_retention_days: int = 30
     # Kill switch, matching REQUIRE_EMAIL_VERIFICATION. Turns the chat off
