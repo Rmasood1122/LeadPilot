@@ -42,6 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.config import settings
 from app.core.logging import get_logger
 from app.core.rate_limiting import enforce_rate_limit
@@ -604,7 +605,8 @@ def generate_summary_now(
             detail="there is nothing to summarise — this meeting has no "
                    "transcript and no notes",
         )
-    result = generate_summary_impl(db, meeting.id)
+    with metered(db, current_user, "meeting_summary"):
+        result = generate_summary_impl(db, meeting.id)
     if not result.startswith("ok"):
         raise HTTPException(status_code=502,
                             detail=f"summary generation failed: {result}")

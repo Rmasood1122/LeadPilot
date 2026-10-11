@@ -293,39 +293,44 @@ def run_displacement_scan(db: Session, strategy_id, now: datetime | None = None)
         logger.exception("displacement scan could not start for strategy %s", strategy_id)
         return 0
 
-    created = 0
-    for lead in leads:
-        try:
-            if recently_alerted(db, lead.id, now):
-                continue
-            for post in _posts_for(db, lead, owner_id, now):
-                matched = scan_post_for_triggers(post.get("text"))
-                if not matched:
-                    continue
-                excerpt = excerpt_of(post.get("text"))
-                alert = DisplacementAlert(
-                    lead_id=lead.id,
-                    matched_keywords=matched,
-                    post_excerpt=excerpt,
-                    post_url=(str(post.get("url"))[:500] if post.get("url") else None),
-                    suggested_dm=generate_displacement_dm(lead, excerpt, matched),
-                    alert_status="pending",
-                    created_at=now,
-                    expires_at=now + timedelta(days=EXPIRY_DAYS),
-                )
-                db.add(alert)
-                db.commit()
-                created += 1
-                # One alert per lead per sweep: the dedup window is per lead,
-                # not per post, so a founder who made the same complaint three
-                # times this week is one alert.
-                break
-        except Exception:  # noqa: BLE001 -- see the docstring
-            logger.exception("displacement scan failed for lead %s", lead.id)
+    from app.services import usage_meter  # noqa: PLC0415
+
+    # P0-5b: the DMs are model calls, metered to the owner and on its daily
+    # AI limit (a lead skipped today is scanned again in 12 hours).
+    with usage_meter.user_scope(db, owner_id, "displacement"):
+        created = 0
+        for lead in leads:
             try:
-                db.rollback()
-            except Exception:  # noqa: BLE001
-                pass
+                if recently_alerted(db, lead.id, now):
+                    continue
+                for post in _posts_for(db, lead, owner_id, now):
+                    matched = scan_post_for_triggers(post.get("text"))
+                    if not matched:
+                        continue
+                    excerpt = excerpt_of(post.get("text"))
+                    alert = DisplacementAlert(
+                        lead_id=lead.id,
+                        matched_keywords=matched,
+                        post_excerpt=excerpt,
+                        post_url=(str(post.get("url"))[:500] if post.get("url") else None),
+                        suggested_dm=generate_displacement_dm(lead, excerpt, matched),
+                        alert_status="pending",
+                        created_at=now,
+                        expires_at=now + timedelta(days=EXPIRY_DAYS),
+                    )
+                    db.add(alert)
+                    db.commit()
+                    created += 1
+                    # One alert per lead per sweep: the dedup window is per lead,
+                    # not per post, so a founder who made the same complaint three
+                    # times this week is one alert.
+                    break
+            except Exception:  # noqa: BLE001 -- see the docstring
+                logger.exception("displacement scan failed for lead %s", lead.id)
+                try:
+                    db.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
     return created
 
 

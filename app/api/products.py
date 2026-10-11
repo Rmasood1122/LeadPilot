@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.api.schemas import (
     PastClientOut,
     PastClientsCreate,
@@ -81,19 +82,20 @@ def add_past_clients(
     if product is None or product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="product not found")
 
-    created: list[PastClient] = []
-    for item in body.clients:
-        patterns = extract_patterns(item.details, item.acquisition_story)
-        created.append(
-            PastClient(
-                product_id=product.id,
-                details=item.details,
-                acquisition_story=item.acquisition_story,
-                extracted_patterns_json=patterns,
+    with metered(db, current_user, "intake", refuse_after=False):
+        created: list[PastClient] = []
+        for item in body.clients:
+            patterns = extract_patterns(item.details, item.acquisition_story)
+            created.append(
+                PastClient(
+                    product_id=product.id,
+                    details=item.details,
+                    acquisition_story=item.acquisition_story,
+                    extracted_patterns_json=patterns,
+                )
             )
-        )
-    db.add_all(created)
-    db.commit()
-    for c in created:
-        db.refresh(c)
-    return created
+        db.add_all(created)
+        db.commit()
+        for c in created:
+            db.refresh(c)
+        return created

@@ -27,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.config import settings
 from app.core.rate_limiting import client_ip, enforce_rate_limit
 from app.db.base import get_db
@@ -248,7 +249,10 @@ def chat(request: Request, body: ChatIn, db: Session = Depends(get_db),
     # answer_question NEVER raises — every failure path returns a ticket
     # suggestion rather than propagating, so a model outage degrades the reply
     # instead of 500-ing the request.
-    answer = support_chat.answer_question(question, history=history)
+    # P0-5b: counted toward the account's day, never refused -- help must stay
+    # reachable even when the day's AI limit is used up.
+    with metered(db, user, "support_chat"):
+        answer = support_chat.answer_question(question, history=history)
 
     assistant = ChatMessage(
         session_id=session.id,

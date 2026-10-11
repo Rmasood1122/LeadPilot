@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered, refuse_if_daily_limit_reached
 from app.api.leads import _owned_lead
 from app.core.rate_limiting import client_ip, enforce_rate_limit
 from app.db.base import get_db
@@ -66,14 +67,15 @@ def get_style_profile(current_user: User = Depends(get_current_user)) -> StylePr
 def put_style_profile(body: StyleProfileIn, db: Session = Depends(get_db),
                       current_user: User = Depends(get_current_user)) -> StyleProfileOut:
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
-    try:
-        profile = style_profile.extract(db, current_user, body.samples)
-    except style_profile.InvalidSamples as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    except Exception as exc:  # noqa: BLE001
-        db.rollback()
-        raise HTTPException(status_code=502,
-                            detail=f"the style analysis failed: {exc}") from exc
+    with metered(db, current_user, "drafting"):
+        try:
+            profile = style_profile.extract(db, current_user, body.samples)
+        except style_profile.InvalidSamples as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            db.rollback()
+            raise HTTPException(status_code=502,
+                                detail=f"the style analysis failed: {exc}") from exc
     return StyleProfileOut(profile=profile, samples=current_user.style_samples_json or [],
                            updated_at=current_user.style_profile_updated_at)
 
@@ -166,10 +168,12 @@ def write_loom_script(lead_id: uuid.UUID, db: Session = Depends(get_db),
     """Write (or rewrite) the recording script on demand, whatever the score."""
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
-    try:
-        script = loom_video.write_script(lead)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"the script could not be written: {exc}") from exc
+    with metered(db, current_user, "drafting"):
+        try:
+            script = loom_video.write_script(lead)
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=502,
+                                detail=f"the script could not be written: {exc}") from exc
     current = loom_video.state(lead)
     status = current.get("status") if current.get("status") == "recorded" else "suggested"
     lead.loom_video_json = {**current, **script, "status": status}
@@ -284,6 +288,7 @@ def analyze_voice_profile(product_id: uuid.UUID, body: VoicePostsIn,
     """
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     _owned_product(db, product_id, current_user)
+    refuse_if_daily_limit_reached(db, current_user.id)  # P0-5b: the worker is metered
     try:
         posts = voice_profiler.clean_posts(body.posts)
     except voice_profiler.InvalidPosts as exc:

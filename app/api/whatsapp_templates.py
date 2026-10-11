@@ -27,6 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.metering import metered
 from app.db.base import get_db
 from app.db.models import (
     Product,
@@ -216,7 +217,8 @@ def generate_templates(
     if product is None or product.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="strategy not found")
     try:
-        rows = svc.generate_drafts(db, strategy)
+        with metered(db, current_user, "drafting"):
+            rows = svc.generate_drafts(db, strategy)
     except TemplateError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return {
