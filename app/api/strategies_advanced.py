@@ -36,10 +36,11 @@ async def get_mv_results(
 ) -> dict:
     """
     Multi-variate test results for all steps with >2 variants.
-    Requires ab_testing feature (starter plan+).
+    Requires the multi_variate feature (Growth and up; product defect #18:
+    this used to check ab_testing, so plans without multi_variate got it).
     """
     try:
-        check_feature(current_user, "ab_testing")
+        check_feature(current_user, "multi_variate")
     except PlanLimitExceeded as e:
         raise HTTPException(status_code=402, detail=plan_limit_response(e))
 

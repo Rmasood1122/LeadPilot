@@ -1,7 +1,7 @@
 /** Pure rules for the "Find leads" and "Create sequence and launch" panels.
  *  Kept free of React so the contract is unit-testable. The server is always
  *  the real gate; these only decide what the screen offers. */
-import { ApiError } from "@/lib/api/client";
+import { ApiError, tooManyRequestsMessage } from "@/lib/api/client";
 import type { SequenceStepInput } from "@/lib/api/outreach";
 import type { LeadOut, StrategyOut } from "@/lib/api/types";
 
@@ -71,7 +71,9 @@ export function sourceErrorMessage(err: unknown): string {
   if (!(err instanceof ApiError)) {
     return "Could not start lead sourcing. Check your connection and try again.";
   }
-  if (err.status === 429) return "Too many requests. Wait a few minutes and try again.";
+  if (err.status === 429) {
+    return tooManyRequestsMessage(err, "Too many requests. Wait a few minutes and try again.");
+  }
   if (err.status === 409) return err.detail || "This strategy cannot source leads right now.";
   if (err.status === 404) return "This strategy no longer exists.";
   return err.detail || "Could not start lead sourcing.";
@@ -84,7 +86,9 @@ export function launchErrorMessage(err: unknown): string {
   if (err.status === 403 && err.detail === "PHONE_NOT_VERIFIED") {
     return "Your phone number is not verified, so outreach is blocked on this account.";
   }
-  if (err.status === 429) return "Too many requests. Wait a few minutes and try again.";
+  if (err.status === 429) {
+    return tooManyRequestsMessage(err, "Too many requests. Wait a few minutes and try again.");
+  }
   if (err.status === 409 || err.status === 422) {
     return err.detail || "The server refused this launch.";
   }

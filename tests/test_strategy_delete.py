@@ -79,6 +79,11 @@ class TestDeleteStrategy:
         assert _count(db_session, m.Lead, m.Lead.strategy_id == sid) > 0
         assert _count(db_session, m.SequenceEnrollment,
                       m.SequenceEnrollment.sequence_id.in_(sequence_ids)) > 0
+        # Product defect #19: a campaign with leads still enrolled is sending
+        # and must be paused before the delete (that guard used to key on a
+        # status nothing assigned, so it never fired).
+        verified_strategy.campaign_state = "paused_manual"
+        db_session.commit()
 
         resp = _delete(client, sid)
 
@@ -154,8 +159,11 @@ class TestDeleteStrategy:
         assert _delete(client, uuid.uuid4()).status_code == 404
 
     def test_a_live_campaign_must_be_paused_first(
-            self, client, db_session, confirmable, verified_strategy):
-        verified_strategy.status = m.StrategyStatus.EXECUTING
+            self, client, db_session, confirmable, verified_strategy, enrolled):
+        # Product defect #19: a live campaign is a `verified` strategy with an
+        # active campaign and leads enrolled (StrategyStatus.EXECUTING, which
+        # this test used to set by hand, is never assigned by the product).
+        assert verified_strategy.status is m.StrategyStatus.VERIFIED
         verified_strategy.campaign_state = "active"
         db_session.commit()
         resp = _delete(client, verified_strategy.id)

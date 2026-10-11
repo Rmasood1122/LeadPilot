@@ -15,7 +15,7 @@ POST /strategies/{id}/campaign/resume  — clears a manual OR bounce pause
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.plans import get_plan
 from app.db.base import get_db
 from app.db.models import Lead, Message, Outcome, OutcomeEvent, Product, Strategy, User
 from app.services import (
@@ -75,13 +76,22 @@ def analytics(
     else:
         bucket = func.strftime(fmt, Outcome.ts)
 
-    series_rows = db.execute(
+    # Product defect #18: the plan's analytics_history_days (30 on Free, 90 on
+    # Starter, ...; -1 = all) limits how far back the time series goes, as the
+    # pricing page advertises. Totals elsewhere are not windowed.
+    history_days = get_plan(getattr(current_user, "plan", "free") or "free").get(
+        "analytics_history_days", -1)
+    series_query = (
         select(bucket.label("bucket"), Outcome.channel, Outcome.event,
                func.count(Outcome.id))
         .join(Lead, Lead.id == Outcome.lead_id)
         .where(Lead.strategy_id == strategy_id)
-        .group_by("bucket", Outcome.channel, Outcome.event)
-        .order_by("bucket")
+    )
+    if history_days != -1:
+        since = datetime.now(timezone.utc) - timedelta(days=int(history_days))
+        series_query = series_query.where(Outcome.ts >= since)
+    series_rows = db.execute(
+        series_query.group_by("bucket", Outcome.channel, Outcome.event).order_by("bucket")
     ).all()
 
     variant_rows = db.execute(
@@ -99,6 +109,8 @@ def analytics(
     return {
         "strategy_id": str(strategy_id),
         "granularity": granularity,
+        # Days of history in `series`; None = all of it.
+        "history_days": None if history_days == -1 else int(history_days),
         "series": [
             {"bucket": b, "channel": ch, "event": ev.value, "count": n}
             for b, ch, ev, n in series_rows

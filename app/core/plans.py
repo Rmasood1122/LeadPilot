@@ -49,6 +49,16 @@ logger = get_logger("core.plans")
 # hole the audit found. The numbers are PLACEHOLDERS pending the founders'
 # pricing decision (docs/program/DECISIONS.md, P0-5-CAPS); they live only here.
 # A typical full Flow-2 strategy costs about $8.29, so Free allows one a day.
+# The most steps one sequence can have, on any plan: the API refuses more
+# (app/api/sequences.py SequenceCreate / StepIn). Plans used to say -1
+# ("Unlimited") here while the API capped at 20 (product defect #18).
+SEQUENCE_STEP_CAP = 20
+
+# Product defect #18: `api_rate_limit_multiplier` was removed from every plan.
+# Nothing read it, and scaling the rate limits by plan would loosen the
+# cost-protecting limits (e.g. 2 strategies/hour) with no stated intent.
+# `analytics_history_days` is enforced on the analytics time series
+# (app/api/analytics.py); `multi_variate` gates GET /strategies/{id}/mv-results.
 PLANS: dict[str, dict[str, Any]] = {
     "free": {
         "max_strategies": 3,
@@ -62,7 +72,6 @@ PLANS: dict[str, dict[str, Any]] = {
         # Website builder: the marketing pages that sell the product.
         "website_builder": False,
         "max_site_pages": 0,
-        "api_rate_limit_multiplier": 1.0,
         "analytics_history_days": 30,
         "display_name": "Free",
         "upgrade_to": "starter",
@@ -78,10 +87,9 @@ PLANS: dict[str, dict[str, Any]] = {
         "multi_variate": False,
         "website_builder": True,
         "max_site_pages": 10,
-        "api_rate_limit_multiplier": 2.0,
         "analytics_history_days": 90,
         "display_name": "Starter",
-        "upgrade_to": "pro",
+        "upgrade_to": "growth",
     },
     # Section E (app/core/billing_catalog.py): the four monthly tiers are
     # starter -> growth -> scale -> enterprise. `pro` is no longer sold; it
@@ -97,7 +105,6 @@ PLANS: dict[str, dict[str, Any]] = {
         "multi_variate": True,
         "website_builder": True,
         "max_site_pages": 25,
-        "api_rate_limit_multiplier": 3.0,
         "analytics_history_days": 365,
         "display_name": "Growth",
         "upgrade_to": "scale",
@@ -106,14 +113,13 @@ PLANS: dict[str, dict[str, Any]] = {
         "max_strategies": -1,
         "max_ai_spend_usd_per_day": 150.0,
         "max_leads_per_strategy": 10000,
-        "max_sequence_steps": -1,
+        "max_sequence_steps": SEQUENCE_STEP_CAP,
         "channels": ["gmail", "whatsapp", "linkedin", "phone"],
         "ab_testing": True,
         "playbook_access": True,
         "multi_variate": True,
         "website_builder": True,
         "max_site_pages": -1,
-        "api_rate_limit_multiplier": 5.0,
         "analytics_history_days": -1,
         "display_name": "Scale",
         "upgrade_to": "enterprise",
@@ -132,7 +138,6 @@ PLANS: dict[str, dict[str, Any]] = {
         "multi_variate": False,
         "website_builder": False,
         "max_site_pages": 0,
-        "api_rate_limit_multiplier": 2.0,
         "analytics_history_days": 365,
         "display_name": "Pay per meeting",
         "upgrade_to": "growth",
@@ -141,7 +146,7 @@ PLANS: dict[str, dict[str, Any]] = {
         "max_strategies": -1,
         "max_ai_spend_usd_per_day": 150.0,
         "max_leads_per_strategy": -1,
-        "max_sequence_steps": -1,
+        "max_sequence_steps": SEQUENCE_STEP_CAP,
         # Channels were not enforced before plan enforcement shipped, so every
         # Pro account could use all four. Pro is ranked above Growth
         # (_LINKEDIN_NETWORK_PLANS) and "keeps exactly what it has", so it
@@ -152,7 +157,6 @@ PLANS: dict[str, dict[str, Any]] = {
         "multi_variate": True,
         "website_builder": True,
         "max_site_pages": -1,
-        "api_rate_limit_multiplier": 5.0,
         "analytics_history_days": -1,
         "display_name": "Pro",
         "upgrade_to": None,
@@ -163,14 +167,13 @@ PLANS: dict[str, dict[str, Any]] = {
         "max_strategies": -1,
         "max_ai_spend_usd_per_day": 400.0,
         "max_leads_per_strategy": -1,
-        "max_sequence_steps": -1,
+        "max_sequence_steps": SEQUENCE_STEP_CAP,
         "channels": ["gmail", "whatsapp", "linkedin", "phone"],
         "ab_testing": True,
         "playbook_access": True,
         "multi_variate": True,
         "website_builder": True,
         "max_site_pages": -1,
-        "api_rate_limit_multiplier": 10.0,
         "analytics_history_days": -1,
         "display_name": "Enterprise",
         "upgrade_to": None,
@@ -194,6 +197,12 @@ _PLAN_UPGRADE_PATH = {
     "pro": None,
     "enterprise": None,
 }
+
+
+# One table for "what to upgrade to" (product defect #20: PLANS["starter"]
+# said "pro", which is no longer sold, while the 402 path said "growth").
+for _plan_key, _plan in PLANS.items():
+    _plan["upgrade_to"] = _PLAN_UPGRADE_PATH[_plan_key]
 
 
 class PlanLimitExceeded(Exception):

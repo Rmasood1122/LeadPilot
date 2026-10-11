@@ -84,6 +84,13 @@ describe("needsVerification (the Shell's redirect rule)", () => {
     expect(needsVerification(user, true)).toBe(false);
     expect(needsVerification({ ...user, phone_verified: true }, false)).toBe(false);
   });
+  // Product defect #5: a deployment that cannot deliver a code does not
+  // require one (GET /auth/me phone_required false), so no redirect for it.
+  it("does not send anyone to the phone step when the phone is not required", () => {
+    const user = { identity_required: true, identity_complete: true, phone_verified: false };
+    expect(needsVerification({ ...user, phone_required: false }, false)).toBe(false);
+    expect(needsVerification({ ...user, phone_required: true }, false)).toBe(true);
+  });
 });
 
 describe("phone deferral", () => {

@@ -5445,3 +5445,9 @@ class ChampionMove(TimestampMixin, Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     dismiss_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+# Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new
+# Outcome (the learning loop and A/B promotion read those columns). Imported
+# last so the listener module can import the classes above.
+from app.db import outcome_attribution as _outcome_attribution  # noqa: E402,F401

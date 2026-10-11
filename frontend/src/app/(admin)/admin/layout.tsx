@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { LogoMark } from "@/components/ui/Logo";
+import { ConfigWarningsBanner } from "@/components/admin/ConfigWarningsBanner";
 import {
   Users, AlertCircle, Shield, BookOpen, Heart, Zap, List,
   GraduationCap, LifeBuoy, KeyRound, SlidersHorizontal, ShieldAlert, ShieldCheck
@@ -70,7 +71,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Link>
         ))}
       </aside>
-      <main className="flex-1 overflow-auto p-6">{children}</main>
+      <main className="flex-1 overflow-auto p-6">
+        <ConfigWarningsBanner />
+        {children}
+      </main>
     </div>
   );
 }

@@ -142,9 +142,9 @@ def record_opt_in(
     ):
         raise OptInError(
             "this phone is on the suppression list (a prior opt-out or "
-            "unsubscribe). A suppressed contact cannot be re-opted-in by "
-            "the sender — only the contact can re-initiate (e.g. by "
-            "messaging you first)."
+            "unsubscribe). LeadPilot will not message a suppressed contact "
+            "again, and the suppression cannot be lifted from the app, so "
+            "no opt-in can be recorded for it."
         )
     row = WhatsAppOptIn(
         lead_id=lead.id,

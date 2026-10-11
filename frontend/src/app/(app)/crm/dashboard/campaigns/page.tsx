@@ -239,7 +239,14 @@ export default function CrmCampaignsPage() {
                       <tbody>
                         {variants.map((variant) => (
                           <tr key={variant.variant} className="border-b border-border/40">
-                            <td className="py-1.5 font-medium">{variant.variant}</td>
+                            <td className="py-1.5 font-medium">
+                              {variant.variant}
+                              {variant.promoted && (
+                                <span className="ml-2 text-xs font-normal text-success">
+                                  promoted winner
+                                </span>
+                              )}
+                            </td>
                             <td className="py-1.5 text-right tabular-nums">
                               {formatCount(variant.sent)}
                             </td>

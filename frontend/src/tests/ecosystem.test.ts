@@ -14,6 +14,14 @@ describe("oauthResultMessage", () => {
 
   it("ignores unrelated query strings", () => {
     expect(oauthResultMessage(new URLSearchParams("tab=integrations"))).toBeNull();
-    expect(oauthResultMessage(new URLSearchParams("gmail=connected"))).toBeNull();
+    expect(oauthResultMessage(new URLSearchParams("zoom=connected"))).toBeNull();
+  });
+
+  // Product defect #16: the Gmail callback now redirects here too.
+  it("reports the Gmail callback result", () => {
+    expect(oauthResultMessage(new URLSearchParams("tab=integrations&gmail=connected")))
+      .toEqual({ text: "Gmail connected", ok: true });
+    expect(oauthResultMessage(new URLSearchParams("gmail=error&reason=missing%20code")))
+      .toEqual({ text: "Gmail connection failed: missing code", ok: false });
   });
 });

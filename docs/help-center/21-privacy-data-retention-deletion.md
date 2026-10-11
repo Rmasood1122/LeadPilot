@@ -89,7 +89,7 @@ When you confirm, LeadPilot:
 
 1. records the erasure in the consent ledger first, so there is proof the request was honoured. That record keeps the email address or phone number it was about;
 2. adds the person's email, phone number and LinkedIn profile to the suppression list, so no strategy will contact or source them again;
-3. clears the lead's name, job title, email, phone, company, LinkedIn details, research notes and the written explanation of its AI score, and marks the lead as dropped. The numeric scores (booking likelihood and F-P-T-A scores) stay on the record. An empty record without personal details is kept so the same person is not re-added to that strategy;
+3. clears the lead's name, job title, email, phone, company, LinkedIn details, research notes, its scores (booking likelihood and F-P-T-A scores) with their explanations, and marks the lead as dropped. An empty record without personal details is kept so the same person is not re-added to that strategy;
 4. forgets which record in your connected CRM (HubSpot or Salesforce) the lead was linked to.
 
 What this does **not** do today:
@@ -102,7 +102,7 @@ What this does **not** do today:
 Yes.
 
 - **Strategy:** open the strategy and press **Delete**. In the **Delete strategy** window, confirm with your password. This permanently deletes the strategy with its research, leads, sequences, messages and campaign history. A campaign that is still sending must be paused first. The deletion is recorded in the security log, and the tamper-evident activity trail keeps its entries.
-- **LinkedIn network:** on the **Network** page, **Delete my uploaded connections** removes every connection you uploaded, after you confirm "Delete all uploaded connections?". The deletion itself is never limited by plan, but the button only shows on Growth and higher plans. After a downgrade, contact support to delete your uploaded connections.
+- **LinkedIn network:** on the **Network** page, **Delete my uploaded connections** removes every connection you uploaded, after you confirm "Delete all uploaded connections?". The deletion is never limited by plan: the button shows on every plan while you have connections stored, including after a downgrade.
 
 ## Can I delete my whole account?
 

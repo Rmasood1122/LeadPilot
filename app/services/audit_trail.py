@@ -117,7 +117,11 @@ def _payload(outcome: Outcome) -> dict:
     meta = outcome.meta_json or {}
     out = {key: meta[key] for key in _SAFE_PAYLOAD_KEYS
            if key in meta and isinstance(meta[key], (str, int, float, bool))}
-    if outcome.variant:
+    # Only a variant the WRITER set: one filled in afterwards by
+    # app/db/outcome_attribution.py is not attested in the hashed payload.
+    from app.db import outcome_attribution  # noqa: PLC0415
+
+    if outcome.variant and not outcome_attribution.variant_was_filled(outcome):
         out.setdefault("variant", outcome.variant)
     url = meta.get("url")
     if isinstance(url, str) and "://" in url:

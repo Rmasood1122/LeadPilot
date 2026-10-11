@@ -72,8 +72,13 @@ class TestHelpers:
             plans.check_plan_quantity(free, "max_sequence_steps", 6, "This has 6 steps.")
         assert "Free plan allows 5 sequence steps. This has 6 steps." == exc.value.message
         assert exc.value.upgrade_to == "starter"
+        # Product defect #18: no plan advertises more steps than the API accepts
+        # (20), so Scale's steps are 20, not "unlimited". -1 still means
+        # unlimited for limits that really are.
         scale = m.User(email="s@x.example", plan=m.PlanTier.SCALE)
-        plans.check_plan_quantity(scale, "max_sequence_steps", 10_000, "unlimited")
+        plans.check_plan_quantity(scale, "max_sequence_steps", plans.SEQUENCE_STEP_CAP, "ok")
+        ent = m.User(email="u@x.example", plan=m.PlanTier.ENTERPRISE)
+        plans.check_plan_quantity(ent, "max_leads_per_strategy", 10_000, "unlimited")
 
     def test_remaining(self):
         free = m.User(email="r@x.example", plan=m.PlanTier.FREE)

@@ -8,7 +8,6 @@ export interface PlanDefinition {
   ab_testing: boolean;
   playbook_access: boolean;
   multi_variate: boolean;
-  api_rate_limit_multiplier: number;
   analytics_history_days: number;
   display_name: string;
   upgrade_to: string | null;

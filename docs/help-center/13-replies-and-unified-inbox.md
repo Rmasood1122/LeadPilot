@@ -87,7 +87,7 @@ There are three filters:
 - **All** – every thread, newest first.
 - **Cleared** – threads you have marked handled, newest first.
 
-Machine mail such as bounces, out-of-office replies and no-reply bots is filed in the conversation but never shows as needing a reply. A thread shows an **Overdue** badge when its reply has waited more than two days, and a "waiting" count when a prospect sent more than one unanswered message. The Inbox menu item does not show a count. The **Needs reply** list shows each waiting person once, however many messages they sent.
+Machine mail such as bounces, out-of-office replies and no-reply bots is filed in the conversation but never shows as needing a reply. A thread shows an **Overdue** badge when its reply has waited more than two days, and a "waiting" count when a prospect sent more than one unanswered message. The Inbox menu item shows how many people are waiting on a reply (shown as "99+" above 99), refreshed every minute. The **Needs reply** list shows each waiting person once, however many messages they sent.
 
 ## What does "Mark handled" do?
 

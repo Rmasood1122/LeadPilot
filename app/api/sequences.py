@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.api.metering import metered
 from app.core.plans import (
-    PlanLimitExceeded, check_plan_quantity, check_send_channel, plan_limit_response,
+    SEQUENCE_STEP_CAP, PlanLimitExceeded, check_plan_quantity, check_send_channel,
+    plan_limit_response,
 )
 from app.db.base import get_db
 from app.db.models import (
@@ -81,7 +82,7 @@ def _enforce_plan_for(db: Session, sequence: Sequence, user: User) -> None:
 
 
 class StepIn(BaseModel):
-    step_no: int = Field(ge=1, le=20)
+    step_no: int = Field(ge=1, le=SEQUENCE_STEP_CAP)
     template: str = Field(min_length=1, description="Messaging brief Claude personalizes per lead")
     variant: str = Field(default="A", max_length=20)
     delay_days: int = Field(default=3, ge=0, le=60, description="Wait after the previous step")
@@ -118,7 +119,7 @@ class SequenceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     channel: ChannelType = ChannelType.EMAIL
     booking_url: str | None = Field(default=None, max_length=500)
-    steps: list[StepIn] = Field(min_length=1, max_length=20)
+    steps: list[StepIn] = Field(min_length=1, max_length=SEQUENCE_STEP_CAP)
 
 
 class StepOut(StepIn):

@@ -79,7 +79,7 @@ New accounts go through a short, two-step verification screen after the email li
 
 You can press **Do this later**. Until your phone is verified you can explore and research, including running strategies, but you cannot launch outreach, choose a paid plan or share dashboards.
 
-The text-message service behind this step (Twilio) has not yet been verified against the live service. If your deployment has not finished setting it up, codes may not arrive. Contact your administrator or support in that case.
+The text-message service behind this step (Twilio) has not yet been verified against the live service. If a production deployment has deliberately no text-message service, LeadPilot cannot send codes, so it does not ask for one: the phone step is skipped and nothing is blocked until a phone is verified. If a text-message service is set up but misconfigured, the check stays on and codes do not arrive; contact your administrator or support. In both cases administrators see a warning at the top of the admin panel explaining what to fix.
 
 ## Do I need a plan?
 

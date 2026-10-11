@@ -129,3 +129,22 @@ export function updateSystemSetting(
 ): Promise<{ key: string; value: SystemSetting["value"] }> {
   return api(`/admin/system-settings/${key}`, { method: "PUT", body: { value } });
 }
+
+// --------------------------------------------------------------------------
+// Deployment warnings (product defect #5)
+// --------------------------------------------------------------------------
+
+export interface ConfigWarning {
+  key: string;
+  severity: "high" | "medium" | "low";
+  /** "error": a misconfiguration that blocks users (e.g. a broken SMS
+   *  provider); "warning": a deliberate setting with a consequence. */
+  level?: "error" | "warning";
+  message: string;
+}
+
+/** Misconfigurations the deployment cannot fix by itself, e.g. phone
+ *  verification required but no SMS transport that can deliver a code. */
+export function listConfigWarnings(): Promise<ConfigWarning[]> {
+  return api("/admin/config-warnings");
+}

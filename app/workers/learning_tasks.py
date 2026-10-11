@@ -211,6 +211,13 @@ def auto_promote_winners(self) -> dict:
     promoted = 0
 
     try:
+        # Review M5: off unless an admin turns it on (system_settings).
+        from app.services import system_settings  # noqa: PLC0415
+
+        if not system_settings.get(db, "ab_auto_promotion_enabled"):
+            logger.info("promotion.disabled")
+            return {"promoted": 0, "skipped": "ab_auto_promotion_enabled is off"}
+
         # Find strategies with >= 2 active variants and enough data
         strategies = db.execute(text("""
             SELECT

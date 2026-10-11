@@ -14,6 +14,7 @@ import { ChatWidget } from "@/components/support/ChatWidget";
 import { useBranding } from "@/lib/branding";
 import { isPhoneDeferred, needsVerification } from "@/lib/identity";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { InboxBadge } from "./InboxBadge";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
@@ -128,6 +129,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             >
               <Icon size={18} aria-hidden="true" />
               {!collapsed && label}
+              {!collapsed && href === "/inbox" && <InboxBadge />}
             </Link>
           ))}
         </nav>
@@ -199,7 +201,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 : "text-muted-foreground",
             )}
           >
-            <Icon size={20} aria-hidden="true" />
+            <span className="relative">
+              <Icon size={20} aria-hidden="true" />
+              {href === "/inbox" && (
+                <span className="absolute -right-3 -top-1"><InboxBadge /></span>
+              )}
+            </span>
             {label}
           </Link>
         ))}

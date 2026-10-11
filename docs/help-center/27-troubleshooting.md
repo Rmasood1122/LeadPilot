@@ -78,7 +78,8 @@ Open **Settings** › **Integrations** and find the **Gmail** card.
 
 **429 – too many, or daily AI limit used up.**
 
-- "Your … plan's daily AI limit ($…) is used up. It resets at 00:00 UTC." – wait for the reset, or upgrade.
+- "Your … plan's daily AI limit ($…) is used up. It resets at 00:00 UTC." – wait for the reset, or upgrade. Resume, Re-verify, lead sourcing and launch all show this message.
+- "This run is forecast to cost $…, but only $… of your $… monthly spend cap is left. …" – your monthly spend cap would be exceeded. Raise it on the Usage page or wait for the new month (UTC).
 - A plain "429 Too Many Requests" is a rate limit. Common defaults: 2 new strategies per hour, 5 lead-sourcing requests per hour, 10 sign-in attempts per 15 minutes, 20 support chat messages per day. Wait and try again. These are deployment settings.
 - "Too many attempts. Wait a while and try again." – too many password confirmations (for example when exporting data).
 

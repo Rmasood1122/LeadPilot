@@ -47,6 +47,42 @@ class TemplateError(ValueError):
 
 
 _PLACEHOLDER = re.compile(r"\{\{(\d+)\}\}")
+# LEGAL GUARD (product defect #28): a MARKETING template must tell the
+# recipient how to opt out -- an INSTRUCTION, not merely the word: a verb then
+# STOP ("Reply STOP to opt out."), or STOP then "opt out"/"unsubscribe", within
+# 25 characters and the same sentence. STOP must be in capitals (the keyword
+# app/api/webhooks_whatsapp.py::_is_opt_out acts on); the verb and the
+# opt-out words are case-insensitive. "NON-STOP deals", "BUS STOP" or a URL
+# ending /STOP are not instructions. UTILITY templates (transactional) are not
+# required to carry it. Mirrored in frontend/src/lib/whatsappTemplate.ts.
+# Basis, needs founder/legal confirmation: WhatsApp Business Messaging Policy
+# (honour opt-out requests); CASL s.6(2)(c), s.11; GDPR Art. 21(2)-(3).
+_OPT_OUT_INSTRUCTION = re.compile(
+    r"(?i:\b(?:reply|text|send|respond|message)\b)[^.\n]{0,25}\bSTOP\b"
+    r"|\bSTOP\b[^.\n]{0,25}(?i:\b(?:opt[ -]?out|unsubscribe)\b)"
+)
+STANDARD_OPT_OUT = "Reply STOP to opt out."
+
+
+def has_opt_out_instruction(body: str | None) -> bool:
+    return bool(_OPT_OUT_INSTRUCTION.search(body or ""))
+
+
+def _category_value(category) -> str:
+    return str(getattr(category, "value", category) or "").lower()
+
+
+def validate_opt_out(body: str | None, category) -> None:
+    """Raise TemplateError if a MARKETING body has no opt-out instruction."""
+    if _category_value(category) != WhatsAppTemplateCategory.MARKETING.value:
+        return
+    if not has_opt_out_instruction(body):
+        raise TemplateError(
+            "a marketing template must tell the recipient how to opt out, with "
+            "the word STOP in capitals in an instruction, e.g. "
+            f'"{STANDARD_OPT_OUT}" or "STOP to unsubscribe" (STOP is the '
+            "keyword LeadPilot acts on to stop messaging a contact)"
+        )
 # Meta template names: lowercase letters, digits, underscores.
 # TODO: verify against current WhatsApp docs (exact charset + max length)
 _NAME_RE = re.compile(r"^[a-z0-9_]{1,200}$")
@@ -64,6 +100,7 @@ def validate_body(body: str) -> dict[int, str]:
       - non-empty, within the configured length limit
         (# TODO: verify limits against current WhatsApp docs — 1024 chars
         for the body component is the configured default)
+      (the opt-out instruction depends on the category: validate_opt_out)
       - variable placeholders must be exactly {{1}}..{{k}} — sequential,
         starting at 1, no gaps, no duplicates ({{2}} without {{1}} is a
         Meta rejection anyway; we fail fast locally)
@@ -149,6 +186,7 @@ def create_draft(
     if not language:
         raise TemplateError("language is required (e.g. 'en_US')")
     slots = validate_body(body)
+    validate_opt_out(body, category)
     descriptions = _validate_variable_descriptions(slots, variable_descriptions)
 
     row = WhatsAppTemplate(
@@ -200,6 +238,8 @@ def update_template(
         )
 
     # draft | rejected: edit in place, back to a clean draft.
+    validate_opt_out(body if body is not None else template.body,
+                     category if category is not None else template.category)
     if body is not None:
         slots = validate_body(body)
         template.body = body.strip()
@@ -234,6 +274,7 @@ def submit_template(session: Session, template: WhatsAppTemplate,
     # Re-validate right before submission — the db row could predate a
     # rule change.
     validate_body(template.body or "")
+    validate_opt_out(template.body, template.category)
     result = adapter.submit_template(
         name=template.name,
         language=template.language,
@@ -347,8 +388,10 @@ _GENERATE_SYSTEM = (
     "HARD RULES for every body: (1) identify the sender by name/company in "
     "the first sentence — no anonymous messages; (2) an honest, specific "
     "value proposition drawn from the provided strategy — no invented "
-    "claims, statistics, urgency or guarantees; (3) end with a plain "
-    "opt-out instruction such as 'Reply STOP to opt out.'; (4) variable "
+    "claims, statistics, urgency or guarantees; (3) a marketing template "
+    f"must end with exactly this opt-out instruction: '{STANDARD_OPT_OUT}' "
+    "(the word STOP stays in capitals -- it is the keyword, the one "
+    "exception to rule 6); (4) variable "
     "placeholders exactly {{1}}, {{2}}... sequential from 1, each described "
     "in variable_descriptions; (5) body under "
     f"{settings.whatsapp_template_body_max_chars} characters; "
@@ -403,13 +446,20 @@ def generate_drafts(session: Session, strategy: Strategy) -> list[WhatsAppTempla
             )
         except ValueError:
             category = WhatsAppTemplateCategory.MARKETING
+        body = str(cand.get("body", "")).strip()
+        if (category is WhatsAppTemplateCategory.MARKETING and body
+                and not has_opt_out_instruction(body)):
+            # Product defect #28: add the standard instruction rather than
+            # dropping an otherwise usable candidate. The person still reviews
+            # every draft before it is submitted.
+            body = f"{body} {STANDARD_OPT_OUT}"
         try:
             row = create_draft(
                 session,
                 name=str(cand.get("name", "")),
                 language=str(cand.get("language", "en_US")),
                 category=category,
-                body=str(cand.get("body", "")),
+                body=body,
                 variable_descriptions=cand.get("variable_descriptions") or {},
             )
             created.append(row)

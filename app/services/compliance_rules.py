@@ -249,6 +249,15 @@ def bounce_threshold(session: Session, strategy: Strategy) -> float:
                        ANY, ANY).bounce_pause_threshold
 
 
+def campaign_daily_cap(session: Session, strategy: Strategy, channel: str) -> int | None:
+    """The daily cap a workspace rule sets for `channel` in EVERY region (rule
+    region ANY), never above the baseline. What the campaign page shows as the
+    cap (product defect #21); a region-specific rule can lower it further for
+    the leads in that region, which the send path applies per lead."""
+    return resolve_for(session, workspace_id_for_strategy(session, strategy),
+                       ANY, channel).daily_cap
+
+
 def has_consent(session: Session, lead: Lead, channel: ChannelType) -> bool:
     if channel is ChannelType.WHATSAPP:
         from app.db.models import OptInStatus  # noqa: PLC0415

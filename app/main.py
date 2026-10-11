@@ -144,6 +144,12 @@ async def _lifespan(_app: FastAPI):
     # Each of those fails quietly rather than crashing — see production_guard.
     # No-op outside APP_ENV=production/prod/live.
     validate_production_config()
+    # Non-fatal problems an admin must still see (also on GET
+    # /admin/config-warnings): e.g. phone verification required but no SMS
+    # transport that can deliver a code.
+    from app.services.identity import log_config_warnings  # noqa: PLC0415
+
+    log_config_warnings()
 
     bootstrap_admin()
     yield

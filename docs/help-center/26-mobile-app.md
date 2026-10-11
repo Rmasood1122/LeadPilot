@@ -10,7 +10,6 @@ sources:
   - frontend/src/hooks/usePushNotifications.ts
   - frontend/src/hooks/useBackButton.ts
   - frontend/src/components/ui/OfflineBanner.tsx
-  - frontend/src/components/ui/PullToRefresh.tsx
   - frontend/src/components/shell/Shell.tsx
   - frontend/src/components/shell/nav.ts
   - frontend/src/lib/storage.ts

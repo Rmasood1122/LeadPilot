@@ -35,7 +35,7 @@ You sign in with your email address and password. Passwords must be at least 8 c
 
 If the email or the password is wrong, the message is always "invalid email or password". LeadPilot does not say which one was wrong, so nobody can use the sign-in page to find out whether an address has an account.
 
-New accounts must confirm their email address before they can use the app. Accounts created through public sign-up also go through identity onboarding, which includes verifying a mobile phone number. You can put the phone step off for the current browser session, but a verified phone number is required before you can choose a paid plan.
+New accounts must confirm their email address before they can use the app. Accounts created through public sign-up also go through identity onboarding, which includes verifying a mobile phone number. You can put the phone step off for the current browser session, but a verified phone number is required before you can choose a paid plan. (A production deployment with deliberately no text-message service cannot send codes, so it skips this step instead.)
 
 ## How many sign-in attempts are allowed?
 

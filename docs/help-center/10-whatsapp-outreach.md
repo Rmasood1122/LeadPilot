@@ -24,6 +24,7 @@ sources:
   - docs/program/DECISIONS.md
   - docs/VERIFICATION_REPORT.md
   - frontend/src/app/(app)/campaigns/page.tsx
+  - frontend/src/components/campaigns/TemplateEditor.tsx
   - frontend/src/app/(app)/settings/page.tsx
   - frontend/src/app/(app)/pipeline/page.tsx
   - frontend/src/components/strategy/OutreachPanel.tsx
@@ -54,12 +55,12 @@ This has three effects you should know about:
 
 Go to **Campaigns**, choose a strategy, and open the **Templates** tab.
 
-- **+ New draft** opens an editor. Give the template a name (lowercase letters, digits and underscores, for example `intro_offer`) and a body. Templates created here use the language `en_US` and the category "marketing". In the current release, a template written in this editor must not contain placeholders such as `{{1}}`: LeadPilot requires a description for every placeholder, and this editor cannot add one, so saving fails with "missing variable descriptions" (even though the editor's example text shows `{{1}}`). Templates with placeholders come from **Generate with AI** or from the LeadPilot API.
+- **+ New draft** opens an editor. Give the template a name (lowercase letters, digits and underscores, for example `intro_offer`) and a body. Templates created here use the language `en_US` and the category "marketing". For every placeholder you type, such as `{{1}}`, the editor adds a "What goes in {{1}}?" field; describe what fills it (for example "first name"). **Save draft** stays disabled until every placeholder has a description and the body contains an opt-out instruction (see below).
 - **Generate with AI** drafts 2 or 3 candidate templates from the strategy's research. Each draft comes with a description of every placeholder. Choose one and press **Edit & save this draft**; keep the same placeholders when you edit it, because the saved descriptions must still match. Drafts are never submitted automatically.
 - **Submit** sends a draft to Meta for review. Meta's review "takes minutes to days".
 - **Sync status** fetches the latest decision from Meta. A rejected template shows Meta's reason, and you can edit and resubmit it.
 
-LeadPilot checks a template before saving it: the body cannot be empty, must be at most 1,024 characters by default, and its placeholders must run `{{1}}`, `{{2}}`, … in order with no gaps or repeats. The editor reminds you to include "Reply STOP to opt out."; LeadPilot does not add this line for you. Editing an approved template creates a new draft version rather than changing the approved one.
+LeadPilot checks a template before saving it and again before submitting it to Meta: the body cannot be empty, must be at most 1,024 characters by default, and its placeholders must run `{{1}}`, `{{2}}`, … in order with no gaps or repeats. A **marketing** template must also tell the contact how to opt out: an instruction with the word STOP in capital letters, such as "Reply STOP to opt out.", "Text STOP anytime" or "STOP to unsubscribe". The word alone does not count ("NON-STOP deals" or a link ending in /STOP is refused), and the instruction is recognised in English only, so a template in another language needs an English opt-out line too. Utility templates are not required to have it. The check runs again when a message is sent: an approved marketing template without the instruction (for example one approved before this rule) is not sent, and the message stops with the status "needs template" and the reason. **Generate with AI** adds "Reply STOP to opt out." to a marketing draft that lacks it; in the editor you add it yourself. Editing an approved template creates a new draft version rather than changing the approved one.
 
 Only **approved** templates are sent. Approval is checked again at the moment of sending; if a template is no longer approved by then, that message stops with the status "needs template" instead of sending.
 
@@ -84,7 +85,7 @@ An opt-in can be recorded in these ways:
 
 LeadPilot also contains a hosted opt-in page, but the app does not currently give you a way to get a contact's link to it.
 
-Every opt-in and opt-out is kept as a history that is only ever added to. You can see a contact's current status as **WhatsApp opt-in** when you open a lead on the **Pipeline** page. A number on the suppression list cannot be opted in again through LeadPilot.
+Every opt-in and opt-out is kept as a history that is only ever added to. You can see a contact's current status as **WhatsApp opt-in** when you open a lead on the **Pipeline** page. A number on the suppression list cannot be opted in again through LeadPilot, and the suppression cannot be lifted from the app.
 
 ## What is the 24-hour window?
 

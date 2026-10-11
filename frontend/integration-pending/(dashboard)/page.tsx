@@ -1,36 +1,17 @@
 // app/(dashboard)/page.tsx
-// M5 dashboard page + M8-C5 OnboardingChecklist addition.
-// Checklist is shown when completed_count < 3; collapses/dismisses itself.
+// M5 dashboard page (parked, not built). The M8-C5 OnboardingChecklist it used
+// to embed was deleted (product defect #22: never mounted, and nothing marks
+// onboarding steps complete); see docs/program/fixes/product-defects.md.
 "use client";
 
-import { Suspense } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api/client";
-import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 import { KanbanPipeline } from "@/components/pipeline/KanbanPipeline";
 import { CampaignSummaryRow } from "@/components/campaigns/CampaignSummaryRow";
 import { QuickStats } from "@/components/analytics/QuickStats";
 
 export default function DashboardPage() {
-  const { data: onboarding } = useQuery({
-    queryKey: ["onboarding-state"],
-    queryFn: () => apiClient.get("/onboarding/state").then((r) => r.data),
-    staleTime: 60_000,
-  });
-
-  const showChecklist =
-    onboarding && !onboarding.all_complete && onboarding.completed_count < 3;
-
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
-
-      {/* Onboarding checklist — only for new users (< 3 steps done) */}
-      {showChecklist && (
-        <Suspense fallback={null}>
-          <OnboardingChecklist />
-        </Suspense>
-      )}
 
       {/* Quick stats row */}
       <QuickStats />

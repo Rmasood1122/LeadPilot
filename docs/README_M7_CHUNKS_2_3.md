@@ -13,7 +13,7 @@
 | Android back button | `src/hooks/useBackButton.ts` |
 | Status bar theming | `src/hooks/useStatusBar.ts` |
 | Offline banner (non-blocking) | `src/components/ui/OfflineBanner.tsx` |
-| Pull-to-refresh + haptics | `src/components/ui/PullToRefresh.tsx` |
+| Pull-to-refresh + haptics | removed 2026-10-11: the component was never mounted in any page (docs/program/fixes/product-defects.md #24) |
 | Safe area insets | `src/styles/globals.css` |
 | Native boot (single entry point) | `src/components/providers/NativeProvider.tsx` |
 | App Links verification file | `public/.well-known/assetlinks.json` |

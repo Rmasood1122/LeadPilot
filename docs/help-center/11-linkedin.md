@@ -113,7 +113,7 @@ Every LeadPilot send to a connection checks again at that moment that your plan 
 
 ## How do I delete my uploaded connections?
 
-On the Network page, click **Delete my uploaded connections** and confirm. This deletes everything you uploaded. The button only appears while your plan includes the Network page; after a downgrade the page shows only the upgrade notice and no delete button. The delete itself is not tied to your plan, so it can still be done through the LeadPilot API (`DELETE /linkedin-network`).
+On the Network page, click **Delete my uploaded connections** and confirm. This deletes everything you uploaded. Deleting is not tied to your plan: after a downgrade the page shows the upgrade notice, and the delete button is still there for as long as you have connections stored. It can also be done through the LeadPilot API (`DELETE /linkedin-network`).
 
 ## Related
 - [Sequences and follow-ups](08-sequences-and-follow-ups.md)

@@ -410,6 +410,23 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 )
                 session.commit()
                 return "needs_template_not_approved"
+            # LEGAL GUARD (product defect #28): a marketing template approved
+            # before the opt-out rule (or edited outside the app) must still
+            # tell the recipient how to opt out. Fails CLOSED, never sent.
+            from app.services import whatsapp_templates as tmpl_rules  # noqa: PLC0415
+
+            try:
+                tmpl_rules.validate_opt_out(tmpl.body, tmpl.category)
+            except tmpl_rules.TemplateError:
+                message.status = MessageStatus.NEEDS_TEMPLATE
+                message.error = (
+                    f"approved marketing template '{tmpl.name}' has no opt-out "
+                    f"instruction (e.g. \"{tmpl_rules.STANDARD_OPT_OUT}\") -- add "
+                    "it, re-submit the template to Meta and use the new version"
+                )
+                _audit(session, strategy, lead, message, "blocked_no_opt_out")
+                session.commit()
+                return "needs_template_no_opt_out"
 
     # ---- Feature 8: the resolved compliance rule for THIS lead + channel ----
     # Workspace / region / channel overrides of the baseline, resolved now.
