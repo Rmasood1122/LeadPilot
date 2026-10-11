@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { changePassword, exportMyData, saveName } from "@/lib/api/profile";
+import { changePassword, deleteMyAccount, exportMyData, saveName } from "@/lib/api/profile";
 import {
-  accountExportFilename, canUpgrade, exportErrorMessage, passwordErrorMessage, planLabel,
-  validateName, validatePasswordChange,
+  BILLING_RETENTION_YEARS, DELETE_ACCOUNT_COPY, DELETE_CONFIRMATION, accountExportFilename,
+  canDeleteAccount, canUpgrade, deleteAccountErrorMessage, exportErrorMessage,
+  passwordErrorMessage, planLabel, validateName, validatePasswordChange,
 } from "@/lib/profile";
 import { NAV } from "@/components/shell/nav";
 
@@ -49,6 +50,50 @@ describe("data export (GDPR)", () => {
     expect(exportErrorMessage(new ApiError(403, "INVALID_PASSWORD"))).toMatch(/password is not right/);
     expect(exportErrorMessage(new ApiError(429, "x"))).toMatch(/Too many/);
     expect(exportErrorMessage(new Error("boom"))).toMatch(/Try again/);
+  });
+});
+
+describe("delete account (GDPR Art. 17)", () => {
+  it("sends DELETE /me with the password and the typed phrase", async () => {
+    await deleteMyAccount("my-pass-1", "DELETE");
+    expect(calls[0].url).toMatch(/\/me$/);
+    expect(calls[0].init.method).toBe("DELETE");
+    expect(JSON.parse(calls[0].init.body as string)).toEqual({
+      password: "my-pass-1", confirm: "DELETE",
+    });
+  });
+  it("enables the button only with a password and the exact phrase", () => {
+    expect(DELETE_CONFIRMATION).toBe("DELETE");
+    expect(canDeleteAccount("pw", "DELETE")).toBe(true);
+    expect(canDeleteAccount("", "DELETE")).toBe(false);
+    for (const typed of ["", "delete", "Delete", "DELETE ", " DELETE", "DELET"]) {
+      expect(canDeleteAccount("pw", typed)).toBe(false);
+    }
+  });
+  it("maps the server's contracts to plain messages", () => {
+    expect(deleteAccountErrorMessage(new ApiError(403, "INVALID_PASSWORD"))).toMatch(/password is not right/);
+    expect(deleteAccountErrorMessage(new ApiError(422, "CONFIRMATION_REQUIRED"))).toMatch(/Type DELETE/);
+    expect(deleteAccountErrorMessage(new ApiError(429, "x"))).toMatch(/Too many/);
+    expect(deleteAccountErrorMessage(new ApiError(502, "Could not reach the payment provider")))
+      .toMatch(/payment provider/);
+    expect(deleteAccountErrorMessage(new ApiError(409, "An administrator account cannot be deleted")))
+      .toMatch(/administrator/);
+    expect(deleteAccountErrorMessage(new Error("boom"))).toMatch(/Try again/);
+  });
+  it("says exactly what is kept (E1 billing 7 years, E2 opt-outs, security record)", () => {
+    expect(BILLING_RETENTION_YEARS).toBe(7);
+    expect(DELETE_ACCOUNT_COPY.kept).toHaveLength(3);
+    expect(DELETE_ACCOUNT_COPY.kept[0]).toMatch(/Billing records/);
+    expect(DELETE_ACCOUNT_COPY.kept[0]).toMatch(/our copy has no name or email/);
+    // Review fix 5: what Stripe and other providers keep is said, not hidden.
+    expect(DELETE_ACCOUNT_COPY.outside.join(" ")).toMatch(/Stripe keeps its own customer record/);
+    expect(DELETE_ACCOUNT_COPY.erased).toMatch(/nothing is deleted/);
+    expect(DELETE_ACCOUNT_COPY.kept[0]).toContain(`${BILLING_RETENTION_YEARS} years`);
+    expect(DELETE_ACCOUNT_COPY.kept[1]).toMatch(/opt-in, opt-out and erasure/);
+    expect(DELETE_ACCOUNT_COPY.kept[1]).toMatch(/do-not-contact list/);
+    expect(DELETE_ACCOUNT_COPY.kept[2]).toMatch(/security record/);
+    expect(DELETE_ACCOUNT_COPY.erased).toMatch(/cannot be undone/);
+    expect(DELETE_ACCOUNT_COPY.erased).toMatch(/no further charges/);
   });
 });
 

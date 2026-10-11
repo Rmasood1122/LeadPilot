@@ -200,6 +200,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         user = db.get(User, user_id)
         if user is None:
             raise HTTPException(status_code=401, detail="user not found")
+    # GDPR erasure (app/services/account_erasure.py): an erased account is a
+    # tombstone row, not a missing one, so an access token issued before the
+    # erasure would still resolve. It gets the same answer as a missing user
+    # -- 401, so the client's refresh fails (its sessions are gone) and it
+    # signs out -- rather than the suspended account's 403.
+    from app.services.account_erasure import is_tombstone  # noqa: PLC0415
+
+    if is_tombstone(user):
+        raise HTTPException(status_code=401, detail="user not found")
     # Suspension is enforced HERE, at the chokepoint, not only in
     # require_admin: otherwise a suspended account keeps every non-admin
     # route. 403 for the same reason as the verification gate below -- the

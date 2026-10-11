@@ -7,7 +7,8 @@ the record on its own before raising, because there is no action to share a
 transaction with and the attempt is exactly what must not be lost.
 
 The same event is also written to the application log, so it is greppable even
-where nobody queries the table.
+where nobody queries the table -- without the IP address, which stays in the
+table only (docs/features/gdpr-erasure.md).
 """
 
 from __future__ import annotations
@@ -34,6 +35,10 @@ AUTH_PASSWORD_CHANGED = "auth.password_changed"
 AUTH_REFRESH_REUSE = "auth.refresh_reuse_detected"
 ACCOUNT_EXPORTED = "account.data_exported"
 ACCOUNT_EXPORT_DENIED = "account.data_export_denied"
+# GDPR Art. 17: the account erased itself (app/services/account_erasure.py).
+# The ACCOUNT_DELETED row carries no IP, user agent or email -- see there.
+ACCOUNT_DELETED = "account.deleted"
+ACCOUNT_DELETE_DENIED = "account.delete_denied"
 
 
 def record(db: Session, *, action: str, request: Request | None = None,
@@ -49,6 +54,8 @@ def record(db: Session, *, action: str, request: Request | None = None,
         ip=ip, user_agent=agent, details_json=details or None,
     )
     db.add(event)
-    logger.info("SECURITY AUDIT action=%s user=%s owner=%s target=%s:%s ip=%s",
-                action, user_id, event.owner_user_id, target_type, event.target_id, ip)
+    # No IP in the application log: the table row holds it (and an account
+    # erasure scrubs it there), but a log line cannot be erased afterwards.
+    logger.info("SECURITY AUDIT action=%s user=%s owner=%s target=%s:%s",
+                action, user_id, event.owner_user_id, target_type, event.target_id)
     return event

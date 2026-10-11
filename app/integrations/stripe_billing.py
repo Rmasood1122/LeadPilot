@@ -156,7 +156,10 @@ def create_subscription_checkout(*, customer_id: str, user_id: str, tier: dict,
 def retrieve_subscription(subscription_id: str) -> dict:
     """The subscription object itself (status, trial, period, price). The
     checkout-completed event does not carry it, and events can arrive in any
-    order, so the handler reads Stripe's current state instead of guessing."""
+    order, so the handler reads Stripe's current state instead of guessing.
+    Raises StripeError ("stripe HTTP 404: ...") when Stripe has no such
+    subscription (app/services/account_erasure.py uses this to tell "already
+    gone" from "could not cancel")."""
     return _request("GET", f"/v1/subscriptions/{subscription_id}")
 
 

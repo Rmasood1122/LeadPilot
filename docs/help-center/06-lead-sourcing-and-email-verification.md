@@ -120,7 +120,7 @@ When a strategy is full, a new sourcing request is refused with an upgrade messa
 ## Can I remove a lead or erase their data?
 
 - **Remove** (next to a verified or flagged lead in the **1. Find leads** list) marks the lead `dropped`, so it is not included when you launch. It also stops any sequence the lead is already in, straight away: their queued messages are cancelled, and a message that is due is checked again at the moment of sending, so a removed lead is never sent to. A dropped lead cannot be moved back to another status.
-- **Delete (GDPR erasure)** (open a lead on the **Pipeline** page) permanently erases the lead's personal data and adds their email address, phone number and LinkedIn profile to the suppression list, so they are never contacted or sourced again. A record that the erasure happened is kept. You confirm with **Delete**.
+- **Delete (GDPR erasure)** (open a lead on the **Pipeline** page) permanently erases the lead's personal data, the messages written to them and the replies they sent, and adds their email address, phone number and LinkedIn profile to the suppression list, so they are never contacted or sourced again. A record that the erasure happened is kept. You confirm with **Delete**.
 
 ## Can I upload my own contact list?
 

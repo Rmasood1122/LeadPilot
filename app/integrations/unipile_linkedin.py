@@ -122,6 +122,13 @@ class UnipileClient:
             raise UnipileError("hosted auth returned no url")
         return data["url"]
 
+    def delete_account(self, account_id: str) -> None:
+        """Disconnect a LinkedIn account: Unipile drops the stored session.
+        Used when the LeadPilot account that connected it is erased
+        (app/services/account_erasure.py).
+        # TODO: verify against current Unipile docs (DELETE /accounts/{id})"""
+        self._request("DELETE", f"/accounts/{account_id}")
+
     def account(self, account_id: str) -> dict:
         """# TODO: verify against current Unipile docs (GET /accounts/{id})"""
         data = self._request("GET", f"/accounts/{account_id}")

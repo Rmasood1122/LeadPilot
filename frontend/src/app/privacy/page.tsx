@@ -4,6 +4,12 @@
  * Must stay publicly accessible over HTTPS (Play Store requirement for the
  * Android build). Static server component: no API calls, no auth. Does NOT use
  * Shell.tsx (authenticated dashboard shell).
+ *
+ * NEEDS FOUNDER/LEGAL REVIEW BEFORE MERGE (2026-10-11): §5 (no analytics
+ * provider -- none exists in the code) and §8 (self-serve account deletion and
+ * what it keeps: docs/features/gdpr-erasure.md, decisions E1-E3) were
+ * rewritten to match the code (founder decision D1). The retention periods in
+ * §8 are defaults awaiting confirmation. Keep docs/PRIVACY_POLICY.md in step.
  */
 
 import type { Metadata } from "next";
@@ -26,7 +32,7 @@ export default function PrivacyPage() {
       <main className="px-6 py-24">
         <article className="mx-auto max-w-3xl">
           <h1 className="text-4xl font-bold tracking-tight">Privacy Policy</h1>
-          <p className="mt-4 text-sm text-gray-400">Effective date: September 13, 2026</p>
+          <p className="mt-4 text-sm text-gray-400">Effective date: October 11, 2026</p>
 
           <Section title="1. Who we are and what this policy covers">
             <p>
@@ -91,12 +97,25 @@ export default function PrivacyPage() {
 
           <Section title="5. Third-party services we use">
             <p>
-              We share data with a small number of service providers, only as far as each needs it to do its
-              job. Stripe processes payments. Anthropic&apos;s Claude models help generate personalised
-              message drafts from prospect research. Unipile provides our LinkedIn integration for sending and
-              receiving messages. Vercel hosts our website. Google provides analytics that help us understand
-              how the site is used. Each provider is bound by its own privacy and security commitments, and a
-              current list of the providers that process your data is available on request.
+              We share data with service providers only as far as each needs it to do its job. Always in use:
+              Neon (database), Upstash (Redis cache and job queue), Render (application servers) and Vercel
+              (this website); Anthropic (Claude models write research, strategies and message drafts from
+              prospect data); Resend (account emails such as sign-up verification); Stripe (payments).
+            </p>
+            <p>
+              Used when the feature is switched on or the connection is made: Google (Gmail API to send from
+              the mailboxes you connect, Google Calendar and Meet for meeting links, Postmaster Tools for
+              sending-domain reputation, Firebase Cloud Messaging for push notifications); Unipile (LinkedIn
+              sending and receiving), with RapidAPI as a fallback for reading public LinkedIn posts; Meta
+              (WhatsApp Business messages); Apollo and Hunter (finding and verifying prospects&apos; business
+              contact details); NewsAPI (news about a prospect&apos;s company); OpenAI (a second AI model, when an
+              administrator enables it); Vapi and ElevenLabs (AI phone calls and voicemail audio); Twilio (SMS
+              verification codes); Recall.ai and Zoom (meeting recording and meeting links); Calendly
+              (bookings); HubSpot, Salesforce and Slack (the CRM and chat tools you connect); Mailreach
+              (mailbox health checks); ipapi.co, ipinfo.io, IPQualityScore and proxycheck.io (the country and
+              VPN check on the IP address you sign up or sign in from); and the AegisAudit, PostIQ and
+              SIGNALFORGE tools when you connect them. We do not use Google Analytics or any other analytics or
+              advertising tracker on the website or in the dashboard.
             </p>
             <p>
               Some of these providers are based outside your country, including in the United States. Where
@@ -135,15 +154,47 @@ export default function PrivacyPage() {
 
           <Section title="8. Data retention">
             <p>
-              We keep account data for as long as your account is active and for as long as needed to meet
-              legal, tax, and accounting obligations. We do not run an automatic deletion schedule for account or
-              prospect data: it stays in your account until it is deleted. You can erase an individual
-              prospect&apos;s personal data from the dashboard at any time; their email address, phone number, and
-              LinkedIn profile are then added to a do-not-contact list that is checked before every send, and a
-              record that the erasure took place is kept. Deleting a campaign strategy deletes its research,
-              prospects, sequences, and messages with it. You can download a copy of the data in your account from
-              your profile page. To ask us to delete your account or any other data, contact us at the address
-              below.
+              We keep account data for as long as your account exists. We do not run an automatic deletion
+              schedule for account or prospect data: it stays in your account until it is deleted. The one
+              exception is support chat: a conversation is deleted 30 days after its last message.
+            </p>
+            <p>
+              You can erase an individual prospect&apos;s personal data from the dashboard at any time. Erased:
+              their name, contact details, company, LinkedIn profile and research notes; the subject and text
+              of every message written to them (any message still waiting to be sent is cancelled) and of every
+              reply they sent; call transcripts, recording links and voicemail audio; booking details; meeting
+              notes, transcripts and summaries; meeting briefs and follow-up drafts; notes, custom fields and
+              deal notes about them; and the review, attribution and fact-check copies of their messages.
+              Kept, without those details: the dates, statuses and counts that campaign reports are built from.
+              Their email address, phone number and LinkedIn profile are added to a do-not-contact list that is
+              checked before every send, and a record that the erasure took place is kept. Data already copied
+              into a CRM you connected stays there. Deleting a campaign strategy deletes its research, prospects,
+              sequences, and messages with it. You can download a copy of the data in your account from your
+              profile page.
+            </p>
+            <p>
+              You can delete your whole account yourself from your profile page, after confirming your password.
+              Any paid plan is cancelled at once and nothing more is charged (if the cancellation cannot be
+              confirmed with the payment provider, nothing is deleted and you are asked to try again), and your
+              account and its data are erased immediately. Connected LinkedIn accounts are also disconnected at
+              Unipile. Kept after that: billing records (amounts, dates, and payment-provider reference numbers,
+              with no name or email address in our copy) for 7 years, for tax and accounting; the consent ledger
+              for your prospects, meaning every recorded opt-in, opt-out, suppression and erasure with the email
+              address or phone number it concerns, its source, its time and a short note on how it was given or
+              withdrawn, and the do-not-contact list, both without a time limit, so that anyone who asked not
+              to be contacted stays protected; and a security record that the account was deleted, without your
+              IP address, device or email address. Stripe, our payment provider, keeps its own customer record
+              of you (name, email and payment details) under its own privacy policy; we do not ask Stripe to
+              delete it.
+            </p>
+            <p>
+              Outside the database: provider responses used to find and verify contact details are cached for
+              up to 30 days (search results for 1 day) and expire on their own; they are not removed when an
+              account is deleted. Our hosting provider&apos;s request logs record the IP address of each request
+              and are kept for the period the hosting provider sets. Access LeadPilot was given inside Google,
+              HubSpot, Salesforce or Slack is removed from LeadPilot but not revoked on the provider&apos;s side;
+              you can remove it there. You can also ask us to delete your account or any other data at the
+              address below.
             </p>
           </Section>
 

@@ -524,15 +524,27 @@ def _flag_if_all_skipped(session: Session, enrollment: SequenceEnrollment) -> No
 # --------------------------------------------------------------------------
 
 
-def make_unsubscribe_token(lead_id: uuid.UUID) -> str:
-    return crypto.encrypt_json({"lead_id": str(lead_id), "purpose": "unsubscribe"})
+def make_unsubscribe_token(lead_id: uuid.UUID, email: str | None = None) -> str:
+    """The token in every email's unsubscribe link. It also carries the
+    recipient address (encrypted, like the rest of the token), so an
+    unsubscribe still reaches the suppression list after the lead -- or the
+    whole sending account -- has been erased (docs/features/gdpr-erasure.md)."""
+    payload = {"lead_id": str(lead_id), "purpose": "unsubscribe"}
+    if email:
+        payload["to"] = email.strip().lower()
+    return crypto.encrypt_json(payload)
 
 
-def parse_unsubscribe_token(token: str) -> uuid.UUID:
+def parse_unsubscribe_payload(token: str) -> tuple[uuid.UUID, str | None]:
+    """(lead id, recipient address or None for tokens minted before 2026-10-11)."""
     data = crypto.decrypt_json(token)
     if data.get("purpose") != "unsubscribe":
         raise ValueError("not an unsubscribe token")
-    return uuid.UUID(data["lead_id"])
+    return uuid.UUID(data["lead_id"]), (data.get("to") or None)
+
+
+def parse_unsubscribe_token(token: str) -> uuid.UUID:
+    return parse_unsubscribe_payload(token)[0]
 
 
 def compliance_footer(unsubscribe_url: str) -> str:
@@ -546,7 +558,7 @@ def compliance_footer(unsubscribe_url: str) -> str:
 def build_compliant_email(lead: Lead, subject: str, body: str) -> tuple[str, str, dict, str]:
     """Returns (subject, body_with_footer, headers, token). Headers carry
     RFC 8058 one-click unsubscribe."""
-    token = make_unsubscribe_token(lead.id)
+    token = make_unsubscribe_token(lead.id, lead.email)
     url = f"{settings.public_base_url.rstrip('/')}/unsubscribe/{token}"
     headers = {
         "List-Unsubscribe": f"<{url}>",

@@ -297,6 +297,9 @@ def gdpr_delete_lead(
     - the lead row keeps only its id + provider external_id as a
       non-personal tombstone; the (strategy, source, external_id) unique
       key then blocks re-insertion within this strategy too.
+    - the correspondence goes too: reply sender/subject/body/AI draft and the
+      subject/body of every message to the person (counts' metadata kept;
+      anything still scheduled is cancelled); provenance loses its values.
     - F10: the SAME PERSON's other lead rows that this account's Champion
       Tracker linked by a job change (the old lead <-> the re-engagement lead
       at the new company, transitively) are erased the same way. The erasure
@@ -317,7 +320,7 @@ def gdpr_delete_lead(
 
 
 def _gdpr_erase_lead(db: Session, lead: Lead, current_user: User) -> None:
-    """Erase ONE lead row (the body of the GDPR delete, unchanged)."""
+    """Erase ONE lead row (the body of the GDPR delete)."""
 
     def _suppress(email: str | None, phone: str | None) -> None:
         if email:
@@ -400,6 +403,16 @@ def _gdpr_erase_lead(db: Session, lead: Lead, current_user: User) -> None:
     from app.services import champion_tracker  # noqa: PLC0415
 
     champion_tracker.erase_for_lead(db, lead.id)
+    # GDPR gap B (docs/features/gdpr-erasure.md): the correspondence itself --
+    # the replies the person sent (address, subject, body, the AI draft answer)
+    # and the subject/body of every message written to them. The non-personal
+    # metadata the reply-rate and send counts read is kept. A message that
+    # could still go out is cancelled first. And provenance keeps WHERE each
+    # field came from but no longer WHAT it was.
+    from app.services import account_erasure  # noqa: PLC0415
+
+    account_erasure.erase_lead_correspondence(db, lead.id)
+    lead.provenance_json = account_erasure.scrub_provenance(lead.provenance_json)
     db.commit()
     # Feature Group 4: forget which CRM record this person was synced to.
     # (What the CRM itself holds is the CRM owner's to erase.)

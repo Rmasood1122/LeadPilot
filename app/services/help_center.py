@@ -149,7 +149,8 @@ HELP_CENTER_DIR_ENV = "HELP_CENTER_DIR"
 #     10.0                               37       2          0
 #
 # 0.50 is the lowest coverage floor that answers no must-refuse item; the
-# nearest one sits at 0.454 (the privacy-policy question). 0.55 keeps a
+# nearest one sat at 0.454 (the privacy-policy question; 0.44 since the
+# 2026-10-11 article 21 rewrite -- the coverage is IDF-weighted). 0.55 keeps a
 # margin above it and drops a wrong answer for one correct one -- the same
 # trade the confidence floor makes: an unnecessary ticket is an annoyance, a
 # confidently wrong answer is the failure that matters.

@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from app.db.base import get_db
-from app.db.models import Lead
+from app.db.models import Lead, SuppressionEntry
 from app.services import sequence_engine as engine
 
 logger = logging.getLogger(__name__)
@@ -38,16 +38,42 @@ reply with "unsubscribe" and you will be removed immediately.</p>
 </body></html>"""
 
 
+def _suppress_address(db: Session, email: str) -> None:
+    """Honour an unsubscribe whose lead record no longer holds the address --
+    the lead was GDPR-erased, or the sending account was deleted. CAN-SPAM
+    (15 U.S.C. 7704(a)(4)) and CASL require the request to be honoured; the
+    address travels in the (encrypted) token for exactly this case. Global
+    suppression + a consent-ledger event with no lead and no account."""
+    from app.services import consent  # noqa: PLC0415
+    from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
+
+    address = email.strip().lower()
+    if not is_suppressed(db, email=address):
+        db.add(SuppressionEntry(email=address, reason="unsubscribed_link"))
+    consent.record(db, lead=None, kind=consent.SUPPRESSED, channel=consent.EMAIL,
+                   source="unsubscribe_link", identifier=address,
+                   detail="unsubscribed via link after the sender's records were erased",
+                   commit=False)
+    db.commit()
+
+
 def _process(token: str, db: Session) -> HTMLResponse:
     try:
-        lead_id = engine.parse_unsubscribe_token(token)
+        lead_id, email = engine.parse_unsubscribe_payload(token)
     except Exception:
         return HTMLResponse(_INVALID_HTML, status_code=400)
     lead = db.get(Lead, lead_id)
-    if lead is None:
-        # Token was valid once but the lead is gone (e.g. GDPR-deleted).
-        return HTMLResponse(_CONFIRM_HTML, status_code=200)
-    engine.unsubscribe_lead(db, lead, source="link")
+    if lead is not None and lead.email:
+        engine.unsubscribe_lead(db, lead, source="link")
+    elif email:
+        # The lead is gone (account deleted) or a GDPR tombstone: the address
+        # in the token is the only copy left -- suppress it.
+        _suppress_address(db, email)
+    elif lead is not None:
+        engine.unsubscribe_lead(db, lead, source="link")
+    # else: a token minted before the address was carried, whose lead is gone.
+    # Nothing can be recorded; the account that sent it no longer exists and
+    # can send nothing more through LeadPilot.
     return HTMLResponse(_CONFIRM_HTML, status_code=200)
 
 

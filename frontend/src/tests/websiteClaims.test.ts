@@ -15,6 +15,11 @@ const BANNED: { phrase: RegExp; why: string }[] = [
   { phrase: /not\s+bots/i, why: "outreach is sent automatically" },
   { phrase: /human\s+senders?/i, why: "outreach is sent automatically" },
   { phrase: /on\s+every\s+prospect/i, why: "research runs per campaign strategy" },
+  // 2026-10-11 (docs/features/gdpr-erasure.md): no analytics code exists, and
+  // account deletion is self-serve on the Profile page.
+  { phrase: /provides\s+analytics/i, why: "no analytics provider is used" },
+  { phrase: /to\s+ask\s+us\s+to\s+delete\s+your\s+account\s+or\s+any\s+other\s+data,\s+contact/i,
+    why: "account deletion is self-serve (DELETE /me)" },
 ];
 
 const ROOTS = ["src/app", "src/components"];

@@ -76,8 +76,10 @@ def gmail_callback(
     except ValueError:
         return frontend_redirect("gmail", "error", "invalid or tampered state")
 
+    from app.services.account_erasure import is_tombstone  # noqa: PLC0415
+
     user = db.get(User, user_id)
-    if user is None:
+    if user is None or is_tombstone(user):   # an erased account stays erased
         return frontend_redirect("gmail", "error", "user for this state not found")
 
     oauth = get_oauth()

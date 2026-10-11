@@ -148,6 +148,24 @@ def revoke_all_for_user(db: Session, user_id: uuid.UUID, reason: str,
     return int(result.rowcount or 0)
 
 
+def _live_user(db: Session, user_id) -> User:
+    """The account a refresh token may still sign in, or raise.
+
+    An erased account (a GDPR tombstone, app/services/account_erasure.py) is
+    answered exactly like a missing one: no new session, no IP or user agent
+    recorded for it. A suspended account gets the same 403 the access-token
+    chokepoint gives it (app/services/auth.py), instead of fresh tokens.
+    """
+    from app.services.account_erasure import is_tombstone  # noqa: PLC0415
+
+    user = db.get(User, user_id)
+    if user is None or is_tombstone(user):
+        raise _unauthorized("user not found")
+    if user.is_suspended:
+        raise HTTPException(status_code=403, detail="account suspended")
+    return user
+
+
 def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
            now: datetime | None = None) -> IssuedTokens:
     """Exchange a refresh token for new tokens, or raise 401. Commits."""
@@ -159,9 +177,7 @@ def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
     if jti is None:
         if not settings.auth_accept_legacy_refresh_tokens:
             raise _unauthorized("session expired")
-        user = db.get(User, user_id)
-        if user is None:
-            raise _unauthorized("user not found")
+        user = _live_user(db, user_id)
         logger.info("auth: exchanging a pre-session refresh token for user %s", user_id)
         return issue_session_tokens(db, user, persistent=True, request=request, now=now)
 
@@ -177,9 +193,7 @@ def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
         rotated_at = _aware(row.rotated_at)
         grace = timedelta(seconds=max(settings.auth_refresh_reuse_grace_seconds, 0))
         if row.revoked_reason == ROTATED and rotated_at is not None and now - rotated_at <= grace:
-            user = db.get(User, row.user_id)
-            if user is None:
-                raise _unauthorized("user not found")
+            user = _live_user(db, row.user_id)
             return IssuedTokens(user=user, access_token=auth_svc.issue_access_token(user.id),
                                 refresh_token=None, persistent=row.persistent)
         if row.revoked_reason == ROTATED:
@@ -196,9 +210,7 @@ def rotate(db: Session, refresh_token: str, *, request: Request | None = None,
 
     if _aware(row.expires_at) <= now:
         raise _unauthorized("session expired")
-    user = db.get(User, row.user_id)
-    if user is None:
-        raise _unauthorized("user not found")
+    user = _live_user(db, row.user_id)
 
     # Claim the row atomically. Two concurrent requests with the same token
     # both passed the checks above; only one UPDATE can match revoked_at IS

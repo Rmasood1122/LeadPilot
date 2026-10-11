@@ -19,3 +19,12 @@ export const changePassword = (currentPassword: string, newPassword: string) =>
  *  re-checked server-side; the workspace header is ignored (/me is personal). */
 export const exportMyData = (password: string) =>
   api<Record<string, unknown>>("/me/data-export", { method: "POST", body: { password } });
+
+/** GDPR Art. 17: erase this account. Password re-checked and "DELETE" typed;
+ *  the workspace header is ignored (/me is personal), so this only ever
+ *  deletes the signed-in person's own account. */
+export const deleteMyAccount = (password: string, confirm: string) =>
+  api<{ deleted: boolean; deleted_at: string; kept: Record<string, string>;
+        billing_retention_years: number }>("/me", {
+    method: "DELETE", body: { password, confirm },
+  });

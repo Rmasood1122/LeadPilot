@@ -90,7 +90,7 @@ A conversation is deleted 30 days after its last message, by a job that runs eve
 
 ## Are there other ways to contact LeadPilot?
 
-Yes. The public **Contact** page on the LeadPilot website offers a link to book a call, an email address, the company's LinkedIn page and WhatsApp numbers. For privacy requests, such as a request to delete your account, use the contact email on the **Privacy** page.
+Yes. The public **Contact** page on the LeadPilot website offers a link to book a call, an email address, the company's LinkedIn page and WhatsApp numbers. You can delete your account yourself on **Profile** (see [Privacy, data retention and deletion](21-privacy-data-retention-deletion.md)); for any other privacy request, use the contact email on the **Privacy** page.
 
 ## Is there a status page?
 

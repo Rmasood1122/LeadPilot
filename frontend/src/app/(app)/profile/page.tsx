@@ -1,16 +1,17 @@
 "use client";
 
 /** Profile: display name, plan (with the online Cancel plan button), password,
- *  download your data (GDPR). */
+ *  download your data and delete the account (GDPR Art. 15/20 and 17). */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { changePassword, exportMyData, getMe, saveName } from "@/lib/api/profile";
+import { changePassword, deleteMyAccount, exportMyData, getMe, saveName } from "@/lib/api/profile";
 import { clearSession } from "@/lib/api/client";
 import { resetAuthStore } from "@/lib/stores/authStore";
 import {
-  accountExportFilename, exportErrorMessage, passwordErrorMessage,
-  validateName, validatePasswordChange,
+  DELETE_ACCOUNT_COPY, DELETE_CONFIRMATION, accountExportFilename, canDeleteAccount,
+  deleteAccountErrorMessage, exportErrorMessage, passwordErrorMessage, validateName,
+  validatePasswordChange,
 } from "@/lib/profile";
 import { PlanCard } from "@/components/billing/PlanCard";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,9 @@ export default function ProfilePage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [exportPw, setExportPw] = useState("");
   const [exportMsg, setExportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [deletePw, setDeletePw] = useState("");
+  const [deleteTyped, setDeleteTyped] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => { if (me.data) setName(me.data.full_name ?? ""); }, [me.data]);
 
@@ -67,6 +71,18 @@ export default function ProfilePage() {
       setExportMsg({ ok: true, text: "Your data has been downloaded." });
     },
     onError: (e) => setExportMsg({ ok: false, text: exportErrorMessage(e) }),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () => deleteMyAccount(deletePw, deleteTyped),
+    // The account no longer exists: every session was ended server-side.
+    onSuccess: () => {
+      clearSession();
+      resetAuthStore();
+      qc.clear();
+      router.replace("/login");
+    },
+    onError: (e) => setDeleteError(deleteAccountErrorMessage(e)),
   });
 
   if (me.isLoading) return <p className="p-6 text-sm">Loading…</p>;
@@ -160,6 +176,46 @@ export default function ProfilePage() {
           <Button disabled={exportMut.isPending || !exportPw}
                   onClick={() => { setExportMsg(null); exportMut.mutate(); }}>
             {exportMut.isPending ? "Preparing…" : "Download my data"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-600/60">
+        <CardHeader><CardTitle className="text-red-600">Delete account</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm">{DELETE_ACCOUNT_COPY.erased}</p>
+          <div className="text-sm text-muted-foreground">
+            <p>Kept after deletion:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {DELETE_ACCOUNT_COPY.kept.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </div>
+          <div className="text-sm text-muted-foreground">
+            <p>Outside LeadPilot&apos;s database:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {DELETE_ACCOUNT_COPY.outside.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </div>
+          <p className="text-sm text-muted-foreground">{DELETE_ACCOUNT_COPY.workspace}</p>
+          <p className="text-sm text-muted-foreground">
+            Want a copy first? Use Download your data above before deleting.
+          </p>
+          <div>
+            <Label htmlFor="delete-pw">Confirm with your password</Label>
+            <Input id="delete-pw" type="password" autoComplete="current-password"
+                   value={deletePw}
+                   onChange={(e) => { setDeletePw(e.target.value); setDeleteError(null); }} />
+          </div>
+          <div>
+            <Label htmlFor="delete-typed">Type {DELETE_CONFIRMATION} to confirm</Label>
+            <Input id="delete-typed" autoComplete="off" value={deleteTyped}
+                   onChange={(e) => { setDeleteTyped(e.target.value); setDeleteError(null); }} />
+          </div>
+          {deleteError && <p role="alert" className="text-sm text-red-600">{deleteError}</p>}
+          <Button variant="destructive"
+                  disabled={deleteMut.isPending || !canDeleteAccount(deletePw, deleteTyped)}
+                  onClick={() => { setDeleteError(null); deleteMut.mutate(); }}>
+            {deleteMut.isPending ? "Deleting…" : "Delete my account permanently"}
           </Button>
         </CardContent>
       </Card>

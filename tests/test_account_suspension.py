@@ -101,8 +101,9 @@ class TestLoginAndRefreshWhileSuspended:
         _suspend(db_session, account)
         rotated = anon_client.post("/auth/refresh",
                                    json={"refresh_token": login.json()["refresh_token"]})
-        assert rotated.status_code == 200, rotated.text
-        access = rotated.json()["access_token"]
-        resp = anon_client.get(PROTECTED, headers={"Authorization": f"Bearer {access}"})
-        assert resp.status_code == 403
-        assert resp.json()["detail"] == "account suspended"
+        # Since docs/features/gdpr-erasure.md (review fix 2) the refresh itself
+        # is refused -- no new session is created for a suspended account --
+        # with the same 403 detail the access-token chokepoint uses.
+        assert rotated.status_code == 403, rotated.text
+        assert rotated.json()["detail"] == "account suspended"
+        assert "access_token" not in rotated.json()

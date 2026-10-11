@@ -713,6 +713,14 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             else:
                 channel = (_get_whatsapp_channel(session) if is_whatsapp
                            else _get_channel(session, account))
+        # GDPR (docs/features/gdpr-erasure.md): a lead or account erasure that
+        # ran after the claim cancels (or deletes) this row. Re-assert the
+        # claim the same way it was taken -- a conditional UPDATE -- and fail
+        # closed if it no longer holds.
+        from app.services import account_erasure  # noqa: PLC0415
+
+        if not account_erasure.confirm_send_claim(session, message.id):
+            raise account_erasure.SendClaimLost(str(message.id))
         result = channel.send(outbound)
     except Exception as exc:
         if li_account is not None:
@@ -720,6 +728,29 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             from app.services import linkedin_limits  # noqa: PLC0415
 
             linkedin_limits.release(li_account, li_action, now=now)
+        from app.services import account_erasure  # noqa: PLC0415
+
+        if isinstance(exc, account_erasure.SendClaimLost):
+            # Nothing was transmitted. The row is no longer ours: never write
+            # status or content to it. If the prospect was erased while this
+            # task rendered, scrub again what the render re-persisted.
+            lead_id = message.lead_id      # read before the rollback expires it
+            session.rollback()
+            if is_phone:
+                from app.services import notifications, phone_calls  # noqa: PLC0415
+
+                try:
+                    phone_calls.release_call_slot(
+                        notifications.owner_of_strategy(session, strategy), now=now)
+                except Exception:  # noqa: BLE001 -- the account may be gone
+                    logger.warning("call slot not released for message %s", message_id)
+            if account_erasure.lead_is_erased(session, lead_id):
+                account_erasure.erase_lead_correspondence(session, lead_id)
+                session.commit()
+                logger.info("message %s not sent: the lead was erased mid-send", message_id)
+                return "cancelled_lead_erased"
+            logger.info("message %s not sent: claim lost before transmit", message_id)
+            return "lost_claim_race"
         if is_phone:
             # The call was never placed: mark it failed and give the daily
             # call slot back.

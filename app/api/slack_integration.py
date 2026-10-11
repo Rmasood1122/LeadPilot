@@ -78,7 +78,10 @@ def slack_callback(code: str | None = None, state: str | None = None,
         user_id = oauth_state.parse(state, "slack")
     except oauth_state.InvalidState as exc:
         return frontend_redirect("slack", "error", str(exc))
-    if db.get(User, user_id) is None:
+    from app.services.account_erasure import is_tombstone  # noqa: PLC0415
+
+    user = db.get(User, user_id)
+    if user is None or is_tombstone(user):   # an erased account stays erased
         return frontend_redirect("slack", "error", "unknown user")
     try:
         client_id, client_secret = _app(db)

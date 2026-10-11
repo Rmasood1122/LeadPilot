@@ -3993,8 +3993,11 @@ class BillingSubscription(TimestampMixin, Base):
     __tablename__ = "billing_subscriptions"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    # RESTRICT, not CASCADE (migration 0081): billing rows are kept, anonymised,
+    # when an account is erased (decision E1, docs/features/gdpr-erasure.md);
+    # deleting the users row must not take them with it.
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), unique=True, index=True
+        ForeignKey("users.id", ondelete="RESTRICT"), unique=True, index=True
     )
     billing_model: Mapped[str] = mapped_column(String(20))   # monthly | pay_per_meeting
     tier: Mapped[str] = mapped_column(String(20))            # starter..enterprise | pay_per_meeting
@@ -4128,8 +4131,9 @@ class BillableMeeting(TimestampMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    # RESTRICT (migration 0081): see BillingSubscription.user_id.
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
     )
     lead_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("leads.id", ondelete="SET NULL"), nullable=True

@@ -231,8 +231,10 @@ async def unipile_notify(request: Request, state: str = Query(min_length=20),
         user_id = uuid.UUID(data["user_id"])
     except Exception:  # noqa: BLE001 -- any bad state is the same answer
         raise HTTPException(status_code=400, detail="invalid or expired state") from None
+    from app.services.account_erasure import is_tombstone  # noqa: PLC0415
+
     user = db.get(User, user_id)
-    if user is None:
+    if user is None or is_tombstone(user):   # an erased account stays erased
         raise HTTPException(status_code=400, detail="invalid or expired state")
     body = await request.json()
     status = str(body.get("status") or "").upper()
