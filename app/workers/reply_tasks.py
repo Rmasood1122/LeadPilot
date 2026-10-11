@@ -53,52 +53,6 @@ def process_inbound_reply_impl(session: Session, reply_id, force: bool = False) 
         return {"status": "not_found", "category": None}
     if reply is None:
         return {"status": "not_found", "category": None}
- feat/f04-reply-copilot
-    # Part 1 Feature 1: the positive-reply label is a SEPARATE question with
-    # its own idempotency marker (intent_at), so a reply classified before
-    # that feature existed still gets a label on the next pass without
-    # regenerating the draft the user may already be editing.
-    from app.services import reply_intent  # noqa: PLC0415
-
-    intent = reply_intent.classify_and_apply(session, reply, force=force)
-
-    # Part 1 Feature 7: a "not now" is a DATE, not a dead end. Turning it into
-    # a plan happens here, right after the label is decided, and never raises
-    # -- a prospect who said "not now" must still be stored and routed exactly
-    # as before if the plan cannot be made.
-    from app.services import reengagement_memory  # noqa: PLC0415
-
-    plan = reengagement_memory.plan_for_reply(session, reply)
-
-    # F04 Reply Copilot: a grounded, claim-verified answer queued for a person.
-    # Behind reply_copilot_enabled (default off): off = one settings read and a
-    # return value identical to before. Its own idempotency (one draft per
-    # reply, UNIQUE), so a redelivery or force=True never replaces a draft a
-    # person may be editing. Never raises.
-    from app.services import reply_copilot  # noqa: PLC0415
-
-    copilot = (reply_copilot.draft_for_reply(session, reply)
-               if reply_copilot.enabled(session) else None)
-
-    def _out(result: dict) -> dict:
-        if copilot is not None:
-            result["copilot"] = copilot
-        return result
-
-    if reply.classified_at is not None and not force:
-        return _out({"status": "skipped", "category": reply.reply_category,
-                     "intent": intent["label"],
-                     "reengagement_plan_id": str(plan.id) if plan else None})
-
-    result = reply_intelligence.classify_reply(session, reply.id)
-    if result.get("error"):
-        return _out({"status": "failed", "category": None, "intent": intent["label"],
-                     "reengagement_plan_id": str(plan.id) if plan else None})
-    reply_intelligence.apply(session, reply, result)
-    return _out({"status": "classified", "category": reply.reply_category,
-                 "intent": intent["label"],
-                 "reengagement_plan_id": str(plan.id) if plan else None})
-
     # P0-5b: every model call below is metered to the account that owns the
     # reply -- counted, never capped (it drives STOP / not-now handling).
     from app.services import usage_meter  # noqa: PLC0415
@@ -120,20 +74,38 @@ def process_inbound_reply_impl(session: Session, reply_id, force: bool = False) 
 
         plan = reengagement_memory.plan_for_reply(session, reply)
 
-        if reply.classified_at is not None and not force:
-            return {"status": "skipped", "category": reply.reply_category,
-                    "intent": intent["label"],
-                    "reengagement_plan_id": str(plan.id) if plan else None}
+    # F04 Reply Copilot: a grounded, claim-verified answer queued for a person.
+    # Behind reply_copilot_enabled (default off): off = one settings read and a
+    # return value identical to before. Its own idempotency (one draft per
+    # reply, UNIQUE), so a redelivery or force=True never replaces a draft a
+    # person may be editing. Never raises. Deliberately OUTSIDE the
+    # reply_handling scope: it opens its own "reply_copilot" scope, which is
+    # account-capped, and a nested scope would join (and be counted as) the
+    # uncapped reply_handling one.
+    from app.services import reply_copilot  # noqa: PLC0415
 
+    copilot = (reply_copilot.draft_for_reply(session, reply)
+               if reply_copilot.enabled(session) else None)
+
+    def _out(result: dict) -> dict:
+        if copilot is not None:
+            result["copilot"] = copilot
+        return result
+
+    if reply.classified_at is not None and not force:
+        return _out({"status": "skipped", "category": reply.reply_category,
+                     "intent": intent["label"],
+                     "reengagement_plan_id": str(plan.id) if plan else None})
+
+    with usage_meter.user_scope(session, _reply_owner(session, reply), "reply_handling"):
         result = reply_intelligence.classify_reply(session, reply.id)
         if result.get("error"):
-            return {"status": "failed", "category": None, "intent": intent["label"],
-                    "reengagement_plan_id": str(plan.id) if plan else None}
+            return _out({"status": "failed", "category": None, "intent": intent["label"],
+                         "reengagement_plan_id": str(plan.id) if plan else None})
         reply_intelligence.apply(session, reply, result)
-        return {"status": "classified", "category": reply.reply_category,
-                "intent": intent["label"],
-                "reengagement_plan_id": str(plan.id) if plan else None}
-
+    return _out({"status": "classified", "category": reply.reply_category,
+                 "intent": intent["label"],
+                 "reengagement_plan_id": str(plan.id) if plan else None})
 
 def _reply_owner(session: Session, reply):
     """The account a reply belongs to: its lead's owner, else the Gmail
@@ -154,7 +126,6 @@ def _reply_owner(session: Session, reply):
         return account.user_id if account is not None else None
     except Exception:  # noqa: BLE001 -- attribution must never block a reply
         return None
- master
 
 
 @celery_app.task(name="app.workers.reply_tasks.process_inbound_reply")

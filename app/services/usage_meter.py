@@ -53,17 +53,6 @@ BUDGETED_PURPOSES = ("pipeline", "verification")
 # (one Flow-2 strategy ~ $8.29) and they stop cleanly: the strategy becomes
 # BUDGET_EXHAUSTED (resumable) and lead scoring falls back to no score.
 #
-feat/f06-quickstart
-# F06 adds "quickstart": a Quickstart run (ICP extraction + review-only
-# drafts) stops cleanly between drafts, so it is capped like the others.
-feat/f04-reply-copilot
-#
-# F04 adds "reply_copilot": a reply draft stops cleanly (no draft; a person
-# answers by hand), so it is capped like the others.
-ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstart",
-                           "reply_copilot")
-
-ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quickstar
 # P0-5b. Every model call now runs inside a scope (request handlers, webhooks
 # and Celery tasks open one), so the purposes below name every kind of work.
 # Capped: work a user starts on demand, or a sweep that can simply try again
@@ -71,6 +60,11 @@ ACCOUNT_CAPPED_PURPOSES = ("pipeline", "verification", "lead_scoring", "quicksta
 # handling (it drives STOP / bounce / unsubscribe logic and must never be
 # starved), sequence launch (enrolment is already committed when its scoring
 # runs) and the in-app help chat (support must stay reachable).
+#
+# F06 adds "quickstart": a Quickstart run (ICP extraction + review-only
+# drafts) stops cleanly between drafts, so it is capped like the others.
+# F04 adds "reply_copilot": a reply draft stops cleanly (no draft; a person
+# answers by hand), so it is capped like the others.
 ACCOUNT_CAPPED_PURPOSES = (
     "pipeline", "verification", "lead_scoring",
     "icp",              # ICP / tactic extraction for lead sourcing
@@ -83,13 +77,13 @@ ACCOUNT_CAPPED_PURPOSES = (
     "meeting_summary",  # meeting summaries
     "voice_profile",    # product voice profile
     "displacement",     # competitor-displacement DMs (12-hourly sweep)
+    "quickstart",       # F06 Quickstart run
+    "reply_copilot",    # F04 Reply Copilot drafts
 )
 COUNTED_ONLY_PURPOSES = (
     "outreach", "meeting_prep", "call_analysis", "reply_handling", "launch",
     "support_chat",
 )
-master
-master
 
 # A prompt's size in tokens is not known before the call. English averages
 # about 4 characters per token, so dividing by 3 OVER-estimates the input and
@@ -140,7 +134,6 @@ class _Scope:
     account_budget_micros: int | None = None
     account_prior_micros: int = 0   # the account's spend so far today, at scope open
     account_plan: str = ""
-feat/f07-spend-guard
     # F07 -- the account's own monthly cap (app/services/spend_guard.py); None unless armed.
     monthly_guard: object | None = None
 
@@ -149,7 +142,6 @@ feat/f07-spend-guard
     # degrade (heuristic score, fallback text); request handlers read this to
     # answer 429 instead of a silently degraded 200.
     account_refused: bool = False
-master
 
 
 _current: ContextVar[_Scope | None] = ContextVar("usage_scope", default=None)
@@ -397,8 +389,12 @@ def scope(session: Session, *, strategy_id=None, user_id=None, purpose: str = "o
     # lead scoring -- whose prior spend was measured over pipeline and
     # verification only, so a strategy that finished near its budget had every
     # send render refused (and retried to failure). Pipeline and verification
-    # only, as BUDGETED_PURPOSES always said.
-    if budget_micros is not None and purpose in BUDGETED_PURPOSES:
+    # only, as BUDGETED_PURPOSES always said. The one exception is a budget
+    # that is NOT the strategy's: a caller that passes its own `prior_micros`
+    # (F06 Quickstart's per-run cap) is metering against its own ledger, so
+    # that budget is armed whatever the purpose.
+    if budget_micros is not None and (purpose in BUDGETED_PURPOSES
+                                      or prior_micros is not None):
         active.budget_micros = int(budget_micros)
         active.prices = _price_table(session)
         active.prior_micros = (int(prior_micros) if prior_micros is not None
