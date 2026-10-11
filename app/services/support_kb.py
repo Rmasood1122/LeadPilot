@@ -1,4 +1,24 @@
-"""The support knowledge base — the ONLY thing the AI is allowed to answer from.
+"""The ORIGINAL support knowledge base (Feature 3) — superseded in Phase 2.
+
+SUPERSEDED BY THE HELP CENTER
+-----------------------------
+The assistant now answers from the fact-checked articles in docs/help-center/
+via app/services/help_center.py. Nothing here is sent to the model or shown as
+an answer any more. What still lives here, and why:
+
+  REFUSAL_MESSAGE, TICKET_SUGGESTION, MOCK_NO_MATCH_MESSAGE
+                  the canned copy support_chat.py returns -- unchanged.
+  FAQ ids         permanent: stored chat messages reference them. Each one
+                  resolves to its help-center chunk through
+                  help_center.LEGACY_FAQ_ALIASES; GET /support/faq still lists
+                  the nine questions (with answers taken from the corpus).
+  FAQ answers     kept verbatim for the record and for the before/after
+                  measurement (scripts/help_center/measure_golden.py). Several
+                  are contradicted by the code ("A human clicks send every
+                  time"; "72-step pipeline" only), which is exactly why they
+                  are no longer served.
+
+The text below describes the original design.
 
 WHY A CURATED FAQ AND NOT RAG OR "THE MODEL JUST KNOWS"
 ------------------------------------------------------

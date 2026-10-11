@@ -1,0 +1,104 @@
+---
+id: send-review-queue
+title: The send-review queue and approvals
+audience: customer
+last_verified: 2026-10-10
+owner: help-center
+sources:
+  - app/services/send_review.py
+  - app/api/send_reviews.py
+  - app/workers/outreach_tasks.py
+  - app/db/models.py
+  - app/services/system_settings.py
+  - app/api/analytics.py
+  - app/services/adversarial_review.py
+  - app/api/sequence_reviews.py
+  - frontend/src/components/campaigns/ReviewQueuePanel.tsx
+  - frontend/src/components/campaigns/SequenceReviewPanel.tsx
+  - frontend/src/lib/sendReview.ts
+  - frontend/src/app/(app)/campaigns/page.tsx
+  - frontend/src/app/(app)/team/page.tsx
+  - docs/features/send-review-queue.md
+  - docs/features/workspaces.md
+---
+
+# The send-review queue and approvals
+
+LeadPilot sends outreach automatically. The send-review queue is a safety net: certain messages are held, just before they would go out, until a person approves or rejects them. This article explains what gets held, how to approve or reject, and how the queue relates to pausing and to the other approval steps in LeadPilot.
+
+## Which messages are held for review?
+
+A message is checked after its text has been written and right before it would be sent. It is held if any of these four rules applies:
+
+- **Prospect objected before** – the prospect's most recent reply was classified as an objection.
+- **Deal has stalled** – the prospect has an open deal whose expected close date has passed, or LeadPilot has marked the prospect as "cooling".
+- **Executive / VIP contact** – the prospect's job title matches a fixed list: founder, co-founder, owner, CEO, COO, CFO, CTO, CMO, CRO, "chief …", president, managing director, partner, VP or vice president, "head of", board member, or chair.
+- **Tone or spam check flagged the copy** – the written message trips LeadPilot's tone or spam rules (the same rules used in the pre-launch review).
+
+The queue covers email, WhatsApp and LinkedIn messages. AI phone calls are not held, because a live call cannot be read and approved in advance.
+
+## Can the queue or a rule be turned off?
+
+Yes, but not by individual users. The queue as a whole and each of the four rules are switched on or off by your LeadPilot administrator in System Settings. All five settings are **on** by default.
+
+If your prospects are mostly founders or executives, the VIP rule would hold nearly every message. The administrator setting for that rule says to turn it off in that case.
+
+If LeadPilot cannot read these settings, it treats the queue as on. If the review check itself fails with an error, the message is sent rather than held, so a fault in the queue does not silently stop all your outreach. The queue sits on top of the normal compliance checks; it does not replace them.
+
+## Where do I find messages waiting for approval?
+
+Go to **Campaigns** and open the **Review** tab. The queue covers all your campaigns, oldest first. You can filter by **Pending**, **Approved** or **Rejected**. When nothing is waiting, you see "Nothing is waiting for approval."
+
+When a message is held, the account owner is sent a notification titled "A message to [name] needs approval", linking to the Review tab.
+
+Each item shows who it is for, their title and company, the step number and channel, how long it has been waiting, and a badge for each rule that applied. The most serious rule is also named in the item's headline. An item still pending after more than 3 days shows a **Going stale** badge, because the copy may no longer fit the timing.
+
+## How do I approve a message?
+
+Read the subject and message. You can edit both before approving. Then click **Approve & send** (or **Approve edit & send** if you changed anything). A note is optional.
+
+What you approve is exactly what is sent. LeadPilot saves the text at the moment the message is held and, after approval, sends that saved text (or your edit). It does not rewrite the message after you approve it.
+
+Approval puts the message back in the normal send queue, and it goes out on the next send run ("Approved — it will send on the next tick").
+
+## How do I reject a message, and what happens next?
+
+Click **Reject**, type a note, then click **Confirm reject**. The note must be at least 5 characters, so the reason is recorded.
+
+A rejected message is never sent. Only that one message is cancelled. The prospect stays enrolled, but rejecting does not schedule the next step. If automatic follow-up is on for the previous step (it is by default), LeadPilot later tries that same step again as a new message, by default 72 hours after the previous step was sent, and the new message is checked by the review queue again. To stop contacting the person, stop or pause them separately.
+
+A review can be decided only once. Trying to approve or reject an item that was already decided returns an error instead of overwriting the earlier decision.
+
+## Does approval skip the other safety checks?
+
+No. An approved message goes back through the full send process. At the moment it is actually sent, LeadPilot checks again that:
+
+- the campaign is still active (not paused),
+- the prospect is still enrolled and not stopped or paused,
+- the prospect is not on the suppression (do-not-contact) list,
+- channel rules still allow it (for example WhatsApp opt-in and template approval),
+- the current compliance rules and the send window allow it,
+- the daily sending limits allow it.
+
+If any of these fails, the approved message is not sent at that time, just like any other message.
+
+## How does the queue work with pausing a campaign?
+
+Pausing a campaign stops everything in it from sending, including messages you have already approved. The send run skips paused campaigns entirely, and the send step checks the campaign state again before sending. When you resume the campaign, approved messages are sent through the normal checks.
+
+Held messages stay in the queue while a campaign is paused. Approving one while the campaign is paused does not send it until the campaign is active again. See [Pause, stop and the kill switch](25-pause-stop-kill-switch.md) for all the ways to pause.
+
+## Is this the same as "Pre-send review" or Team approvals?
+
+No. LeadPilot has three separate checks with similar names:
+
+- **Send-review queue** (this article): checks one message, at send time, for the four rules above.
+- **Pre-send review** on a sequence: checks the sequence's content before it can be launched. It looks for spam and tone problems, compliance problems (for example removing the unsubscribe footer or a misleading "Re:" subject), and claims about prospects. "Block" findings stop the launch until the content is fixed or an owner or manager overrides it with a written reason of at least 10 characters. Changing the content after an override brings the check back.
+- **Team approvals**: in a workspace that requires approval, an SDR's first launch of a sequence waits for an owner or manager to approve it under **Team**, **Approvals**.
+
+## Related
+- [Sequences and follow-ups](08-sequences-and-follow-ups.md)
+- [Replies and the unified inbox](13-replies-and-unified-inbox.md)
+- [Compliance](20-compliance.md)
+- [Workspaces and agency mode](24-workspaces-and-agency-mode.md)
+- [Pause, stop and the kill switch](25-pause-stop-kill-switch.md)

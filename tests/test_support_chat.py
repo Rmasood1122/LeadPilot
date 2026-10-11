@@ -19,8 +19,19 @@ import pytest
 from sqlalchemy import select
 
 from app.db import models as m
-from app.services import support_chat, support_kb
+from app.services import help_center, support_chat, support_kb
 from tests.conftest import auth_headers
+
+# Phase 2 (help center): the assistant cites help-center chunk ids and mock
+# mode answers with a chunk's opening paragraph. The FAQ id
+# "what-is-leadpilot" (FakeClaude's default citation) now resolves to this
+# chunk through the permanent alias map, and "what is LeadPilot" is answered
+# with the first paragraph of article 01 -- asserted against the article
+# text itself, not against the retriever's own output.
+WHAT_IS_CHUNK = help_center.LEGACY_FAQ_ALIASES["what-is-leadpilot"]
+WHAT_IS_ANSWER = help_center.opening_paragraph(
+    help_center.chunk_by_id(WHAT_IS_CHUNK).sections[0])
+assert WHAT_IS_ANSWER.startswith("LeadPilot is an outbound sales system.")
 
 
 def _ask(client, message, session_id=None):
@@ -204,12 +215,15 @@ class TestFailureFallbacks:
 
     def test_hallucinated_faq_ids_are_stripped(self, client, fake_claude):
         """A fabricated citation must never be stored as if it were real —
-        it is the clearest signal the model is inventing rather than citing."""
+        it is the clearest signal the model is inventing rather than citing.
+
+        Phase 2: the real id survives as its help-center chunk id (legacy FAQ
+        ids are translated through the permanent alias map)."""
         fake_claude.support_response = {
             "on_topic": True, "confidence": 0.9, "answer": "Grounded.",
             "faq_ids": ["what-is-leadpilot", "totally-made-up", 42, None],
         }
-        assert _ask(client, "q").json()["answer"]["faq_ids"] == ["what-is-leadpilot"]
+        assert _ask(client, "q").json()["answer"]["faq_ids"] == [WHAT_IS_CHUNK]
 
 
 # --------------------------------------------------------------------------
@@ -243,7 +257,8 @@ class TestChatPersistence:
             select(m.ChatMessage).where(m.ChatMessage.role == "assistant")
         ).scalars().one()
         assert assistant.confidence == 0.9
-        assert assistant.faq_ids == ["what-is-leadpilot"]
+        # FakeClaude cites the legacy id; it is stored as its chunk id.
+        assert assistant.faq_ids == [WHAT_IS_CHUNK]
 
     def test_follow_ups_continue_the_same_session(self, client, db_session):
         first = _ask(client, "What is LeadPilot?").json()["session_id"]
@@ -736,11 +751,13 @@ class TestMockModeAnswers:
     def test_a_known_question_returns_the_FAQ_ANSWER_VERBATIM(
             self, client, mock_mode, no_model_allowed):
         """Verbatim, not paraphrased. Mock mode's guarantee is stronger than
-        live mode's: there is no step at which a fact could be added."""
+        live mode's: there is no step at which a fact could be added.
+
+        Phase 2: "the FAQ answer" is now the help-center paragraph."""
         data = _ask(client, "what is LeadPilot").json()["answer"]
-        assert data["text"] == support_kb.by_id("what-is-leadpilot").answer
+        assert data["text"] == WHAT_IS_ANSWER
         assert data["reason"] == "mock_faq_match"
-        assert data["faq_ids"] == ["what-is-leadpilot"]
+        assert data["faq_ids"] == [WHAT_IS_CHUNK]
         assert data["suggest_ticket"] is False
 
     def test_an_unknown_question_offers_a_TICKET(self, client, mock_mode,
@@ -779,7 +796,7 @@ class TestMockModeAnswers:
         assert [r.role for r in rows] == ["user", "assistant"]
         assert rows[0].content == "what is LeadPilot"
         assert rows[1].reason == "mock_faq_match"
-        assert rows[1].faq_ids == ["what-is-leadpilot"]
+        assert rows[1].faq_ids == [WHAT_IS_CHUNK]
 
     def test_a_no_match_turn_is_stored_too(self, client, db_session,
                                            mock_mode, no_model_allowed):
@@ -831,7 +848,7 @@ class TestMockModeAnswers:
         monkeypatch.setattr(app_settings, "ai_mode", "console")
         with caplog.at_level(logging.INFO, logger="app.services.support_chat"):
             data = _ask(client, "what is LeadPilot").json()["answer"]
-        assert data["text"] == support_kb.by_id("what-is-leadpilot").answer
+        assert data["text"] == WHAT_IS_ANSWER
         assert data["reason"] == "mock_faq_match"
         assert any("AI_MODE=console" in r.getMessage()
                    for r in caplog.records), caplog.text
@@ -877,7 +894,7 @@ class TestInvalidKeyFallsBackToTheFAQ:
         fake_claude.support_response = self._auth_error()
         data = _ask(client, "what is LeadPilot").json()["answer"]
         assert data["reason"] == "mock_faq_match"
-        assert data["text"] == support_kb.by_id("what-is-leadpilot").answer
+        assert data["text"] == WHAT_IS_ANSWER
         assert data["suggest_ticket"] is False
 
     def test_a_401_on_an_UNANSWERABLE_question_still_offers_a_ticket(

@@ -92,6 +92,13 @@ media/
 docs/
 *.md
 !README.md
+# EXCEPT the help center: app/services/help_center.py reads these files at
+# runtime to answer support questions. Without them the image builds and boots
+# fine and the support assistant quietly turns every answer into a ticket.
+# (Docker applies the LAST matching rule, so these must stay below docs/.)
+!docs/help-center/
+!docs/help-center/*.md
+!docs/help-center/_synonyms.yaml
 docker-compose*.yml
 Dockerfile
 .dockerignore
