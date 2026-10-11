@@ -19,20 +19,26 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 import redis.asyncio as aioredis
 
 from app.core.database import get_db
 from app.core.redis_client import get_redis
 from app.core.logging import get_logger
 from app.api.deps import get_current_user, require_admin
+from app.services.health_checks import (
+    CELERY_HEARTBEAT_KEY,
+    CELERY_HEARTBEAT_TTL_SECONDS,
+    check_celery_heartbeat,
+    check_database,
+    check_redis,
+)
 
 logger = get_logger("api.health")
 router = APIRouter(prefix="/health", tags=["health"])
 
-# Celery heartbeat key written by beat_heartbeat.py every 60 seconds
-CELERY_HEARTBEAT_KEY = "celery:heartbeat"
-CELERY_HEARTBEAT_TTL_SECONDS = 120  # if key is older than 2 minutes, workers are stale
+# Re-exported for anything that imported them from here before the checks
+# moved to app/services/health_checks.py.
+__all__ = ["router", "CELERY_HEARTBEAT_KEY", "CELERY_HEARTBEAT_TTL_SECONDS"]
 
 
 # ---------------------------------------------------------------------------
@@ -57,53 +63,25 @@ async def health_check(
     components: dict[str, dict[str, Any]] = {}
     overall = "ok"
 
+    # The checks live in app/services/health_checks.py, shared with
+    # GET /status/public. This function only composes them, exactly as it did
+    # when they were inline (response bytes pinned by
+    # tests/test_status_public.py::TestHealthUnchanged).
+
     # --- Database ---
-    try:
-        db.execute(text("SELECT 1"))
-        components["database"] = {"status": "ok"}
-    except Exception as e:
-        logger.error("health.database_unreachable", error=str(e))
-        components["database"] = {"status": "down", "error": "connection failed"}
+    components["database"] = check_database(db)
+    if components["database"]["status"] == "down":
         overall = "down"
 
     # --- Redis ---
-    try:
-        await redis.ping()
-        components["redis"] = {"status": "ok"}
-    except Exception as e:
-        logger.error("health.redis_unreachable", error=str(e))
-        components["redis"] = {"status": "down", "error": "ping failed"}
+    components["redis"] = await check_redis(redis)
+    if components["redis"]["status"] == "down":
         overall = "down"
 
     # --- Celery workers (via heartbeat key) ---
-    try:
-        heartbeat_raw = await redis.get(CELERY_HEARTBEAT_KEY)
-        if heartbeat_raw is None:
-            # No heartbeat key — either workers never started or key expired
-            components["celery"] = {"status": "degraded", "reason": "no heartbeat key found"}
-            if overall == "ok":
-                overall = "degraded"
-        else:
-            last_beat = float(heartbeat_raw)
-            age_seconds = time.time() - last_beat
-            if age_seconds > CELERY_HEARTBEAT_TTL_SECONDS:
-                components["celery"] = {
-                    "status": "degraded",
-                    "reason": f"heartbeat stale ({int(age_seconds)}s ago)",
-                    "last_beat_seconds_ago": int(age_seconds),
-                }
-                if overall == "ok":
-                    overall = "degraded"
-            else:
-                components["celery"] = {
-                    "status": "ok",
-                    "last_beat_seconds_ago": int(age_seconds),
-                }
-    except Exception as e:
-        logger.error("health.celery_check_failed", error=str(e))
-        components["celery"] = {"status": "degraded", "error": str(e)}
-        if overall == "ok":
-            overall = "degraded"
+    components["celery"] = await check_celery_heartbeat(redis)
+    if components["celery"]["status"] != "ok" and overall == "ok":
+        overall = "degraded"
 
     response_body: dict[str, Any] = {"status": overall, "components": components}
     status_code = 503 if overall == "down" else 200

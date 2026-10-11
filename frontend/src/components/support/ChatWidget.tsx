@@ -23,8 +23,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ticketSubjectFor } from "@/lib/support/ticketSubject";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  AlertCircle, LifeBuoy, MessageSquare, Send, Ticket, X,
+  Activity, AlertCircle, LifeBuoy, MessageSquare, Send, Ticket, X,
 } from "lucide-react";
+import { statusPageLink } from "@/lib/statusPage";
 import {
   createSupportTicket, getSupportFaq, listChatSessions, getChatSession,
   sendChatMessage, startChatSession,
@@ -238,6 +239,19 @@ export function ChatWidget() {
           >
             <Ticket size={15} aria-hidden="true" />
           </button>
+          {statusPageLink() && (
+            <a
+              href={statusPageLink()!.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="support-status-link"
+              className="rounded p-1.5"
+              aria-label="Service status (opens in a new tab)"
+              title="Service status"
+            >
+              <Activity size={15} aria-hidden="true" />
+            </a>
+          )}
           <button
             type="button"
             data-testid="support-widget-close"
