@@ -33,6 +33,9 @@ export function isDue(plan: ReengagementPlan, now: Date = new Date()): boolean {
 
 /** The line that explains WHY this date, so nobody has to trust it blindly. */
 export function whyThisDate(plan: ReengagementPlan): string {
+  if (plan.reason_kind === "job_change") {
+    return "They moved to a new company — the move itself is the reason to get back in touch.";
+  }
   if (plan.date_from_prospect && plan.stated_return_on) {
     return `They asked us to come back on ${plan.stated_return_on}.`;
   }
@@ -47,6 +50,10 @@ export function whyThisDate(plan: ReengagementPlan): string {
  *  sanity-check it before it goes, and so they can write it themselves. */
 export function suggestedOpener(plan: ReengagementPlan): string {
   const who = plan.lead?.full_name?.split(" ")[0] ?? "there";
+  if (plan.reason_kind === "job_change") {
+    const where = plan.lead?.company ? ` at ${plan.lead.company}` : "";
+    return `Hi ${who} — congratulations on the new role${where}. Is the same problem on your plate there?`;
+  }
   if (plan.reason_text) {
     return `Hi ${who} — when we spoke you said ${plan.reason_text}. Has that changed?`;
   }

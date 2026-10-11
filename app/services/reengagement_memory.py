@@ -79,6 +79,14 @@ REASON_LABELS = {
     UNSPECIFIED: "No reason given",
 }
 
+#: F10 Champion Tracker: a plan created because a champion (a past positive
+#: replier or a customer) moved to a new company. NOT in REASON_KINDS on
+#: purpose: REASON_KINDS is the vocabulary the "not now" extraction prompt
+#: offers the model, and a reply can never be a job change detected by
+#: enrichment. PLAN_LABELS is what every plan (either origin) is shown with.
+JOB_CHANGE = "job_change"
+PLAN_LABELS = {**REASON_LABELS, JOB_CHANGE: "Changed jobs"}
+
 #: How long to wait, per reason. A budget objection resolves at the next
 #: budget cycle; a contract objection resolves when the contract does, which
 #: is usually longer; "we're busy this month" resolves fastest. Using one
@@ -443,6 +451,8 @@ def brief_for(plan: ReengagementPlan, lead: Lead) -> str:
     unwanted follow-up they get.
     """
     who = lead.full_name or "there"
+    if plan.reason_kind == JOB_CHANGE:
+        return _job_change_brief(lead, who)
     when = plan.stated_return_on.isoformat() if plan.stated_return_on else "around now"
     quoted = (f'They said: "{plan.reason_text}".' if plan.reason_text
               else "They gave no reason beyond bad timing.")
@@ -454,6 +464,66 @@ def brief_for(plan: ReengagementPlan, lead: Lead) -> str:
         f"what they described changed? Reason on file: "
         f"{REASON_LABELS.get(plan.reason_kind or UNSPECIFIED)}."
     )
+
+
+def _job_change_brief(lead: Lead, who: str) -> str:
+    """F10: the brief for a champion who moved. It states only what enrichment
+    recorded (old and new company/title) and never claims the prospect SAID
+    anything -- a job change is something we observed, not something they
+    told us."""
+    champion = (lead.enrichment_json or {}).get("champion") or {}
+    before = " at ".join(p for p in (champion.get("from_title"),
+                                     champion.get("from_company")) if p) or "their previous company"
+    now_at = " at ".join(p for p in (lead.title, lead.company) if p) or "a new company"
+    return (
+        f"RE-ENGAGEMENT AFTER A JOB CHANGE. {who} worked with us before as "
+        f"{before} and is now {now_at}. Acknowledge the move briefly and "
+        f"congratulate them once. Refer to the earlier relationship only in "
+        f"general terms; do not quote anything they said and do not claim "
+        f"anything about their new company that is not in the stored data. "
+        f"This is not a first contact and not a hard pitch: one short "
+        f"paragraph, one question about whether the same problem exists in "
+        f"the new role."
+    )
+
+
+def plan_for_job_change(db: Session, lead: Lead, *, owner_id,
+                        now: datetime | None = None) -> ReengagementPlan:
+    """F10: the re-engagement plan for a champion's NEW lead.
+
+    Created already `due`, because the move itself is the trigger -- there is
+    no date to wait for. Being `due` (not `scheduled`) also means the daily
+    sweep never picks it up, so `reengagement_memory_auto_send` cannot turn
+    it into a message on its own: the new lead has no sequence and no sent
+    message, and nothing here creates either. A person decides.
+
+    Idempotent per lead: an existing job-change plan for the lead is returned.
+    Commits. The CRM next-action mirror and the notification never raise.
+    """
+    now = now or _now()
+    existing = db.execute(select(ReengagementPlan).where(
+        ReengagementPlan.lead_id == lead.id,
+        ReengagementPlan.reason_kind == JOB_CHANGE)).scalars().first()
+    if existing is not None:
+        return existing
+    plan = ReengagementPlan(
+        lead_id=lead.id,
+        user_id=owner_id,
+        strategy_id=lead.strategy_id,
+        source_reply_id=None,
+        reason_kind=JOB_CHANGE,
+        # The prospect said nothing: reason_text is THEIR words and stays empty.
+        reason_text=None,
+        stated_return_on=None,
+        due_at=now,
+        interval_days=0,
+        status=DUE,
+    )
+    db.add(plan)
+    db.commit()
+    _mirror_next_action(db, lead, plan)
+    _notify_due(db, plan)
+    return plan
 
 
 def _last_message(db: Session, lead: Lead) -> Message | None:
@@ -558,7 +628,7 @@ def _notify_due(db: Session, plan: ReengagementPlan) -> None:
         notification_tasks.enqueue_event(
             plan.user_id, "reengagement_due",
             title=f"Time to go back to {who}",
-            body=(plan.reason_text or REASON_LABELS.get(plan.reason_kind or UNSPECIFIED)),
+            body=(plan.reason_text or PLAN_LABELS.get(plan.reason_kind or UNSPECIFIED)),
             deep_link=f"/leads/detail?id={plan.lead_id}",
             data={"plan_id": str(plan.id), "lead_id": str(plan.lead_id)},
             webhook_payload={"plan_id": str(plan.id), "lead_id": str(plan.lead_id),
@@ -581,7 +651,7 @@ def plan_out(db: Session, plan: ReengagementPlan) -> dict:
                   "company": lead.company, "email": lead.email,
                   "status": lead.status.value if lead.status else None} if lead else None),
         "reason_kind": plan.reason_kind,
-        "reason_label": REASON_LABELS.get(plan.reason_kind or UNSPECIFIED),
+        "reason_label": PLAN_LABELS.get(plan.reason_kind or UNSPECIFIED),
         "reason_text": plan.reason_text,
         # True when the PROSPECT named the date. "They asked for March" and
         # "we guessed 90 days" are different promises, and the UI says which.

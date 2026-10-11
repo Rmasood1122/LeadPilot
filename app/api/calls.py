@@ -174,6 +174,18 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
 
     if guardrails.send_block(db, lead, db.get(Strategy, lead.strategy_id)) is not None:
         raise HTTPException(status_code=409, detail="this contact is on your exclusion list")
+    # F10 Champion Tracker: a person confirmed to have left the company this
+    # lead was sourced at is never contacted through the old lead again (same
+    # SAFETY GUARD as the send chokepoint; not behind the flag).
+    from app.services import champion_tracker  # noqa: PLC0415
+
+    if champion_tracker.departure_block(db, lead, db.get(Strategy, lead.strategy_id)):
+        raise HTTPException(status_code=409,
+                            detail="this person has left the company -- contact them at "
+                                   "their new company instead")
+    if champion_tracker.derived_opt_out(db, lead, current_user.id):
+        raise HTTPException(status_code=409,
+                            detail="this person opted out under an earlier record")
     if not phone_calls.consent_ok(db, lead):
         raise HTTPException(status_code=409,
                             detail="no phone consent recorded for this lead -- record it first")

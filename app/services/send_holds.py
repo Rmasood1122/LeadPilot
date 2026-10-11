@@ -1,19 +1,18 @@
 """Send-time HOLDS: one definition of "a message a guard parked for later".
 
-A send-time guard may hold a message instead of sending or cancelling it:
-status FAILED, with the guard's prefix on `message.error`, so the message is
-kept, visible and releasable:
+Two guards in the send chokepoint hold a message instead of sending or
+cancelling it: status FAILED, with the guard's prefix on `message.error`, so
+the message is kept, visible and releasable:
 
     F01 Bounce Shield    'bounce_shield: '     (app/services/bounce_shield.py)
-
-A later guard that holds the same way adds its prefix to HOLD_PREFIXES.
+    F10 Champion Tracker 'champion_tracker: '  (app/services/champion_tracker.py)
 
 A held message is still the message for its step. Everything that asks "is a
 step already pending for this enrollment?" (the follow-up sweep in
 app/workers/outreach_tasks.py) must count it, or it creates a second copy of
 the step while the first is held, and every copy sends on release. And a
 release must put back AT MOST ONE message per (sequence, lead, step) -- this
-module does both, for every guard, so no guard can drift from the others.
+module does both, for every guard, so neither can drift from the other.
 """
 
 from __future__ import annotations
@@ -26,9 +25,10 @@ from sqlalchemy.orm import Session
 from app.db.models import Message, MessageStatus
 
 # The prefixes, as literals so this module imports nothing from the guards.
-# Each guard's tests assert its own ERROR_PREFIX is listed.
+# Each guard asserts its own ERROR_PREFIX is listed (tests/test_champion_tracker.py).
 BOUNCE_SHIELD_PREFIX = "bounce_shield: "        # F01
-HOLD_PREFIXES: tuple[str, ...] = (BOUNCE_SHIELD_PREFIX,)
+CHAMPION_TRACKER_PREFIX = "champion_tracker: "  # F10
+HOLD_PREFIXES: tuple[str, ...] = (BOUNCE_SHIELD_PREFIX, CHAMPION_TRACKER_PREFIX)
 
 # A message in one of these states IS the step: a held copy of it is redundant.
 _LIVE = (MessageStatus.SCHEDULED, MessageStatus.SENDING, MessageStatus.SENT,

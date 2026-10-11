@@ -241,6 +241,57 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if enrollment.status is not EnrollmentStatus.STOPPED:
             engine.stop_enrollment(session, enrollment, reason="suppressed_excluded")
         return "cancelled_excluded"
+    # ---- F10 Champion Tracker (SAFETY GUARD, every channel) ----------------
+    # 1. Departure block. A person confirmed to have LEFT the company this lead
+    #    was sourced at is never messaged at the old lead or the old address
+    #    again. A recorded departure is a fact, so this is NOT behind the flag
+    #    (no rows = no change). Lookup error fails CLOSED: deferred an hour.
+    # 2. Staleness hold (flag champion_tracker_enabled). Role data older than
+    #    the limit holds the message (FAILED + prefix: kept, visible,
+    #    releasable) until the re-verify sweep confirms the role. No provider
+    #    call here; nothing rendered; the enrollment lives.
+    from app.services import champion_tracker  # noqa: PLC0415
+
+    try:
+        departed = champion_tracker.departure_block(session, lead, strategy)
+        # 1b. A lead created FROM a move (a champion's new company) inherits
+        #     the person's opt-outs recorded on any EARLIER record, now --
+        #     suppression is keyed by address and would not follow the person.
+        opted_out = (None if departed is not None else champion_tracker.derived_opt_out(
+            session, lead, _owner_or_raise(session, strategy)))
+    except Exception:
+        logger.exception("departure check failed for message %s -- deferred", message_id)
+        session.rollback()
+        message = session.get(Message, message_id)
+        message.scheduled_at = now + timedelta(hours=1)
+        message.error = "departure check could not be run -- deferred (fails closed)"
+        session.commit()
+        return champion_tracker.SEND_RESULT_DEFERRED
+    if departed is not None:
+        champion_tracker.cancel_for_departure(message, departed)
+        _audit(session, strategy, lead, message, champion_tracker.AUDIT_LEFT,
+               extra={"move_id": str(departed.id)})
+        session.commit()
+        if enrollment.status is not EnrollmentStatus.STOPPED:
+            engine.stop_enrollment(session, enrollment, reason=champion_tracker.STOP_REASON)
+        return champion_tracker.SEND_RESULT_LEFT
+    if opted_out is not None:
+        message.status = MessageStatus.CANCELLED
+        message.error = f"suppressed at send time: {opted_out}"[:1000]
+        _audit(session, strategy, lead, message, "blocked_suppressed",
+               extra={"earlier_record": opted_out})
+        session.commit()
+        if enrollment.status is not EnrollmentStatus.STOPPED:
+            engine.stop_enrollment(session, enrollment, reason="suppressed")
+        return "cancelled_suppressed"
+    if champion_tracker.enabled(session):
+        stale = champion_tracker.staleness_hold(session, lead, now)
+        if stale is not None:
+            champion_tracker.hold_message(message, stale)
+            _audit(session, strategy, lead, message, champion_tracker.AUDIT_HELD,
+                   extra={"reason": stale})
+            session.commit()
+            return champion_tracker.SEND_RESULT_HELD
     # ---- F01 Bounce Shield (SAFETY GUARD, email only, flag default off) ----
     # An email goes only to an address verified valid (fresh), catch-all under
     # an 'allow' policy, or one a manager overrode for this lead. Blocked =
@@ -645,6 +696,17 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     if not is_reply_copilot:
         engine.schedule_next_step(session, message, now=now)
     return "sent"
+
+
+def _owner_or_raise(session: Session, strategy: Strategy):
+    """The account owning `strategy`. Raises when it cannot be resolved, so a
+    guard that needs it fails closed (the caller defers the send)."""
+    from app.services import champion_tracker, notifications  # noqa: PLC0415
+
+    owner = notifications.owner_of_strategy(session, strategy)
+    if owner is None:
+        raise champion_tracker.OwnerUnresolved(f"no owner for strategy {strategy.id}")
+    return owner
 
 
 def _audit(session: Session, strategy: Strategy, lead: Lead, message: Message,
@@ -1584,10 +1646,10 @@ def _last_sent_message(session: Session, enrollment: SequenceEnrollment) -> Mess
 
 
 def _has_pending_message(session: Session, enrollment: SequenceEnrollment) -> bool:
-    # A message a send-time guard HOLDS (F01 Bounce Shield: FAILED + the
-    # guard's prefix) is still pending for its step. Without this the
-    # follow-up sweep made a new copy of a held step every time its lock
-    # expired, and every copy sent when the hold released.
+    # A message a send-time guard HOLDS (F01 Bounce Shield, F10 Champion
+    # Tracker: FAILED + the guard's prefix) is still pending for its step.
+    # Without this the follow-up sweep made a new copy of a held step every
+    # time its lock expired, and every copy sent when the hold released.
     from app.services import send_holds  # noqa: PLC0415
 
     return session.execute(
