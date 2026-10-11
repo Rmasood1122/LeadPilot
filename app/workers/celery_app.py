@@ -415,6 +415,13 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.billing_tasks.charge_due_meetings",
         "schedule": 1800.0,
     },
+    # Annual billing: auto-renewal notices (acknowledgment, trial ending,
+    # 30 days before an annual renewal). Daily at 15:10 UTC -- morning in the
+    # US; the notice window is 15-30 days wide, so a missed day catches up.
+    "send-renewal-notices": {
+        "task": "app.workers.billing_tasks.send_renewal_notices",
+        "schedule": crontab(hour=15, minute=10),
+    },
     # Feature A2: chain newly recorded audit events every five minutes.
     "seal-audit-trails": {
         "task": "app.workers.audit_tasks.seal_audit_trails",

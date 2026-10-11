@@ -75,9 +75,18 @@ def test_the_revision_follows_0076():
     assert module.down_revision == "0076_quickstart"
 
 
+# Columns a LATER migration adds to these tables. 0077 is judged against the
+# model minus these; each is proven by its own migration's test
+# (tests/test_annual_billing_migration.py for 0081).
+LATER_COLUMNS = {"reply_copilot_settings": {"answer_earlier_replies": "0082_annual_billing"}}
+
+
 @pytest.mark.parametrize("table", TABLES)
 def test_table_matches_the_model(from_models, from_migration, table):
-    assert _describe(from_migration, table) == _describe(from_models, table)
+    expected = _describe(from_models, table)
+    for column in LATER_COLUMNS.get(table, {}):
+        expected["columns"].pop(column)
+    assert _describe(from_migration, table) == expected
 
 
 def test_one_draft_per_reply_is_enforced_by_the_schema(from_migration):

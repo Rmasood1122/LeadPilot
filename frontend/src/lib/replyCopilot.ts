@@ -54,6 +54,10 @@ export interface DraftPage {
 export interface CopilotSettings {
   auto_send_meeting_time: boolean;
   auto_send_allowed: boolean;
+  /** Per-account stop attribution (default true). False = strict: an answer
+   *  to a prospect's later reply is cancelled when their earlier reply is
+   *  what stopped the sequence. Absent from an older API = true. */
+  answer_earlier_replies?: boolean;
   enabled: boolean;
 }
 
@@ -149,4 +153,9 @@ export function autoSendBlockedReason(settings: CopilotSettings | undefined): st
     return "An administrator has not allowed auto-send on this deployment.";
   }
   return null;
+}
+
+/** The account's stop-attribution setting; missing means the default (on). */
+export function answersEarlierReplies(settings: CopilotSettings | undefined): boolean {
+  return settings?.answer_earlier_replies !== false;
 }

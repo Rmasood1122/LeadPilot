@@ -353,6 +353,16 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                        "classified just after the end still "
                                        "counts (0-168; values above 168 are "
                                        "treated as 168)."),
+    # Annual billing (docs/features/annual-billing.md). Off by default: it
+    # offers a new way to pay. Switching it off only stops NEW annual
+    # checkouts -- existing annual subscriptions keep their webhooks, cancel
+    # path and renewal notices (legal duties never depend on this flag).
+    "annual_billing_enabled": (False, "Offer an annual subscription (monthly "
+                               "price x ANNUAL_MONTHS_CHARGED, billed yearly, "
+                               "auto-renews) next to monthly on the pricing "
+                               "page and at checkout. Off only hides it for "
+                               "new checkouts; existing annual plans keep "
+                               "their renewal notices and cancel path."),
     # F10 -- Champion Tracker + staleness check
     # (docs/features/f10-champion-tracker.md). Off by default: it holds sends
     # whose role data is old and spends Apollo/Hunter units re-verifying.

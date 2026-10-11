@@ -21,7 +21,12 @@ from app.config import settings
 from app.db import models as m
 from app.integrations import stripe_billing
 
-MONTHLY_ENTERPRISE = {"billing_model": "monthly", "tier": "enterprise"}
+from app.core import billing_catalog
+
+MONTHLY_ENTERPRISE = {"billing_model": "monthly", "tier": "enterprise",
+                      # consent to the auto-renewal disclosure (annual billing, 2026-10-11)
+                      "accept_renewal_terms": True,
+                      "disclosure_version": billing_catalog.DISCLOSURE_VERSION}
 
 
 @pytest.fixture()

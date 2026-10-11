@@ -1,6 +1,7 @@
 "use client";
 
-/** Profile: display name, plan, password, download your data (GDPR). */
+/** Profile: display name, plan (with the online Cancel plan button), password,
+ *  download your data (GDPR). */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,9 +9,10 @@ import { changePassword, exportMyData, getMe, saveName } from "@/lib/api/profile
 import { clearSession } from "@/lib/api/client";
 import { resetAuthStore } from "@/lib/stores/authStore";
 import {
-  accountExportFilename, canUpgrade, exportErrorMessage, passwordErrorMessage, planLabel,
+  accountExportFilename, exportErrorMessage, passwordErrorMessage,
   validateName, validatePasswordChange,
 } from "@/lib/profile";
+import { PlanCard } from "@/components/billing/PlanCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -101,15 +103,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Plan</CardTitle></CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <p>You are on the <strong>{planLabel(me.data.plan)}</strong> plan.</p>
-          {canUpgrade(me.data.plan)
-            ? <Button onClick={() => router.push("/pricing")}>Upgrade plan</Button>
-            : <p className="text-muted-foreground">This is the highest plan.</p>}
-        </CardContent>
-      </Card>
+      <PlanCard plan={me.data.plan} />
 
       <Card>
         <CardHeader><CardTitle>Change password</CardTitle></CardHeader>

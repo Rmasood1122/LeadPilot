@@ -25,8 +25,13 @@ meetings_ledger.build_ledger for the pilot's period; this module only compares
 the ledger's totals with the buyer's targets.
 
 NOTHING HERE TOUCHES BILLING. No function in this module writes users.plan or
-billing_subscriptions (tests pin it). LeadPilot has no annual plan; the pilot
-records the plan at start and end for the verdict page and changes neither.
+billing_subscriptions (tests pin it). The pilot records the plan at start and
+end for the verdict page and changes neither; ending a pilot never starts,
+renews, upgrades or converts a subscription (there is an annual plan since
+2026-10-11, and the only way to it is a checkout the account makes). The one
+link runs the other way: billing READS get_active/verdict_final_at so a
+checkout during a pilot gets a trial that ends no earlier than the verdict
+(docs/features/annual-billing.md).
 
 EMAIL is LeadPilot's own transactional gateway (email_sender.send_email) to the
 account owner's login address. It is not, and cannot become, an outreach send:
@@ -70,9 +75,10 @@ MET, NOT_MET, NOT_COMPARABLE = "met", "not_met", "not_comparable"
 SENDING, SENT, FAILED = "sending", "sent", "failed"
 
 VERDICT_VERSION = "leadpilot.pilot-verdict.v1"
-BILLING_STATEMENT = ("The pilot did not change your plan or billing. LeadPilot has no "
-                     "annual plan, and ending a pilot never starts, renews or upgrades "
-                     "a subscription.")
+BILLING_STATEMENT = ("The pilot did not change your plan or billing. Ending a pilot "
+                     "never starts, renews, upgrades or converts a subscription - "
+                     "monthly or annual - and a plan bought during a pilot is not "
+                     "charged before the verdict.")
 
 _MAX_COUNT = 100_000
 _MAX_MONEY_CENTS = 100_000_000    # 1,000,000.00 in the report currency

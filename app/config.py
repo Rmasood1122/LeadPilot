@@ -490,6 +490,13 @@ class Settings(BaseSettings):
     stripe_price_growth: str = ""
     stripe_price_scale: str = ""
     stripe_price_enterprise: str = ""
+    # Same for the annual plans (interval "year"). If set, the Price's amount
+    # MUST equal monthly x ANNUAL_MONTHS_CHARGED (app/core/billing_catalog.py);
+    # nothing checks it against the catalog. Unset = inline price_data.
+    stripe_price_starter_annual: str = ""
+    stripe_price_growth_annual: str = ""
+    stripe_price_scale_annual: str = ""
+    stripe_price_enterprise_annual: str = ""
     # Seconds of clock skew tolerated on a Stripe-Signature timestamp.
     stripe_webhook_tolerance_seconds: int = 300
 

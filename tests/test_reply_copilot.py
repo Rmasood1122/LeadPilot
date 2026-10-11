@@ -914,7 +914,8 @@ class TestAutoSend:
         r = client.put("/reply-copilot/settings", json={"auto_send_meeting_time": True})
         assert r.status_code == 409
         assert client.get("/reply-copilot/settings").json() == {
-            "auto_send_meeting_time": False, "auto_send_allowed": False, "enabled": True}
+            "auto_send_meeting_time": False, "auto_send_allowed": False,
+            "answer_earlier_replies": True, "enabled": True}
         assert client.put("/reply-copilot/settings",
                           json={"auto_send_meeting_time": False}).status_code == 200
 

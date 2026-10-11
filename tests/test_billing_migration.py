@@ -85,10 +85,21 @@ def test_the_revision_follows_0039():
     assert module.down_revision == "0039_identity_verification"
 
 
+# Columns a LATER migration adds to these tables. 0040 is judged against the
+# model minus these; each is proven by its own migration's test
+# (tests/test_annual_billing_migration.py for 0081).
+LATER_COLUMNS = {"billing_subscriptions": {name: "0082_annual_billing" for name in (
+    "trial_started_at", "trial_used", "renewal_consent_at", "consent_disclosure_version",
+    "consent_price_cents", "consent_interval", "consent_checkout_session_id",
+    "price_unit_amount_cents", "price_interval", "price_currency", "support_note")}}
+
+
 @pytest.mark.parametrize("table", NEW_TABLES)
 def test_tables_match_the_models(from_models, migrated, table):
     migrated_shape = _describe(sa.inspect(migrated), table)
     model_shape = _describe(from_models, table)
+    for column in LATER_COLUMNS.get(table, {}):
+        model_shape["columns"].pop(column)
     assert migrated_shape["columns"] == model_shape["columns"]
     assert migrated_shape["fks"] == model_shape["fks"]
     assert migrated_shape["indexes"] == model_shape["indexes"]

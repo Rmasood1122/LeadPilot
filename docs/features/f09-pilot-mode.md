@@ -37,27 +37,32 @@ verdict export, and the page.
 
 ### The truth about annual plans and auto-renewal (checked in code)
 
-* **There is no annual plan anywhere in LeadPilot.** `billing_catalog.BILLING_MODELS`
-  is `("monthly", "pay_per_meeting")`; the only Stripe price LeadPilot creates
-  is `recurring: {interval: "month"}` (`stripe_billing.create_subscription_checkout`).
-  So "no automatic conversion to an annual plan" is true today by absence.
-* **Monthly subscriptions do auto-renew** month to month (Stripe's normal
-  behaviour), and a monthly checkout carries a **14-day trial**
-  (`billing_catalog.TRIAL_DAYS`) that Stripe converts to a paid month when it
-  ends. That is existing behaviour of the *billing* feature, unrelated to the
-  pilot, and **a 14-day trial ends before a 30-day pilot does**. F09 does not
-  extend the trial and does not start, renew, upgrade or cancel anything.
-  Whether a pilot should come with a 30-day trial is a **founder pricing
-  decision** (listed under Unverified / decisions), not something this
-  feature decides silently.
+*Updated 2026-10-11 — the founders added an annual plan
+(`docs/features/annual-billing.md`).*
+
+* **There is an annual plan, but only as a checkout the account makes.**
+  `billing_catalog.BILLING_MODELS` is `("monthly", "annual", "pay_per_meeting")`;
+  annual is offered only while `annual_billing_enabled` is on, needs an
+  explicit "I agree to these renewal terms", and bills with Stripe interval
+  `year`. Nothing converts a monthly or pilot account to annual; webhooks take
+  the model from Stripe's own price interval (tests in
+  `tests/test_annual_billing.py::TestNeverAutoConvert`).
+* **Monthly and annual subscriptions auto-renew**, and each comes with a
+  14-day trial once per account. **The defect this section used to record is
+  fixed in billing, not here:** a subscription checkout made while the account
+  has an ACTIVE pilot gets `trial_end = max(normal trial end,
+  verdict_final_at)` (at least 48 h ahead, Stripe's minimum), so nothing is
+  charged before the verdict, even for an account that already used its
+  trial. A subscription that was already running when the pilot started keeps
+  renewing as before — F09 still never touches billing.
 * **Enforced:** `app/services/pilot_mode.py` never writes `users.plan` or
-  `billing_subscriptions`; tests pin that starting a pilot, sending
-  scorecards, and ending it (on schedule and early) leave both exactly as they
-  were, with and without an existing trialing subscription. A second test pins
-  the absence of any non-monthly Stripe interval and any billing model other
-  than monthly / pay-per-meeting, so whoever adds an annual plan meets this
-  spec first. The verdict records the plan at start and at end and says in
-  words that the pilot changed neither.
+  `billing_subscriptions` and never imports billing (test pinned); billing
+  *reads* `pilot_mode.get_active` / `verdict_final_at`. Tests pin that starting
+  a pilot, sending scorecards, and ending it leave both exactly as they were,
+  and that the monthly checkout still bills monthly. The verdict records the
+  plan at start and at end and says in words that the pilot changed neither
+  (the statement no longer says "LeadPilot has no annual plan" — verdicts
+  stored before 2026-10-11 keep the old sentence, which was true then).
 
 ## Behavior
 
@@ -221,9 +226,10 @@ finishes them (verdict + email, after the grace period) once it is back on.
 
 ## Non-goals
 
-* No billing change of any kind: no trial, no discount, no plan switch, no
-  conversion, no cancellation. (A 30-day trial for pilots is a founder
-  decision — see Unverified.)
+* No billing change of any kind from this module: no trial, no discount, no
+  plan switch, no conversion, no cancellation. (Decided 2026-10-11: billing
+  itself pushes a NEW subscription's trial past an active pilot's verdict —
+  `docs/features/annual-billing.md`.)
 * No new metric: every number is F08's. No projection ("on track to…").
 * No editing criteria after the start.
 * No per-client (agency) pilot UI beyond scoping to campaigns.
@@ -396,8 +402,9 @@ Email: at most 5 transactional emails per pilot.
   copy does not say "you started"; a suspended owner is not mailed;
 * **no automatic conversion:** starting, scorecards, ending on schedule and
   ending early leave `users.plan` and the `billing_subscriptions` row
-  unchanged (with a trialing subscription and with none); the catalog has no
-  annual model and Stripe checkout uses a monthly interval;
+  unchanged (with a trialing subscription and with none); the monthly Stripe
+  checkout uses a monthly interval and an annual price exists only for an
+  explicit annual checkout (`test_annual_exists_only_as_an_explicit_checkout`);
 * tenancy: another account's pilot is 404 on every route and never in the
   list; its outcomes never in our numbers; foreign `strategy_ids` 404;
 * flag off: every route 409, sweep `{"skipped": "disabled"}` with no rows or
@@ -432,11 +439,12 @@ STAR row: **"Every pilot ends with a verdict page and export."** Measured:
 
 ## Unverified
 
-* **Founder decision — trial length vs pilot length.** Monthly checkouts carry
-  a 14-day trial that Stripe converts to a paid month automatically; a 30-day
-  pilot outlasts it. F09 does not change billing. Whether pilots should get a
-  30-day trial, or the pilot page should warn when a trial ends inside the
-  pilot, is for the founders.
+* ~~Founder decision — trial length vs pilot length.~~ **Decided 2026-10-11**
+  ("Add Annual Plan"): a subscription checkout during an active pilot gets a
+  trial that ends no earlier than the verdict (`app/services/billing.py`
+  `trial_end_for`; `docs/features/annual-billing.md`). Still open: a
+  subscription that was already running when the pilot started keeps
+  renewing (and charging) during the pilot.
 * Email delivery is through the configured transactional provider (Resend in
   production); whether `calendarharvest.com` is verified in Resend with
   SPF/DKIM is the open GAP-007 founder check — until then scorecards may land
@@ -478,8 +486,9 @@ STAR row: **"Every pilot ends with a verdict page and export."** Measured:
 * When the verdict is final you get a verdict page that stays readable
   afterwards, a PDF/CSV verdict and your full account data export — `app/api/pilots.py`
   (`/pilots/{id}/export`), `app/api/account_data.py` (`/me/data-export`).
-* Ending the pilot never changes your plan or billing; LeadPilot has no annual
-  plan — `app/core/billing_catalog.py` (`BILLING_MODELS`),
-  `tests/test_pilot_mode.py` (billing invariance tests).
+* Ending the pilot never changes your plan or billing, and a plan bought
+  during a pilot is not charged before the verdict —
+  `app/services/billing.py` (`trial_end_for`), `tests/test_pilot_mode.py`
+  (billing invariance tests), `tests/test_annual_billing.py` (`TestPilotTrial`).
 * Only owners and managers can start or end a pilot —
   `app/services/rbac.py` (`SDR_BLOCKED_PREFIXES`).

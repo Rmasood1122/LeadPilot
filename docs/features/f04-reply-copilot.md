@@ -216,13 +216,27 @@ narrow additions, all for `origin == "reply_copilot"` only:
    right after by the chokepoint itself (`cancelled_suppressed` /
    `cancelled_excluded`), which also catches an opt-out received after
    approval.
-2. **The enrollment-stopped gate** (`reply_copilot.answers_the_stop`). The send
+2. **The enrollment-stopped gate** (`reply_copilot.answers_the_stop`, logic in
+   `stop_explained_by`). The send
    path cancels anything on a stopped enrollment. A Reply Copilot message may
    pass it **only** when the stop is attributable to the conversation it
    answers: `stop_reason == "replied_<class>"` of **this draft's reply**, or of
    an earlier reply of the same lead (the prospect wrote twice: the first
    reply stopped the sequence, the second is not re-stopped), **and**
-   `stopped_at` is not before that reply was stored. A stop for any other
+   `stopped_at` is not before that reply was stored.
+   **Per-account setting `answer_earlier_replies`** (founder decision
+   2026-10-11, "User decide this"; `reply_copilot_settings`, default **true** =
+   the rule just described). When the account sets it to **false (strict)**,
+   only the stop caused by **this draft's own reply** is accepted: its class
+   must match the stop reason, it must be stored at or before `stopped_at`,
+   and no other reply of the lead stored at or before it may match the same
+   stop (a reply-class stop is written once, by the first stopping reply, so
+   an earlier match means the stop was that reply's; a tie fails closed).
+   In practice, strict means an answer to a prospect's second reply is
+   cancelled (`cancelled_stopped`) and the reply returns to "needs reply".
+   Strict only ever cancels more; it never lets through anything the default
+   would stop. Auto-send does not queue an answer the strict gate would
+   cancel (`auto_send_decision` → `stop_not_from_this_reply`). A stop for any other
    reason (unsubscribed, bounced, excluded, manual, `crm_*`, `call_*`,
    `meeting_booked`, `kill_signal:*`), a reply-class stop no reply of this
    conversation explains, or a stop without `stopped_at` cancels it
@@ -307,7 +321,9 @@ LinkedIn is never auto-sent (copy-only).
 
 `reply_copilot_settings` — one per account: `user_id` (PK, FK users CASCADE),
 `auto_send_meeting_time` (Boolean, server default false),
-`updated_by_user_id` (FK users SET NULL), timestamps.
+`answer_earlier_replies` (Boolean, server default **true**; added by migration
+`0082_annual_billing`, so every existing account keeps the original
+behaviour), `updated_by_user_id` (FK users SET NULL), timestamps.
 
 JSON (not JSONB), `sa.Uuid`, boolean server defaults — works on SQLite and
 PostgreSQL. **Downgrade** drops both tables: drafts and the opt-in are lost;
@@ -328,7 +344,7 @@ tombstone, so its FK cascade never fires).
 | `POST` | `/reply-copilot/drafts/{id}/approve` | `{subject?, body?}` — email only; 409 not pending / LinkedIn / contact blocked / no campaign to send through; 422 forbidden phrase or unsupported claim |
 | `POST` | `/reply-copilot/drafts/{id}/copy` | `{body?}` — LinkedIn only; same checks; sends nothing |
 | `POST` | `/reply-copilot/drafts/{id}/discard` | |
-| `GET` / `PUT` | `/reply-copilot/settings` | `{auto_send_meeting_time}` + whether the deployment allows it |
+| `GET` / `PUT` | `/reply-copilot/settings` | `{auto_send_meeting_time?, answer_earlier_replies?}` (either alone; neither = 422) + whether the deployment allows auto-send. `answer_earlier_replies` needs no deployment switch. |
 | `GET` | `/reply-copilot/metrics?days=30` | the success metric (below) |
 
 Every route is authenticated; every query filters `reply_drafts.user_id =
@@ -349,7 +365,9 @@ the booking link used, and an editable text area. Email: **Approve & send** (or
 clipboard, then records the copy) and **Discard**. Decided drafts show their
 delivery state (queued / sent / held for review / blocked: reason). The card
 also holds the account's auto-send opt-in toggle, disabled with an explanation
-when the deployment does not allow it.
+when the deployment does not allow it, and the "When a prospect wrote twice,
+still send an approved answer to the later reply" toggle
+(`answer_earlier_replies`, on by default).
 
 ## Tenancy
 
@@ -455,7 +473,15 @@ forbidden phrases; auto-send conditions. Tests: `tests/test_reply_copilot.py`
 - **auto-send**: only with deployment switch AND account opt-in AND
   meeting-time intent AND email; LinkedIn never; missing booking link or
   claim changes → stays pending; settings PUT refused while not allowed.
-- migration matches the models (`tests/test_reply_copilot_migration.py`).
+- migration matches the models (`tests/test_reply_copilot_migration.py`;
+  `answer_earlier_replies` is proven by `tests/test_annual_billing_migration.py`).
+- **`answer_earlier_replies`** (`tests/test_reply_copilot_strictness.py`):
+  default on (no row, row created for auto-send) answers the second reply;
+  strict cancels it (different class and same class), still answers the reply
+  that caused the stop, ignores an earlier out-of-office reply; switching back
+  restores the default; strict auto-send does not queue; API round trip
+  without the deployment switch, empty PUT 422, refused auto-send does not
+  half-apply, per-account, flag off 404.
 - `frontend/src/tests/replyCopilot.test.ts` — labels, edit detection,
   delivery state, metric formatting.
 
@@ -505,5 +531,6 @@ Neither number is measured yet — see Unverified.
 - An edit with a claim LeadPilot cannot back, or a forbidden phrase, cannot be approved (`app/services/reply_copilot.py:860`; API returns 422, `app/api/reply_copilot.py:74`).
 - Approve sends through the normal send path with the unsubscribe footer and one-click headers, so it can wait for the prospect's send window or the daily cap (`app/workers/outreach_tasks.py:487`, `app/workers/outreach_tasks.py:754`).
 - LinkedIn drafts are copy-only; LeadPilot never sends them (`app/services/reply_copilot.py:1014`).
-- A queued answer is cancelled if the lead books a meeting, is disqualified or closed, or writes again before it goes out (`app/services/reply_copilot.py:1090`).
+- A queued answer is cancelled if the lead books a meeting, is disqualified or closed, or writes again before it goes out (`app/services/reply_copilot.py`, `send_time_hold`).
+- When a prospect wrote twice, an approved answer to the later reply is still sent by default; turn off "When a prospect wrote twice, still send an approved answer to the later reply" to send only answers to the reply that stopped the sequence (`app/services/reply_copilot.py`, `stop_explained_by`; setting `answer_earlier_replies`).
 - Auto-send covers only "send me a time" email replies and needs an admin switch plus your own opt-in, both off by default (`app/services/reply_copilot.py:806`, `app/services/system_settings.py:299`).
