@@ -437,6 +437,21 @@ answerable:
   question: What time of day do my messages go out to prospects?
   expected:
   - sequences-and-follow-ups#when-does-each-step-go-out
+- id: q73
+  style: paraphrase
+  question: Can my restaurant use LeadPilot to get catering orders from offices nearby?
+  expected:
+  - who-its-for-and-not-for#can-a-restaurant-clinic-or-local-shop-use-leadpilot
+- id: q74
+  style: non_native
+  question: i have small clinic, can it find company clients near me
+  expected:
+  - who-its-for-and-not-for#can-a-restaurant-clinic-or-local-shop-use-leadpilot
+- id: q75
+  style: paraphrase
+  question: Can I send a promotion to my own cafe customers who signed up?
+  expected:
+  - who-its-for-and-not-for#can-a-local-business-message-its-own-customers
 must_refuse:
 - id: r01
   category: off_topic

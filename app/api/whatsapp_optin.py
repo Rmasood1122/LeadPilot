@@ -38,6 +38,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import Lead, OptInSource, Product, Strategy, User, WhatsAppOptIn
 from app.services import whatsapp_optin as svc
@@ -107,6 +108,10 @@ def record_optin(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     lead = _owned_lead(lead_id, db, current_user)
+    # A customer's WhatsApp consent comes only through the customer import
+    # (date + how they opted in, H1 opt-out checks), never a bare API call.
+    local_business.refuse_if_customer(
+        lead, "Recording a WhatsApp opt-in through the API (use the customer import)")
     try:
         row = svc.record_opt_in(
             db, lead,
@@ -281,7 +286,10 @@ async def import_optins(
         select(Lead)
         .join(Strategy, Strategy.id == Lead.strategy_id)
         .join(Product, Product.id == Strategy.product_id)
-        .where(Lead.phone.isnot(None), Product.user_id == current_user.id)
+        .where(Lead.phone.isnot(None), Product.user_id == current_user.id,
+               # A business's imported customers get WhatsApp consent only
+               # through the customer import (local business mode).
+               Lead.source != local_business.CUSTOMER_SOURCE)
     ).scalars()
     for lead in owned_leads:
         try:

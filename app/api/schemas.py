@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.db.models import BatchStage, FlowType, LeadStatus, ProductType, StrategyStatus
+from app.services.local_business import BusinessTypeKey, ServiceArea
 
 # --- Products ---------------------------------------------------------
 
@@ -19,6 +20,10 @@ class ProductCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1)
     type: ProductType
+    business_type: BusinessTypeKey | None = Field(
+        default=None,
+        description="Local business mode: restaurant | healthcare | retail | "
+                    "local_service | other. Omit for a non-local business.")
 
 
 class ProductOut(BaseModel):
@@ -29,6 +34,7 @@ class ProductOut(BaseModel):
     description: str
     type: ProductType
     created_at: datetime
+    business_type: str | None = None
 
 
 # --- Past clients (Flow 1 intake) ------------------------------------
@@ -88,6 +94,14 @@ class StrategyCreate(BaseModel):
                      "find leads, write the sequence and start outreach automatically. "
                      "Off unless enabled with the lawful-basis confirmation."),
     )
+    # Local business mode (docs/features/local-business-mode.md). Only for a
+    # product with a business_type; 422 otherwise.
+    service_area: ServiceArea | None = Field(
+        default=None, description="Local business mode: where the business's "
+        "B2B buyers are (city or postal code, country, radius)")
+    local_offer: str | None = Field(
+        default=None, max_length=500,
+        description="Local business mode: what the business offers business buyers")
 
 
 class StrategyResumeIn(BaseModel):
@@ -131,6 +145,10 @@ class StrategyOut(BaseModel):
     spent_usd: float | None = None
     steps_per_phase: int | None = None   # None = the full nine
     planned_steps: int | None = None
+    # Local business mode. business_type is the product's (read-only here).
+    business_type: str | None = None
+    service_area: dict | None = None
+    local_offer: str | None = None
 
 
 class PhaseProgress(BaseModel):

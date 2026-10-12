@@ -326,6 +326,12 @@ def refresh(session: Session, lead: Lead, *, owner_id, strategy: Strategy | None
     now = now or _now()
     if owner_id is None:
         return {"created": 0, "updated": 0, "skipped": "no owner"}
+    # Local business mode: no signals are derived about a business's own
+    # customer (a consumer).
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    if is_customer(lead):
+        return {"created": 0, "updated": 0, "skipped": "customer"}
     try:
         if strategy is None and lead.strategy_id is not None:
             strategy = session.get(Strategy, lead.strategy_id)

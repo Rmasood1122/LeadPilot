@@ -33,6 +33,7 @@ sources:
   - app/services/network_messages.py
   - frontend/src/app/(app)/network/page.tsx
   - app/api/sequences.py
+  - app/services/local_business.py
 ---
 
 # Lead sourcing and email verification
@@ -45,7 +46,7 @@ Open the verified strategy's page. In the **1. Find leads** card, enter **How ma
 
 Lead sourcing only works for a strategy whose status is `verified`. For any other status the request is refused.
 
-LeadPilot builds the search from the strategy's research: job titles, industries, locations, company size ranges and keywords from the ideal customer profile. Through the API a request can ask for up to 1,000 leads, but one sourcing run is capped at 200 by default.
+LeadPilot builds the search from the strategy's research: job titles, industries, locations, company size ranges and keywords from the ideal customer profile. For a local business with a service area, the location is your city or postcode instead (the radius is not sent to the lead provider). Through the API a request can ask for up to 1,000 leads, but one sourcing run is capped at 200 by default.
 
 By default you can start 5 sourcing requests per hour. Each lead uses paid Apollo and Hunter credits, so the screen suggests starting small. Search results are cached for 1 day, and enrichment, email-finding and email-check results for 30 days, so repeating the same lookup within those periods does not pay for it again (and an email check repeated within 30 days returns the earlier result).
 

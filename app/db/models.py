@@ -846,6 +846,19 @@ class Product(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     type: Mapped[ProductType] = mapped_column(_enum(ProductType))
+    # --- Local business mode (migration 0088) -----------------------------
+    # restaurant | healthcare | retail | local_service | other -- see
+    # app/services/local_business.py::BUSINESS_TYPES. NULL = not a local
+    # business, which is every product created before the feature: their
+    # prompts, sourcing and sends are exactly what they were.
+    business_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Set the first time the product is `healthcare` and NEVER cleared: a
+    # product that was a clinic keeps customer win-back refused forever, even
+    # if its business type is changed later (its customer list would still be
+    # a patient list). See local_business.change_business_type.
+    healthcare_locked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="products")
     past_clients: Mapped[list["PastClient"]] = relationship(back_populates="product")
@@ -1043,8 +1056,26 @@ class Strategy(TimestampMixin, Base):
     reengagement_weekly_cap: Mapped[int] = mapped_column(
         Integer, default=25, server_default=text("25"), nullable=False
     )
+    # --- Local business mode (migration 0088) -----------------------------
+    # {city, postal_code, country, radius, unit, timezone} -- validated by
+    # app/services/local_business.py::ServiceArea. NULL = no service area.
+    # The radius is used in prompts and recorded on lead batches; it is NOT
+    # sent to the lead provider (see docs/features/local-business-mode.md).
+    service_area_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # What the business offers business buyers, in the owner's words.
+    local_offer: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     product: Mapped["Product"] = relationship(back_populates="strategies")
+
+    @property
+    def business_type(self) -> str | None:
+        """The product's local business type, read through the relationship.
+
+        One source of truth (products.business_type); exposed here so a
+        scheduler or a prompt that holds a strategy can read
+        `strategy.business_type` without a second query."""
+        product = self.product
+        return product.business_type if product is not None else None
     research_steps: Mapped[list["ResearchStep"]] = relationship(
         back_populates="strategy"
     )
@@ -1426,6 +1457,15 @@ class Sequence(TimestampMixin, Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     approval_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     approval_payload_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # --- Local business mode (migration 0088) -----------------------------
+    # prospects (B2B leads, every sequence before 0088) | customers (the
+    # business's own opted-in customers, win-back). Enrollment never mixes
+    # the two and the send path cancels a message whose lead is of the other
+    # audience -- see app/services/local_business.py::customer_send_block.
+    audience: Mapped[str] = mapped_column(
+        String(20), default="prospects", server_default=text("'prospects'"),
+        nullable=False
+    )
 
     strategy: Mapped["Strategy"] = relationship(back_populates="sequences")
     steps: Mapped[list["SequenceStep"]] = relationship(
@@ -5735,7 +5775,46 @@ class AutopilotLaunch(TimestampMixin, Base):
     )
 
 
-# Product defect #2:fill outcomes.strategy_id / outcomes.variant on every new
+class CustomerImport(Base):
+    """Local business mode, Part B (migration 0088) -- one row per import of a
+    business's OWN customer list for consent-based win-back.
+
+    The proof of each person's consent is in consent_events (and
+    whatsapp_optins); this row is the import itself: who uploaded it, when,
+    into which campaign, under which business type, and the attestation the
+    owner confirmed. Refused rows are kept as line numbers and reasons only --
+    never the refused personal data (GDPR Art. 5(1)(c)).
+
+    No updated_at: an import is a fact that happened once.
+    """
+
+    __tablename__ = "customer_imports"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
+    )
+    business_type: Mapped[str] = mapped_column(String(30))
+    attestation: Mapped[str] = mapped_column(Text)
+    # local_business.ATTESTATION_VERSION the person confirmed.
+    attestation_version: Mapped[str] = mapped_column(String(10))
+    accepted_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    rejected_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    # [{line, reason}] -- no names, addresses or numbers.
+    rejected_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+# Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new
 # Outcome (the learning loop and A/B promotion read those columns). Imported
 # last so the listener module can import the classes above.
 from app.db import outcome_attribution as _outcome_attribution  # noqa: E402,F401

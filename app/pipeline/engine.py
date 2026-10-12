@@ -74,8 +74,13 @@ def next_step(session: Session, strategy: Strategy) -> StepSpec | None:
 # --------------------------------------------------------------------------
 
 
-def _product_block(product: Product) -> str:
-    return f"Name: {product.name}\nType: {product.type.value}\nDescription: {product.description}"
+def _product_block(product: Product, local_block: str = "") -> str:
+    """The product as every step's prompt sees it. Local business mode
+    (docs/features/local-business-mode.md) appends the LOCAL BUSINESS CONTEXT
+    section when the product is a local business; otherwise the block is
+    byte-identical to what it always was."""
+    block = f"Name: {product.name}\nType: {product.type.value}\nDescription: {product.description}"
+    return f"{block}\n\n{local_block}" if local_block else block
 
 
 def _patterns_block(session: Session, strategy: Strategy) -> str:
@@ -160,8 +165,11 @@ def _context_block(session: Session, strategy: Strategy, spec: StepSpec) -> str:
 def run_step(session: Session, strategy: Strategy, spec: StepSpec) -> None:
     """Execute ONE step and commit its row before returning."""
     product = session.get(Product, strategy.product_id)
+    from app.services import local_business  # noqa: PLC0415
+
     prompt = spec.build_prompt(
-        product_block=_product_block(product),
+        product_block=_product_block(product,
+                                     local_business.block_for_strategy(session, strategy)),
         patterns_block=_patterns_block(session, strategy),
         context_block=_context_block(session, strategy, spec),
     )

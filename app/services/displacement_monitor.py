@@ -236,10 +236,14 @@ def watchlist(db: Session, strategy_id) -> list[Lead]:
     a lead who went quiet at `contacted` posting "cold email is not working"
     is precisely the person this feature exists for.
     """
+    from app.services.local_business import CUSTOMER_SOURCE  # noqa: PLC0415
+
     return db.execute(
         select(Lead).where(Lead.strategy_id == strategy_id,
                            Lead.linkedin_url.isnot(None),
-                           Lead.status != LeadStatus.DROPPED)
+                           Lead.status != LeadStatus.DROPPED,
+                           # Local business mode: consumers are never watched.
+                           Lead.source != CUSTOMER_SOURCE)
     ).scalars().all()
 
 

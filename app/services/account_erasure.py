@@ -128,6 +128,9 @@ DELETED: frozenset[str] = frozenset({
     "api_keys", "api_usage", "attribution_entries", "auth_sessions",
     "autopilot_launches",  # opt-in proof stays in compliance_audit_log (E2)
     "daily_send_approvals",  # the decisions themselves stay in compliance_audit_log (E2)
+    # Local business win-back import log (attestation, counts, refused line
+    # numbers). The proof of each consent is consent_events, KEPT as E2.
+    "customer_imports",
     "calendar_availability", "calendar_booking_pages", "calendar_bookings", "calls",
     "campaign_costs", "champion_moves", "channel_suggestions", "chat_messages",
     "chat_sessions", "claim_verification_log", "client_sending_domains",

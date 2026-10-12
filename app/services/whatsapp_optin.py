@@ -123,12 +123,16 @@ def record_opt_in(
     source: OptInSource,
     evidence: str | None = None,
     consent_text: str | None = None,
+    commit: bool = True,
 ) -> WhatsAppOptIn:
     """Append an opted_in row and sync the lead cache.
 
     manual_import REQUIRES evidence — a consent record with no evidence
     is worthless in a dispute and violates WhatsApp policy expectations.
-    There is deliberately no way to relax this."""
+    There is deliberately no way to relax this.
+
+    commit=False adds everything to the caller's transaction instead (the
+    local-business customer import commits once for the whole file)."""
     if source is OptInSource.MANUAL_IMPORT and not (evidence or "").strip():
         raise OptInError(
             "manual_import opt-ins require evidence (where/when/how this "
@@ -167,8 +171,10 @@ def record_opt_in(
 
     consent.record_grant(session, lead, channel=consent.WHATSAPP,
                          source=f"whatsapp_{source.value}",
-                         detail=(evidence or consent_text or "")[:300] or None)
-    session.commit()
+                         detail=(evidence or consent_text or "")[:300] or None,
+                         commit=commit)
+    if commit:
+        session.commit()
     logger.info("whatsapp opt-in recorded lead=%s source=%s", lead.id, source.value)
     return row
 

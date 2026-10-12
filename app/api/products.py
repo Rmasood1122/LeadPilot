@@ -2,7 +2,8 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -16,6 +17,7 @@ from app.api.schemas import (
 )
 from app.db.base import get_db
 from app.db.models import PastClient, Product, User
+from app.services.local_business import BusinessTypeKey
 from app.services.pattern_recognition import extract_patterns
 
 router = APIRouter(prefix="/products", tags=["intake"])
@@ -24,6 +26,7 @@ router = APIRouter(prefix="/products", tags=["intake"])
 @router.post("", response_model=ProductOut, status_code=201)
 def create_product(
     body: ProductCreate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> Product:
@@ -35,13 +38,26 @@ def create_product(
     can never create a product under another user's account by passing a
     different email in the body.
     """
+    if body.business_type is not None:
+        from app.services import local_business  # noqa: PLC0415
+
+        if not local_business.enabled(db):
+            raise HTTPException(status_code=422, detail=local_business.LOCAL_MODE_DISABLED)
     product = Product(
+        id=uuid.uuid4(),
         user_id=current_user.id,
         name=body.name,
         description=body.description,
         type=body.type,
     )
     db.add(product)
+    if body.business_type is not None:
+        from app.services import local_business  # noqa: PLC0415
+
+        # Audited like every later change (who, from, to) and sets the
+        # healthcare lock when the product starts as healthcare.
+        local_business.change_business_type(db, product, body.business_type,
+                                            actor=current_user, request=request)
     db.commit()
     db.refresh(product)
     return product
@@ -58,6 +74,44 @@ def get_product(
         # 404 (not 403) so an attacker can't tell "exists but not yours"
         # from "doesn't exist" — standard ownership-check practice.
         raise HTTPException(status_code=404, detail="product not found")
+    return product
+
+
+class LocalBusinessTypeIn(BaseModel):
+    business_type: BusinessTypeKey | None = Field(
+        description="restaurant | healthcare | retail | local_service | other; "
+                    "null = not a local business")
+
+
+@router.put("/{product_id}/local-business", response_model=ProductOut)
+def set_business_type(
+    product_id: uuid.UUID,
+    body: LocalBusinessTypeIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Product:
+    """Local business mode: set or clear the product's business type.
+
+    Every change is audited (security_audit_events: who, from, to). Healthcare
+    rules (local_business.change_business_type): a product holding imported
+    customers can neither become nor stop being healthcare (409), and a
+    product that was ever healthcare keeps customer win-back refused."""
+    product = db.get(Product, product_id)
+    if product is None or product.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="product not found")
+    from app.services import local_business  # noqa: PLC0415
+
+    if body.business_type is not None and not local_business.enabled(db):
+        raise HTTPException(status_code=422, detail=local_business.LOCAL_MODE_DISABLED)
+    try:
+        local_business.change_business_type(db, product, body.business_type,
+                                            actor=current_user, request=request)
+    except local_business.ImportRefused as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+    db.commit()
+    db.refresh(product)
     return product
 
 

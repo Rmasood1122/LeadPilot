@@ -100,6 +100,7 @@ from app.api.signals import router as signals_router                   # F02 Sig
 from app.api.champions import router as champions_router               # F10 Champion Tracker
 from app.api.send_approval import router as send_approval_router       # daily send approval
 from app.api.autopilot import router as autopilot_router               # Autopilot launch + best time
+from app.api.local_business import router as local_business_router     # local business mode
 
 # M9: registers the SQLAlchemy session listeners that publish CRM events
 # to Redis. Imported for its SIDE EFFECT -- install() is a no-op marker so
@@ -346,6 +347,9 @@ app.include_router(send_approval_router)         # daily send approval: /send-ap
 # Autopilot launch. /autopilot is a new prefix; /strategies/{id}/autopilot,
 # /best-time and /send-diagnostics are new sub-paths of /strategies/{id}.
 app.include_router(autopilot_router)             # /strategies/{id}/autopilot|best-time|send-diagnostics
+# Local business mode: /local-business/* is a new prefix; /strategies/{id}/
+# local-business and /strategies/{id}/customers/import are new sub-paths.
+app.include_router(local_business_router)        # local business mode + win-back import
 
 
 # ---------------------------------------------------------------------------

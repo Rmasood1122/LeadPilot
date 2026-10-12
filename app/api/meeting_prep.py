@@ -28,6 +28,7 @@ from app.api.deps import get_current_user
 from app.api.metering import metered
 from app.api.leads import _owned_lead
 from app.core.rate_limiting import enforce_rate_limit
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import (
     Meeting,
@@ -210,6 +211,7 @@ def request_lead_meeting_prep(lead_id: uuid.UUID, body: PrepRequestIn,
     the reminders follow that meeting's time."""
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "A meeting prep brief")
     meeting = _owned_meeting(db, body.meeting_id, current_user, lead.id)
     brief = meeting_prep.upsert_brief(
         db, lead, user_id=current_user.id, source=meeting_prep.SOURCE_MANUAL,
@@ -253,6 +255,10 @@ def log_meeting_outcome(lead_id: uuid.UUID, body: OutcomeIn,
     if body.generate_followup:
         enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
+    if body.generate_followup:
+        # Logging an outcome is local; a model-drafted follow-up to a
+        # consumer is not offered.
+        local_business.refuse_if_customer(lead, "A drafted follow-up email")
     meeting = _owned_meeting(db, body.meeting_id, current_user, lead.id)
     row = meeting_followup.log_outcome(
         db, user=current_user, lead=lead, outcome=body.outcome, notes=body.notes,

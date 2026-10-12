@@ -40,9 +40,14 @@ def rescore_strategy_impl(session, strategy_id: uuid.UUID) -> int:
     strategy = session.get(Strategy, strategy_id)
     if strategy is None:
         return 0
+    from app.services.local_business import CUSTOMER_SOURCE  # noqa: PLC0415
+
+    # Local business mode: a business's imported customers are not prospects
+    # and are never scored (a model call about the person).
     leads = session.execute(
         select(Lead).where(Lead.strategy_id == strategy_id,
-                           Lead.status.in_(lead_scoring.SCORABLE))
+                           Lead.status.in_(lead_scoring.SCORABLE),
+                           Lead.source != CUSTOMER_SOURCE)
     ).scalars().all()
     from app.services import usage_meter  # noqa: PLC0415
 

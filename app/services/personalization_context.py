@@ -80,6 +80,12 @@ def ensure_fresh(session: Session, lead: Lead, *, owner_id=None, force: bool = F
 
     now = now or _now()
     result = {"posts": "skipped", "news": "skipped"}
+    # Local business mode: a business's imported customer is a consumer --
+    # their posts and news are never fetched from any provider.
+    from app.services.local_business import is_customer  # noqa: PLC0415
+
+    if is_customer(lead):
+        return {"posts": "skipped_customer", "news": "skipped_customer"}
     try:
         if not lead.linkedin_url:
             lead.linkedin_url = linkedin_url_for(lead)

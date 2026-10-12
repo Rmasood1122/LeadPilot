@@ -20,6 +20,7 @@ from app.api.deps import get_current_user
 from app.api.metering import metered, refuse_if_daily_limit_reached
 from app.api.leads import _owned_lead, _owned_strategy
 from app.core.rate_limiting import enforce_rate_limit
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import (
     PipelineKind,
@@ -248,6 +249,7 @@ def rescore_lead(lead_id: uuid.UUID, db: Session = Depends(get_db),
                  current_user: User = Depends(get_current_user)) -> LeadScoreOut:
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "Lead scoring")
     strategy = db.get(Strategy, lead.strategy_id)
     with metered(db, current_user, "lead_scoring"):
         lead_scoring.score_leads(db, strategy, [lead])

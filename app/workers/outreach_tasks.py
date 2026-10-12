@@ -264,6 +264,35 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                                    reason="suppressed" if target else engine.STOP_NO_ADDRESS)
         return "cancelled_suppressed" if target else "cancelled_no_address"
 
+    # ---- Local business mode, Part B: customer win-back (SAFETY GUARD) -----
+    # Every message: a prospect in a customer sequence, or an imported
+    # customer in a prospect sequence, is cancelled. A customer message also
+    # needs the win-back flag, email or WhatsApp, a non-healthcare local
+    # business (HIPAA) and -- for email -- a current opt-in in the consent
+    # ledger (WhatsApp opt-in is the existing gate below). Lookup error fails
+    # CLOSED: deferred an hour. docs/features/local-business-mode.md.
+    from app.services import local_business  # noqa: PLC0415
+
+    try:
+        winback_block = local_business.customer_send_block(session, lead, sequence,
+                                                           message, strategy)
+    except Exception:
+        logger.exception("win-back check failed for message %s -- deferred", message_id)
+        session.rollback()
+        message = session.get(Message, message_id)
+        message.scheduled_at = now + timedelta(hours=1)
+        message.error = "win-back consent could not be checked -- deferred (fails closed)"
+        session.commit()
+        return "deferred_winback_unavailable"
+    if winback_block is not None:
+        local_business.cancel_for_block(session, message, winback_block)
+        _audit(session, strategy, lead, message, local_business.AUDIT_BLOCKED,
+               extra={"reason": winback_block})
+        session.commit()
+        if enrollment.status is not EnrollmentStatus.STOPPED:
+            engine.stop_enrollment(session, enrollment, reason=local_business.STOP_REASON)
+        return local_business.SEND_RESULT
+
     # ---- F05 Guardrails Studio: the account's exclusion lists -------------
     # SAFETY GUARD. Customers, open deals, churned accounts and do-not-contact
     # entries of THIS account (domain / company / contact), checked NOW -- an
@@ -749,6 +778,9 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 # F04: the approved words, never a re-render -- with the same
                 # claim check and compliant footer + headers as every email.
                 outbound = _render_reply_copilot_outbound(session, strategy, lead, message)
+            elif local_business.is_customer(lead):
+                # Local business mode, Part B: the owner's own win-back copy.
+                outbound = _render_customer_email_outbound(session, strategy, lead, message)
             else:
                 outbound = _render_email_outbound(session, strategy, lead,
                                                   sequence, message, now=now)
@@ -1082,6 +1114,39 @@ def _render_reply_copilot_outbound(session: Session, strategy: Strategy, lead: L
     )
 
 
+def _render_customer_email_outbound(session: Session, strategy: Strategy, lead: Lead,
+                                    message: Message) -> OutboundMessage:
+    """Local business mode, Part B: a win-back email to the business's own
+    opted-in customer. The owner's copy as written ({first_name} and
+    {business_name} filled) -- no model writes it and nothing is researched
+    about the person (no posts, news or signals). The claim check still runs,
+    then build_compliant_email adds the unsubscribe footer, the region notice
+    and the RFC 8058 one-click headers, as for every email. No open or click
+    tracking for consumers."""
+    from app.services import claim_verification, local_business  # noqa: PLC0415
+
+    subject, body = local_business.render_customer_email(
+        session, strategy, lead, _step_of(session, message).template)
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead,
+                                         message=message, channel="email",
+                                         fields={"subject": subject, "body": body})
+    subject, body = checked["subject"], checked["body"]
+    subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
+    message.subject = subject
+    message.body = body
+    message.unsubscribe_token = token
+    message.personalization_json = {"winback": True, "model_written": False}
+    return OutboundMessage(
+        message_id=str(message.id),
+        lead_id=str(lead.id),
+        to_address=lead.email,
+        subject=subject,
+        body=body,
+        headers=headers,
+        thread_ref=_thread_ref_for_followup(session, message),
+    )
+
+
 def _render_whatsapp_outbound(session: Session, strategy: Strategy, lead: Lead,
                               message: Message, now: datetime) -> OutboundMessage:
     """Build the WhatsApp OutboundMessage: template variables filled via
@@ -1108,12 +1173,21 @@ def _render_whatsapp_outbound(session: Session, strategy: Strategy, lead: Lead,
 
     tmpl = session.get(WhatsAppTemplate, message.whatsapp_template_id)
     step = _step_of(session, message)
-    values = render_whatsapp_variables(
-        session, strategy, lead,
-        template_body=tmpl.body or "",
-        variable_descriptions=tmpl.variable_descriptions_json or {},
-        variable_mapping=getattr(step, "variable_mapping_json", None),
-    )
+    from app.services import local_business  # noqa: PLC0415
+
+    if local_business.is_customer(lead):
+        # Local business mode, Part B: a customer's template variables are
+        # deterministic name fields only -- never model-written.
+        values = local_business.customer_whatsapp_values(
+            lead, getattr(step, "variable_mapping_json", None),
+            tmpl.variable_descriptions_json or {})
+    else:
+        values = render_whatsapp_variables(
+            session, strategy, lead,
+            template_body=tmpl.body or "",
+            variable_descriptions=tmpl.variable_descriptions_json or {},
+            variable_mapping=getattr(step, "variable_mapping_json", None),
+        )
     # Feature A1: the template is Meta-approved and fixed; only the variables
     # are model-written, so they are what gets checked. An unsupported claim in
     # a slot is replaced with a neutral value rather than leaving it empty.
@@ -2022,6 +2096,12 @@ def check_followup_due_impl(session: Session, now: datetime | None = None,
         lead = session.get(Lead, enrollment.lead_id)
         strategy = session.get(Strategy, lead.strategy_id) if lead else None
         if strategy is None or strategy.campaign_state != engine.CAMPAIGN_ACTIVE:
+            continue
+        # Local business mode: the automatic follow-up is model-written; a
+        # business's own customer only ever receives the owner's copy.
+        from app.services.local_business import is_customer  # noqa: PLC0415
+
+        if is_customer(lead):
             continue
 
         next_step_no = _next_followup_step(session, enrollment, last)

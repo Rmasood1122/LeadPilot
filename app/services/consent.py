@@ -306,13 +306,14 @@ def suppress_everywhere(db: Session, lead: Lead, *, source: str, reason: str,
 
 
 def record_grant(db: Session, lead: Lead, *, channel: str, source: str,
-                 detail: str | None = None, actor: User | None = None) -> ConsentEvent:
+                 detail: str | None = None, actor: User | None = None,
+                 commit: bool = True) -> ConsentEvent:
     """Consent was GIVEN — a WhatsApp opt-in, a form submission, a phone
     consent. Recorded so the ledger shows both halves; a ledger that only
     holds withdrawals cannot show that contact was lawful to begin with."""
     return record(db, lead=lead, kind=GRANTED, channel=channel, source=source,
                   identifier=(lead.phone if channel in (PHONE, WHATSAPP) else lead.email),
-                  detail=detail, actor=actor)
+                  detail=detail, actor=actor, commit=commit)
 
 
 def record_erasure(db: Session, lead: Lead, *, source: str = "gdpr_request",

@@ -1,6 +1,8 @@
 /** Pure intake-wizard state machine — exported for unit tests (Chunk 7:
  *  branching yes/no past clients). */
 
+import { localErrors, type LocalDraft } from "@/lib/localBusiness";
+
 export type IntakeStep = "product" | "past-clients-question" | "past-clients" | "review";
 
 export interface PastClientDraft {
@@ -13,6 +15,8 @@ export interface IntakeState {
   product: { name: string; description: string; type: "product" | "skill" };
   hasPastClients: boolean | null;
   clients: PastClientDraft[];
+  /** Local business mode: optional; absent or businessType "" = not local. */
+  local?: LocalDraft;
 }
 
 export const INITIAL_INTAKE: IntakeState = {
@@ -65,7 +69,8 @@ export function canAdvance(state: IntakeState): boolean {
   switch (state.step) {
     case "product":
       return state.product.name.trim().length > 0 &&
-             state.product.description.trim().length > 0;
+             state.product.description.trim().length > 0 &&
+             localErrors(state.local).length === 0;
     case "past-clients-question":
       return state.hasPastClients !== null;
     case "past-clients":

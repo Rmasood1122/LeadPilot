@@ -25,6 +25,9 @@ from app.db.models import SecurityAuditEvent
 logger = logging.getLogger(__name__)
 
 STRATEGY_DELETED = "strategy.deleted"
+# Local business mode (docs/features/local-business-mode.md).
+PRODUCT_BUSINESS_TYPE_CHANGED = "product.business_type_changed"
+CUSTOMERS_IMPORTED = "customers.imported"
 STRATEGY_DELETE_DENIED = "strategy.delete_denied"
 STRATEGY_PASSES_OVERRIDDEN = "strategy.passes_overridden"
 STRATEGY_PASSES_OVERRIDE_DENIED = "strategy.passes_override_denied"

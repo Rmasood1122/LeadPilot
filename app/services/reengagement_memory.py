@@ -330,6 +330,12 @@ def plan_for_reply(db: Session, reply: InboundReply,
         lead = db.get(Lead, reply.lead_id)
         if lead is None:
             return None
+        # Local business mode: no dated return visit (a model extraction and
+        # a model-written touch) for a business's own customer.
+        from app.services.local_business import is_customer  # noqa: PLC0415
+
+        if is_customer(lead):
+            return None
 
         today = now.astimezone(timezone.utc).date()
         extraction = extract(db, reply, today=today)

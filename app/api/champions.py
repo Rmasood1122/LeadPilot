@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.api.leads import _owned_lead
 from app.core.rate_limiting import enforce_rate_limit
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import User
 from app.services import champion_tracker, rbac
@@ -74,6 +75,7 @@ def refresh_role_check(lead_id: uuid.UUID, db: Session = Depends(get_db),
     # a paid lookup. FastAPI has already validated the path by now.
     enforce_rate_limit(str(current_user.id), "champion_refresh", "RATE_LIMIT_AI_ACTION")
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "A role check at a provider")
     if not champion_tracker.enabled(db):
         raise HTTPException(status_code=409, detail="The champion tracker is off.")
     inactive = champion_tracker.inactive_reason(lead)

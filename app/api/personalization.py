@@ -29,6 +29,7 @@ from app.api.deps import get_current_user
 from app.api.metering import metered, refuse_if_daily_limit_reached
 from app.api.leads import _owned_lead
 from app.core.rate_limiting import client_ip, enforce_rate_limit
+from app.services import local_business
 from app.db.base import get_db
 from app.db.models import Lead, Product, User
 from app.services import (
@@ -148,6 +149,7 @@ def refresh_lead_personalization(lead_id: uuid.UUID, db: Session = Depends(get_d
                                  current_user: User = Depends(get_current_user)):
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "Personalization research")
     personalization_context.ensure_fresh(db, lead, owner_id=current_user.id, force=True)
     return _out(lead)
 
@@ -157,6 +159,7 @@ def set_linkedin_url(lead_id: uuid.UUID, body: LinkedInUrlIn,
                      db: Session = Depends(get_db),
                      current_user: User = Depends(get_current_user)):
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "A LinkedIn profile")
     if body.linkedin_url != lead.linkedin_url:
         lead.linkedin_url = body.linkedin_url
         # A different person's posts must not survive a URL correction.
@@ -172,6 +175,7 @@ def write_loom_script(lead_id: uuid.UUID, db: Session = Depends(get_db),
     """Write (or rewrite) the recording script on demand, whatever the score."""
     enforce_rate_limit(str(current_user.id), "ai_action", _AI_LIMIT)
     lead = _owned_lead(db, lead_id, current_user)
+    local_business.refuse_if_customer(lead, "A personal video script")
     with metered(db, current_user, "drafting"):
         try:
             script = loom_video.write_script(lead)

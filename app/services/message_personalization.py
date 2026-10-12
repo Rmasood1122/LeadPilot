@@ -56,7 +56,13 @@ def _playbook(session: Session, strategy: Strategy) -> str:
     research = ("\n\n".join(r.output for r in rows)
                 or "(no messaging research found — keep it short, factual and human)")
     mutation = _applied_mutation(session, strategy)
-    return f"{mutation}\n\n{research}" if mutation else research
+    playbook = f"{mutation}\n\n{research}" if mutation else research
+    # Local business mode (docs/features/local-business-mode.md): the local
+    # context and its hard limits come first. Empty for every other product.
+    from app.services import local_business  # noqa: PLC0415
+
+    local = local_business.block_for_strategy(session, strategy)
+    return f"{local}\n\n{playbook}" if local else playbook
 
 
 def _voice(session: Session, strategy: Strategy) -> str:

@@ -279,6 +279,10 @@ export interface StrategyOut {
   error: string | null;
   budget_usd?: number | null;
   spent_usd?: number | null;
+  /** Local business mode (create/list responses; absent on older servers). */
+  business_type?: string | null;
+  service_area?: Record<string, unknown> | null;
+  local_offer?: string | null;
 }
 
 /** src/tests/statusTone.test.ts imports the strategy shape as `Strategy`,

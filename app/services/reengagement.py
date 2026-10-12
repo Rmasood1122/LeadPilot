@@ -251,6 +251,8 @@ def candidates(session: Session, strategy: Strategy, now: datetime, limit: int,
     """Up to `limit` eligible enrollments of ONE campaign, oldest first."""
     if limit <= 0:
         return []
+    from app.services.local_business import CUSTOMER_SOURCE  # noqa: PLC0415
+
     rows = session.execute(
         select(SequenceEnrollment)
         .join(Sequence, Sequence.id == SequenceEnrollment.sequence_id)
@@ -259,6 +261,9 @@ def candidates(session: Session, strategy: Strategy, now: datetime, limit: int,
                Lead.strategy_id == strategy.id,
                SequenceEnrollment.status == EnrollmentStatus.COMPLETED,
                Lead.status == LeadStatus.CONTACTED,
+               # Local business mode: model-written re-engagement is a B2B
+               # feature; a business's own customers never get it.
+               Lead.source != CUSTOMER_SOURCE,
                ~exists().where(ReengagementAttempt.enrollment_id == SequenceEnrollment.id))
         .order_by(SequenceEnrollment.updated_at, SequenceEnrollment.id)
         .limit(_SCAN_LIMIT)
