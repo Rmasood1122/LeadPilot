@@ -55,6 +55,9 @@ def _suppress_address(db: Session, email: str) -> None:
                    detail="unsubscribed via link after the sender's records were erased",
                    commit=False)
     db.commit()
+    from app.services import email_network  # noqa: PLC0415
+
+    email_network.purge_address(db, address)    # never raises
 
 
 def _process(token: str, db: Session) -> HTMLResponse:

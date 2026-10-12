@@ -5046,6 +5046,156 @@ class LinkedInNetworkMessage(TimestampMixin, Base):
 
 
 # --------------------------------------------------------------------------
+# Private email network (migration 0090, docs/features/email-network.md)
+# --------------------------------------------------------------------------
+#
+# The LinkedIn network's twin for the people a user already emails. Same
+# privacy boundary: every row belongs to the ONE account that imported it and
+# is only read back for that account (no shared pool). DATA MINIMISATION: a
+# contact row holds who (name, address, company, title), how often (counts),
+# how recently (first/last seen) and whether it was two-way -- never a
+# subject, a body, a Message-ID, an attachment or a signature. People the
+# filters exclude (newsletters, role inboxes, personal domains, colleagues,
+# suppressed / excluded people) are never stored; only counts by reason are.
+
+
+class EmailNetworkImport(TimestampMixin, Base):
+    """One upload (contacts file / mailbox export) or one Gmail scan.
+
+    tally_json is TRANSIENT: a Gmail scan runs in chunks, and the running
+    per-correspondent tallies (address, name, counts, dates) sit here only
+    until the scan finishes, then it is cleared. Addresses already excluded by
+    a fixed rule are held only as hashes, for counting unique people."""
+
+    __tablename__ = "email_network_imports"
+    __table_args__ = (
+        # One ACTIVE Gmail scan per account (review round): two concurrent
+        # "Scan my Gmail" requests cannot both start one.
+        Index("uq_email_network_imports_active_scan", "user_id", unique=True,
+              sqlite_where=text("kind = 'gmail_scan' AND status IN ('queued', 'running')"),
+              postgresql_where=text("kind = 'gmail_scan' AND status IN ('queued', 'running')")),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # google_csv | outlook_csv | csv | vcard | mbox | gmail_scan
+    kind: Mapped[str] = mapped_column(String(20))
+    # done | queued | running | failed | reconnect_required
+    status: Mapped[str] = mapped_column(String(30), default="done")
+    attested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attestation_version: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    rows_in_file: Mapped[int] = mapped_column(Integer, default=0)
+    messages_scanned: Mapped[int] = mapped_column(Integer, default=0)
+    people_found: Mapped[int] = mapped_column(Integer, default=0)
+    added: Mapped[int] = mapped_column(Integer, default=0)
+    updated: Mapped[int] = mapped_column(Integer, default=0)
+    excluded: Mapped[int] = mapped_column(Integer, default=0)
+    excluded_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    cap_note: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    page_token: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    chunk_seq: Mapped[int] = mapped_column(Integer, default=0)
+    tally_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailContact(TimestampMixin, Base):
+    """One person the account emails or has in its address book. Counts are
+    kept per source in source_counts_json ({"mbox": {...}, "gmail": {...}})
+    and combined by MAX, not SUM, so a mailbox file and a Gmail scan of the
+    same mailbox are not counted twice."""
+
+    __tablename__ = "email_contacts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "email", name="uq_email_contacts_user_id_email"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    email: Mapped[str] = mapped_column(String(320))
+    domain: Mapped[str] = mapped_column(String(253))
+    full_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    company: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    company_from_domain: Mapped[bool] = mapped_column(Boolean, default=False)
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    sent_to_count: Mapped[int] = mapped_column(Integer, default=0)
+    received_from_count: Mapped[int] = mapped_column(Integer, default=0)
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    two_way: Mapped[bool] = mapped_column(Boolean, default=False)
+    in_contacts_file: Mapped[bool] = mapped_column(Boolean, default=False)
+    source_counts_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class EmailContactMatch(TimestampMixin, Base):
+    __tablename__ = "email_contact_matches"
+    __table_args__ = (
+        UniqueConstraint("contact_id", "product_id",
+                         name="uq_email_contact_matches_contact_id_product_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("email_contacts.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    score: Mapped[int] = mapped_column(Integer)
+    icp_score: Mapped[int] = mapped_column(Integer, default=0)
+    relationship_score: Mapped[int] = mapped_column(Integer, default=0)
+    segment: Mapped[str] = mapped_column(String(120))
+    reasons_json: Mapped[list] = mapped_column(JSON, default=list)
+    analyzed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class EmailNetworkMessage(TimestampMixin, Base):
+    """A warm first email the user is writing to one of THEIR OWN contacts.
+    Never sent from here: once SAVED it can be attached to a campaign as that
+    person's first email, and the campaign's normal send path sends it (with
+    every check). Deleted with the contact / the account / the person's
+    erasure."""
+
+    __tablename__ = "email_network_messages"
+    __table_args__ = (
+        UniqueConstraint("user_id", "contact_id",
+                         name="uq_email_network_messages_user_id_contact_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    contact_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("email_contacts.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), index=True
+    )
+    subject: Mapped[str] = mapped_column(String(200))
+    body: Mapped[str] = mapped_column(Text)
+    # draft -> approved (saved) -> attached (to a campaign lead) -> used
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    strategy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+
+
+# --------------------------------------------------------------------------
 # F05 Guardrails Studio (migration 0072): per-account exclusion lists and the
 # per-product approved-claims / forbidden-phrases library.
 # --------------------------------------------------------------------------

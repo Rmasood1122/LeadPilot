@@ -70,6 +70,11 @@ OWNERSHIP: dict[str, list[str]] = {
     "deliverability_checks": ["user_id"],
     "device_tokens": ["user_id"],
     "enrichment_attempts": ["user_id"],            # F01 cost ledger (no PII)
+    # Email network (docs/features/email-network.md)
+    "email_contacts": ["user_id"],
+    "email_contact_matches": ["user_id"],
+    "email_network_imports": ["user_id"],          # counts + attestation; tally transient
+    "email_network_messages": ["user_id"],         # the user's own saved first emails
     "external_crm_connections": ["user_id"],
     "external_crm_links": ["user_id"],
     "gmail_accounts": ["user_id"],

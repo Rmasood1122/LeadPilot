@@ -155,6 +155,10 @@ DELETED: frozenset[str] = frozenset({
     # Voice twin: the clone is deleted AT THE PROVIDER first
     # (disconnect_providers -> voice_twin.provider_deletions_for_erasure).
     "voice_clones", "voice_twin_settings",
+    # Email network: the account's imported contacts, scores, saved first
+    # emails and import records (docs/features/email-network.md).
+    "email_contacts", "email_contact_matches", "email_network_imports",
+    "email_network_messages",
     "whatsapp_optins", "workspace_invitations", "workspace_members", "workspaces",
 })
 

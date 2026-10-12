@@ -31,6 +31,10 @@ engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
     future=True,
+    # Statement parameters are personal data (email addresses, names). A
+    # DataError / IntegrityError must not copy them into exception text and
+    # from there into logs or error trackers (email-network review round M6).
+    hide_parameters=True,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)

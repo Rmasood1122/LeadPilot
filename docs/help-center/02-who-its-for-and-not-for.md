@@ -71,7 +71,7 @@ The same research lists clear non-fits:
 
 Not as leads. Leads for email and WhatsApp sequences come only from LeadPilot's own sourcing step, which searches for people matching your verified strategy and then checks their email addresses. There is no way to import your own contact list as leads. If your business depends on emailing or messaging a list you already have, LeadPilot does not currently support that. The one narrow exception, switched off by default, is a local business importing its own customers who opted in to its marketing (see "Can a local business message its own customers?" below).
 
-The one exception is LinkedIn. On the Growth, Scale, Pro and Enterprise plans, the **Network** page lets you upload your LinkedIn `Connections.csv` export and send saved messages to people who are still your 1st-degree connections. Those connections do not become leads. See the LinkedIn article.
+Two exceptions are on the **Network** page, on the Growth, Scale, Pro and Enterprise plans. You can upload your LinkedIn `Connections.csv` export and send saved messages to people who are still your 1st-degree connections; those connections do not become leads. And, once the email network is switched on for your server (it is off by default), you can bring in your own business email contacts (contacts files, a mailbox export or your connected Gmail) and add the ones that fit your products to a campaign; they become leads and go through the same email verification and send checks as any other lead. See the LinkedIn article.
 
 ## Can a restaurant, clinic or local shop use LeadPilot?
 

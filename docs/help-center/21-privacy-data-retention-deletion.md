@@ -116,6 +116,7 @@ Yes.
 
 - **Strategy:** open the strategy and press **Delete**. In the **Delete strategy** window, confirm with your password. This permanently deletes the strategy with its research, leads, sequences, messages and campaign history. A campaign that is still sending must be paused first. The deletion is recorded in the security log, and the tamper-evident activity trail keeps its entries.
 - **LinkedIn network:** on the **Network** page, **Delete my uploaded connections** removes every connection you uploaded, after you confirm "Delete all uploaded connections?". The deletion is never limited by plan: the button shows on every plan while you have connections stored, including after a downgrade.
+- **Email contacts:** on the **Network** page, **Email contacts** tab, **Delete my email contacts** removes every imported contact, score, saved first email and import record, after you confirm. It is never limited by plan either. Email contacts store names, addresses, companies, titles, counts and dates only, never the subject or text of any email.
 
 ## Can I delete my whole account?
 

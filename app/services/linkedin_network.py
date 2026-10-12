@@ -267,6 +267,13 @@ def _score(profile: _Profile, position: str | None, company: str | None):
     return min(100, content + bonus), reasons
 
 
+#: Shared with the email network (app/services/email_network.py), which scores
+#: a contact's title / company against the same product ICP. Aliases only: the
+#: LinkedIn behaviour is exactly the functions above.
+icp_profile = _profile
+icp_score = _score
+
+
 def analyze_user(db: Session, user: User) -> dict:
     """Re-score the user's OWN connections against the user's OWN products."""
     now = datetime.now(timezone.utc)

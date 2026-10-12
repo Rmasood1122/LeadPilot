@@ -59,8 +59,13 @@ _NOTICES = {
 
 
 def region_notice(lead: Lead) -> str | None:
-    """An extra footer line for the regimes that ask for one."""
-    text = _NOTICES.get(compliance_region.lead_region(lead) or "")
+    """An extra footer line for the regimes that ask for one. An
+    email-network lead of unknown region gets the strictest one (the GDPR
+    right-to-object notice) -- review round H2."""
+    region = compliance_region.lead_region(lead)
+    if region is None and compliance_region.strictest_when_unknown(lead):
+        region = "eu"
+    text = _NOTICES.get(region or "")
     return text.format(sender=settings.sender_identity) if text else None
 
 
@@ -76,7 +81,7 @@ def checks_for(lead: Lead, message: Message | None, channel: str) -> dict:
     }
     if channel == "email" and message is not None:
         checks["unsubscribe_link"] = bool(message.unsubscribe_token)
-        checks["region_notice"] = region in _NOTICES
+        checks["region_notice"] = region_notice(lead) is not None
         checks["open_tracking"] = compliance_region.open_tracking_allowed(lead)
     if channel == "phone":
         checks["phone_consent"] = lead.phone_consent_at is not None

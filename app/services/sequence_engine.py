@@ -734,6 +734,11 @@ def unsubscribe_lead(session: Session, lead: Lead, source: str,
         if enrollment.status is not EnrollmentStatus.STOPPED:
             stop_enrollment(session, enrollment, reason="unsubscribed")
     session.commit()
+    # Email network: the address leaves every account's email contacts now,
+    # not at the next weekly refresh. After the commits above; never raises.
+    from app.services import email_network  # noqa: PLC0415
+
+    email_network.purge_address(session, lead.email)
 
 
 def record_bounce(session: Session, lead: Lead, message: Message | None = None,

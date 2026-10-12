@@ -2,7 +2,7 @@
 id: linkedin
 title: LinkedIn outreach and your LinkedIn network
 audience: customer
-last_verified: 2026-10-11
+last_verified: 2026-10-12
 owner: help-center
 sources:
   - app/services/plan_holds.py
@@ -27,6 +27,14 @@ sources:
   - app/services/daily_send_approval.py
   - docs/features/daily-send-approval.md
   - app/workers/network_tasks.py
+  - app/api/email_network.py
+  - app/services/email_network.py
+  - app/services/email_network_filter.py
+  - app/services/email_network_parse.py
+  - app/services/email_network_gmail.py
+  - app/services/email_network_messages.py
+  - frontend/src/components/network/EmailNetworkPanel.tsx
+  - docs/features/email-network.md
 ---
 
 # LinkedIn outreach and your LinkedIn network
@@ -122,6 +130,49 @@ Every LeadPilot send to a connection checks again at that moment that your plan 
 ## How do I delete my uploaded connections?
 
 On the Network page, click **Delete my uploaded connections** and confirm. This deletes everything you uploaded. Deleting is not tied to your plan: after a downgrade the page shows the upgrade notice, and the delete button is still there for as long as you have connections stored. It can also be done through the LeadPilot API (`DELETE /linkedin-network`).
+
+## Can I find warm leads in my own email contacts?
+
+Yes, on the same plans as the LinkedIn network (Growth, Scale, Pro and Enterprise), once the email network is switched on for your LeadPilot server (it is off by default). The **Network** page has two tabs: **LinkedIn** and **Email contacts**. On **Email contacts**, first tick the box confirming that these are your own business contacts, then bring your contacts in one of these ways:
+
+- a Google Contacts CSV export, an Outlook contacts CSV export, or a vCard (`.vcf`) file from Apple Contacts or a phone (up to 20 MB; at most 10 addresses are read from one cell);
+- a mailbox export such as a Google Takeout `.mbox` file (up to 300 MB and 50,000 messages; for a message sent to more than 50 people only the first 50 count);
+- **Scan my connected Gmail**, which reads the last 12 months of your connected Gmail account, up to 5,000 messages, in the background. Only the account owner can start it, not a workspace manager. If your Gmail connection is too old to allow this, the page asks you to reconnect Gmail in Settings. A new scan can be started an hour after the last one started, whether it finished, failed or needed a reconnect.
+
+One upload keeps at most 50,000 people and an account holds at most 100,000 email contacts. When a limit is reached, the summary says what was left out. Everyone in the workspace who can open the Network page sees the contacts list and matches, as with the LinkedIn network.
+
+LeadPilot then scores each contact against each of your products with the same fixed rules as the LinkedIn network (job title and company against your target customer), plus how strong the email relationship is: whether you have written to each other, how recently, and how often. People who have never emailed back and forth with you are ranked below people who have. Each match shows why, for example "You emailed each other 14 times, last in Aug 2026". Scores are refreshed weekly. This scoring does not use AI.
+
+## What does LeadPilot read from my mailbox, and who is left out?
+
+A mailbox file is read through on LeadPilot's server to find the From, To, Cc and Date lines of each email, plus the markers that show an email was a newsletter or sent automatically; everything else is discarded as it is read. A Gmail scan asks Google for those lines only. Subjects, the text of your emails, attachments and signatures are never stored. For each person LeadPilot keeps their name, email address, company, job title (only if your contacts file has one), how many emails went each way, the first and last date, and whether the exchange was two-way. A company that is not in a contacts file is guessed from the email domain and marked as a guess.
+
+These people are left out and never stored, and the import summary counts them by reason:
+
+- personal addresses such as Gmail, Yahoo, Outlook.com, Hotmail, iCloud, AOL and Proton, including their country versions (the feature is for business contacts only);
+- role inboxes such as info@, support@, sales@, hello@, admin@ and billing@, and variants such as customer-service@ or sales-team@;
+- newsletters, no-reply and other automated senders;
+- you and your colleagues (your own addresses and your company's domain and its subdomains; you can add other addresses of yours on the page);
+- anyone on the suppression list (unsubscribed, bounced or erased on request) or on your exclusion lists.
+
+Someone who is suppressed later is hidden from your matches at once. An unsubscribe or an erasure request removes them from your email contacts straight away; other suppressions (for example a bounce) are removed at the weekly refresh.
+
+Your email contacts are private to your account and never shown to any other account.
+
+## How do I contact people from my email contacts?
+
+LeadPilot does not send one-off emails from this page. There are two ways to reach a match, and both go through the normal campaign send checks:
+
+- **Add to campaign.** Tick the people and choose one of your campaigns. They become ordinary leads in that campaign, and their email addresses are verified like any other lead. Only verified leads are enrolled, when you launch or enroll the campaign as usual.
+- **Write a first email.** **Draft it in my voice** asks AI to write a short first email; edit it and click **Save**. A draft is never sent. Common phrases that claim a meeting, a call or a conversation that your email history does not show (for example "great speaking last week" or "thanks for taking my call" when you have never emailed back and forth) are refused when you save, and checked again on the final words when the email is sent. Then **Use as their first email** in a campaign: the person is added to that campaign, and when you launch it, their first campaign email is your saved text instead of a written one. If that email is rejected in review or fails, you can detach it and write a new one.
+
+Either way, every email goes out through the campaign's normal sending, with the unsubscribe link and your postal address added, after your daily send approval, and only if the person is not suppressed; your exclusion lists are also checked at send time when they are switched on for your server (people on them are always kept out of your email contacts). People from your email contacts get the GDPR "right to object" notice and no open-tracking pixel unless their address shows a country with lighter rules (for example a .us address).
+
+Canadian (.ca) addresses with no two-way email in the last two years cannot be added to a campaign, and are skipped at send time once the last two-way email is more than two years old, because under Canada's anti-spam law implied consent from a business relationship lasts two years. Two limits: only .ca addresses are checked, so Canadians on other domains are not detected, and a two-way email exchange is only a stand-in for a business relationship.
+
+## How do I delete my email contacts?
+
+On the **Email contacts** tab, click **Delete my email contacts** and confirm. This deletes every contact, score, saved first email and import record for your account. To delete one person, click **Delete this contact** next to them. Like the LinkedIn network, deleting is never tied to your plan. People you already added to a campaign stay there as leads, and you remove them like any other lead. If you delete a saved first email that was already attached to a campaign, that person's first campaign email is held in the review queue for you to approve, edit or reject, instead of being written by AI and sent. Erasing a lead on request also removes that person from your email contacts.
 
 ## Related
 - [Sequences and follow-ups](08-sequences-and-follow-ups.md)

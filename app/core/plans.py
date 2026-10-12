@@ -187,6 +187,10 @@ PLANS: dict[str, dict[str, Any]] = {
 _LINKEDIN_NETWORK_PLANS = frozenset({"growth", "scale", "pro", "enterprise"})
 for _plan_key, _plan in PLANS.items():
     _plan["linkedin_network"] = _plan_key in _LINKEDIN_NETWORK_PLANS
+    # Email network (docs/features/email-network.md): the LinkedIn network's
+    # twin for the people a user already emails -- the same tiers, its own key
+    # so the 402 names the right feature.
+    _plan["email_network"] = _plan_key in _LINKEDIN_NETWORK_PLANS
 
 _PLAN_UPGRADE_PATH = {
     "free": "starter",

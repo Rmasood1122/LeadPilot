@@ -355,6 +355,11 @@ def _gdpr_erase_lead(db: Session, lead: Lead, current_user: User) -> None:
 
     consent.record_erasure(db, lead, actor=current_user)
 
+    # Email network: the same person's contact row in THIS account's network
+    # (and any saved first email to them) goes too, in the same commit.
+    from app.services import email_network  # noqa: PLC0415
+
+    email_network.erase_person(db, current_user.id, email=lead.email, lead_id=lead.id)
     _suppress(lead.email, lead.phone)
     # Feature Group 5: the LinkedIn profile is personal data AND a contact
     # route -- suppress it like the email and phone, then erase it.
