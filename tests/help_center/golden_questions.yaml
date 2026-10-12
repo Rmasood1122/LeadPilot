@@ -452,6 +452,21 @@ answerable:
   question: Can I send a promotion to my own cafe customers who signed up?
   expected:
   - who-its-for-and-not-for#can-a-local-business-message-its-own-customers
+- id: q76
+  style: paraphrase
+  question: Can the AI make sales calls using a clone of my own voice?
+  expected:
+  - compliance#can-the-ai-call-people-in-my-own-voice
+- id: q77
+  style: non_native
+  question: the ai will say it is me or say it is robot when somebody ask?
+  expected:
+  - compliance#can-the-ai-call-people-in-my-own-voice
+- id: q78
+  style: paraphrase
+  question: Can I jump into a phone call my AI assistant is having right now?
+  expected:
+  - compliance#can-my-ai-assistant-answer-my-calls-and-can-i-take-over-a-live-call
 must_refuse:
 - id: r01
   category: off_topic

@@ -221,6 +221,18 @@ def create_sequence(
                 status_code=422,
                 detail=f"step {s.step_no}: linkedin_action is only valid on "
                        "LinkedIn steps")
+    # Voice twin guard 2: an AI-call step brief may not tell the assistant to
+    # hide that it is an AI (refused here, on save, with the reason).
+    from app.services import voice_twin  # noqa: PLC0415
+
+    for s in body.steps:
+        if (s.channel or body.channel) is ChannelType.PHONE:
+            try:
+                voice_twin.refuse_concealment(s.template,
+                                              voice_twin.owner_names(db, current_user.id))
+            except voice_twin.VoiceTwinError as exc:
+                raise HTTPException(status_code=422,
+                                    detail=f"step {s.step_no}: {exc.detail}") from exc
     step_nos = [s.step_no for s in body.steps]
     if sorted(step_nos) != list(range(1, len(step_nos) + 1)):
         raise HTTPException(status_code=422,

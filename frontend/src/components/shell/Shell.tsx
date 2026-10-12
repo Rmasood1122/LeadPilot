@@ -16,6 +16,7 @@ import { isPhoneDeferred, needsVerification } from "@/lib/identity";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { InboxBadge } from "./InboxBadge";
 import { SendApprovalBanner } from "@/components/campaigns/SendApprovalBanner";
+import { LiveCallBanner } from "@/components/calls/LiveCallBanner";
 
 /** Responsive app shell: collapsible sidebar on >=md, bottom-tab bar on
  *  mobile (the M7 Capacitor wrapper ships THIS layout). Also the protected
@@ -164,6 +165,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {/* Daily send approval: shown on every page while today's automatic
               sending is waiting for a decision (mounted once, like the chat). */}
           <SendApprovalBanner />
+          <LiveCallBanner />
           {children}
         </main>
       </div>

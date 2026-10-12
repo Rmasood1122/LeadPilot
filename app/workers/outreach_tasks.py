@@ -953,6 +953,8 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
             call.provider_call_id = result.provider_message_id
             call.provider = (result.raw or {}).get("provider") or call.provider
             call.status = "ringing"
+            # Voice twin: the live-control link for "Take over" (never shown).
+            call.control_url = ((result.raw or {}).get("control_url") or None)
     sent_meta = {"step_no": message.step_no, "variant": message.variant}
     if outcome_source:
         sent_meta["source"] = outcome_source
@@ -1382,6 +1384,18 @@ def _prepare_phone(session: Session, strategy: Strategy, lead: Lead, message: Me
 
     if not system_settings.get(session, "phone_calling_enabled"):
         return _fail("failed_calling_disabled", "AI calling is disabled (Admin > System Settings)")
+    # Voice twin guard 3: an AI call of this account claimed to be human, so
+    # every AI call waits until a person has read the transcript and resumed
+    # them. Deferred, never dropped (like a plan hold).
+    from app.services import voice_twin  # noqa: PLC0415
+
+    if voice_twin.calls_paused(session, notifications.owner_of_strategy(session, strategy)):
+        tomorrow = now.astimezone(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        message.scheduled_at = engine.next_window_slot(tomorrow, tz)
+        message.error = "AI calls paused after a disclosure incident (Settings > Voice)"
+        session.commit()
+        return "deferred_ai_calls_paused"
     if not phone_calls.e164(lead.phone):
         return _fail("failed_bad_number", "the lead's phone number cannot be dialled")
     if not phone_calls.consent_ok(session, lead):
@@ -1421,7 +1435,22 @@ def _render_phone_outbound(session: Session, strategy: Strategy, lead: Lead,
     fields.update({f"item:talking_point:{i}": p for i, p in enumerate(points)})
     checked = claim_verification.enforce(session, strategy=strategy, lead=lead, message=message,
                                          channel="phone", fields=fields)
-    script["first_message"] = checked["first_message"] or script.get("first_message")
+    # Voice twin guard 1: whatever the claim check changed, the disclosure and
+    # the recording notice still open the call (and the voicemail).
+    from app.services import voice_twin  # noqa: PLC0415
+
+    opening = meta.get("disclosure")
+    if not voice_twin.valid_opening(opening):
+        opening = voice_twin.GENERIC_OPENING
+    vm_opening = meta.get("voicemail_disclosure")
+    if not voice_twin.valid_voicemail_opening(vm_opening):
+        vm_opening = voice_twin.GENERIC_VOICEMAIL_OPENING
+    names = tuple(meta.get("owner_names") or ()) + (str(meta.get("owner_name") or ""),)
+    script["first_message"] = voice_twin.enforce_opening(
+        checked["first_message"] or script.get("first_message"), opening, names)
+    if checked["voicemail"]:
+        checked["voicemail"] = voice_twin.enforce_opening(checked["voicemail"], vm_opening,
+                                                          names)
     script["close"] = checked["close"]
     script["talking_points"] = [checked[f"item:talking_point:{i}"] for i in range(len(points))
                                 if checked[f"item:talking_point:{i}"]]
@@ -1433,7 +1462,7 @@ def _render_phone_outbound(session: Session, strategy: Strategy, lead: Lead,
     call.script_json = script
     meta = {**meta, "first_message": script["first_message"],
             "voicemail_text": call.voicemail_text,
-            "system_prompt": phone_calls.system_prompt(script, lead)}
+            "system_prompt": phone_calls.system_prompt(script, lead, meta.get("identity"))}
     message.body = call.script_json["first_message"]
     message.subject = None
     return OutboundMessage(message_id=str(message.id), lead_id=str(lead.id),

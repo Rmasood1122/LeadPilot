@@ -2,7 +2,7 @@
 id: compliance
 title: Compliance (CAN-SPAM, GDPR, CASL, PDPA)
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-12
 owner: help-center
 sources:
   - app/services/sequence_engine.py
@@ -19,6 +19,10 @@ sources:
   - app/core/production_guard.py
   - app/services/adversarial_review.py
   - app/services/phone_calls.py
+  - app/services/voice_twin.py
+  - app/api/voice_twin.py
+  - frontend/src/components/settings/VoiceTwinCard.tsx
+  - docs/features/voice-twin.md
   - app/services/system_settings.py
   - frontend/src/components/leads/ConsentPanel.tsx
   - frontend/src/components/settings/DeliverabilityCard.tsx
@@ -90,10 +94,22 @@ Outreach emails can carry a tracking pixel to count opens, but **never for EU, E
 
 - **Send window:** by default messages go out between 09:00 and 17:00 in the lead's time zone, weekdays only.
 - **WhatsApp:** cold messages need an approved Meta template and a recorded opt-in, in every country. See [WhatsApp outreach](10-whatsapp-outreach.md).
-- **AI phone calls** are off by default (an administrator setting). When they are on, by default a lead is only called if their phone consent has been recorded; otherwise the call step is skipped and the sequence continues. AI-voice calls are regulated in the US under the TCPA.
+- **AI phone calls** are off by default (an administrator setting). When they are on, by default a lead is only called if their phone consent has been recorded; otherwise the call step is skipped and the sequence continues. AI-voice calls are regulated in the US under the TCPA. Every AI call, and every voicemail it leaves, starts by saying it is an AI assistant, and every call says it is recorded.
 - **Pre-launch review:** a sequence is checked before launch for compliance problems, such as briefs that remove the unsubscribe footer, misleading "Re:" subject lines, or a placeholder postal address. Blocking findings stop the launch unless an owner or manager overrides them with a written reason.
 
 Your administrator can set rules per workspace, region and channel (Admin › Compliance Rules): a different send window anywhere between 07:00 and 20:00, weekend sending on or off, lower daily caps, a lower bounce-pause threshold, or requiring recorded consent. Daily caps and the bounce-pause threshold can only be lowered, never raised past the deployment defaults. The send window can be set anywhere between 07:00 and 20:00, which can be wider than the default 09:00–17:00. If a matching rule is invalid, LeadPilot uses the strictest combination of the defaults and the valid rules. If the rules cannot be read at all, it falls back to the deployment defaults. Because LeadPilot records no consent for email or LinkedIn, a "consent required" rule on those channels stops those sends.
+
+## Can the AI call people in my own voice?
+
+Yes, if your administrator has turned on AI calling and voice cloning (both are off by default). In **Settings**, **Voice**, under **Your voice on calls**, you sign a written consent that the recordings are of your own voice, then upload recordings (or record them in the browser). They are sent straight to ElevenLabs, which creates a Professional Voice Clone; LeadPilot does not keep the recordings. ElevenLabs then asks you to read a short text aloud to prove the voice is yours, and trains the voice, which can take hours. When it is ready you can hear the opening line and turn on **Use my voice for AI calls**.
+
+Your voice sounds like you, but the assistant never pretends to be you or a human. Every call opens with "Hi, this is <your name>'s AI assistant, using <your name>'s voice. This call is recorded." If someone asks whether it is a real person, it says it is an AI assistant and offers to put them through to you. Notes or call briefs that tell it to hide that it is an AI are refused when you save them. After every call, LeadPilot checks what the assistant said; if it ever claimed to be human, all your AI calls are paused until you read the call and resume them. You can revoke your consent at any time: the voice stops being used at once and is deleted at ElevenLabs. Deleting your account deletes it too, and an unused clone is deleted after 3 years.
+
+## Can my AI assistant answer my calls, and can I take over a live call?
+
+Yes. **Answer my calls with my AI assistant** (off by default; the account owner or a manager can turn it on) lets the assistant answer people who call your own AI-calling number. It says it is an AI assistant and that the call is recorded, and it can book a meeting on your booking page, take a message, or put the caller through to your phone. If a caller asks not to be called again, their number is added to the suppression list.
+
+When any AI call is live you get a notification and a banner in the app. Press **Take over** to have the call put through to the phone number you saved under **Settings**, **Voice**. You cannot listen in to a live call from the app.
 
 ## What is the consent ledger and the compliance audit log?
 

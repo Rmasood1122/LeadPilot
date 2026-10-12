@@ -893,6 +893,14 @@ block. Graceful empty handling is a hard requirement, not an afterthought.
   consent requirement and bounce-pause threshold per workspace, recipient
   region and channel. Resolved at send time, and fail-closed: an empty table is
   the old baseline, and an invalid or unreadable rule only ever tightens
+- Voice twin (flag `voice_clone_calls_enabled`, off by default; needs AI
+  calling on): the account owner's OWN voice as an ElevenLabs Professional
+  Voice Clone (written consent first, recordings never stored, revoke deletes
+  it at ElevenLabs) for AI calls, AI answering of inbound calls (book, take a
+  message, transfer), and live Take over. Every call opens "this is
+  <owner>'s AI assistant, using <owner>'s voice. This call is recorded.";
+  concealment is refused on save and a post-call check pauses the account if
+  the assistant ever claims to be human (`docs/features/voice-twin.md`)
 </details>
 
 <details open>

@@ -152,10 +152,24 @@ DELETED: frozenset[str] = frozenset({
     "spend_forecasts", "strategies", "strategy_model_outputs", "strategy_uncertain_zones",
     "strategy_versions", "support_tickets", "tool_integration_settings",
     "tutorial_progress", "voice_profiles", "webhook_deliveries", "webhook_targets",
+    # Voice twin: the clone is deleted AT THE PROVIDER first
+    # (disconnect_providers -> voice_twin.provider_deletions_for_erasure).
+    "voice_clones", "voice_twin_settings",
     "whatsapp_optins", "workspace_invitations", "workspace_members", "workspaces",
 })
 
 ERASURE: dict[str, str] = {**{name: DELETE for name in DELETED}, **KEPT}
+
+# NOT DELETED, AND NOT IN KEPT (voice twin, review fix M3): voice_clone_deletions.
+# When the ElevenLabs delete of a voice clone fails during erasure, a tombstone
+# row (provider + the provider's opaque voice id + attempts; no owner column,
+# nothing personal) is written there and SURVIVES the erasure, because it is
+# the only way to finish deleting the person's biometric voice model at the
+# provider (GDPR Art. 17 / BIPA s.15(a) -- needs founder/legal confirmation).
+# It is not an OWNERSHIP table (it has no owner), so it cannot be in KEPT; the
+# hourly voice_clone_housekeeping task retries it, raises an operator alert
+# (task_errors + security_audit_events) and deletes the row on success.
+PROVIDER_DELETION_QUEUE = "voice_clone_deletions"
 
 # Tables account_export EXCLUDES (no exportable content) that still hang off
 # users.id: their rows for the account are deleted too.
@@ -317,17 +331,24 @@ def disconnect_providers(db: Session, user_id: uuid.UUID) -> dict:
     from app.db.models import LinkedInAccount  # noqa: PLC0415
     from app.integrations import unipile_linkedin  # noqa: PLC0415
 
+    # Voice twin: a Professional Voice Clone of the owner's voice is biometric
+    # data held AT ELEVENLABS; delete it there before our rows go. Only added
+    # to the record when the account ever had one.
+    from app.services import voice_twin  # noqa: PLC0415
+
+    voices = voice_twin.provider_deletions_for_erasure(db, user_id)
+    extra = {"elevenlabs_voices": voices} if voices is not None else {}
     ids = list(db.execute(select(LinkedInAccount.unipile_account_id)
                           .where(LinkedInAccount.user_id == user_id)).scalars())
     if not ids:
-        return {"unipile": "none"}
+        return {"unipile": "none", **extra}
     try:
         client = unipile_linkedin.get_client(db, user_id)
     except Exception:  # noqa: BLE001
         logger.exception("account deletion: could not build the Unipile client")
         client = None
     if client is None:
-        return {"unipile": "not_configured", "accounts": len(ids)}
+        return {"unipile": "not_configured", "accounts": len(ids), **extra}
     done = failed = 0
     for account_id in ids:
         try:
@@ -337,7 +358,7 @@ def disconnect_providers(db: Session, user_id: uuid.UUID) -> dict:
             failed += 1
             logger.warning("account deletion: Unipile account %s not disconnected: %s",
                            account_id, exc)
-    return {"unipile": {"disconnected": done, "failed": failed}}
+    return {"unipile": {"disconnected": done, "failed": failed}, **extra}
 
 
 _VOICEMAIL_FILE = re.compile(r"^[0-9a-f]{32}\.mp3$")
@@ -630,7 +651,9 @@ LEAD_SCRUB: dict[str, dict | str] = {
                          "draft_error": None},
     "calls": {"to_number": ERASED_TEXT, "transcript": None, "voicemail_text": None,
               "voicemail_audio_url": None, "recording_url": None, "script_json": None,
-              "analysis_json": None, "error": None},
+              "analysis_json": None, "error": None,
+              # Voice twin: an inbound caller's number and the live-control link.
+              "from_number": None, "control_url": None},
     "calendar_bookings": {"invitee_name": ERASED_TEXT, "invitee_email": ERASED_EMAIL,
                           "invitee_phone": None, "invitee_timezone": None, "notes": None,
                           "answers": None, "meeting_link": None},

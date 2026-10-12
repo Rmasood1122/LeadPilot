@@ -15,8 +15,10 @@ import { PhoneCall } from "lucide-react";
 import {
   OUTCOME_LABEL,
   callNow,
+  directionLabel,
   formatDuration,
   getCall,
+  listInboundCalls,
   listLeadCalls,
   listStrategyCalls,
   outcomeTone,
@@ -52,10 +54,15 @@ function CallRow({ call, detail, showLead }: {
         <Badge tone={outcomeTone(call.outcome)}>
           {call.outcome ? OUTCOME_LABEL[call.outcome] : call.status.replace(/_/g, " ")}
         </Badge>
-        {showLead && (
+        <Badge tone="default">{directionLabel(call)}</Badge>
+        {call.voice_clone_used && <Badge tone="accent">Your voice (AI)</Badge>}
+        {showLead && call.lead_id && (
           <Link href={`/leads/detail?id=${call.lead_id}&tab=calls`} className="font-medium underline underline-offset-2">
             {call.lead_name ?? "Lead"}
           </Link>
+        )}
+        {showLead && !call.lead_id && (
+          <span className="font-medium">{call.from_number ?? "Unknown caller"}</span>
         )}
         <span className="text-muted-foreground">
           {new Date(call.created_at).toLocaleString()} · {formatDuration(call.duration_seconds)} · {call.provider}
@@ -98,10 +105,16 @@ function CallRow({ call, detail, showLead }: {
               <summary className="cursor-pointer text-xs text-muted-foreground">Script</summary>
               <p className="mt-1 italic">&ldquo;{d.script_json.first_message}&rdquo;</p>
               <ul className="mt-1 list-disc pl-5">
-                {d.script_json.talking_points.map((p, i) => <li key={i}>{p}</li>)}
+                {(d.script_json.talking_points ?? []).map((p, i) => <li key={i}>{p}</li>)}
               </ul>
             </details>
           )}
+          {(d?.script_json?.messages_taken ?? []).map((m, i) => (
+            <p key={i}>
+              <span className="font-medium">Message{m.caller_name ? ` from ${m.caller_name}` : ""}:</span>{" "}
+              {m.message}{m.callback_number ? ` (call back ${m.callback_number})` : ""}
+            </p>
+          ))}
           {d?.transcript && (
             <details>
               <summary className="cursor-pointer text-xs text-muted-foreground">Transcript</summary>
@@ -125,6 +138,20 @@ export function StrategyCalls({ strategyId }: { strategyId: string }) {
     <AsyncState isLoading={query.isLoading} error={query.error}
                 empty={!query.data?.length}
                 emptyLabel="No AI calls for this campaign yet. Add a phone step to a sequence, or use Call now on a lead.">
+      <ul className="space-y-2">
+        {(query.data ?? []).map((call) => <CallRow key={call.id} call={call} showLead />)}
+      </ul>
+    </AsyncState>
+  );
+}
+
+/** Voice twin: inbound calls your AI assistant answered (Settings > Voice). */
+export function InboundCalls() {
+  const query = useQuery({ queryKey: ["inbound-calls"], queryFn: listInboundCalls, refetchInterval: 60_000 });
+  return (
+    <AsyncState isLoading={query.isLoading} error={query.error}
+                empty={!query.data?.length}
+                emptyLabel="No inbound calls answered by your AI assistant yet.">
       <ul className="space-y-2">
         {(query.data ?? []).map((call) => <CallRow key={call.id} call={call} showLead />)}
       </ul>

@@ -80,8 +80,30 @@ def from_migration(tmp_path):
     engine.dispose()
 
 
-def test_calls_table_matches(from_models, from_migration):
-    assert _describe(from_migration, "calls") == _describe(from_models, "calls")
+@pytest.fixture()
+def from_migration_with_voice_twin(tmp_path):
+    """0027 created `calls`; 0089 (voice twin) added direction,
+    voice_clone_used, from_number, control_url and made lead_id nullable. The
+    model is the result of both, so both run here."""
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'migration_vt.db'}")
+    _build_prereqs(engine)
+    with engine.begin() as connection:
+        with Operations.context(MigrationContext.configure(connection)):
+            _load("0027_phone_calling.py").upgrade()
+            _load("0089_voice_twin.py").upgrade()
+    yield sa.inspect(engine)
+    engine.dispose()
+
+
+def test_calls_table_matches(from_models, from_migration_with_voice_twin):
+    assert (_describe(from_migration_with_voice_twin, "calls")
+            == _describe(from_models, "calls"))
+
+
+def test_0027_alone_still_creates_the_original_calls_table(from_migration):
+    columns = _describe(from_migration, "calls")["columns"]
+    assert columns["lead_id"]["nullable"] is False
+    assert "direction" not in columns and "control_url" not in columns
 
 
 def test_lead_columns_match(from_models, from_migration):

@@ -256,13 +256,24 @@ export interface RequestOptions {
   method?: string;
   body?: unknown;
   formData?: FormData;
+  /** A raw binary body (voice twin: one audio recording), sent as-is with its
+   *  own Content-Type -- the server streams it on without a multipart parser
+   *  that would spool it to disk. */
+  raw?: { body: Blob; contentType: string; filename?: string };
+  /** Read the response as a Blob (audio) instead of JSON. */
+  blob?: boolean;
   auth?: boolean; // default true
 }
 
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const doFetch = async () => {
     const { headers, credentials } = authRouteInit(path);
-    if (!opts.formData) headers["Content-Type"] = "application/json";
+    if (opts.raw) {
+      headers["Content-Type"] = opts.raw.contentType;
+      // Headers are Latin-1 only: "Voice Memo – Rehan.m4a" would make fetch
+      // throw. Percent-encoded here, decoded by the server.
+      if (opts.raw.filename) headers["X-Filename"] = encodeURIComponent(opts.raw.filename);
+    } else if (!opts.formData) headers["Content-Type"] = "application/json";
     if (opts.auth !== false) {
       const token = getAccessTokenSync();
       if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -272,9 +283,9 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
       if (workspace) headers[WORKSPACE_HEADER] = workspace;
     }
     return fetch(`${BASE}${path}`, {
-      method: opts.method ?? (opts.body || opts.formData ? "POST" : "GET"),
+      method: opts.method ?? (opts.body || opts.formData || opts.raw ? "POST" : "GET"),
       headers,
-      body: opts.formData ?? (opts.body ? JSON.stringify(opts.body) : undefined),
+      body: opts.raw?.body ?? opts.formData ?? (opts.body ? JSON.stringify(opts.body) : undefined),
       ...(credentials ? { credentials } : {}),
     });
   };
@@ -291,6 +302,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     throw error;
   }
   if (resp.status === 204) return undefined as T;
+  if (opts.blob) return (await resp.blob()) as T;
   return (await resp.json()) as T;
 }
 

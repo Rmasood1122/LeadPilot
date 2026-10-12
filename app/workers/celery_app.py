@@ -251,6 +251,12 @@ def _aggregation_hour() -> int:
 
 
 celery_app.conf.beat_schedule = {
+    # Voice twin: retry ElevenLabs deletes of revoked voice clones and expire
+    # clones unused for 3 years (docs/features/voice-twin.md). Hourly.
+    "voice-clone-housekeeping": {
+        "task": "app.workers.call_tasks.voice_clone_housekeeping",
+        "schedule": 3600.0,
+    },
     # Private LinkedIn network: re-score stored connections every Monday 04:10 UTC.
     "linkedin-network-weekly-refresh": {
         "task": "leadpilot.network.weekly_refresh",

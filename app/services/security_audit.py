@@ -35,6 +35,20 @@ STRATEGY_PASSES_OVERRIDE_DENIED = "strategy.passes_override_denied"
 # and its lawful-basis confirmation, and turning it off.
 AUTOPILOT_OPT_IN = "autopilot.opt_in"
 AUTOPILOT_OPT_OUT = "autopilot.opt_out"
+# Voice twin (docs/features/voice-twin.md): the owner's biometric consent,
+# its revocation, the account switches, the pause after a disclosure incident
+# and a live takeover.
+VOICE_CLONE_CONSENTED = "voice_clone.consented"
+VOICE_CLONE_REVOKED = "voice_clone.revoked"
+VOICE_TWIN_SETTINGS_CHANGED = "voice_twin.settings_changed"
+VOICE_TWIN_PAUSED = "voice_twin.paused"
+VOICE_TWIN_RESUMED = "voice_twin.resumed"
+VOICE_TWIN_TAKEOVER = "voice_twin.takeover"
+# Review fix M3: a provider voice whose delete failed after an account
+# erasure (operator alert) and its eventual deletion.
+VOICE_CLONE_DELETE_PENDING = "voice_clone.delete_pending"
+VOICE_CLONE_PROVIDER_DELETED = "voice_clone.provider_deleted"
+VOICE_TWIN_NUMBER_ASSIGNED = "voice_twin.number_assigned"
 LINKEDIN_NETWORK_IMPORTED = "linkedin_network.imported"
 LINKEDIN_NETWORK_ERASED = "linkedin_network.erased"
 AUTH_LOGOUT = "auth.logout"

@@ -19,6 +19,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/components/ui/toast";
 import { VoiceSettings } from "@/components/settings/VoiceSettings";
+import { VoiceTwinCard } from "@/components/settings/VoiceTwinCard";
 import { LinkedInAccountsCard } from "@/components/settings/LinkedInAccountsCard";
 import { SlackCard } from "@/components/settings/SlackCard";
 import { CrmCards } from "@/components/settings/CrmCards";
@@ -528,7 +529,13 @@ export default function SettingsPage() {
       </div>
       {tab === "appearance" && <AppearanceSettings />}
       {/* Feature Group 2: the voice every outreach message is written in. */}
-      {tab === "voice" && <VoiceSettings />}
+      {tab === "voice" && (
+        <div className="space-y-6">
+          <VoiceSettings />
+          {/* Voice twin: your cloned voice on AI calls, AI answering, take-over. */}
+          <VoiceTwinCard />
+        </div>
+      )}
       {tab === "integrations" && <IntegrationsSettings />}
       {/* Feature Group 9: email health + the compliance audit log. */}
       {tab === "deliverability" && (
