@@ -63,7 +63,19 @@ def _ordinary_titles(db_session, leads):
 
 
 def _as_linkedin(db_session, message):
+    """Turn a scheduled email step into a LinkedIn step of an account whose
+    plan covers LinkedIn.
+
+    The plan matters: the free plan has no LinkedIn, and plan holds
+    (app/services/plan_holds.py) hold such a message for every enrollment
+    created on or after PLAN_HOLD_EFFECTIVE_AT (2026-10-12 00:00 UTC). The
+    fixtures enroll with the real clock, so from that day the plan hold fired
+    before the daily-approval gate this module tests. Growth includes
+    LinkedIn (app/core/plans.py), so only daily approval decides here."""
     lead = db_session.get(m.Lead, message.lead_id)
+    strategy = db_session.get(m.Strategy, lead.strategy_id)
+    owner = db_session.get(m.User, db_session.get(m.Product, strategy.product_id).user_id)
+    owner.plan = m.PlanTier.GROWTH
     lead.linkedin_url = f"https://www.linkedin.com/in/{lead.external_id.lower()}"
     message.channel = m.ChannelType.LINKEDIN
     db_session.commit()
