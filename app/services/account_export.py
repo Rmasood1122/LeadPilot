@@ -29,7 +29,7 @@ import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import Table, select
+from sqlalchemy import Table, and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.db.base import Base
@@ -59,6 +59,8 @@ OWNERSHIP: dict[str, list[str]] = {
     "compliance_audit_log": ["user_id"],
     "consent_events": ["user_id"],
     "customer_imports": ["user_id"],               # local business win-back imports (no PII)
+    "voice_clones": ["user_id"],                   # voice twin: consent + clone metadata (no audio)
+    "voice_twin_settings": ["user_id"],            # voice twin switches
     "daily_send_approvals": ["user_id"],           # daily send approval decisions
     "champion_moves": ["user_id"],                 # F10 (address hash only)
     "crm_custom_fields": ["user_id"],
@@ -170,6 +172,9 @@ EXCLUDED: dict[str, str] = {
     "password_reset_tokens": ("one-way token hashes; each request (time, IP) is "
                               "exported as a security_audit_events row"),
     "phone_verification_codes": "one-way code hashes only",
+    "voice_clone_deletions": ("voice twin: provider voice ids still to be deleted at "
+                              "ElevenLabs after an erasure; no owner column, nothing "
+                              "personal"),
 }
 
 # Credentials: never exported, on any table.
@@ -182,6 +187,15 @@ REDACTED_COLUMNS = frozenset({
 REDACTED_BY_TABLE: dict[str, frozenset[str]] = {
     "integration_tokens": frozenset({"value"}),
     "device_tokens": frozenset({"token"}),
+    # Voice twin: the provider's live-call control URL is a capability link.
+    "calls": frozenset({"control_url"}),
+}
+
+# Rows whose FIRST ownership hop is NULL but which name their owner directly:
+# an inbound call from a number that is no lead of the account (voice twin)
+# has lead_id NULL and user_id = the account. table -> (first hop, owner column).
+DIRECT_OWNER_FALLBACK: dict[str, tuple[str, str]] = {
+    "calls": ("lead_id", "user_id"),
 }
 REDACTED = "[redacted]"
 
@@ -217,7 +231,12 @@ def owner_clause(name: str, user_id: uuid.UUID):
     path = OWNERSHIP[name]
     if not path:
         return table.c.id == user_id
-    return _hop(table, path, user_id)
+    clause = _hop(table, path, user_id)
+    fallback = DIRECT_OWNER_FALLBACK.get(name)
+    if fallback is not None:
+        hop, owner = fallback
+        clause = or_(clause, and_(table.c[hop].is_(None), table.c[owner] == user_id))
+    return clause
 
 
 def _hop(table: Table, path: list[str], user_id: uuid.UUID):

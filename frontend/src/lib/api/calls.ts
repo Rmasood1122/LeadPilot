@@ -23,7 +23,11 @@ export interface CallAnalysis {
 
 export interface CallSummary {
   id: string;
-  lead_id: string;
+  /** null only for an inbound call from a number that is no lead (voice twin). */
+  lead_id: string | null;
+  direction?: "outbound" | "inbound";
+  voice_clone_used?: boolean;
+  from_number?: string | null;
   provider: string;
   to_number: string;
   status: string;
@@ -48,6 +52,8 @@ export interface CallDetail extends CallSummary {
     questions: string[];
     close: string;
     voicemail: string;
+    /** Voice twin, inbound calls: messages the assistant took. */
+    messages_taken?: { caller_name: string; message: string; callback_number: string; at: string }[];
   } | null;
   voicemail_text: string | null;
   transcript: string | null;
@@ -59,6 +65,11 @@ export function listStrategyCalls(strategyId: string): Promise<CallSummary[]> {
 
 export function listLeadCalls(leadId: string): Promise<CallDetail[]> {
   return api(`/leads/${leadId}/calls`);
+}
+
+/** Voice twin: inbound calls the AI assistant answered for this account. */
+export function listInboundCalls(): Promise<CallSummary[]> {
+  return api(`/voice-twin/inbound-calls`);
 }
 
 export function getCall(callId: string): Promise<CallDetail> {
@@ -94,6 +105,11 @@ export function outcomeTone(outcome: CallOutcome | null):
   if (outcome === "answered") return "accent";
   if (outcome === "voicemail_dropped" || outcome === "voicemail") return "warning";
   return "default";
+}
+
+/** Voice twin: "Inbound" / "Outbound", and whether your cloned voice spoke. */
+export function directionLabel(call: Pick<CallSummary, "direction">): string {
+  return call.direction === "inbound" ? "Inbound" : "Outbound";
 }
 
 /** 185 -> "3:05"; null -> "—". */

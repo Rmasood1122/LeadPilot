@@ -2,7 +2,7 @@
 id: known-limitations
 title: Known limitations
 audience: customer
-last_verified: 2026-10-11
+last_verified: 2026-10-12
 owner: help-center
 sources:
   - FEATURES.md
@@ -27,6 +27,7 @@ sources:
   - app/integrations/zoom.py
   - app/integrations/recall.py
   - app/integrations/voice_providers.py
+  - app/services/voice_twin.py
   - app/integrations/hubspot.py
   - app/core/plans.py
   - app/api/strategies_advanced.py
@@ -74,6 +75,7 @@ In particular:
 - **Google Meet and Zoom** meeting creation has not been verified against the live services. Creating a meeting with your own custom link is the only verified path. If Meet or Zoom fails, the meeting is still created, without the video link.
 - **Recall.ai** (the bot that records and transcribes a call) has been built and tested with simulations only and has never been called live.
 - **Zoom meetings** are all hosted by one Zoom account configured for the deployment.
+- **AI calls in your own voice** (ElevenLabs voice cloning, AI answering of your calls and Take over through Vapi) have been built and tested with simulations only. Some of the settings that make the assistant sound natural are switched off until they are checked against the live service.
 
 ## What are the sending limitations?
 

@@ -174,7 +174,12 @@ class TestPlacingACall:
         assert call.provider_call_id == "vapi-call-1" and call.status == "ringing"
         assert call.to_number == "+15550102000"
         assert "AI assistant" in call.script_json["first_message"]
-        assert call.voicemail_text.startswith("Hi Sara")
+        # Voice twin guard 1 (contract change): the voicemail now always OPENS
+        # with the AI disclosure, then the model's personalised words.
+        assert call.voicemail_text.startswith("This is an AI assistant calling for ")
+        assert "Hi Sara" in call.voicemail_text
+        assert call.script_json["first_message"].startswith("Hi Sara, this is an AI assistant")
+        assert "This call is recorded." in call.script_json["first_message"]
         # Voicemail rendered to audio and hosted.
         assert call.voicemail_audio_url.endswith(".mp3")
         assert list((tmp_path / "voicemails").iterdir())

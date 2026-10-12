@@ -96,6 +96,21 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                               "consent. Turning this off is a legal decision "
                               "for your jurisdiction, not a product one."),
     "phone_daily_call_limit": (40, "AI calls per account per day."),
+    # Voice twin (docs/features/voice-twin.md). OFF by default, and it needs
+    # phone_calling_enabled too: an account owner may clone their OWN voice
+    # (written consent first) for AI calls, and turn on AI answering of
+    # inbound calls. Every call still says it is an AI and that it is
+    # recorded -- enforced in code, not configurable.
+    "voice_clone_calls_enabled": (False, "Let account owners clone their own "
+                                  "voice (ElevenLabs Professional Voice "
+                                  "Clone, written consent first) for AI "
+                                  "calls, and let the AI answer inbound "
+                                  "calls. Needs AI calling on. Every call "
+                                  "still opens by saying it is an AI "
+                                  "assistant and that the call is recorded. "
+                                  "Biometric-data and AI-disclosure laws "
+                                  "apply -- read the voice twin spec "
+                                  "before enabling."),
     # Feature Group 9 -- deliverability & safety
     "deliverability_health_threshold": (70, "Email health score below which "
                                         "a campaign launch is warned."),

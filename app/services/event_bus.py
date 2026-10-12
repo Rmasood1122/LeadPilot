@@ -69,6 +69,11 @@ EVENTS: dict[str, str] = {
     # Autopilot launch (docs/features/autopilot-launch.md): launched, waiting
     # for a prerequisite (connect Gmail / LinkedIn, plan), or waiting for review.
     "autopilot_update": "Autopilot update",
+    # Voice twin (docs/features/voice-twin.md): an AI call is live now (with
+    # "Take over"), and an AI call claimed to be human (calls paused).
+    "ai_call_live": "AI call in progress",
+    "voice_twin_incident": "AI call paused: disclosure incident",
+    "ai_call_message": "Message taken by your AI assistant",
 }
 
 

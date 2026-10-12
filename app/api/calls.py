@@ -7,7 +7,10 @@
   PUT    /leads/{id}/phone-consent      record consent (source + evidence)
   DELETE /leads/{id}/phone-consent      revoke it
   POST   /webhooks/vapi                 PUBLIC: status + end-of-call reports
+  POST   /webhooks/vapi/inbound         PUBLIC: voice twin -- assistant-request for
+                                        an inbound call, tool-calls (book, message)
   POST   /webhooks/elevenlabs           PUBLIC: post-call transcription
+  POST   /calls/{id}/takeover           voice twin: transfer a live AI call to the owner
 
 WEBHOOK AUTHENTICATION (fail closed -- no secret configured, no delivery accepted)
   vapi        `x-vapi-secret` (the serverUrlSecret we set on every call) or
@@ -50,7 +53,11 @@ class CallOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    lead_id: uuid.UUID
+    # None only for an inbound call from a number that is no lead (voice twin).
+    lead_id: uuid.UUID | None
+    direction: str = "outbound"
+    voice_clone_used: bool = False
+    from_number: str | None = None
     provider: str
     to_number: str
     status: str
@@ -86,10 +93,23 @@ def _with_names(db: Session, calls: list[Call]) -> list[CallOut]:
     out = []
     for call in calls:
         item = CallOut.model_validate(call)
-        lead = db.get(Lead, call.lead_id)
+        lead = db.get(Lead, call.lead_id) if call.lead_id is not None else None
         item.lead_name = (lead.full_name or lead.company) if lead else None
         out.append(item)
     return out
+
+
+def _owned_call(db: Session, call_id: uuid.UUID, current_user: User) -> Call:
+    """A call of this account (through its lead, or -- an inbound call from a
+    number that is no lead -- directly through user_id). 404 otherwise."""
+    from app.services import account_export  # noqa: PLC0415
+
+    call = db.execute(select(Call).where(
+        Call.id == call_id, account_export.owner_clause("calls", current_user.id))
+    ).scalar_one_or_none()
+    if call is None:
+        raise HTTPException(status_code=404, detail="call not found")
+    return call
 
 
 @router.get("/strategies/{strategy_id}/calls", response_model=list[CallOut])
@@ -113,14 +133,7 @@ def lead_calls(lead_id: uuid.UUID, db: Session = Depends(get_db),
 @router.get("/calls/{call_id}", response_model=CallDetail)
 def get_call(call_id: uuid.UUID, db: Session = Depends(get_db),
              current_user: User = Depends(get_current_user)) -> Call:
-    call = db.get(Call, call_id)
-    if call is None:
-        raise HTTPException(status_code=404, detail="call not found")
-    try:
-        _owned_lead(db, call.lead_id, current_user)
-    except HTTPException:
-        raise HTTPException(status_code=404, detail="call not found") from None
-    return call
+    return _owned_call(db, call_id, current_user)
 
 
 @router.put("/leads/{lead_id}/phone-consent")
@@ -157,6 +170,14 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
     enforce_rate_limit(str(current_user.id), "ai_action", "RATE_LIMIT_AI_ACTION")
     lead = _owned_lead(db, lead_id, current_user)
     local_business.refuse_channel(lead, "phone")
+    from app.services import voice_twin  # noqa: PLC0415
+
+    # Voice twin guard 2: a brief that tells the AI to hide that it is an AI
+    # is refused, with the reason.
+    try:
+        voice_twin.refuse_concealment(body.brief, voice_twin.owner_names(db, current_user.id))
+    except voice_twin.VoiceTwinError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
     from app.integrations import voice_providers  # noqa: PLC0415
     from app.integrations.outreach_base import OutboundMessage  # noqa: PLC0415
     from app.integrations.phone_channel import PhoneChannel  # noqa: PLC0415
@@ -164,6 +185,10 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
 
     if not system_settings.get(db, "phone_calling_enabled"):
         raise HTTPException(status_code=409, detail="AI calling is disabled by the administrator")
+    if voice_twin.calls_paused(db, current_user.id):
+        raise HTTPException(status_code=409,
+                            detail="AI calls are paused after a disclosure incident -- read "
+                                   "the transcript and resume them in Settings > Voice")
     try:  # plan channels: only Scale and Enterprise include phone
         check_send_channel(current_user, "phone")
     except PlanLimitExceeded as exc:
@@ -228,8 +253,27 @@ def call_now(lead_id: uuid.UUID, body: CallNowIn, db: Session = Depends(get_db),
     call.provider_call_id = result.provider_message_id
     call.provider = (result.raw or {}).get("provider") or call.provider
     call.status = "ringing"
+    call.control_url = (result.raw or {}).get("control_url") or None
     db.commit()
     return call
+
+
+@router.post("/calls/{call_id}/takeover")
+def take_over(call_id: uuid.UUID, request: Request, db: Session = Depends(get_db),
+              current_user: User = Depends(get_current_user)) -> dict:
+    """Voice twin: put the live AI call through to the owner's own phone
+    (the provider's live call control). Owner or workspace manager; audited."""
+    from app.services import rbac, voice_twin  # noqa: PLC0415
+
+    if not rbac.at_least(getattr(request.state, "workspace_role", "owner"), "manager"):
+        raise HTTPException(status_code=403, detail="Only the owner or a manager can take over "
+                                                    "a call.")
+    call = _owned_call(db, call_id, current_user)
+    actor = getattr(request.state, "actor", current_user)
+    try:
+        return voice_twin.take_over(db, call, actor_id=actor.id, owner_id=current_user.id)
+    except voice_twin.VoiceTwinError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -292,23 +336,42 @@ _VAPI_STATUS = {"queued": "queued", "ringing": "ringing", "in-progress": "in_pro
 
 @router.post("/webhooks/vapi")
 async def vapi_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
-    """# TODO: verify against current Vapi docs (server message shapes)"""
+    """Envelope `message.type` + `message.call` verified against docs.vapi.ai
+    (server events) on 2026-10-12; see the voice-twin spec for the rest."""
     raw = await request.body()
     if not verify_vapi(raw, request.headers, credentials.get_secret(db, "vapi", "webhook_secret")):
         raise HTTPException(status_code=401, detail="invalid webhook signature")
     payload = json.loads(raw or b"{}")
-    msg = payload.get("message") or payload
+    return _vapi_event(db, payload.get("message") or payload)
+
+
+def _vapi_event(db: Session, msg: dict) -> dict:
+    from app.integrations import voice_providers  # noqa: PLC0415
+    from app.services import voice_twin  # noqa: PLC0415
+
     kind = msg.get("type")
     call_obj = msg.get("call") or {}
-    call = db.execute(select(Call).where(Call.provider_call_id == call_obj.get("id"))
+    call = db.execute(select(Call).where(Call.provider == "vapi",
+                                         Call.provider_call_id == call_obj.get("id"))
                       ).scalar_one_or_none() if call_obj.get("id") else None
     if call is None:
         return {"ok": True, "matched": False}
+    monitor = call_obj.get("monitor") if isinstance(call_obj.get("monitor"), dict) else {}
+    if not call.control_url and voice_providers.control_url_ok(monitor.get("controlUrl")):
+        call.control_url = monitor["controlUrl"][:500]
 
     if kind == "status-update":
         call.status = _VAPI_STATUS.get(str(msg.get("status")), call.status)
         db.commit()
+        if call.status == "in_progress" and call.user_id and _dedupe(db, "vapi",
+                                                                     f"live:{call_obj['id']}"):
+            # Voice twin: the owner hears that an AI call is live, with
+            # "Take over" (push + the in-app banner, which polls).
+            voice_twin.notify_live(db, call)
         return {"ok": True, "status": call.status}
+
+    if kind == "tool-calls" and call.direction == "inbound":
+        return {"results": _tool_results(db, call, msg)}
 
     if kind == "end-of-call-report":
         if not _dedupe(db, "vapi", f"eoc:{call_obj['id']}"):
@@ -324,12 +387,106 @@ async def vapi_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
             recording_url=msg.get("recordingUrl") or artifact.get("recordingUrl"),
             duration_seconds=int(duration) if duration is not None else None,
             started_at=started, ended_at=ended)
+        # Voice twin guard 3 (every AI call): did the assistant claim to be
+        # human? Deterministic, before any analysis.
+        messages = artifact.get("messages") if isinstance(artifact.get("messages"), list) else None
+        check = _safe_post_call_check(db, call, messages)
         if needs_analysis:
             call_tasks.enqueue_analysis(call.id)
         return {"ok": True, "outcome": call.outcome.value if call.outcome else None,
-                "analysis_queued": needs_analysis}
+                "analysis_queued": needs_analysis, "disclosure_incident": bool(check["claims"])}
 
     return {"ok": True, "action": "ignored", "type": kind}
+
+
+def _safe_post_call_check(db: Session, call: Call, messages: list | None) -> dict:
+    """L8: the end-of-call row and its dedupe marker are already committed; a
+    failure in the check must not 500 (the provider would not retry -- it is a
+    duplicate now) and must not stop the analysis being queued. It is logged
+    loudly and reported in the response."""
+    from app.services import voice_twin  # noqa: PLC0415
+
+    try:
+        return voice_twin.post_call_check(db, call, messages)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        logger.exception("voice twin: post-call check failed for call %s", call.id)
+        return {"claims": [], "check_failed": True}
+
+
+def _tool_results(db: Session, call: Call, msg: dict) -> list[dict]:
+    """Vapi `tool-calls` -> `results` [{name, toolCallId, result}] (verified
+    shape). Only our own inbound tools are run, only for this call's account."""
+    from app.services import voice_twin  # noqa: PLC0415
+
+    results = []
+    for item in (msg.get("toolCallList") or [])[:5]:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or (item.get("function") or {}).get("name") or "")
+        args = item.get("parameters") or item.get("arguments") or \
+            (item.get("function") or {}).get("arguments") or {}
+        if isinstance(args, str):
+            try:
+                args = json.loads(args)
+            except ValueError:
+                args = {}
+        try:
+            result = voice_twin.run_tool(db, call, name, args)
+        except Exception:  # noqa: BLE001 -- the caller is on the line; answer something
+            db.rollback()
+            logger.exception("voice twin tool %s failed on call %s", name, call.id)
+            result = "That did not work; offer to take a message instead."
+        results.append({"name": name, "toolCallId": item.get("id"), "result": result})
+    return results
+
+
+@router.post("/webhooks/vapi/inbound")
+async def vapi_inbound_webhook(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Voice twin: the phone number's server URL. Signed like /webhooks/vapi
+    (fail closed). `assistant-request` must be answered within 7.5 s (docs):
+    no model call happens here, only database reads.
+
+    The account is found ONLY by the provider's phone-number id
+    (voice_twin.inbound_account); an unknown number is refused."""
+    from app.config import settings  # noqa: PLC0415
+    from app.services import voice_twin  # noqa: PLC0415
+
+    raw = await request.body()
+    secret = credentials.get_secret(db, "vapi", "webhook_secret")
+    if not verify_vapi(raw, request.headers, secret):
+        raise HTTPException(status_code=401, detail="invalid webhook signature")
+    payload = json.loads(raw or b"{}")
+    msg = payload.get("message") or payload
+    if msg.get("type") != "assistant-request":
+        return _vapi_event(db, msg)
+
+    call_obj = msg.get("call") or {}
+    if call_obj.get("type") not in (None, "inboundPhoneCall"):
+        raise HTTPException(status_code=422, detail="not an inbound phone call")
+    row = voice_twin.inbound_account(db, call_obj.get("phoneNumberId"))
+    if row is None:
+        logger.warning("voice twin: assistant-request for an unknown number %s",
+                       call_obj.get("phoneNumberId"))
+        raise HTTPException(status_code=404, detail="unknown phone number")
+    refusal = voice_twin.answer_refusal(row, db)
+    if refusal is not None:
+        logger.info("voice twin: not answering for %s (%s)", row.user_id, refusal)
+        if row.transfer_number:
+            return {"destination": {"type": "number", "number": row.transfer_number}}
+        return {"error": "This is an automated message. Nobody can take your call right "
+                         "now. Please call back later."}
+    if not call_obj.get("id"):
+        raise HTTPException(status_code=422, detail="call id missing")
+    customer = call_obj.get("customer") if isinstance(call_obj.get("customer"), dict) else {}
+    phone = msg.get("phoneNumber") if isinstance(msg.get("phoneNumber"), dict) else {}
+    base = settings.public_base_url.rstrip("/")
+    call, assistant = voice_twin.build_inbound(
+        db, row, provider_call_id=str(call_obj["id"])[:120],
+        from_number=customer.get("number"), to_number=phone.get("number"),
+        server_url=f"{base}/webhooks/vapi", tool_url=f"{base}/webhooks/vapi/inbound",
+        secret=secret, model=settings.anthropic_model)
+    return {"assistant": assistant}
 
 
 @router.post("/webhooks/elevenlabs")
@@ -357,6 +514,12 @@ async def elevenlabs_webhook(request: Request, db: Session = Depends(get_db)) ->
         db, call, ended_reason=str(meta.get("termination_reason") or data.get("status") or ""),
         transcript=transcript, recording_url=None,
         duration_seconds=meta.get("call_duration_secs"))
+    # Voice twin guard 3, on the STRUCTURED turns (M6): a multi-line agent
+    # turn is one turn, so its second line is still the agent speaking.
+    messages = [{"role": str(t.get("role") or ""), "message": str(t.get("message") or "")}
+                for t in turns if isinstance(t, dict)]
+    check = _safe_post_call_check(db, call, messages)
     if needs_analysis:
         call_tasks.enqueue_analysis(call.id)
-    return {"ok": True, "analysis_queued": needs_analysis}
+    return {"ok": True, "analysis_queued": needs_analysis,
+            "disclosure_incident": bool(check["claims"])}

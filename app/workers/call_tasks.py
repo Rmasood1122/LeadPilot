@@ -49,3 +49,16 @@ def enqueue_analysis(call_id) -> bool:
     except Exception as exc:  # noqa: BLE001
         logger.warning("could not queue call analysis %s: %s", call_id, exc)
         return False
+
+
+@celery_app.task(name="app.workers.call_tasks.voice_clone_housekeeping")
+def voice_clone_housekeeping() -> dict:
+    """Voice twin: retry provider deletes of revoked clones (`revoke_pending`)
+    and revoke clones unused for voice_twin.RETENTION_YEARS (BIPA)."""
+    from app.services import voice_twin  # noqa: PLC0415
+
+    session = SessionLocal()
+    try:
+        return voice_twin.retry_pending(session)
+    finally:
+        session.close()

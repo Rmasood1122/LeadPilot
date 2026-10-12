@@ -3279,7 +3279,8 @@ class CallOutcome(str, enum.Enum):
 
 
 class Call(TimestampMixin, Base):
-    """One AI outbound call to one lead.
+    """One AI call: outbound to a lead, or (voice twin, migration 0089)
+    inbound from someone who called the account's own number.
 
     Created in the send path BEFORE the provider is asked to dial, so the
     script and voicemail that were prepared survive a provider failure. The
@@ -3288,6 +3289,10 @@ class Call(TimestampMixin, Base):
 
     `provider_call_id` is unique: the webhook finds the call by it, and a
     retried webhook delivery updates the same row.
+
+    INBOUND CALLS FROM A NUMBER THAT IS NOT A LEAD have lead_id NULL. Their
+    owner is `user_id` (account_export.DIRECT_OWNER_FALLBACK), so they are
+    still exported and erased with the account.
     """
 
     __tablename__ = "calls"
@@ -3297,8 +3302,10 @@ class Call(TimestampMixin, Base):
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    lead_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("leads.id", ondelete="CASCADE"), index=True
+    # NULL only for an inbound call from a number that matches none of the
+    # account's leads (migration 0089).
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="CASCADE"), index=True, nullable=True
     )
     strategy_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("strategies.id", ondelete="SET NULL"), nullable=True
@@ -3309,6 +3316,19 @@ class Call(TimestampMixin, Base):
     message_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
     )
+    # Voice twin (migration 0089). outbound | inbound
+    direction: Mapped[str] = mapped_column(
+        String(10), default="outbound", server_default="outbound", nullable=False
+    )
+    # True when the account owner's own cloned voice spoke on this call.
+    voice_clone_used: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    # Inbound: the caller's number (E.164). Personal data: erased with the lead.
+    from_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # The provider's live-call control URL (Vapi monitor.controlUrl). A
+    # capability URL: never returned by the API, redacted from exports.
+    control_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     provider: Mapped[str] = mapped_column(String(20))       # vapi | elevenlabs
     provider_call_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     to_number: Mapped[str] = mapped_column(String(40))
@@ -5812,6 +5832,140 @@ class CustomerImport(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+# --------------------------------------------------------------------------
+# Voice twin -- "Your voice on calls" (migration 0089, docs/features/voice-twin.md)
+# --------------------------------------------------------------------------
+
+
+class VoiceClone(TimestampMixin, Base):
+    """One Professional Voice Clone of the account owner's OWN voice, from the
+    written consent to its deletion.
+
+    A voiceprint is biometric data (BIPA 740 ILCS 14, GDPR Art. 9): the row
+    holds the exact consent text the person signed, who (user_id + typed
+    signature) and when, BEFORE any recording leaves their browser. LeadPilot
+    never stores the recordings themselves -- they are streamed to the
+    provider and dropped (voice_twin.upload_sample).
+
+    status: consented | collecting | verifying | training | ready | failed |
+            revoke_pending | revoked
+    Only `ready` is ever used on a call. `revoke_pending` means the provider
+    delete has not succeeded yet: unusable, retried by a beat task.
+    """
+
+    __tablename__ = "voice_clones"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(
+        String(20), default="elevenlabs", server_default="elevenlabs", nullable=False
+    )
+    provider_voice_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(30), default="consented", server_default="consented", nullable=False
+    )
+    consent_version: Mapped[str] = mapped_column(String(10))
+    consent_text: Mapped[str] = mapped_column(Text)
+    # The name the person typed as their signature.
+    consent_signature: Mapped[str] = mapped_column(String(200))
+    consented_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    sample_count: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    sample_bytes: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    # The last provider status we read (fine-tuning state, verification) --
+    # no audio, no transcript.
+    provider_state_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                          nullable=True)
+    revoke_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                                 nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                        nullable=True)
+    revoke_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+
+
+class VoiceCloneDeletion(Base):
+    """Review fix M3: a provider voice that must still be deleted AFTER its
+    owner's rows are gone (an account erasure whose ElevenLabs delete failed).
+
+    Deliberately NOT owned (no user column, no foreign key) and holding nothing
+    personal -- the provider's name and its opaque voice id, the attempt count
+    and the last provider error -- so it survives the erasure and the hourly
+    task (voice_twin.retry_pending) can finish the deletion of the biometric
+    voice model. The row is deleted as soon as the provider confirms.
+    """
+
+    __tablename__ = "voice_clone_deletions"
+    __table_args__ = (
+        UniqueConstraint("provider", "provider_voice_id",
+                         name="uq_voice_clone_deletions_provider_voice"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    provider: Mapped[str] = mapped_column(String(20))
+    provider_voice_id: Mapped[str] = mapped_column(String(120))
+    attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default=text("0"), nullable=False
+    )
+    last_error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                             nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class VoiceTwinSettings(TimestampMixin, Base):
+    """The account's switches for AI calls in the owner's voice and for AI
+    answering of inbound calls. One row per account; no row = everything off.
+
+    inbound_phone_number_id is the provider phone-number id this account
+    answers on. UNIQUE: one number answers for exactly one account, and the
+    inbound webhook maps the provider's id to the account through this column
+    only -- never through anything the caller sends.
+
+    paused_at: set by the post-call check when an assistant turn claimed to be
+    human. While set, no AI call of this account is placed or answered until a
+    person resumes it (audited).
+    """
+
+    __tablename__ = "voice_twin_settings"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_voice_twin_settings_user_id"),
+        UniqueConstraint("inbound_phone_number_id",
+                         name="uq_voice_twin_settings_inbound_phone_number_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    use_clone_for_calls: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    answer_inbound: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False
+    )
+    inbound_phone_number_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    # The owner's own phone (E.164): live takeover and "put me through to
+    # the owner" transfer here.
+    transfer_number: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # Owner-written notes for the receptionist (hours, what the business
+    # does). Checked on save: no instruction to hide that it is an AI.
+    assistant_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    paused_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
 # Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new

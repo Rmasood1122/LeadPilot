@@ -10,7 +10,15 @@ because a number on the do-not-contact list must never ring.
 
 OutboundMessage.metadata carries everything the provider needs:
     {"call_id", "system_prompt", "first_message", "voicemail_text",
-     "customer_name", "server_url", "server_secret"}
+     "customer_name", "server_url", "server_secret",
+     voice twin: "disclosure", "voicemail_disclosure", "owner_name",
+     "voice_id", "voice_clone", "transfer_number"}
+
+VOICE TWIN, THE LAST-MOMENT GUARD (docs/features/voice-twin.md): whatever the
+metadata says, the first message and the voicemail are re-checked here to OPEN
+with the AI disclosure and recording notice, and the system prompt to START
+with the identity rules. An invalid or missing disclosure in the metadata is
+replaced by the generic one -- a call never goes out without it.
 """
 
 from __future__ import annotations
@@ -55,17 +63,59 @@ class PhoneChannel(OutreachChannel):
                                               linkedin=lead.linkedin_url):
             raise ComplianceError("lead is suppressed", compliance_code="SUPPRESSED")
 
+    def _owner_names(self, message: OutboundMessage, meta: dict) -> tuple[str, ...]:
+        """Every name the account owner goes by (H1): from the metadata AND
+        from the database, so a call whose metadata lost them still filters
+        "this is <owner>" out of what is said."""
+        from app.services import notifications, voice_twin  # noqa: PLC0415
+
+        names = list(meta.get("owner_names") or []) + [str(meta.get("owner_name") or "")]
+        try:
+            lead = self.session.get(Lead, uuid.UUID(str(message.lead_id))) \
+                if message.lead_id else None
+            owner = notifications.owner_of_lead(self.session, lead) if lead is not None else None
+            if owner is not None:
+                names += list(voice_twin.owner_names(self.session, owner))
+        except Exception:  # noqa: BLE001 -- the metadata names still apply
+            pass
+        return tuple(n for n in names if n)
+
+    @staticmethod
+    def _disclosed(meta: dict, body: str | None, names: tuple[str, ...] = ()) -> dict:
+        """Guard 1 + 2, enforced on the words that actually go to the provider."""
+        from app.services import voice_twin  # noqa: PLC0415
+
+        opening = meta.get("disclosure")
+        if not voice_twin.valid_opening(opening):
+            opening = voice_twin.GENERIC_OPENING
+        vm_opening = meta.get("voicemail_disclosure")
+        if not voice_twin.valid_voicemail_opening(vm_opening):
+            vm_opening = voice_twin.GENERIC_VOICEMAIL_OPENING
+        voicemail = meta.get("voicemail_text")
+        owner = voice_twin.clean_name(meta.get("owner_name")) or "the seller"
+        clone = bool(meta.get("voice_clone") and meta.get("voice_id"))
+        return {
+            "first_message": voice_twin.enforce_opening(meta.get("first_message") or body,
+                                                        opening, names),
+            "voicemail_message": (voice_twin.enforce_opening(voicemail, vm_opening, names)
+                                  if voicemail else None),
+            "system_prompt": voice_twin.ensure_identity_rules(
+                meta.get("system_prompt") or "", owner, clone=clone,
+                can_transfer=bool(meta.get("transfer_number"))),
+            "voice_id": meta.get("voice_id") if clone else None,
+            "voice_is_clone": clone,
+            "transfer_number": meta.get("transfer_number") or None,
+        }
+
     def send(self, message: OutboundMessage) -> SendResult:
         meta = message.metadata or {}
         self._guard(message)
         kwargs = dict(to_number=message.to_address, customer_name=meta.get("customer_name"),
-                      system_prompt=meta.get("system_prompt") or "",
-                      first_message=meta.get("first_message") or message.body,
-                      voicemail_message=meta.get("voicemail_text"),
                       server_url=meta.get("server_url") or "",
                       server_secret=meta.get("server_secret"),
                       metadata={"call_id": meta.get("call_id"), "lead_id": message.lead_id,
-                                "message_id": message.message_id})
+                                "message_id": message.message_id},
+                      **self._disclosed(meta, message.body, self._owner_names(message, meta)))
         errors = []
         for provider in (self.vapi, self.eleven):
             if provider is None or (provider is self.eleven and not getattr(provider, "can_call", False)):

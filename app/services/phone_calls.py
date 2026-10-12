@@ -231,10 +231,31 @@ def write_script(session: Session, strategy: Strategy, lead: Lead, brief: str) -
     return script
 
 
-def system_prompt(script: dict, lead: Lead) -> str:
-    objections = "\n".join(f"- If they say \"{o['objection']}\": {o['response']}"
+def system_prompt(script: dict, lead: Lead, identity: dict | None = None) -> str:
+    """The outbound assistant's prompt. Voice twin: it always STARTS with the
+    identity rules (never claim to be human; say plainly it is an AI) and the
+    natural-delivery rules -- whatever the script says."""
+    from app.services import voice_twin  # noqa: PLC0415
+
+    identity = identity or {}
+    names = tuple(identity.get("owner_names") or ()) + (str(identity.get("owner_name") or ""),)
+
+    def said(text) -> str:
+        # H1: any line the assistant may say aloud loses a sentence that
+        # claims to BE the owner or a human, before it reaches the prompt.
+        return voice_twin.strip_identity_claims(str(text or ""), names)
+
+    objections = "\n".join(f"- If they say \"{o['objection']}\": {said(o['response'])}"
                            for o in script.get("objection_handling") or [])
+    rules = voice_twin.identity_rules(
+        str(identity.get("owner_name") or "the seller"),
+        clone=bool(identity.get("voice_clone")),
+        can_transfer=bool(identity.get("transfer_number")))
     return "\n".join([
+        rules,
+        "",
+        voice_twin.STYLE_RULES,
+        "",
         "You are an AI assistant making one outbound call on behalf of a seller. "
         "You have already disclosed you are an AI; if asked again, confirm it. "
         "Be brief and polite. Your only goal: book a short meeting. If the person "
@@ -242,10 +263,10 @@ def system_prompt(script: dict, lead: Lead) -> str:
         "again, and end the call.",
         f"Prospect: {lead.full_name or 'unknown'}, {lead.title or ''} at {lead.company or ''}.",
         f"Objective: {script.get('objective')}",
-        "Talking points:\n" + "\n".join(f"- {p}" for p in script.get("talking_points") or []),
+        "Talking points:\n" + "\n".join(f"- {said(p)}" for p in script.get("talking_points") or []),
         f"Objections:\n{objections}",
-        "Questions to ask:\n" + "\n".join(f"- {q}" for q in script.get("questions") or []),
-        f"Close: {script.get('close')}",
+        "Questions to ask:\n" + "\n".join(f"- {said(q)}" for q in script.get("questions") or []),
+        f"Close: {said(script.get('close'))}",
     ])
 
 
@@ -305,7 +326,7 @@ def record_end_of_call(session: Session, call: Call, *, ended_reason: str | None
     call.started_at = started_at or call.started_at
     call.ended_at = ended_at or _now()
     settled = outcome_from_ended_reason(ended_reason, transcript, call.voicemail_text)
-    lead = session.get(Lead, call.lead_id)
+    lead = session.get(Lead, call.lead_id) if call.lead_id is not None else None
     if settled is not None:
         call.outcome = settled
         _stamp_lead(lead, call)
@@ -352,10 +373,17 @@ def analyze(session: Session, call: Call) -> dict:
         "stop_request": bool(data.get("stop_request")),
     }
     call.analysis_json = analysis
-    lead = session.get(Lead, call.lead_id)
+    lead = session.get(Lead, call.lead_id) if call.lead_id is not None else None
     _stamp_lead(lead, call)
     session.commit()
     if lead is None:
+        # Voice twin: an inbound caller who is no lead and asked not to be
+        # called is suppressed by number (the same stop handling).
+        if analysis["stop_request"] and call.direction == "inbound":
+            from app.services import voice_twin  # noqa: PLC0415
+
+            voice_twin.suppress_caller(session, call)
+            session.commit()
         return analysis
 
     if analysis["stop_request"]:
@@ -407,28 +435,53 @@ def prepare_call(session: Session, strategy: Strategy, lead: Lead, brief: str, *
     from app.integrations import voice_providers  # noqa: PLC0415
     from app.services import credentials  # noqa: PLC0415
 
+    from app.core.exceptions import ComplianceError  # noqa: PLC0415
+    from app.services import voice_twin  # noqa: PLC0415
+
+    # Voice twin guard 2: a brief that tells the assistant to hide that it is
+    # an AI never becomes a call (refused on save too; this catches old rows).
+    names = voice_twin.owner_names(session, owner_id)
+    if voice_twin.concealment_problems(brief, names):
+        raise ComplianceError("the call brief asks the AI to hide that it is an AI",
+                              compliance_code="AI_CONCEALMENT")
     vapi, eleven = voice_providers.get_clients(session, owner_id)
+    ident = voice_twin.call_identity(session, owner_id, greet=lead.full_name)
+    ident.meta["owner_names"] = list(names)
     script = write_script(session, strategy, lead, brief)
+    # Guard 1: the disclosure + recording notice open every call and the
+    # voicemail, whatever the model wrote.
+    script["first_message"] = voice_twin.enforce_opening(script["first_message"], ident.opening,
+                                                         names)
     voicemail = script.get("voicemail") or None
+    if voicemail:
+        voicemail = voice_twin.enforce_opening(voicemail, ident.voicemail_opening, names)
+        script["voicemail"] = voicemail
     call = Call(
         lead_id=lead.id, strategy_id=strategy.id, user_id=owner_id,
         message_id=message.id if message is not None else None,
         provider="vapi" if vapi is not None else "elevenlabs",
         to_number=e164(lead.phone) or (lead.phone or ""),
         status="queued", script_json=script, voicemail_text=voicemail,
-        voicemail_audio_url=render_voicemail_audio(eleven, voicemail or ""),
+        direction="outbound", voice_clone_used=ident.clone is not None,
+        # A voicemail in the owner's cloned voice is not rendered to a hosted
+        # file (data minimisation): the provider speaks it on the call.
+        voicemail_audio_url=(None if ident.clone is not None
+                             else render_voicemail_audio(eleven, voicemail or "")),
     )
     session.add(call)
+    voice_twin.mark_clone_used(ident.clone)
     session.flush()
     base = settings.public_base_url.rstrip("/")
     meta = {
         "call_id": str(call.id),
-        "system_prompt": system_prompt(script, lead),
+        "system_prompt": system_prompt(script, lead, ident.meta),
         "first_message": script["first_message"],
         "voicemail_text": voicemail,
         "customer_name": lead.full_name,
         "server_url": f"{base}/webhooks/{call.provider}",
         "server_secret": credentials.get_secret(session, call.provider, "webhook_secret"),
+        "identity": ident.meta,
+        **ident.meta,
     }
     return call, meta
 
