@@ -119,7 +119,10 @@ async def learning_loop_health(
             "last_run_seconds_ago": last_run_ago_seconds,
             "last_run_duration_ms": int(last_duration_raw) if last_duration_raw else None,
             "patterns_updated_last_run": int(patterns_updated_raw) if patterns_updated_raw else None,
-            "last_error": last_error_raw,
+            # The stored value is the worker's raw exception text; the
+            # details are in /admin/task-errors and the log. A response
+            # carries a fixed sentence (gaps-sweep-2 #17).
+            "last_error": "the last run failed" if last_error_raw else None,
             "recommendation": (
                 "Check /admin/task-errors for details."
                 if last_error_raw else

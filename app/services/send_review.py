@@ -420,6 +420,43 @@ def reject(db: Session, review: SendReview, *, actor_user_id=None, note: str | N
 REJECTED_ERROR_PREFIX = "rejected in review: "
 
 
+#: decision_note prefix of a review the SYSTEM closed (no reviewer). The
+#: marker is what tells history apart from a person's rejection: review_out
+#: exposes it as `closed_by_system` and the queue labels it (gaps-sweep-2
+#: review L6). Kept in the note rather than a new status value so no stored
+#: status vocabulary, filter or frontend type changes.
+SYSTEM_CLOSED_PREFIX = "closed by system: "
+
+
+def closed_by_system(review: SendReview) -> bool:
+    return (review.status == REJECTED and review.decided_by_user_id is None
+            and (review.decision_note or "").startswith(SYSTEM_CLOSED_PREFIX))
+
+
+def close_for_cancelled(db: Session, message_ids, *, note: str,
+                        now: datetime | None = None) -> int:
+    """Close the PENDING reviews of messages the system just cancelled (a
+    stopped enrollment). Closed as REJECTED -- "this message is never sent",
+    which is what happened -- with no reviewer (decided_by_user_id NULL) and
+    a note "closed by system: <stop reason>" (SYSTEM_CLOSED_PREFIX), so the
+    queue no longer asks a person to decide something already decided and
+    history never shows it as a person's rejection. Unlike reject() it does
+    NOT advance the sequence: the enrollment is stopped. Does not commit.
+    Returns the count."""
+    ids = [mid for mid in message_ids if mid is not None]
+    if not ids:
+        return 0
+    now = now or _now()
+    rows = db.execute(select(SendReview).where(SendReview.message_id.in_(ids),
+                                               SendReview.status == PENDING)).scalars().all()
+    for review in rows:
+        review.status = REJECTED
+        review.decided_at = now
+        review.decided_by_user_id = None
+        review.decision_note = f"{SYSTEM_CLOSED_PREFIX}{note or 'message cancelled'}"[:500]
+    return len(rows)
+
+
 def advance_after_reject(db: Session, message: Message, now: datetime) -> bool:
     """Move an ACTIVE enrollment past a rejected step (see reject()). Returns
     True when it advanced.
@@ -483,6 +520,9 @@ def review_out(db: Session, review: SendReview) -> dict:
         "decided_at": review.decided_at.isoformat() if review.decided_at else None,
         "decided_by_user_id": (str(review.decided_by_user_id)
                                if review.decided_by_user_id else None),
+        # Closed by the system when the sequence stopped -- not a person's
+        # rejection (close_for_cancelled).
+        "closed_by_system": closed_by_system(review),
         "created_at": review.created_at.isoformat() if review.created_at else None,
     }
 

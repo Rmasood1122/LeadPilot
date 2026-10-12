@@ -31,6 +31,7 @@ from app.integrations.outreach_base import (
     SendResult,
     register_channel,
 )
+from app.core.mime_policy import OUTBOUND_POLICY
 from app.integrations.plumbing import BaseHttpAdapter
 from app.services import crypto
 
@@ -246,7 +247,10 @@ def build_mime(from_address: str | None, message: OutboundMessage) -> EmailMessa
     one-click unsubscribe headers survive MIME assembly -- without a mailbox,
     a token or a network call.
     """
-    mime = EmailMessage()
+    # OUTBOUND_POLICY: long structured headers (List-Unsubscribe with its
+    # token, a long Message-ID in In-Reply-To/References) go out raw on one
+    # line; the default policy RFC-2047-encoded them (mime_policy.py).
+    mime = EmailMessage(policy=OUTBOUND_POLICY)
     mime["From"] = from_address or "me"
     mime["To"] = message.to_address
     if message.subject:
@@ -370,6 +374,11 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
                 if headers.get(name)}
         if auto:
             raw["headers"] = auto
+        # gaps-sweep-2 #6: the reply's own Message-ID and References chain, so
+        # an answer can set In-Reply-To / References and thread in the
+        # prospect's client too (app/services/email_threading.py sanitises).
+        from app.services import email_threading  # noqa: PLC0415
+
         return InboundMessage(
             provider_message_id=data.get("id", ""),
             thread_ref=data.get("threadId"),
@@ -379,6 +388,9 @@ class GmailChannel(BaseHttpAdapter, OutreachChannel):
             body=text,
             received_at=None,
             raw=raw,
+            rfc_message_id=email_threading.clean_message_id(headers.get("message-id")),
+            rfc_references=email_threading.clean_references(headers.get("references"),
+                                                            headers.get("in-reply-to")),
         )
 
     # ---- live now --------------------------------------------------------
@@ -414,7 +426,7 @@ def _gmail_http() -> httpx.Client:
 
 
 def _raw_message(from_addr: str | None, to: str, subject: str, body: str) -> str:
-    mime = EmailMessage()
+    mime = EmailMessage(policy=OUTBOUND_POLICY)
     mime["From"] = from_addr or "me"
     mime["To"] = to
     mime["Subject"] = subject

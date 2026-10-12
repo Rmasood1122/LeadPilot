@@ -35,6 +35,7 @@ import {
   formatPrice,
   checkoutButtonLabel,
   newAccountTerms,
+  planSwitchNotice,
   renewalDisclosure,
   type BillingInterval,
   type CheckoutTerms,
@@ -71,6 +72,16 @@ export default function PricingPage() {
   // The trial a checkout would get NOW (first trial / used trial / pilot) is
   // the backend's decision; the disclosure and the button are driven by it.
   // A signed-out visitor sees a new account's terms (they sign up first).
+  // The current subscription, so the page can say what a switch does to it
+  // BEFORE checkout (planSwitchNotice; gaps-sweep-2 #15).
+  const { data: overview } = useQuery({
+    queryKey: ["billing", "overview"],
+    queryFn: billingApi.overview,
+    enabled: signedIn,
+    retry: false,
+    staleTime: 60 * 1000,
+  });
+  const switchNotice = planSwitchNotice(overview?.subscription);
   const { data: accountTerms, isLoading: termsLoading } = useQuery({
     queryKey: ["billing", "checkout-terms"],
     queryFn: billingApi.checkoutTerms,
@@ -156,6 +167,13 @@ export default function PricingPage() {
             </p>
           )}
         </div>
+
+        {switchNotice && (
+          <p role="note" data-testid="plan-switch-notice"
+             className="mx-auto mb-6 max-w-2xl rounded-lg border border-border bg-card p-3 text-sm">
+            {switchNotice}
+          </p>
+        )}
 
         {isLoading && <p className="text-center text-muted-foreground">Loading plans…</p>}
         {isError && <p className="text-center text-destructive">Plans could not be loaded. Refresh to try again.</p>}

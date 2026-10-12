@@ -500,6 +500,44 @@ class TestWebhook:
                                  "sender": {"attendee_provider_id": "pid-40"}})
         assert again.json().get("duplicate") is True
 
+    def test_the_reply_job_is_published_after_classification(
+            self, client, db_session, verified_strategy, li_accounts, fake_claude,
+            monkeypatch):
+        """gaps-sweep-2 #7: the reply-intelligence job used to be published
+        before routing, so it could read classification NULL."""
+        from app.workers import reply_tasks
+
+        seen = []
+        monkeypatch.setattr(reply_tasks, "enqueue", lambda reply_id: seen.append(
+            db_session.get(m.InboundReply, reply_id).classification) or True)
+        credentials.set_system_secret(db_session, "unipile", "webhook_secret", "whsec")
+        _li_lead(db_session, verified_strategy, 43, linkedin_provider_id="pid-43")
+        resp = _signed(client, {"event": "message_received", "account_id": "acc-0",
+                                "message_id": "m43", "message": "Sounds interesting",
+                                "sender": {"attendee_provider_id": "pid-43"}})
+        assert resp.json()["classification"] == "interested"
+        assert seen == ["interested"]
+
+    def test_the_reply_job_is_published_even_if_routing_fails(
+            self, client, db_session, verified_strategy, li_accounts, fake_claude,
+            monkeypatch):
+        from app.workers import outreach_tasks, reply_tasks
+
+        seen = []
+        monkeypatch.setattr(reply_tasks, "enqueue", lambda reply_id: seen.append(reply_id))
+
+        def boom(*a, **k):
+            raise RuntimeError("router down")
+
+        monkeypatch.setattr(outreach_tasks, "route_linkedin_inbound_impl", boom)
+        credentials.set_system_secret(db_session, "unipile", "webhook_secret", "whsec")
+        _li_lead(db_session, verified_strategy, 44, linkedin_provider_id="pid-44")
+        with pytest.raises(RuntimeError):
+            _signed(client, {"event": "message_received", "account_id": "acc-0",
+                             "message_id": "m44", "message": "hello",
+                             "sender": {"attendee_provider_id": "pid-44"}})
+        assert len(seen) == 1
+
     def test_unsubscribe_reply_suppresses_the_profile(self, client, db_session,
                                                       verified_strategy, li_accounts,
                                                       fake_claude):

@@ -439,13 +439,25 @@ def _handle_inbound(db: Session, msg: dict, phone_number_id: str | None) -> None
             lead.status = LeadStatus.REPLIED
     db.commit()
 
-    # Feature 2: classify what the human does next. After the commit, and off
-    # this thread -- Meta retries a webhook that does not answer quickly, and
-    # a retry here would mean a second copy of the same message.
+    # Feature 2: classify what the human does next -- off this thread (Meta
+    # retries a webhook that does not answer quickly, and a retry here would
+    # mean a second copy of the same message), and only AFTER the routing
+    # below has set and committed reply_row.classification. Publishing first
+    # let the job read a NULL classification that reply_intent,
+    # reengagement_memory and Reply Copilot branch on (gaps-sweep-2 #7).
+    # `finally`: a routing error must not also leave the reply unclassified.
     from app.workers import reply_tasks  # noqa: PLC0415
 
-    reply_tasks.enqueue(reply_row.id)
+    reply_id = reply_row.id   # read now: a failed routing may leave the session unusable
+    try:
+        _route_whatsapp_reply(db, lead, reply_row, body, msg)
+    finally:
+        reply_tasks.enqueue(reply_id)
 
+
+def _route_whatsapp_reply(db, lead, reply_row, body: str, msg: dict) -> None:
+    """Opt-out or routing for one stored WhatsApp reply (no-op without a
+    lead). Sets reply_row.classification and commits."""
     if lead is None:
         return
 

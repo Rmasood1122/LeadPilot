@@ -403,30 +403,16 @@ def _fetch_variant_data(
     if db_session is None:
         return {v: {"sends": 0, "replies": 0, "bookings": 0, "unsubscribes": 0} for v in variants}
 
-    from sqlalchemy import text
-    sql = text("""
-        SELECT
-            variant,
-            COUNT(*) FILTER (WHERE event = 'sent') AS sends,
-            COUNT(*) FILTER (WHERE event = 'replied') AS replies,
-            COUNT(*) FILTER (WHERE event = 'booked') AS bookings,
-            COUNT(*) FILTER (WHERE event = 'unsubscribed') AS unsubscribes
-        FROM outcomes
-        WHERE strategy_id = :sid
-          AND variant = ANY(:variants)
-        GROUP BY variant
-    """)
+    # Portable SQL (ab_testing.variant_counts). It was PostgreSQL-only
+    # (a COUNT FILTER clause, an ANY array match, a dashed-UUID string in raw SQL),
+    # so on SQLite it always fell into the except below and returned zeros --
+    # the multi-variate comparison could not be exercised offline.
+    from app.services.ab_testing import variant_counts  # noqa: PLC0415
+
     try:
-        rows = db_session.execute(sql, {"sid": strategy_id, "variants": variants}).mappings().all()
-        result = {v: {"sends": 0, "replies": 0, "bookings": 0, "unsubscribes": 0} for v in variants}
-        for row in rows:
-            result[row["variant"]] = {
-                "sends": row["sends"] or 0,
-                "replies": row["replies"] or 0,
-                "bookings": row["bookings"] or 0,
-                "unsubscribes": row["unsubscribes"] or 0,
-            }
-        return result
+        counts = variant_counts(db_session, strategy_id, variants)
+        return {v: {"sends": c["sends"], "replies": c["replies"], "bookings": c["bookings"],
+                    "unsubscribes": c["unsubscribes"]} for v, c in counts.items()}
     except Exception as e:
         logger.error("multi_variate.fetch_failed", error=str(e))
         return {v: {"sends": 0, "replies": 0, "bookings": 0, "unsubscribes": 0} for v in variants}

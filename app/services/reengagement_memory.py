@@ -413,10 +413,20 @@ def still_appropriate(db: Session, plan: ReengagementPlan) -> str | None:
         return f"the prospect moved on to {lead.status.value} without this"
     if lead.kill_signal:
         return f"kill signal: {lead.kill_signal}"
-    suppressed = db.execute(select(SuppressionEntry).where(
-        SuppressionEntry.email == lead.email)).scalar_one_or_none() if lead.email else None
-    if suppressed is not None:
-        return f"suppressed ({suppressed.reason})"
+    # All three identifiers, the same check the send path makes
+    # (lead_tasks.is_suppressed): an opt-out by phone or on LinkedIn must
+    # cancel the plan too, not only an email unsubscribe. The email row's
+    # reason is kept in the text when it is the email that matched.
+    from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
+
+    if lead.email and is_suppressed(db, email=lead.email):
+        entry = db.execute(select(SuppressionEntry).where(
+            SuppressionEntry.email == lead.email.lower().strip()).limit(1)).scalars().first()
+        return f"suppressed ({entry.reason if entry is not None else 'email'})"
+    if lead.phone and is_suppressed(db, phone=lead.phone):
+        return "suppressed (phone number)"
+    if lead.linkedin_url and is_suppressed(db, linkedin=lead.linkedin_url):
+        return "suppressed (LinkedIn profile)"
     return None
 
 

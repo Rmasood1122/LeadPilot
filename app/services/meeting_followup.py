@@ -51,7 +51,6 @@ from app.db.models import (
     CrmNote,
     Deal,
     DealStage,
-    EnrollmentStatus,
     GmailAccount,
     Lead,
     LeadStatus,
@@ -62,7 +61,6 @@ from app.db.models import (
     Outcome,
     OutcomeEvent,
     Product,
-    SequenceEnrollment,
     Strategy,
     User,
 )
@@ -138,16 +136,13 @@ def _cents(value) -> int:
 
 
 def _stop_live_enrollments(db: Session, lead: Lead, reason: str) -> int:
+    """Every logged outcome ends the sequence (the meeting happened), not only
+    the closed ones -- so this stops whatever the new status is, through the
+    shared helper. Reason "meeting_outcome_<x>" is categorised
+    `meeting_outcome` by sequence_completion."""
     from app.services import sequence_engine as engine  # noqa: PLC0415
 
-    stopped = 0
-    for enrollment in db.execute(
-        select(SequenceEnrollment).where(SequenceEnrollment.lead_id == lead.id)
-    ).scalars().all():
-        if enrollment.status is not EnrollmentStatus.STOPPED:
-            engine.stop_enrollment(db, enrollment, reason=reason)
-            stopped += 1
-    return stopped
+    return engine.stop_live_enrollments(db, lead.id, reason)
 
 
 def log_outcome(db: Session, *, user: User, lead: Lead,
@@ -467,7 +462,11 @@ def send_followup(db: Session, row: MeetingOutcome, *, user: User,
         db.commit()
         raise FollowupNotSendable(str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        raise FollowupNotSendable(f"Gmail refused the send: {exc}") from exc
+        # The provider's text goes to the log, not into the 409 the user sees.
+        logger.warning("meeting follow-up %s: Gmail send failed: %s", row.id, exc)
+        raise FollowupNotSendable(
+            "Gmail refused the send. Try again, or open the draft in Gmail and "
+            "send it from there.") from exc
 
     row.sent_at = now or _now()
     row.gmail_message_id = sent.get("id") or row.gmail_message_id

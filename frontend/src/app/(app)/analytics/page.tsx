@@ -15,6 +15,7 @@ import { BenchmarkPanel } from "@/components/analytics/BenchmarkPanel";
 import { ReplyQualityPanel } from "@/components/analytics/ReplyQualityPanel";
 import { CompletionPanel } from "@/components/analytics/CompletionPanel";
 import { AttributionPanel } from "@/components/analytics/AttributionPanel";
+import { MultiVariateResults } from "@/components/strategies/MultiVariateResults";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { historyLabel } from "@/lib/analyticsHistory";
 import { Badge } from "@/components/ui/badge";
@@ -163,6 +164,20 @@ export default function AnalyticsPage() {
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Multi-variate (3+ variant) results, ranked with significance. The
+            plan gate is the endpoint's: without multi_variate it answers 402
+            and the panel says which plan includes it. */}
+        {effectiveId && (
+          <Card aria-label="Multi-variate test results">
+            <CardHeader>
+              <CardTitle className="text-sm">Multi-variate test results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MultiVariateResults strategyId={effectiveId} />
             </CardContent>
           </Card>
         )}

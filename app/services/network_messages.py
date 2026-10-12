@@ -11,6 +11,7 @@ Every path (copy, one-click, bulk) shares these rules:
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -25,6 +26,8 @@ from app.services import linkedin_network as ln
 MESSAGE_MAX = 1500
 BULK_MAX = 25
 BULK_SPACING_SECONDS = 90
+
+logger = logging.getLogger(__name__)
 
 SYSTEM = (
     "You write ONE short LinkedIn message from a person to someone they are ALREADY "
@@ -162,7 +165,11 @@ def deliver(db: Session, user: User, msg: LinkedInNetworkMessage, channel: str) 
         client.start_chat(profile["provider_id"], account.unipile_account_id, msg.text)
     except UnipileError as exc:
         linkedin_limits.release(account, "message")
-        raise _fail(db, msg, 502, f"LinkedIn send failed: {str(exc)[:200]}") from exc
+        # Unipile's text goes to the log; the message row and the 502 say
+        # what happened without the provider's body (gaps-sweep-2 review L3).
+        logger.warning("network message %s: Unipile send failed: %s", msg.id, exc)
+        raise _fail(db, msg, 502, "LinkedIn send failed: the LinkedIn provider "
+                                  "refused it. Try again later.") from exc
     now = datetime.now(timezone.utc)
     account.last_used_at = now
     msg.status, msg.channel, msg.sent_at, msg.error = "sent", channel, now, None

@@ -108,7 +108,7 @@ Go to the **Pricing** page. You can also reach it from **Profile**, in the **Pla
 - You must be signed in. If you are not, the button takes you to sign-up.
 - Your phone number must be verified first (unless your production deployment deliberately has no text-message service, in which case the check is skipped). If it is not, you see "Verify your phone to choose a plan." and you are sent to the verification screen.
 - You finish on a checkout page run by Stripe, the payment provider. For pay per meeting, this step saves your card for later charges. When checkout finishes you return to Settings.
-- Choosing a different plan replaces your current one. The subscription being replaced is cancelled so you are not billed twice.
+- Choosing a different plan replaces your current one. The subscription being replaced is cancelled straight away when the new checkout is completed, so you are not billed twice. The unused part of a period you already paid for is not refunded or credited: changing plans with proration is not available online yet. If you have a monthly or annual subscription (or are in its free trial), the Pricing page says this above the plans before you check out.
 - Leaving checkout without finishing does not change or downgrade your current plan.
 - LeadPilot never moves you to an annual plan by itself. Only you can choose annual, at checkout.
 - Once an annual year has been paid, it cannot be changed to another plan online before the year ends, because that would need a partial refund. Contact support, or cancel it and choose a new plan when the year ends. During the free trial of an annual plan you can still switch.
@@ -160,7 +160,7 @@ If a monthly payment fails, the subscription is marked past due. You keep your p
 
 The Pricing page shows an analytics history length for each plan: 30 days on Free, 90 days on Starter, 365 days on Growth and Pay per meeting, and unlimited on Scale, Pro and Enterprise. The day-by-day chart of a strategy's sends, replies and other events only goes back that far, and its title says so (for example "last 30 days"). Totals and the A/B variant table are not limited.
 
-Multi-variate testing (comparing three or more variants at once; the results are available through the LeadPilot API) is included in Growth, Scale, Pro and Enterprise. Starter and Pay per meeting include A/B testing but not multi-variate results; asking for them is refused with an upgrade message.
+Multi-variate testing (comparing three or more variants at once; the results are on the **Analytics** page and through the LeadPilot API) is included in Growth, Scale, Pro and Enterprise. Starter and Pay per meeting include A/B testing but not multi-variate results; asking for them is refused with an upgrade message.
 
 On a production deployment where Stripe is not set up, choosing a plan fails with "payments are not configured; plans cannot be changed right now".
 

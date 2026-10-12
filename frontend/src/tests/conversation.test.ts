@@ -4,6 +4,7 @@ import {
   dayLabel,
   formatDuration,
   groupByDay,
+  holdBadge,
   itemTitle,
   openSuggestions,
   type ChannelSuggestion,
@@ -29,6 +30,21 @@ describe("itemTitle", () => {
     expect(itemTitle(item({ kind: "booking", channel: "calendar" }))).toBe("Meeting booked");
     expect(itemTitle(item({ kind: "channel_suggestion", channel: "linkedin", from_channel: "email",
                             direction: "system" }))).toBe("Suggested switch: Email → LinkedIn");
+  });
+});
+
+describe("held messages (gaps-sweep-2 #8)", () => {
+  it("a held message is on hold, never 'not sent'", () => {
+    const hold = { kind: "bounce_shield", label: "Bounce Shield", reason: "address unverified" };
+    expect(itemTitle(item({ status: "failed", hold }))).toBe("Email on hold");
+    expect(holdBadge(hold)).toBe("On hold: Bounce Shield");
+    expect(itemTitle(item({ status: "scheduled", channel: "linkedin",
+                            hold: { kind: "daily_send_approval", label: "Daily approval",
+                                    reason: "waiting" } }))).toBe("LinkedIn on hold");
+  });
+  it("a real failure is still a failure", () => {
+    expect(itemTitle(item({ status: "failed", hold: null }))).toBe("Email not sent");
+    expect(holdBadge(null)).toBeNull();
   });
 });
 

@@ -32,7 +32,10 @@ logger = logging.getLogger(__name__)
 
 
 class StripeError(ClientHunterError):
-    """Stripe refused or could not be reached."""
+    """Stripe refused or could not be reached. The message can carry Stripe's
+    own response text, so it is never put in an API response as is."""
+
+    user_safe = False
 
 
 class StripeNotConfigured(StripeError):

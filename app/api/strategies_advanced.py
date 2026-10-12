@@ -8,6 +8,7 @@ New endpoints:
 """
 from __future__ import annotations
 
+import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -29,7 +30,7 @@ router = APIRouter(prefix="/strategies", tags=["strategies"])
 
 @router.get("/{strategy_id}/mv-results")
 async def get_mv_results(
-    strategy_id: str,
+    strategy_id: uuid.UUID,
     metric: str = Query("meeting_rate"),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
@@ -45,20 +46,22 @@ async def get_mv_results(
         raise HTTPException(status_code=402, detail=plan_limit_response(e))
 
     # Verify ownership
-    _check_strategy_ownership(db, strategy_id, str(current_user.id))
+    _check_strategy_ownership(db, strategy_id, current_user.id)
 
-    from sqlalchemy import text
-    # Get all variants for this strategy
-    rows = db.execute(text("""
-        SELECT DISTINCT variant FROM outcomes
-        WHERE strategy_id = :sid AND variant IS NOT NULL
-        ORDER BY variant
-    """), {"sid": strategy_id}).scalars().all()
+    # Typed ORM, not text() with a dashed-UUID string: SQLite stores UUIDs as
+    # 32 hex characters, so the raw comparison never matched there (offline
+    # tests could never exercise this route) -- gaps-sweep-2 #9.
+    from sqlalchemy import select  # noqa: PLC0415
 
-    variants = list(rows)
+    from app.db.models import Outcome  # noqa: PLC0415
+
+    variants = list(db.execute(
+        select(Outcome.variant).where(Outcome.strategy_id == strategy_id,
+                                      Outcome.variant.isnot(None))
+        .distinct().order_by(Outcome.variant)).scalars().all())
     if len(variants) < 2:
         return {
-            "strategy_id": strategy_id,
+            "strategy_id": str(strategy_id),
             "variants": variants,
             "message": "Need at least 2 variants to compare.",
         }
@@ -67,14 +70,14 @@ async def get_mv_results(
     from dataclasses import asdict
 
     result = compare_multi_variants(
-        strategy_id=strategy_id,
+        strategy_id=str(strategy_id),
         variants=variants,
         metric=metric,
         db_session=db,
     )
 
     return {
-        "strategy_id": result.strategy_id,
+        "strategy_id": str(result.strategy_id),
         "variants": result.variants,
         "metric": result.metric,
         "per_variant_stats": {
@@ -112,7 +115,7 @@ async def get_mv_results(
 
 @router.get("/{strategy_id}/personalization-stats")
 async def get_personalization_stats(
-    strategy_id: str,
+    strategy_id: uuid.UUID,
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> dict:
@@ -120,10 +123,10 @@ async def get_personalization_stats(
     Per-strategy personalization scores and correlation with reply rate.
     Used by the Campaign page "Personalization health" indicator.
     """
-    _check_strategy_ownership(db, strategy_id, str(current_user.id))
+    _check_strategy_ownership(db, strategy_id, current_user.id)
 
     from app.services.personalization_scorer import score_strategy_messages
-    stats = score_strategy_messages(strategy_id, db)
+    stats = score_strategy_messages(str(strategy_id), db)
 
     # Determine health indicator
     corr = stats.get("correlation")
@@ -143,7 +146,7 @@ async def get_personalization_stats(
         indicator_label = "Moderate personalization"
 
     return {
-        "strategy_id": strategy_id,
+        "strategy_id": str(strategy_id),
         **stats,
         "health_indicator": indicator,
         "health_label": indicator_label,
@@ -166,12 +169,16 @@ async def get_plans() -> dict:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _check_strategy_ownership(db, strategy_id: str, user_id: str) -> None:
-    from sqlalchemy import text
-    row = db.execute(text("""
-        SELECT s.id FROM strategies s
-        JOIN products p ON p.id = s.product_id
-        WHERE s.id = :sid AND p.user_id = :uid
-    """), {"sid": strategy_id, "uid": user_id}).first()
+def _check_strategy_ownership(db, strategy_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """404 unless the strategy belongs to `user_id`. Typed ORM comparison: the
+    old raw-SQL version bound the dashed UUID string, which never equals the
+    32-hex form SQLite stores, so it 404'd every owner on SQLite."""
+    from sqlalchemy import select  # noqa: PLC0415
+
+    from app.db.models import Product, Strategy  # noqa: PLC0415
+
+    row = db.execute(
+        select(Strategy.id).join(Product, Product.id == Strategy.product_id)
+        .where(Strategy.id == strategy_id, Product.user_id == user_id)).first()
     if not row:
         raise HTTPException(status_code=404, detail="Strategy not found")

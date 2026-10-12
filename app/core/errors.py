@@ -108,3 +108,24 @@ async def validation_exception_handler(request: Request, exc: Exception) -> JSON
             },
         )
     return await global_exception_handler(request, exc)
+
+
+def public_detail(exc: BaseException, generic: str, *, event: str, **context: Any) -> str:
+    """The text an API response may carry for `exc`, with the detail LOGGED.
+
+    Only the application's own errors (ClientHunterError subclasses whose
+    `user_safe` is True -- sentences written for the account holder, e.g.
+    "Google Calendar access was not granted") are passed through. Anything
+    else -- a provider SDK error, an HTTP client error, a parser error, or an
+    application error that wraps a provider's text (StripeError,
+    EmailSendError, SmsSendError: user_safe False) -- can carry hostnames,
+    URLs, response bodies or internal names, so the caller gets `generic` and
+    the log gets the exception (gaps-sweep-2 #17 and its review). Use: HTTPException(502, detail=
+    f"the call could not be placed: {public_detail(exc, 'provider error', event=...)}").
+    """
+    from app.core.exceptions import ClientHunterError  # noqa: PLC0415
+
+    logger.warning(event, error=str(exc), error_type=type(exc).__name__, **context)
+    if isinstance(exc, ClientHunterError) and getattr(exc, "user_safe", False):
+        return str(exc)
+    return generic

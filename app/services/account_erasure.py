@@ -610,7 +610,10 @@ ERASED_EMAIL = "erased@" + TOMBSTONE_DOMAIN
 LEAD_SCRUB: dict[str, dict | str] = {
     "inbound_replies": {"from_address": ERASED_TEXT, "subject": None, "body": ERASED_TEXT,
                         "ai_draft_response": None, "intent_reason": None,
-                        "authenticity_signals_json": None, "thread_ref": None},
+                        "authenticity_signals_json": None, "thread_ref": None,
+                        # 0086: the email's Message-ID / References can name
+                        # the sender's host or address; erased with the rest.
+                        "rfc_message_id": None, "rfc_references": None},
     "send_reviews": {"subject_snapshot": None, "body_snapshot": None,
                      "edited_subject": None, "edited_body": None,
                      "decision_note": None, "triggers_json": None},

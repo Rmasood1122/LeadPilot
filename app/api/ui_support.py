@@ -147,19 +147,16 @@ def patch_lead(
         )
     moved = body.status is not lead.status
     lead.status = body.status
-    db.commit()
-    if moved and body.status is LeadStatus.DROPPED:
-        # "Remove": the lead stops being contacted NOW -- every live
-        # enrollment is stopped (pending messages cancelled). The send
-        # chokepoint also refuses a dropped lead, whatever set the status.
-        from app.db.models import EnrollmentStatus, SequenceEnrollment  # noqa: PLC0415
+    if moved:
+        # "Remove" (DROPPED) and the closed statuses end the lead's sequences
+        # NOW -- every live enrollment is stopped (pending messages
+        # cancelled), in the same transaction as the status. One rule for
+        # every status writer (sequence_engine.stop_for_status); the send
+        # chokepoint also refuses a dropped or closed lead.
         from app.services import sequence_engine  # noqa: PLC0415
 
-        for enrollment in db.execute(select(SequenceEnrollment).where(
-                SequenceEnrollment.lead_id == lead.id)).scalars().all():
-            if enrollment.status is not EnrollmentStatus.STOPPED:
-                sequence_engine.stop_enrollment(db, enrollment,
-                                                reason=sequence_engine.STOP_LEAD_REMOVED)
+        sequence_engine.stop_for_status(db, lead, commit=False)
+    db.commit()
     # Feature Group 4: mirror a manual move to the connected CRM now (the
     # 15-minute sweep would catch it too, just later).
     from app.services import crm_sync  # noqa: PLC0415

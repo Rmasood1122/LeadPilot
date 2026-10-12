@@ -304,3 +304,27 @@ export function cancelConsequence(sub: SubscriptionView): string {
   const until = sub.status === "trialing" ? sub.trial_ends_at : sub.current_period_end;
   return `Your plan will not renew. You keep it until ${until ? formatDate(new Date(until)) : "the end of the current period"}, then the account returns to Free.`;
 }
+
+/** What choosing a different plan does to the CURRENT subscription, said
+ *  before checkout (gaps-sweep-2 #15). The backend's switch path
+ *  (app/services/billing.py, checkout completed while another subscription
+ *  exists) cancels the replaced Stripe subscription at once, with no
+ *  proration, credit or refund. Whether to offer proration is a founder
+ *  decision; until then the page says what happens. null when there is no
+ *  live subscription to replace. A PAID annual year is refused online
+ *  (annual_locked_until), so it never reaches this. */
+export function planSwitchNotice(sub: {
+  billing_model: string; tier: string; status: string; is_stub: boolean;
+} | null | undefined): string | null {
+  if (!sub || sub.is_stub) return null;
+  if (sub.billing_model !== "monthly" && sub.billing_model !== "annual") return null;
+  if (!["trialing", "active", "past_due"].includes(sub.status)) return null;
+  const kind = sub.billing_model === "annual" ? "annual" : "monthly";
+  if (sub.status === "trialing") {
+    return `You are in the free trial of a ${kind} plan. Choosing a different plan ends `
+      + "that trial as soon as the new checkout is completed.";
+  }
+  return `You have a ${kind} subscription. Choosing a different plan cancels it as soon as `
+    + "the new checkout is completed. The unused part of the period you already paid for is "
+    + "not refunded or credited (prorated changes are not available online yet).";
+}

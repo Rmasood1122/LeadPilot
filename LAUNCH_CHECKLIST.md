@@ -48,8 +48,8 @@ Work through this from top to bottom before going live. Every item has a verific
 
 ## 4. Compliance (non-negotiable)
 
-- [ ] Gmail warm-up schedule configured (`GMAIL_WARMUP_START_DAILY=20`, `GMAIL_DAILY_SEND_CAP=500`)
-- [ ] Bounce pause threshold set (`GMAIL_BOUNCE_PAUSE_THRESHOLD=0.03`)
+- [ ] Gmail warm-up schedule configured (`GMAIL_WARMUP_START_SENDS=10`, `GMAIL_WARMUP_DAILY_INCREMENT=10`, `GMAIL_DAILY_CAP=100`; corrected 2026-10-11 -- the names this line used to give were read by nothing)
+- [ ] Bounce pause threshold set (`BOUNCE_RATE_PAUSE_THRESHOLD=0.03`, `BOUNCE_MIN_SENDS=10`; a workspace compliance rule may lower it)
 - [ ] Suppression list endpoint tested: unsubscribe link leads to instant suppression
 - [ ] WhatsApp cold-contact templates approved by Meta before first campaign
 - [ ] At least one test lead verified that unsubscribe removes them from all future sends
@@ -103,9 +103,9 @@ Work through this from top to bottom before going live. Every item has a verific
 
 - [ ] `npm run build` in `frontend/` completes with no TypeScript errors
 - [x] ~~Login → Dashboard: OnboardingChecklist visible for new user~~ — SUPERSEDED 2026-10-11: the OnboardingChecklist component was never mounted (no dashboard route exists) and nothing marks onboarding steps complete, so it was deleted (docs/program/fixes/product-defects.md #22). Nothing to verify.
-- [ ] Analytics page: SendTimeCard and SubjectLineCard render (even if "No data yet")
-- [ ] Settings page: PlanCard shows current plan limits
-- [ ] Campaign page: PersonalizationHealth and MultiVariateResults sections visible
+- [ ] Analytics page: SendTimeCard and SubjectLineCard render (even if "No data yet") — NOTE 2026-10-11 (gaps-sweep-2): neither component is rendered by any page today (`frontend/src/components/analytics/SendTimeCard.tsx`, `SubjectLineCard.tsx` have no importer). Owned by the send-time scheduling work; this item cannot pass until they are mounted.
+- [ ] ~~Settings page~~ **Profile page**: the Plan card shows the current plan, its limits and the cancel button (`frontend/src/components/billing/PlanCard.tsx`, mounted in `app/(app)/profile/page.tsx`). Corrected 2026-10-11: `components/settings/PlanCard.tsx` is imported only by the parked `frontend/integration-pending/` page, so nothing on Settings shows it.
+- [ ] ~~Campaign page~~ **Analytics page**: the "Multi-variate test results" card is visible under the variant comparison (mounted 2026-10-11, gaps-sweep-2 #9; an account without multi-variate testing sees the upgrade line). PersonalizationHealth (`components/campaigns/PersonalizationHealth.tsx`) is not rendered by any page as of 2026-10-11 — reported for triage; this half cannot pass until it is mounted.
 - [ ] Android APK installs and loads; push notification received on test device
 - [ ] Theme engine: custom color → live preview → save → reload → theme persists
 

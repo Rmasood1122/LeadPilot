@@ -300,6 +300,8 @@ def gdpr_delete_lead(
     - the correspondence goes too: reply sender/subject/body/AI draft and the
       subject/body of every message to the person (counts' metadata kept;
       anything still scheduled is cancelled); provenance loses its values.
+    - the lead is DROPPED and every live enrollment is stopped (reason
+      lead_removed) in the same commit, through sequence_engine.stop_for_status.
     - F10: the SAME PERSON's other lead rows that this account's Champion
       Tracker linked by a job change (the old lead <-> the re-engagement lead
       at the new company, transitively) are erased the same way. The erasure
@@ -413,6 +415,14 @@ def _gdpr_erase_lead(db: Session, lead: Lead, current_user: User) -> None:
 
     account_erasure.erase_lead_correspondence(db, lead.id)
     lead.provenance_json = account_erasure.scrub_provenance(lead.provenance_json)
+    # The lead is now DROPPED: end its sequences through the shared rule every
+    # status writer uses (sequence_engine.stop_for_status, reason
+    # lead_removed), in the same transaction. Before, the enrollments stayed
+    # ACTIVE and only the send-time gates (dropped lead, suppression) kept
+    # the erased person from being contacted (gaps-sweep-2 review L5).
+    from app.services import sequence_engine  # noqa: PLC0415
+
+    sequence_engine.stop_for_status(db, lead, commit=False)
     db.commit()
     # Feature Group 4: forget which CRM record this person was synced to.
     # (What the CRM itself holds is the CRM owner's to erase.)

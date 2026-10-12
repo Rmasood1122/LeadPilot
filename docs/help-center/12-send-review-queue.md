@@ -86,6 +86,8 @@ While a message waits in the queue, LeadPilot does not create another copy of th
 
 A review can be decided only once. Trying to approve or reject an item that was already decided returns an error instead of overwriting the earlier decision.
 
+If the prospect's sequence stops while a message is waiting (they reply, unsubscribe, bounce, are removed or closed, and so on), the waiting message is cancelled and its review closes by itself. It is listed under **Rejected**, marked **Closed by the system** (not a person's rejection), with the stop reason as the note (for example "closed by system: enrollment stopped: unsubscribed") and no reviewer named. It no longer waits under **Pending**.
+
 ## Does approval skip the other safety checks?
 
 No. An approved message goes back through the full send process. At the moment it is actually sent, LeadPilot checks again that:

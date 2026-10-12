@@ -42,6 +42,44 @@ _LIVE = (MessageStatus.SCHEDULED, MessageStatus.SENDING, MessageStatus.SENT,
 
 DUPLICATE_ERROR = "duplicate of a held step - cancelled on release"
 
+# Daily send approval holds a message differently: it stays SCHEDULED, moved to
+# the next local midnight, with this prefix (daily_send_approval.ERROR_PREFIX;
+# asserted equal in tests/test_gaps_sweep_2.py). Not in HOLD_PREFIXES, which
+# describe FAILED-status holds.
+DAILY_APPROVAL_PREFIX = "daily_send_approval: "
+
+#: prefix -> (kind, label) for the "On hold" badge (hold_of below).
+_HOLD_KINDS: dict[str, tuple[str, str]] = {
+    BOUNCE_SHIELD_PREFIX: ("bounce_shield", "Bounce Shield"),
+    CHAMPION_TRACKER_PREFIX: ("champion_tracker", "Champion Tracker"),
+    PLAN_LIMIT_PREFIX: ("plan_limit", "Plan limit"),
+    DAILY_APPROVAL_PREFIX: ("daily_send_approval", "Daily approval"),
+}
+
+
+def hold_of(status, error: str | None) -> dict | None:
+    """Why a message is ON HOLD, for display -- or None when it is not held.
+
+    The ONE place the UI learns "held, not failed": a guard-held message is
+    stored as FAILED and used to be shown as a plain failure. Returns
+    {"kind", "label", "reason"} where `reason` is the guard's own text with
+    its prefix removed. Covers the FAILED-status guard holds (Bounce Shield,
+    Champion Tracker, plan limit), the daily-approval hold (SCHEDULED +
+    prefix) and the human review queue (AWAITING_REVIEW)."""
+    status = getattr(status, "value", status)
+    text = error or ""
+    if status == MessageStatus.AWAITING_REVIEW.value:
+        return {"kind": "send_review", "label": "Send review",
+                "reason": "waiting for approval in the review queue"}
+    allowed = {MessageStatus.FAILED.value: HOLD_PREFIXES,
+               MessageStatus.SCHEDULED.value: (DAILY_APPROVAL_PREFIX,)}.get(status, ())
+    for prefix in allowed:
+        if text.startswith(prefix):
+            kind, label = _HOLD_KINDS[prefix]
+            return {"kind": kind, "label": label,
+                    "reason": text[len(prefix):].strip() or label}
+    return None
+
 
 def held_clause(prefixes: tuple[str, ...] = HOLD_PREFIXES):
     """SQL: this message is held by one of `prefixes`."""

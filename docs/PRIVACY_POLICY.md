@@ -43,6 +43,11 @@ The system stores the subject and body of every message it sends for you, and th
 ### Device and usage data
 - **Device token:** A Firebase Cloud Messaging token tied to your device, used to send push notifications about your campaigns.
 - **Security records:** Sign-ins, refused attempts, data exports and deletions are recorded in your account's security log.
+- **Sessions:** For each signed-in session, the IP address and the browser/device description (user agent) your browser sends.
+- **Network check:** The country and VPN check made on the IP address you sign up or sign in from.
+- **AI usage:** How much AI processing your account uses, so plan limits can be applied. Your progress through the in-app tutorials.
+- **Request logs:** The server's request logs record the time, IP address and address requested for each request, for operation and security.
+- **No page tracking:** No analytics or tracking tool records which pages you view or how you move through the dashboard. (Corrected 2026-10-11, gaps-sweep-2 #13 -- NEEDS FOUNDER/LEGAL REVIEW, together with the website policy's section 2.)
 
 ---
 

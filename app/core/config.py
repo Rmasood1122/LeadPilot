@@ -390,12 +390,12 @@ class Settings(BaseSettings):
     brute-forceable.
     """
 
-    # ---------------------------------------------------------------------------
-    # Sending limits (M8-C3)
-    # ---------------------------------------------------------------------------
-    GMAIL_DAILY_SEND_CAP: int = 500
-    GMAIL_BOUNCE_PAUSE_THRESHOLD: float = 0.03
-    GMAIL_WARMUP_START_DAILY: int = 20
+    # Sending limits live in app/config.py (gmail_daily_cap,
+    # gmail_warmup_start_sends, gmail_warmup_daily_increment,
+    # bounce_rate_pause_threshold, bounce_min_sends). The M8-C3 fields
+    # GMAIL_DAILY_SEND_CAP / GMAIL_BOUNCE_PAUSE_THRESHOLD /
+    # GMAIL_WARMUP_START_DAILY that stood here were read by nothing and were
+    # removed (gaps-sweep-2 #12); extra="ignore" keeps an old .env loading.
 
     # ---------------------------------------------------------------------------
     # Frontend / CORS

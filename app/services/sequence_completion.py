@@ -2,8 +2,8 @@
 
 THE PROMISE. A sequence stops early ONLY for a reason a person would recognise
 as a decision: the prospect replied and the reply was routed, they
-unsubscribed, the address bounced, they booked, compliance suppressed them, or
-someone closed them in the CRM. Everything else means a prospect quietly
+unsubscribed, the address bounced, they booked, compliance suppressed them,
+someone closed them in the CRM, or a person logged the meeting's outcome. Everything else means a prospect quietly
 stopped being contacted halfway through a campaign that was still running --
 which is the failure this feature exists to make impossible to hide.
 
@@ -53,6 +53,7 @@ SUPPRESSED = "suppressed"
 OPTED_OUT = "opted_out"
 CRM_CLOSED = "crm_closed"
 CALL_OUTCOME = "call_outcome"
+MEETING_OUTCOME = "meeting_outcome"
 SYSTEM_KILL = "system_kill"
 ALL_STEPS_SKIPPED = "all_steps_skipped"
 LEAD_REMOVED = "lead_removed"
@@ -60,7 +61,7 @@ NO_ADDRESS = "no_address"
 OTHER = "other"
 
 CATEGORIES = (REPLIED, UNSUBSCRIBED, BOUNCED, MEETING_BOOKED, SUPPRESSED,
-              OPTED_OUT, CRM_CLOSED, CALL_OUTCOME, SYSTEM_KILL,
+              OPTED_OUT, CRM_CLOSED, CALL_OUTCOME, MEETING_OUTCOME, SYSTEM_KILL,
               ALL_STEPS_SKIPPED, LEAD_REMOVED, NO_ADDRESS, OTHER)
 
 #: Early stops a person would recognise as a decision. Everything outside this
@@ -69,7 +70,7 @@ CATEGORIES = (REPLIED, UNSUBSCRIBED, BOUNCED, MEETING_BOOKED, SUPPRESSED,
 #: worth seeing the volume of.
 AUTHORISED = frozenset({REPLIED, UNSUBSCRIBED, BOUNCED, MEETING_BOOKED,
                         SUPPRESSED, OPTED_OUT, CRM_CLOSED, CALL_OUTCOME,
-                        LEAD_REMOVED})
+                        MEETING_OUTCOME, LEAD_REMOVED})
 
 #: Human-readable labels for the breakdown, so the UI never renders a slug.
 LABELS = {
@@ -81,6 +82,7 @@ LABELS = {
     OPTED_OUT: "Opted out",
     CRM_CLOSED: "Closed in the CRM",
     CALL_OUTCOME: "Ended on a call outcome",
+    MEETING_OUTCOME: "Meeting outcome logged",
     SYSTEM_KILL: "Stopped by an automated kill signal",
     ALL_STEPS_SKIPPED: "Every step was skipped",
     LEAD_REMOVED: "Lead removed by you",
@@ -102,6 +104,9 @@ _PREFIXES: tuple[tuple[str, str], ...] = (
     ("opted_out", OPTED_OUT),
     ("crm_", CRM_CLOSED),
     ("call_", CALL_OUTCOME),
+    # meeting_followup.log_outcome: "meeting_outcome_<kind>". A person logged
+    # what happened at the meeting -- a decision, so authorised.
+    ("meeting_outcome_", MEETING_OUTCOME),
     ("kill_signal", SYSTEM_KILL),
     ("completed_all_skipped", ALL_STEPS_SKIPPED),
     ("lead_removed", LEAD_REMOVED),

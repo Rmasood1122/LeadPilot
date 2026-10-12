@@ -137,7 +137,9 @@ def audit_response(
                                    consent_to_send_data=consent_to_send_data)
             return wait_for_result(client, base_url, audit_id)
     except httpx.RequestError as exc:
-        raise AegisAuditError(f"Network error reaching AegisAudit: {exc}") from exc
+        logger.warning("AegisAudit request failed: %s", exc)
+        raise AegisAuditError(
+            f"Network error reaching AegisAudit ({type(exc).__name__}).") from exc
 
 
 def health_check(base_url: str, timeout: float = 5.0) -> bool:

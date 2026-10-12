@@ -3,6 +3,16 @@
 
 export type ThreadKind = "message" | "reply" | "call" | "booking" | "meeting" | "channel_suggestion";
 
+/** Why a message is held rather than failed -- built by ONE backend helper,
+ *  app/services/send_holds.py hold_of (guard prefixes, daily approval, the
+ *  review queue). Never re-derived from `error` here. */
+export interface MessageHold {
+  kind: "bounce_shield" | "champion_tracker" | "plan_limit" | "daily_send_approval"
+    | "send_review" | string;
+  label: string;
+  reason: string;
+}
+
 export interface ThreadItem {
   id: string;
   kind: ThreadKind;
@@ -13,6 +23,7 @@ export interface ThreadItem {
   subject?: string | null;
   body?: string | null;
   step_no?: number | null;
+  hold?: MessageHold | null;
   opened?: boolean | null;
   open_count?: number | null;
   classification?: string | null;
@@ -51,6 +62,8 @@ export function itemTitle(item: ThreadItem): string {
   const ch = channelLabel(item.channel);
   switch (item.kind) {
     case "message":
+      // Held by a guard or waiting for a person: not a failure.
+      if (item.hold) return `${ch} on hold`;
       if (item.status === "scheduled") return `${ch} scheduled`;
       if (item.status === "bounced") return `${ch} bounced`;
       if (item.status === "failed" || item.status === "needs_template") return `${ch} not sent`;
@@ -68,6 +81,11 @@ export function itemTitle(item: ThreadItem): string {
     default:
       return ch;
   }
+}
+
+/** The badge text for a held message: "On hold: Bounce Shield". */
+export function holdBadge(hold: MessageHold | null | undefined): string | null {
+  return hold ? `On hold: ${hold.label}` : null;
 }
 
 export interface DayGroup {

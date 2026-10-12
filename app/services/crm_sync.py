@@ -46,11 +46,9 @@ from app.db.models import (
     CrmSyncLink,
     Deal,
     DealStage,
-    EnrollmentStatus,
     Lead,
     LeadStatus,
     Product,
-    SequenceEnrollment,
     Strategy,
 )
 from app.integrations import hubspot, salesforce
@@ -572,12 +570,11 @@ def apply_lead_status(db: Session, lead: Lead, new_status: str, *, source: str) 
         return False
     lead.status = LeadStatus(new_status)
     if new_status in TERMINAL:
+        # The shared rule (sequence_engine.CLOSED_STATUSES == TERMINAL,
+        # asserted in tests/test_gaps_sweep_2.py), with the CRM's own reason.
         from app.services import sequence_engine as engine  # noqa: PLC0415
 
-        for enrollment in db.execute(select(SequenceEnrollment).where(
-                SequenceEnrollment.lead_id == lead.id,
-                SequenceEnrollment.status != EnrollmentStatus.STOPPED)).scalars().all():
-            engine.stop_enrollment(db, enrollment, reason=f"crm_{source}")
+        engine.stop_for_status(db, lead, reason=f"crm_{source}")
     logger.info("crm %s moved lead %s %s -> %s", source, lead.id, current, new_status)
     return True
 

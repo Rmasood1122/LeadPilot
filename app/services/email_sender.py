@@ -54,7 +54,10 @@ __all__ = [
 
 
 class EmailSendError(ClientHunterError):
-    """The message could not be handed to the transport."""
+    """The message could not be handed to the transport. Can carry the
+    provider's response text: never put in an API response as is."""
+
+    user_safe = False
 
 
 # In-process capture for EMAIL_PROVIDER=memory. Tests read this; nothing in
@@ -125,7 +128,9 @@ def _send_smtp(to: str, subject: str, html: str, text: str) -> str:
             "EMAIL_PROVIDER=smtp but SMTP_HOST is empty. For the Mailtrap "
             "sandbox set SMTP_HOST=sandbox.smtp.mailtrap.io and SMTP_PORT=2525."
         )
-    message = EmailMessage()
+    from app.core.mime_policy import OUTBOUND_POLICY  # noqa: PLC0415
+
+    message = EmailMessage(policy=OUTBOUND_POLICY)   # long headers go out raw
     message["From"] = _from_header()
     message["To"] = to
     message["Subject"] = subject

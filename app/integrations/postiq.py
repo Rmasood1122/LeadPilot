@@ -110,7 +110,8 @@ def verify_token(*, webapp_url: str, token: str) -> None:
                 "client": {"name": CLIENT_NAME, "version": CLIENT_VERSION},
             })
     except httpx.RequestError as exc:
-        raise PostIQError(f"Network error reaching PostIQ: {exc}") from exc
+        logger.warning("PostIQ request failed: %s", exc)
+        raise PostIQError(f"Network error reaching PostIQ ({type(exc).__name__}).") from exc
 
     data = _json(r)
     code = data.get("error_code")

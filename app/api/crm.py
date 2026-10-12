@@ -362,6 +362,13 @@ def patch_lead(
             )
             changed.append(f"custom.{key}")
 
+    if "status" in changed:
+        # Removed / closed / disqualified ends the lead's sequences, the same
+        # rule the Pipeline board applies (sequence_engine.stop_for_status) --
+        # in the SAME transaction as the status change.
+        from app.services import sequence_engine  # noqa: PLC0415
+
+        sequence_engine.stop_for_status(db, lead, commit=False)
     db.commit()
     db.refresh(lead)
     return {"id": str(lead.id), "status": lead.status.value, "changed": changed}
@@ -387,6 +394,7 @@ def bulk_patch_leads(
 
     updated: list[str] = []
     skipped: list[dict] = []
+    moved: list = []
 
     # Resolve every lead first: an id belonging to another account must 404
     # the whole request rather than being quietly skipped, because a silent
@@ -432,6 +440,7 @@ def bulk_patch_leads(
             )
             meta = crm_service.get_or_create_meta(db, lead)
             meta.stage_entered_at = datetime.now(timezone.utc)
+            moved.append(lead)
 
         if assign:
             meta = crm_service.get_or_create_meta(db, lead)
@@ -475,6 +484,15 @@ def bulk_patch_leads(
 
         updated.append(str(lead.id))
 
+    # Removed / closed / disqualified ends each moved lead's sequences -- the
+    # same rule as every other status writer (sequence_engine.stop_for_status)
+    # -- and the status changes and the stops commit TOGETHER: a failure part
+    # way can no longer leave closed leads whose sequences still run
+    # (gaps-sweep-2 review L4).
+    from app.services import sequence_engine  # noqa: PLC0415
+
+    for lead in moved:
+        sequence_engine.stop_for_status(db, lead, commit=False)
     db.commit()
     return {"updated": updated, "updated_count": len(updated),
             "skipped": skipped, "skipped_count": len(skipped)}

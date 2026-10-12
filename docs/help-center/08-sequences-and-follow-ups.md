@@ -104,6 +104,8 @@ Every send also passes the daily cap, the suppression check and, where triggered
 | A meeting is booked through Calendly | Sequences stop. (The Calendly integration has not yet been verified against the live service.) |
 | The lead is suppressed by the time a message is due | That message is cancelled and the sequence stops. |
 | You remove the lead (**Remove**, which marks it `dropped`) | The sequence stops straight away; a removed lead is never sent to. |
+| You move the lead to closed won, closed lost or disqualified (Pipeline board, CRM grid, bulk edit, a HubSpot or Salesforce deal stage) | All of that lead's sequences stop straight away, and any step still waiting (scheduled, in the send-review queue, or held by a safety check) is cancelled. A closed lead is never sent another sequence step. |
+| You log a meeting outcome (**Log Meeting Outcome**) | All of that lead's sequences stop. |
 | A step's channel has no address for the lead (for example a WhatsApp step and no phone number) | That message is cancelled and the sequence stops, with the reason "no address for the step's channel" (not counted as a compliance stop). |
 | An automated reply (ticket receipts, no-reply bots) | Nothing changes; it is stored but not treated as a reply. |
 

@@ -249,6 +249,20 @@ def bounce_threshold(session: Session, strategy: Strategy) -> float:
                        ANY, ANY).bounce_pause_threshold
 
 
+def account_bounce_threshold(session: Session, user_id: uuid.UUID) -> float:
+    """The bounce-pause threshold every campaign of this account pauses at:
+    its workspace's rule (region and channel ANY), never above the baseline.
+    Account-level reports (the CRM campaigns dashboard, the Bounce Shield
+    report) show THIS, the number the auto-pause actually uses, not the 3%
+    baseline -- one helper so they cannot disagree (gaps-sweep-2 #11). Equal
+    to bounce_threshold() for every strategy the account owns (strategies
+    resolve their workspace through their product's owner)."""
+    uid = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(str(user_id))
+    workspace_id = session.execute(
+        select(Workspace.id).where(Workspace.owner_user_id == uid)).scalar_one_or_none()
+    return resolve_for(session, workspace_id, ANY, ANY).bounce_pause_threshold
+
+
 def campaign_daily_cap(session: Session, strategy: Strategy, channel: str) -> int | None:
     """The daily cap a workspace rule sets for `channel` in EVERY region (rule
     region ANY), never above the baseline. What the campaign page shows as the

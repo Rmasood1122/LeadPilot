@@ -142,8 +142,8 @@ two lists are separate.
 # Part B — optional: status.calendarharvest.com (`status-page/` app)
 
 Status: built and drilled locally on branch `claude/status-page` (2026-10-11). **Not live,
-and no longer required.** To deploy it the founders would still have to do D6 (UptimeRobot
-read-only key and the DNS record) and decide D2 (the production worker), and the CI job must
+and no longer required.** To deploy it the founders would still have to supply the UptimeRobot
+read-only key and the DNS record (decision D6 itself is resolved, 2026-10-11, by Part A) and decide D2 (the production worker), and the CI job must
 land in its own `gate/` PR (section 9). Spec: `STAR_PROMPT.md` §A.5. If it is deployed, the
 site links can stay on `/status/` (Part A) or point at the subdomain; decide then.
 
@@ -245,7 +245,7 @@ A2) and, if deployed, this app's server (no CORS involved).
   response bytes are pinned by `TestHealthUnchanged` (9 tests), which passed against the original
   `health.py` before the move and again after.
 
-## 4. UptimeRobot — what the founders do (D6; worth doing for either page)
+## 4. UptimeRobot — what the founders do (optional; worth doing for either page)
 
 Names must match exactly (case ignored): the site finds monitors by name.
 
@@ -301,7 +301,7 @@ Steps:
 6. Optional: an HTTP(s) monitor `LeadPilot - Status page` on `https://www.calendarharvest.com/status/`
    (proves the page itself is served; it is static, so it does not test the API).
 
-## 5. Vercel — what the founders do (D6; optional Part B only)
+## 5. Vercel — what the founders do (optional Part B only)
 
 1. vercel.com → Add New → Project → import `Rmasood1122/LeadPilot` (same repo as the frontend;
    a second project).
@@ -406,7 +406,7 @@ the body; `/history` listed it; `/history.rss` had one `<item>` with title, perm
 deliberately broken file made `incident-lint` exit 1 with five specific errors.
 
 **Still needed for exit gate 3:** a Vercel preview URL, the same three drills against the real
-UptimeRobot account and production API once D6 is done, the Lighthouse score, and founder
+UptimeRobot account and production API once the key and DNS exist (Part B only), the Lighthouse score, and founder
 confirmation of DNS and D2.
 
 ## 9. CI job (its own `gate/` PR)

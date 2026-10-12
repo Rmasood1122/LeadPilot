@@ -296,7 +296,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
 
 
 // ── Combined-build compat export ────────────────────────────────────────────
-// The M8 api modules (admin, onboarding, plans) and several M8 components
+// The M8 api modules (admin, plans) and several M8 components
 // were written against an `apiClient` object.  The M5 equivalent is the
 // module-level `api<T>()` function — provide a thin adapter here so all
 // call sites compile without changes.

@@ -23,6 +23,7 @@ import {
 } from "@/lib/api/sendReview";
 import {
   canDecide,
+  decisionLabel,
   hasEdits,
   isStale,
   rejectNoteError,
@@ -158,6 +159,9 @@ function ReviewRow({ item }: { item: SendReviewItem }) {
             <div className="space-y-1">
               {item.subject && <p className="font-medium">{item.subject}</p>}
               <p className="whitespace-pre-line text-muted-foreground">{item.body}</p>
+              {decisionLabel(item) && (
+                <p className="text-xs font-medium text-muted-foreground">{decisionLabel(item)}</p>
+              )}
               {item.decision_note && (
                 <p className="text-xs text-muted-foreground">Note: {item.decision_note}</p>
               )}

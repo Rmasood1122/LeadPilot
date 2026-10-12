@@ -50,7 +50,7 @@ connected Gmail account).
 | DKIM | a key with a non-empty `p=` under one of the selectors in `deliverability_dkim_selectors` (default `google`; comma-separated) | yes |
 | DMARC | exactly one `v=DMARC1` record at `_dmarc.<domain>`, falling back to the organisational domain (last two labels); `p=` one of none/quarantine/reject | yes; `p=none` passes with a warning (Gmail's rule is "publish DMARC", any policy) |
 | alignment | DMARC passes only if SPF or DKIM is aligned with the From domain. Gmail sends with envelope-from and DKIM `d=` equal to the mailbox domain once SPF/DKIM are set up for that domain, so alignment holds iff DMARC exists **and** (SPF ok **or** DKIM ok) | yes |
-| one-click unsubscribe | the bytes `gmail.build_mime` produces carry `List-Unsubscribe: <https://…/unsubscribe/<token>>` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the URL is HTTPS (RFC 8058 §3.1); the token decodes back to the lead; `POST /unsubscribe/{token}` is a registered route | yes |
+| one-click unsubscribe | the bytes `gmail.build_mime` produces carry `List-Unsubscribe: <https://…/unsubscribe/<token>>` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click`; the URL is HTTPS (RFC 8058 §3.1); the token decodes back to the lead; `POST /unsubscribe/{token}` is a registered route; and in the RAW transmitted bytes neither header is RFC 2047 encoded (`=?`) or folded across lines (added 2026-10-12: the parsed check passed while `build_mime`'s default email policy encoded the ~230-character List-Unsubscribe value on every send; `build_mime` now uses `app/core/mime_policy.OUTBOUND_POLICY`, max line 998) | yes |
 
 A consumer mailbox (gmail.com etc., `deliverability.CONSUMER_DOMAINS`) is
 signed and authorised by its provider; SPF/DKIM/DMARC are reported as

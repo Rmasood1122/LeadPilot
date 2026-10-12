@@ -225,6 +225,24 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if enrollment.status is not EnrollmentStatus.STOPPED:
             engine.stop_enrollment(session, enrollment, reason=engine.STOP_LEAD_REMOVED)
         return "cancelled_lead_removed"
+    # ---- a CLOSED lead gets no more sequence steps -------------------------
+    # Closed won / lost / disqualified end the sequence (sequence_engine.
+    # stop_for_status, called by every status writer). Checked here too so an
+    # enrollment a writer did not stop -- or one closed before that rule
+    # existed -- cannot send its next step. Sequence steps only (origin NULL).
+    # Other origins have their own lead-status gates: a Reply Copilot answer
+    # to a closed lead is cancelled by reply_copilot.send_time_hold
+    # (cancelled_lead_status -- won / lost / disqualified are not answerable),
+    # and the post-meeting follow-up is not a Message at all.
+    if lead.status in engine.CLOSED_STATUSES and message.origin is None:
+        message.status = MessageStatus.CANCELLED
+        message.error = f"lead closed (status {lead.status.value})"
+        _audit(session, strategy, lead, message, "blocked_lead_closed")
+        session.commit()
+        if enrollment.status in (EnrollmentStatus.ACTIVE, EnrollmentStatus.PAUSED):
+            engine.stop_enrollment(session, enrollment,
+                                   reason=engine.status_stop_reason(lead.status))
+        return "cancelled_lead_closed"
     is_whatsapp = message.channel is ChannelType.WHATSAPP
     # Feature Group 5: the LinkedIn channel addresses the lead's profile.
     is_linkedin = message.channel is ChannelType.LINKEDIN
@@ -1001,6 +1019,10 @@ def _render_reply_copilot_outbound(session: Session, strategy: Strategy, lead: L
                                          fields={"subject": subject, "body": body})
     subject, body = checked["subject"], checked["body"]
     subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
+    # gaps-sweep-2 #6: In-Reply-To / References from the prospect's reply, so
+    # the answer threads in their client too (Gmail's threadId only threads it
+    # in the sender's mailbox). The compliance headers above are kept as built.
+    headers = {**headers, **reply_copilot.thread_headers(session, message)}
     message.subject = subject
     message.body = body
     message.unsubscribe_token = token
@@ -1464,6 +1486,9 @@ def _route_inbound(session: Session, inbound, account: GmailAccount) -> str:
         body=inbound.body,
         classification=classification,
         received_at=inbound.received_at,
+        # gaps-sweep-2 #6: what an answer needs for In-Reply-To / References.
+        rfc_message_id=getattr(inbound, "rfc_message_id", None),
+        rfc_references=getattr(inbound, "rfc_references", None),
     )
     # Feature A3: scored in the same commit the reply is stored in, so the
     # inbox never shows a reply without its authenticity. Never raises.

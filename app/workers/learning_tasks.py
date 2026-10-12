@@ -189,6 +189,88 @@ def _upsert_playbook_score(db, score_data: dict) -> None:
     db.commit()
 
 
+def promote_winners(db, *, min_sample: int, now=None) -> int:
+    """The promotion sweep itself (auto_promote_winners minus the session and
+    the admin flag). Returns how many strategies were promoted.
+
+    DIALECT-NEUTRAL since gaps-sweep-2 #18: it was raw PostgreSQL SQL
+    (array_agg, gen_random_uuid(), NOW(), ON CONFLICT, dashed-UUID strings
+    bound into raw SQL), so no offline test could run it. Same rules:
+      * candidates: a strategy with >= 2 variants among its sent / replied /
+        booked outcomes and >= `min_sample` sends in all;
+      * a strategy that already has an `ab_promoted` outcome is never
+        promoted again (the marker is permanent);
+      * > 2 variants: compare_multi_variants; exactly 2: compare_variants;
+      * a winner sets strategies.default_variant and writes the ab_promoted
+        marker in the same commit. The marker insert runs in a SAVEPOINT: on
+        PostgreSQL the partial unique index from 0012 rejects a concurrent
+        second marker (the old ON CONFLICT DO NOTHING), and that rejection
+        is swallowed exactly as before.
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from sqlalchemy import case, func, select  # noqa: PLC0415
+    from sqlalchemy.exc import IntegrityError  # noqa: PLC0415
+
+    from app.db.models import Outcome, OutcomeEvent, Strategy  # noqa: PLC0415
+    from app.services.ab_testing import compare_variants  # noqa: PLC0415
+    from app.services.multi_variate import compare_multi_variants  # noqa: PLC0415
+
+    now = now or datetime.now(timezone.utc)
+    rows = db.execute(
+        select(Outcome.strategy_id, Outcome.variant,
+               func.sum(case((Outcome.event == OutcomeEvent.SENT, 1), else_=0)).label("sends"))
+        .where(Outcome.variant.isnot(None), Outcome.strategy_id.isnot(None),
+               Outcome.event.in_([OutcomeEvent.SENT, OutcomeEvent.REPLIED,
+                                  OutcomeEvent.BOOKED]))
+        .group_by(Outcome.strategy_id, Outcome.variant)).all()
+    candidates: dict = {}
+    for strategy_id, variant, sends in rows:
+        slot = candidates.setdefault(strategy_id, {"variants": [], "sends": 0})
+        slot["variants"].append(variant)
+        slot["sends"] += int(sends or 0)
+
+    promoted = 0
+    for strategy_id, slot in sorted(candidates.items(), key=lambda kv: str(kv[0])):
+        variants = sorted(slot["variants"])
+        if len(variants) < 2 or slot["sends"] < min_sample:
+            continue
+        already = db.execute(select(func.count(Outcome.id)).where(
+            Outcome.strategy_id == strategy_id,
+            Outcome.event == OutcomeEvent.AB_PROMOTED)).scalar_one()
+        if already:
+            continue   # skip -- already promoted
+        try:
+            if len(variants) > 2:
+                winner = compare_multi_variants(strategy_id=str(strategy_id), variants=variants,
+                                                metric="meeting_rate", db_session=db).winner
+            else:
+                result = compare_variants(str(strategy_id), variants[0], variants[1],
+                                          db_session=db)
+                winner = getattr(result, "winner", None)
+            if not winner:
+                continue
+            strategy = db.get(Strategy, strategy_id)
+            if strategy is None:
+                continue
+            strategy.default_variant = winner
+            try:
+                with db.begin_nested():
+                    db.add(Outcome(strategy_id=strategy_id, event=OutcomeEvent.AB_PROMOTED,
+                                   variant=winner, ts=now))
+            except IntegrityError:
+                pass   # a concurrent sweep wrote the marker first
+            db.commit()
+            promoted += 1
+            logger.info("promotion.winner_set", strategy_id=str(strategy_id), winner=winner,
+                        variant_count=len(variants))
+        except Exception as e:
+            db.rollback()
+            logger.warning("promotion.strategy_failed", strategy_id=str(strategy_id),
+                           error=str(e))
+    return promoted
+
+
 @celery_app.task(
     name="app.workers.learning_tasks.auto_promote_winners",
     bind=True,
@@ -203,9 +285,7 @@ def auto_promote_winners(self) -> dict:
     bind_celery_task_context(task_id=self.request.id, task_name="auto_promote_winners")
 
     from app.core.database import SessionLocal
-    from app.services.multi_variate import compare_multi_variants
     from app.core.config import settings
-    from sqlalchemy import text
 
     db = SessionLocal()
     promoted = 0
@@ -218,85 +298,7 @@ def auto_promote_winners(self) -> dict:
             logger.info("promotion.disabled")
             return {"promoted": 0, "skipped": "ab_auto_promotion_enabled is off"}
 
-        # Find strategies with >= 2 active variants and enough data
-        strategies = db.execute(text("""
-            SELECT
-                o.strategy_id,
-                array_agg(DISTINCT o.variant) AS variants,
-                COUNT(DISTINCT o.variant) AS variant_count,
-                SUM(CASE WHEN o.event = 'sent' THEN 1 ELSE 0 END) AS total_sends
-            FROM outcomes o
-            WHERE o.variant IS NOT NULL
-              AND o.event IN ('sent', 'replied', 'booked')
-            GROUP BY o.strategy_id
-            HAVING COUNT(DISTINCT o.variant) >= 2
-               AND SUM(CASE WHEN o.event = 'sent' THEN 1 ELSE 0 END) >= :min_sample
-        """), {"min_sample": settings.PLAYBOOK_MIN_SAMPLE}).mappings().all()
-
-        for row in strategies:
-            strategy_id = str(row["strategy_id"])
-            variants = list(row["variants"])
-            variant_count = len(variants)
-
-            # Check double-promotion guard
-            already_promoted = db.execute(text("""
-                SELECT COUNT(*) FROM outcomes
-                WHERE strategy_id = :sid AND event = 'ab_promoted'
-            """), {"sid": strategy_id}).scalar() or 0
-
-            if already_promoted > 0:
-                continue  # skip — already promoted
-
-            try:
-                # Use multi-variate for >2, binary for exactly 2
-                if variant_count > 2:
-                    result = compare_multi_variants(
-                        strategy_id=strategy_id,
-                        variants=variants,
-                        metric="meeting_rate",
-                        db_session=db,
-                    )
-                    winner = result.winner
-                else:
-                    # Binary comparison (M8 Ch2 logic — kept for backward compat)
-                    from app.services.ab_testing import compare_variants
-                    result = compare_variants(strategy_id, variants[0], variants[1], db_session=db)
-                    winner = result.winner if hasattr(result, "winner") else None
-
-                if winner:
-                    # Set default_variant on strategy
-                    db.execute(text("""
-                        UPDATE strategies
-                        SET default_variant = :winner, updated_at = NOW()
-                        WHERE id = :sid
-                    """), {"winner": winner, "sid": strategy_id})
-
-                    # Write ab_promoted outcome (idempotency key = strategy_id)
-                    db.execute(text("""
-                        INSERT INTO outcomes (id, strategy_id, event, variant, ts)
-                        -- REPAIR: id is a client-side UUID PK with no DB
-                        -- default (PG16 gen_random_uuid supplies it here);
-                        -- lead_id nullable per 0012 for system events. The
-                        -- 0012 partial unique index makes ON CONFLICT a real
-                        -- DB-level idempotency guarantee.
-                        VALUES (gen_random_uuid(), :sid, 'ab_promoted', :winner, NOW())
-                        ON CONFLICT DO NOTHING
-                    """), {"sid": strategy_id, "winner": winner})
-                    db.commit()
-                    promoted += 1
-                    logger.info(
-                        "promotion.winner_set",
-                        strategy_id=strategy_id,
-                        winner=winner,
-                        variant_count=variant_count,
-                    )
-            except Exception as e:
-                logger.warning(
-                    "promotion.strategy_failed",
-                    strategy_id=strategy_id,
-                    error=str(e),
-                )
-
+        promoted = promote_winners(db, min_sample=settings.PLAYBOOK_MIN_SAMPLE)
         return {"promoted": promoted}
     finally:
         db.close()

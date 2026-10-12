@@ -20,6 +20,8 @@ const BANNED: { phrase: RegExp; why: string }[] = [
   { phrase: /provides\s+analytics/i, why: "no analytics provider is used" },
   { phrase: /to\s+ask\s+us\s+to\s+delete\s+your\s+account\s+or\s+any\s+other\s+data,\s+contact/i,
     why: "account deletion is self-serve (DELETE /me)" },
+  // gaps-sweep-2 #13: nothing records which pages or features a person uses.
+  { phrase: /pages\s+and\s+features\s+you\s+use/i, why: "no page or feature tracking exists" },
 ];
 
 const ROOTS = ["src/app", "src/components"];

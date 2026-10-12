@@ -27,10 +27,11 @@ rendering only — rows where sent_at IS NOT NULL are never modified.
 from __future__ import annotations
 
 import math
+import uuid
 from dataclasses import dataclass, field
 from typing import Optional
 
-from sqlalchemy import text
+from sqlalchemy import case, func, select
 
 __all__ = ["ABTestResult", "VariantStats", "compare_variants", "two_proportion_z_test"]
 
@@ -137,23 +138,56 @@ class ABTestResult:
 _HARM_EVENTS = ("bounced", "unsubscribed", "opted_out")
 
 
-def _load_variant_stats(db_session, strategy_id: str, variant: str) -> VariantStats:
-    row = db_session.execute(text("""
-        SELECT
-            SUM(CASE WHEN event = 'sent'   THEN 1 ELSE 0 END) AS sends,
-            SUM(CASE WHEN event = 'replied' THEN 1 ELSE 0 END) AS replies,
-            SUM(CASE WHEN event = 'booked' THEN 1 ELSE 0 END) AS bookings,
-            SUM(CASE WHEN event IN ('bounced', 'unsubscribed', 'opted_out')
-                     THEN 1 ELSE 0 END) AS harms
-        FROM outcomes
-        WHERE strategy_id = :sid AND variant = :variant
-    """), {"sid": strategy_id, "variant": variant}).mappings().first()
+def strategy_uuid(strategy_id) -> uuid.UUID:
+    """A strategy id as a UUID, from a UUID or its dashed / 32-hex string.
+
+    The outcome queries below are typed ORM, not text(): a dashed string bound
+    into raw SQL never matches the 32-hex form SQLite stores (so these paths
+    were PostgreSQL-only and unexercised offline -- gaps-sweep-2 #9/#18)."""
+    return strategy_id if isinstance(strategy_id, uuid.UUID) else uuid.UUID(str(strategy_id))
+
+
+def _count(*events: str):
+    """SUM(CASE WHEN outcomes.event IN events THEN 1 ELSE 0 END) -- portable."""
+    from app.db.models import Outcome, OutcomeEvent  # noqa: PLC0415
+
+    return func.sum(case((Outcome.event.in_([OutcomeEvent(e) for e in events]), 1), else_=0))
+
+
+def variant_counts(db_session, strategy_id, variants) -> dict[str, dict[str, int]]:
+    """{variant: {sends, replies, bookings, harms}} for every requested variant
+    (zeros when it has no rows). One grouped query; same on SQLite and
+    PostgreSQL."""
+    from app.db.models import Outcome  # noqa: PLC0415
+
+    wanted = list(variants)
+    out = {v: {"sends": 0, "replies": 0, "bookings": 0, "harms": 0, "unsubscribes": 0}
+           for v in wanted}
+    if not wanted:
+        return out
+    rows = db_session.execute(
+        select(Outcome.variant,
+               _count("sent").label("sends"), _count("replied").label("replies"),
+               _count("booked").label("bookings"), _count(*_HARM_EVENTS).label("harms"),
+               _count("unsubscribed").label("unsubscribes"))
+        .where(Outcome.strategy_id == strategy_uuid(strategy_id),
+               Outcome.variant.in_(wanted))
+        .group_by(Outcome.variant)).mappings().all()
+    for row in rows:
+        out[row["variant"]] = {k: int(row[k] or 0)
+                               for k in ("sends", "replies", "bookings", "harms",
+                                         "unsubscribes")}
+    return out
+
+
+def _load_variant_stats(db_session, strategy_id, variant: str) -> VariantStats:
+    row = variant_counts(db_session, strategy_id, [variant])[variant]
     return VariantStats(
         variant=variant,
-        sends=int(row["sends"] or 0),
-        replies=int(row["replies"] or 0),
-        bookings=int(row["bookings"] or 0),
-        harms=int(row["harms"] or 0),
+        sends=row["sends"],
+        replies=row["replies"],
+        bookings=row["bookings"],
+        harms=row["harms"],
     )
 
 

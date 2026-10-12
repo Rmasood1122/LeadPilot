@@ -1,5 +1,6 @@
 """Sequence endpoints — create, enroll, inspect (M3)."""
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Literal
@@ -33,8 +34,9 @@ from app.db.models import (
     WhatsAppTemplateStatus,
 )
 from app.services import sequence_engine as engine
-from app.services.whatsapp_templates import _validate_variable_descriptions
+from app.services.whatsapp_templates import TemplateError, _validate_variable_descriptions
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["sequences"])
 
 
@@ -228,12 +230,23 @@ def create_sequence(
         try:
             slots = {int(n): "" for n in expected}
             _validate_variable_descriptions(slots, s.variable_mapping or expected)
-        except Exception as exc:
+        except TemplateError as exc:
+            # The validator's own sentence (written for the user): echoed.
             raise HTTPException(
                 status_code=422,
                 detail=f"step {s.step_no}: variable_mapping must cover "
                        f"exactly the template's variables "
                        f"{sorted(expected)} — {exc}")
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            # int() / shape errors: Python's own text ("invalid literal for
+            # int() with base 10 ...") is logged, never echoed (gaps-sweep-2
+            # review L7).
+            logger.warning("sequence step %s: variable mapping check failed: %r",
+                           s.step_no, exc)
+            raise HTTPException(
+                status_code=422,
+                detail=f"step {s.step_no}: variable_mapping must cover "
+                       f"exactly the template's variables {sorted(expected)}") from exc
 
     # Plan (402) after every shape check (422), so a malformed request is told
     # what is wrong with it before being told to upgrade.

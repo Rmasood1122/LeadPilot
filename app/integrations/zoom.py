@@ -128,8 +128,13 @@ class ZoomAdapter(BaseHttpAdapter):
                   "account_id": self.creds["account_id"]},
         )
         if resp.status_code >= 400:
+            # Zoom's response body goes to the log only: ZoomNotConfigured's
+            # message reaches the user as the meeting's platform_error.
+            logger.warning("zoom token request refused: HTTP %s %s",
+                           resp.status_code, resp.text[:500])
             raise ZoomNotConfigured(
-                f"Zoom rejected the credentials: HTTP {resp.status_code} {resp.text[:200]}"
+                f"Zoom rejected the credentials (HTTP {resp.status_code}). Check the "
+                "Zoom account ID, client ID and client secret under Admin > Integrations."
             )
         token = resp.json().get("access_token") or ""
         if not token:

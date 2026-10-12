@@ -8,7 +8,16 @@ from __future__ import annotations
 
 
 class ClientHunterError(Exception):
-    """Base class for all application errors."""
+    """Base class for all application errors.
+
+    `user_safe`: the message is a sentence the application wrote for the
+    account holder, so app.core.errors.public_detail may put it in an API
+    response. A subclass whose message can carry a PROVIDER's text (a Stripe,
+    Resend/SMTP or Twilio error body) sets it False; its callers map it to
+    fixed text themselves (gaps-sweep-2 review L2).
+    """
+
+    user_safe: bool = True
 
 
 class ComplianceError(ClientHunterError):
