@@ -160,6 +160,41 @@ class EnrollRequest(BaseModel):
                              f"allowed: {allowed}")
         return value or [LeadStatus.VERIFIED]
 
+    # LEGAL GUARD (app/services/launch_consent.py): the person confirms, and
+    # the server checks and records, that they may lawfully contact these
+    # leads. Optional in the schema so an old client gets the guard's own clear
+    # 422 rather than a bare "field required"; checked in the endpoint.
+    lawful_basis_confirmed: bool | None = Field(
+        default=None, description="Must be true: you confirm a lawful basis to contact "
+        "the leads being enrolled (text at GET /launch/lawful-basis)")
+    lawful_basis_text_version: str | None = Field(
+        default=None, max_length=60,
+        description="The version of the confirmation text you were shown")
+
+
+class ApproveRequest(BaseModel):
+    """A manager approving an SDR's launch. Needed only for a request stored
+    before the lawful-basis confirmation existed."""
+    lawful_basis_confirmed: bool | None = None
+    lawful_basis_text_version: str | None = Field(default=None, max_length=60)
+
+
+def _require_lawful_basis(confirmed, version) -> None:
+    from app.services import launch_consent  # noqa: PLC0415
+
+    try:
+        launch_consent.check(confirmed, version)
+    except launch_consent.LaunchConsentError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@router.get("/launch/lawful-basis")
+def launch_lawful_basis(current_user: User = Depends(get_current_user)) -> dict:
+    """The confirmation text a person must accept to launch a sequence."""
+    from app.services import launch_consent  # noqa: PLC0415
+
+    return launch_consent.text()
+
 
 @router.post("/strategies/{strategy_id}/sequences", response_model=SequenceOut, status_code=201)
 def create_sequence(
@@ -311,6 +346,25 @@ def _review_gate(db: Session, sequence: Sequence, current_user: User) -> None:
                             headers={"X-Review-Id": str(review.id)})
 
 
+def _note_enrolled(db: Session, sequence: Sequence, enrolled: int) -> None:
+    """Add the enrolled count to this launch's lawful-basis audit row."""
+    from sqlalchemy.orm.attributes import flag_modified  # noqa: PLC0415
+
+    from app.db.models import ComplianceAuditLog  # noqa: PLC0415
+    from app.services import launch_consent  # noqa: PLC0415
+
+    row = db.execute(
+        select(ComplianceAuditLog)
+        .where(ComplianceAuditLog.channel == launch_consent.AUDIT_CHANNEL,
+               ComplianceAuditLog.decision == launch_consent.AUDIT_DECISION)
+        .order_by(ComplianceAuditLog.ts.desc(), ComplianceAuditLog.id.desc())
+    ).scalars().first()
+    if row is not None and (row.checks_json or {}).get("sequence_id") == str(sequence.id):
+        row.checks_json = {**row.checks_json, "enrolled": enrolled}
+        flag_modified(row, "checks_json")
+        db.commit()
+
+
 def _launch(db: Session, sequence: Sequence, lead_statuses) -> int:
     enrolled = engine.enroll_leads(db, sequence, lead_statuses=lead_statuses)
     if enrolled and sequence.status in (SequenceStatus.DRAFT, SequenceStatus.PENDING_APPROVAL):
@@ -334,6 +388,7 @@ def enroll(
     requires approval, is held as `pending_approval` instead -- nothing is
     enrolled or scheduled until a manager approves it."""
     sequence = _owned_sequence(db, sequence_id, current_user)
+    _require_lawful_basis(body.lawful_basis_confirmed, body.lawful_basis_text_version)
     # Migration 0039: outreach from an account whose phone is unproved (post-
     # 0039 signups only) is refused with PHONE_NOT_VERIFIED.
     from app.services import identity as identity_svc  # noqa: PLC0415
@@ -346,9 +401,22 @@ def enroll(
     # SDR cannot queue blocked content for a manager to approve blind.
     with metered(db, current_user, "launch"):  # P0-5b: review + enrolment scoring, counted
         _review_gate(db, sequence, current_user)
+        from app.services import launch_consent  # noqa: PLC0415
+
+        actor = _actor(request, current_user)
         if _needs_approval(db, request, sequence):
+            launch_consent.record(db, sequence=sequence, owner_id=current_user.id,
+                                  actor_id=actor.id, request=request,
+                                  lead_statuses=body.lead_statuses,
+                                  outcome="approval_requested")
             return _request_approval(db, request, sequence, body)
-        result = {"enrolled": _launch(db, sequence, body.lead_statuses)}
+        # In the same commit as the enrollment (enroll_leads commits).
+        launch_consent.record(db, sequence=sequence, owner_id=current_user.id,
+                              actor_id=actor.id, request=request,
+                              lead_statuses=body.lead_statuses, outcome="launched")
+        enrolled = _launch(db, sequence, body.lead_statuses)
+        _note_enrolled(db, sequence, enrolled)
+        result = {"enrolled": enrolled}
         # Feature Group 9: launching into a sick sending domain is allowed, but
         # never silently.
         from app.services import deliverability  # noqa: PLC0415
@@ -393,7 +461,12 @@ def _request_approval(db: Session, request: Request, sequence: Sequence,
     sequence.approval_requested_by_user_id = actor.id if actor else None
     sequence.approval_requested_at = datetime.now(timezone.utc)
     sequence.approval_note = None
-    sequence.approval_payload_json = {"lead_statuses": [s.value for s in body.lead_statuses]}
+    sequence.approval_payload_json = {
+        "lead_statuses": [s.value for s in body.lead_statuses],
+        # The SDR's lawful-basis confirmation travels with the request.
+        "lawful_basis_confirmed": body.lawful_basis_confirmed,
+        "lawful_basis_text_version": body.lawful_basis_text_version,
+    }
     db.commit()
     ws = db.get(Workspace, getattr(request.state, "workspace_id", None))
     for user_id in (workspaces.approvers(db, ws) if ws else []):
@@ -432,6 +505,7 @@ def _notify_decision(sequence: Sequence, approved: bool, actor: User) -> None:
 def approve_sequence(
     sequence_id: uuid.UUID,
     request: Request,
+    body: ApproveRequest | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
@@ -439,6 +513,14 @@ def approve_sequence(
     sequence = _owned_sequence(db, sequence_id, current_user)
     if sequence.status is not SequenceStatus.PENDING_APPROVAL:
         raise HTTPException(status_code=409, detail="this sequence is not awaiting approval")
+    # LEGAL GUARD: the SDR confirmed a lawful basis with the request; a request
+    # stored before that confirmation existed needs the approving manager's.
+    from app.services import launch_consent  # noqa: PLC0415
+
+    managers_confirmation = not launch_consent.is_confirmed(sequence.approval_payload_json)
+    if managers_confirmation:
+        _require_lawful_basis(body.lawful_basis_confirmed if body else None,
+                              body.lawful_basis_text_version if body else None)
     from app.services import identity as identity_svc  # noqa: PLC0415
 
     identity_svc.require_verified_phone(current_user)
@@ -460,8 +542,14 @@ def approve_sequence(
                        "ask for a new launch.") from None
         sequence.approved_by_user_id = actor.id
         sequence.approved_at = datetime.now(timezone.utc)
+        if managers_confirmation:
+            launch_consent.record(db, sequence=sequence, owner_id=current_user.id,
+                                  actor_id=actor.id, request=request,
+                                  lead_statuses=payload.lead_statuses, outcome="launched")
         db.commit()
         enrolled = _launch(db, sequence, payload.lead_statuses)
+        if managers_confirmation:
+            _note_enrolled(db, sequence, enrolled)
         if sequence.status is SequenceStatus.PENDING_APPROVAL:
             # Approved, but no lead matched yet: it can be launched again later
             # without another approval.

@@ -765,6 +765,31 @@ def queued_jobs(monkeypatch):
     monkeypatch.setattr("app.workers.webhook_tasks.enqueue_delivery",
                         lambda delivery_id, countdown=0: _record("webhooks", delivery_id,
                                                                  countdown))
+
+    # Autopilot launch: `advance` enqueues and its sourcing chain. Recorded
+    # only when the strategy really has Autopilot on (the real helper's rule).
+    jobs["autopilot"] = []
+    jobs["autopilot_chains"] = []
+
+    def _advance(session, strategy_id):
+        from app.services import autopilot  # noqa: PLC0415
+
+        try:      # never raises, like the real helper
+            row = autopilot.row_for(session, strategy_id)
+        except Exception:  # noqa: BLE001
+            return False
+        if row is None or not row.enabled:
+            return False
+        jobs["autopilot"].append(str(strategy_id))
+        return True
+
+    monkeypatch.setattr("app.workers.autopilot_tasks.enqueue_advance", _advance)
+    monkeypatch.setattr("app.workers.autopilot_tasks.start_lead_chain",
+                        lambda batch_id, strategy_id: _record("autopilot_chains", batch_id,
+                                                              strategy_id))
+    jobs["reslot"] = []
+    monkeypatch.setattr("app.workers.autopilot_tasks.enqueue_reslot",
+                        lambda strategy_id: _record("reslot", strategy_id))
     return jobs
 
 
@@ -970,6 +995,50 @@ def daily_send_approval_off(monkeypatch):
     from app.services import daily_send_approval
 
     monkeypatch.setattr(daily_send_approval, "enabled", lambda db: False)
+
+
+@pytest.fixture(autouse=True)
+def launch_lawful_basis_off(monkeypatch):
+    """The manual-launch lawful-basis guard is OFF for every suite that does
+    not test it -- the same pattern as `daily_send_approval_off` above.
+
+    WHY. The guard is always on in production (app/services/launch_consent.py):
+    POST /sequences/{id}/enroll needs `lawful_basis_confirmed` + the current
+    text version. Dozens of suites -- several of them SEALED compliance suites
+    that may not be edited -- launch with `json={}` to test other gates
+    (preflight, plan, review, verified-only). It is switched back ON by
+    tests/test_launch_lawful_basis.py, which also asserts the production
+    default is on, so the default cannot drift while this hides it.
+    """
+    from app.services import launch_consent
+
+    monkeypatch.setattr(launch_consent, "enforced", lambda: False)
+
+
+@pytest.fixture(autouse=True)
+def best_time_scheduling_off(monkeypatch):
+    """Best-time scheduling is OFF for every suite that does not test it --
+    the same pattern as `daily_send_approval_off` above.
+
+    WHY. It defaults ON in production (docs/features/autopilot-launch.md), and
+    a deferral out of hours lands on the best quarter-hour INSIDE the window
+    rather than exactly on its start. Measured on 2026-10-12 (the reviewer's
+    besttime_on_plugin forcing it ON over the 47 test files that touch
+    send_message_impl / enroll_leads / the window helpers): 1,523 passed and 5
+    failed -- every one pins the exact window start (09:00, 11:00, 14:00):
+    test_compliance.py::TestSendWindow::test_outside_hours_defers_to_window_start
+    (sealed), two in test_compliance_rules.py and two in test_lead_timezone.py.
+    Nothing else depends on it being off. The sealed scenario's production
+    behaviour (09:00-09:29 the same morning, inside the window) is pinned with
+    best-time ON, across zones, DST and compliance-rule windows, by
+    tests/test_best_time_window_guard.py. It is also switched back ON by
+    tests/test_send_time.py and tests/test_autopilot_launch.py (their
+    `best_time_on` fixtures), which assert the production DEFAULT is True and
+    that off = the old schedule.
+    """
+    from app.services import send_time
+
+    monkeypatch.setattr(send_time, "enabled", lambda db: False)
 
 
 @pytest.fixture()

@@ -1006,6 +1006,13 @@ class Strategy(TimestampMixin, Base):
     send_windows_computed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # --- Autopilot launch (migration 0087): best time to send -------------
+    # The send-time plan made when the pipeline completes (per-channel local
+    # weekday/hour windows + reasons, from the ICP priors, refined by one
+    # metered model call) and the person's own override window. See
+    # app/services/send_time.py. NULL = no plan yet / no override.
+    send_time_plan_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    send_time_override_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # --- Feature 1 (migration 0033): pipeline health score ----------------
     # One 0-100 number the founder can read instead of four dashboards, plus
     # the band and the sentence the UI shows. Recomputed every six hours by
@@ -1617,6 +1624,9 @@ class Message(TimestampMixin, Base):
     # WHERE status = 'scheduled' AND scheduled_at <= now ORDER BY scheduled_at.
     __table_args__ = (
         Index("ix_messages_status_scheduled_at", "status", "scheduled_at"),
+        # Migration 0087: the best-time learning refresh scans recent SENT
+        # messages (status = 'sent' AND sent_at >= now - 180 days).
+        Index("ix_messages_status_sent_at", "status", "sent_at"),
     )
 
     sequence: Mapped["Sequence"] = relationship(back_populates="messages")
@@ -5643,7 +5653,89 @@ class DailySendApproval(TimestampMixin, Base):
     notify_result_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
-# Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new
+class AutopilotLaunch(TimestampMixin, Base):
+    """Autopilot launch (migration 0087) -- one row per strategy.
+
+    The per-strategy opt-in "when research finishes, find leads, write the
+    sequence and start outreach automatically", the lawful-basis confirmation
+    that turning it on requires (who, when, the text version AND the exact
+    text), and the state of the automatic launch. See
+    docs/features/autopilot-launch.md and app/services/autopilot.py.
+
+    The confirmation is ALSO written to compliance_audit_log (kept on account
+    erasure as proof); this row is the working state.
+    """
+
+    __tablename__ = "autopilot_launches"
+    __table_args__ = (
+        UniqueConstraint("strategy_id", name="uq_autopilot_launches_strategy_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    strategy_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("strategies.id", ondelete="CASCADE")
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), nullable=False
+    )
+    # off | waiting_for_research | waiting_for_review | blocked | sourcing |
+    # waiting_for_channels | launched  (autopilot.STATES)
+    state: Mapped[str] = mapped_column(String(30), default="off", server_default="off",
+                                       nullable=False)
+    state_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The PERSON who confirmed (in a workspace the acting member, not the owner).
+    confirmed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                          nullable=True)
+    text_version: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    confirmed_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lead_batches.id", ondelete="SET NULL"), nullable=True
+    )
+    # {"email": "<sequence uuid>", "linkedin": ...}
+    sequences_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # {"email": {"state": "launched"|"waiting"|"blocked", "reason": str|None,
+    #            "enrolled": n}}
+    channels_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # {"<reason key>": "<iso ts>"} -- one notification per distinct reason.
+    notified_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Conditional-UPDATE claim so two workers never create the batch or a
+    # sequence twice (autopilot._claim).
+    claim_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                        nullable=True)
+    launched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                         nullable=True)
+    last_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                             nullable=True)
+    # --- review fixes ---------------------------------------------------
+    # The lead batches Autopilot itself started (it never enrolls anyone else).
+    batch_ids_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # The leads its own batches VERIFIED, snapshotted when the batch finished:
+    # a lead added or flipped to verified by hand later is never in it.
+    eligible_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # {lead_id: reason} -- leads enrollment would skip (suppressed, excluded,
+    # departed); they leave the pool so no gate re-runs for them.
+    unreachable_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # The ICP criteria extracted once (never re-bought on a retry).
+    icp_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Back-off after a spend refusal: nothing is retried before this instant.
+    retry_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                         nullable=True)
+    # Sourcing-chain publication (a failed publish is retried, then given up).
+    chain_published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                                nullable=True)
+    chain_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"),
+                                                nullable=False)
+    # The approved WhatsApp template the person chose for Autopilot.
+    whatsapp_template_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("whatsapp_templates.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+# Product defect #2:fill outcomes.strategy_id / outcomes.variant on every new
 # Outcome (the learning loop and A/B promotion read those columns). Imported
 # last so the listener module can import the classes above.
 from app.db import outcome_attribution as _outcome_attribution  # noqa: E402,F401

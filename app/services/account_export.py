@@ -106,6 +106,7 @@ OWNERSHIP: dict[str, list[str]] = {
     "voice_profiles": ["product_id", "user_id"],
     "strategies": ["product_id", "user_id"],
     # --- through a strategy ---------------------------------------------
+    "autopilot_launches": ["strategy_id", "product_id", "user_id"],  # opt-in + state
     "lead_batches": ["strategy_id", "product_id", "user_id"],
     "leads": ["strategy_id", "product_id", "user_id"],
     "reply_sentiment_weeks": ["strategy_id", "product_id", "user_id"],

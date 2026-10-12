@@ -126,6 +126,7 @@ KEPT: dict[str, str] = {
 # tests/test_account_erasure.py fails.
 DELETED: frozenset[str] = frozenset({
     "api_keys", "api_usage", "attribution_entries", "auth_sessions",
+    "autopilot_launches",  # opt-in proof stays in compliance_audit_log (E2)
     "daily_send_approvals",  # the decisions themselves stay in compliance_audit_log (E2)
     "calendar_availability", "calendar_booking_pages", "calendar_bookings", "calls",
     "campaign_costs", "champion_moves", "channel_suggestions", "chat_messages",

@@ -28,6 +28,10 @@ vi.mock("@/components/strategy/ReverifyStrategyButton", () => ({ ReverifyStrateg
 vi.mock("@/components/strategy/OverridePassesPanel", () => ({ OverridePassesPanel: () => null }));
 vi.mock("@/components/strategy/OutreachPanel", () => ({ OutreachPanel: () => null }));
 vi.mock("@/components/strategy/PipelineHealthCard", () => ({ PipelineHealthCard: () => null }));
+// Autopilot launch cards fetch their own data; tested in autopilot.test.ts.
+vi.mock("@/components/strategy/AutopilotCard", () => ({ AutopilotCard: () => null }));
+vi.mock("@/components/strategy/BestTimeCard", () => ({ BestTimeCard: () => null }));
+vi.mock("@/components/strategy/SendDiagnosticsPanel", () => ({ SendDiagnosticsPanel: () => null }));
 
 import StrategyDetailPage from "@/app/(app)/strategies/detail/page";
 

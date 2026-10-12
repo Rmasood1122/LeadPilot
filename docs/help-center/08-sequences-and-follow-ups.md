@@ -28,6 +28,15 @@ sources:
   - frontend/src/app/(app)/campaigns/page.tsx
   - app/integrations/calendly.py
   - docs/VERIFICATION_REPORT.md
+  - app/services/autopilot.py
+  - app/services/send_time.py
+  - app/services/send_diagnostics.py
+  - app/api/autopilot.py
+  - app/services/launch_consent.py
+  - app/services/lead_timezone.py
+  - docs/features/autopilot-launch.md
+  - frontend/src/components/strategy/AutopilotCard.tsx
+  - frontend/src/components/strategy/BestTimeCard.tsx
 ---
 
 # Sequences and follow-ups
@@ -50,10 +59,10 @@ On a verified strategy's page, after finding leads, use the **2. Write the email
 1. Enter a **Sequence name**.
 2. Under **First email: what should it say?**, describe the first email: who you are, why you are writing, one clear ask.
 3. Optionally add a **Follow-up email** and the **Days to wait before the follow-up** (the form starts at 3).
-4. Tick the box confirming you may lawfully email each person on the list.
+4. Tick the box confirming you may lawfully contact each person on the list. LeadPilot records who confirmed, when, and the exact wording; the launch is refused without it.
 5. Press **Launch to N lead(s)**.
 
-In the app today, this creates an email-only sequence with one or two steps. Longer sequences, and steps on other channels, are created through the LeadPilot API, which accepts up to 20 steps numbered 1, 2, 3 and so on with no gaps.
+In the app today, this creates an email-only sequence with one or two steps. Longer sequences, and steps on other channels, are created through the LeadPilot API, which accepts up to 20 steps numbered 1, 2, 3 and so on with no gaps. A launch through the API must also confirm the lawful basis: send `lawful_basis_confirmed: true` and the current `lawful_basis_text_version` (the wording and its version are at `GET /launch/lawful-basis`). Without them the launch is refused with a 422 that says so.
 
 ## How many steps can I put in a sequence?
 
@@ -85,10 +94,27 @@ On launch, LeadPilot enrolls the strategy's `verified` leads that have the addre
 
 ## When does each step go out?
 
-- **Step 1** is scheduled for the next moment inside the send window.
-- **Each later step** is scheduled when the previous step is actually sent: its delay in days is added, then the time is moved into the next send window.
-- The send window is business hours in the lead's own time zone, 09:00 to 17:00 by default, with weekends skipped. A lead with no known time zone uses the deployment's fallback zone (UTC by default).
-- If smart send time is turned on for the campaign, a step may be held for the campaign's best engagement window, for up to 72 hours by default.
+- **Step 1** is scheduled for the best time to send at or after the moment you launch, inside the send window.
+- **Each later step** is scheduled when the previous step is actually sent: its delay in days is added, then the time is moved to the best time to send inside the send window.
+- The send window is business hours in the lead's own time zone, 09:00 to 17:00 by default, with weekends skipped. LeadPilot works out each lead's time zone from the location found for them: the country, and for the United States, Canada, Australia and Brazil the state or province. A lead with no known location uses the time zone of the strategy's target region, then your account's time zone (from your calendar settings), then the deployment's fallback zone (UTC by default). The **Why isn't this sending?** panel says how many leads use a fallback.
+- **Best time to send** picks a slot within the next 72 hours (by default) in the prospect's local time. It starts from published industry patterns, which are starting assumptions, not promises: business email Tuesday to Thursday 09:00 to 11:00; LinkedIn weekday mornings and lunchtime; WhatsApp late morning or mid-afternoon. Some industries get their own window, for example restaurants and cafés 14:30 to 16:30 (between lunch and dinner service) and clinics 09:00 to 11:00. When a strategy's research finishes, LeadPilot adjusts these windows to that strategy's ideal customer. Once your account has sent 30 messages on a channel, your own reply rates by day and hour are blended in.
+- The strategy page shows **Best time to send**: "Messages go out …" for each channel, and why. Press **Choose my own window** to set your own days and hours (only the account owner or a workspace manager can, signed in). Messages are then only ever placed inside your window, never outside it; messages already scheduled are moved into it in the background over the next few minutes. A window that never overlaps the permitted sending hours for the strategy's leads (for example a compliance rule's hours) is refused, because those messages could never be sent.
+- If smart send time is turned on for the campaign, a step may be held for the campaign's best engagement window, for up to 72 hours by default. Your own window wins over it.
+
+## Can LeadPilot find leads and start sending automatically when the research finishes?
+
+Yes, if you turn on **Autopilot** for the strategy: "When research finishes, find leads, write the sequence and start outreach automatically". You can tick it on the last step of **New strategy** or later in the **Autopilot** card on the strategy page. It is never on unless you turn it on, and turning it on needs you to confirm that you have a lawful basis to contact the people it finds. Only the account owner or a workspace manager can turn it on.
+
+When the strategy is verified, Autopilot:
+
+1. runs its own lead search, the same way as **Find leads** (25 by default, within your plan's limits and your spend limits);
+2. writes a short sequence for each channel from the strategy's own messaging research;
+3. runs the same checks as **Launch** (plan, pre-launch review, sending-domain checks);
+4. enrolls only the `verified` leads its own search found, each on one channel, and schedules step 1 at the best time to send.
+
+Autopilot never contacts leads you added or verified by hand, leads from an earlier search, or people flagged by job-change tracking: those are only ever enrolled by you. Leads it found that can never be contacted (for example suppressed or excluded) are counted on the Autopilot card and are not reported as launched.
+
+Autopilot does not skip anything. It can only be turned on while **daily send approval** is on for every channel it uses (email, LinkedIn and WhatsApp), and if daily send approval is turned off later, Autopilot pauses, tells you, and its messages wait until approval is back. Every message still waits for your daily send approval and passes every check before it is sent. If your spend limits refuse the lead search, Autopilot tells you and tries again the next day. If verification needs your review, Autopilot waits for you. If a channel is not ready (for example Gmail is not connected, no LinkedIn account is connected, or your plan does not include it), Autopilot starts the channels that are ready, tells you by email and notification what to connect, and starts the waiting channel by itself once it is ready. WhatsApp is only used for people who opted in, and only with the approved WhatsApp template you choose in the Autopilot card; until you choose one, the WhatsApp channel waits. You can turn Autopilot off at any time; to stop messages already scheduled, pause the campaign.
 
 Every send also passes the daily cap, the suppression check and, where triggered, the send-review queue. Messages over the day's cap wait for the next day; they are not dropped.
 

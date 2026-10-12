@@ -36,6 +36,8 @@ sources:
   - app/workers/celery_app.py
   - docs/program/BASELINE.md
   - app/services/daily_send_approval.py
+  - app/services/send_diagnostics.py
+  - frontend/src/components/strategy/SendDiagnosticsPanel.tsx
 ---
 
 # Troubleshooting
@@ -104,7 +106,7 @@ Leads can only be sourced for a strategy that passed all 10 verification checks.
 
 ## Nothing is sending. Why?
 
-Check these in order:
+Open the strategy and look at the **Why isn't this sending?** panel. It lists, for each channel, everything that is stopping messages right now, in plain words, with what to do and a link to fix it. It uses the same checks as sending itself. You can also check these in order:
 
 1. **Is the campaign paused?** On **Campaigns**, a "Campaign paused" banner shows the reason. Press **Resume** when ready.
 2. **Is it inside the send window?** By default, messages go out between 09:00 and 17:00 in the lead's time zone (UTC if unknown), on weekdays only.

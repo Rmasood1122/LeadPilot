@@ -28,6 +28,10 @@ STRATEGY_DELETED = "strategy.deleted"
 STRATEGY_DELETE_DENIED = "strategy.delete_denied"
 STRATEGY_PASSES_OVERRIDDEN = "strategy.passes_overridden"
 STRATEGY_PASSES_OVERRIDE_DENIED = "strategy.passes_override_denied"
+# Autopilot launch (docs/features/autopilot-launch.md): the per-strategy opt-in
+# and its lawful-basis confirmation, and turning it off.
+AUTOPILOT_OPT_IN = "autopilot.opt_in"
+AUTOPILOT_OPT_OUT = "autopilot.opt_out"
 LINKEDIN_NETWORK_IMPORTED = "linkedin_network.imported"
 LINKEDIN_NETWORK_ERASED = "linkedin_network.erased"
 AUTH_LOGOUT = "auth.logout"

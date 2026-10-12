@@ -333,6 +333,12 @@ def enrich_leads_impl(session: Session, batch_id: uuid.UUID, source: LeadSource 
                 "enrichment": enriched.enrichment,
             }
             lead.status = LeadStatus.ENRICHED
+            # The lead's own timezone, from its location (country / state /
+            # provider time_zone), where the send window reads it. Never a
+            # fallback zone: see app/services/lead_timezone.py.
+            from app.services import lead_timezone as lead_tz  # noqa: PLC0415
+
+            lead_tz.record(lead)
             # Part 1 Feature 10: tag every field this stage actually filled,
             # with the provider that filled it. Never raises -- enrichment has
             # already succeeded and losing a tag must not lose the lead.

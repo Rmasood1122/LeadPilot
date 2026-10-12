@@ -320,9 +320,45 @@ as *cited* only when the claim engine verified the sentence against that
 signal's own stored source. No new vendor, no new fetch, no new model call.
 See `docs/features/f02-signal-radar.md`.
 
+**Autopilot launch: research to first message without a person in between
+(flag `autopilot_launch_enabled` offers it; each strategy opts in, off by
+default).** When a strategy opted in -- with a recorded lawful-basis
+confirmation (who, when, the exact text; audited) -- and verification passes,
+Autopilot runs its own lead search through the ordinary sourcing chain, writes
+one sequence per channel from the strategy's own messaging research, runs the
+Launch button's own gates, and enrolls each VERIFIED lead of its OWN batch on
+one channel (never hand-added, earlier or job-change-tracking leads). It can
+only be on while daily send approval covers every channel it uses; otherwise it
+pauses and its messages are held. A failed or
+needs-review verification is never bypassed; a channel whose prerequisite is
+missing (Gmail, LinkedIn account, plan, approved WhatsApp template) waits while
+the ready ones launch, the owner is told by email + push, and a 15-minute
+sweep resumes it. No new send path: every message still passes the whole send
+chokepoint, daily send approval included.
+
+**Best time to send (flag `best_time_scheduling_enabled`, default on).** Each
+step is placed at the best slot in the prospect's local time inside sending
+hours: channel and industry priors ("priors, not promises"), refined per
+strategy when its pipeline completes (one metered call, priors on failure),
+then the account's own reply rates once it has 30 sends on a channel (Bayesian
+smoothing toward the prior). A person (owner or manager) can set their own window, which is hard: nothing
+is placed outside it, and one that never overlaps the permitted hours is 422.
+Learned rates are refreshed into Redis every six hours, so placing a message
+costs at most one query. The strategy
+page's **Why isn't this sending?** panel lists, per channel, every condition
+stopping sends, each read from the gate the send path itself runs. Each lead's
+timezone now comes from its own location (country, and state/province for the
+US, Canada, Australia and Brazil), written at enrichment, so sending hours open
+in the prospect's business day, not UTC's; leads with no location use the
+strategy's target region, then the account's zone. A manual launch now needs a
+server-checked, recorded lawful-basis confirmation (422 without it). See
+`docs/features/autopilot-launch.md`.
+
 *Files:* `app/services/message_personalization.py`,
 `app/services/sequence_engine.py`, `app/api/sequences.py`,
-`app/services/signal_radar.py`
+`app/services/signal_radar.py`, `app/services/autopilot.py`,
+`app/services/send_time.py`, `app/services/send_diagnostics.py`,
+`app/services/lead_timezone.py`, `app/services/launch_consent.py`
 
 ---
 

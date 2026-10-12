@@ -36,11 +36,26 @@ export function createSequence(
   return api(`/strategies/${strategyId}/sequences`, { body });
 }
 
+/** The lawful-basis text a person confirms before launching (server-owned;
+ *  its version is sent back with the launch and recorded). */
+export interface LaunchLawfulBasis { version: string; text: string }
+
+export const getLaunchLawfulBasis = () => api<LaunchLawfulBasis>("/launch/lawful-basis");
+
 /** Enroll verified leads and schedule their first message. The server applies
- *  its own gates (verified strategy, active campaign, red-team review, phone
- *  proof, manager approval); a refusal comes back as an ApiError. */
+ *  its own gates (lawful-basis confirmation, verified strategy, active
+ *  campaign, red-team review, phone proof, manager approval); a refusal comes
+ *  back as an ApiError. `confirmedVersion` is the version of the lawful-basis
+ *  text the person ticked -- the server refuses (422) without it. */
 export function enrollSequence(
   sequenceId: string,
+  confirmedVersion: string,
 ): Promise<{ enrolled?: number; warning?: string; status?: string }> {
-  return api(`/sequences/${sequenceId}/enroll`, { body: { lead_statuses: ["verified"] } });
+  return api(`/sequences/${sequenceId}/enroll`, {
+    body: {
+      lead_statuses: ["verified"],
+      lawful_basis_confirmed: true,
+      lawful_basis_text_version: confirmedVersion,
+    },
+  });
 }

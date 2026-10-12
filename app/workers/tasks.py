@@ -147,6 +147,22 @@ def run_pipeline(self, strategy_id: str) -> str:
             logger.exception("strategy %s: pattern_key assignment failed", strategy_id)
             session.rollback()
 
+        # Autopilot launch / best time to send: the send-time plan (per-channel
+        # windows in the prospect's local time) from the ICP the step above
+        # just bound -- a post-completion step, not a registry step, so the
+        # 72/144-step count is unchanged. Only when it will be used (best-time
+        # on AND Autopilot on or an active sequence: send_time.plan_wanted) --
+        # no model call otherwise. Metered `send_time`; never raises
+        # (priors on any failure) and is never re-bought on a resume.
+        try:
+            from app.services import send_time  # noqa: PLC0415
+
+            if send_time.plan_wanted(session, strategy):
+                send_time.ensure_plan(session, strategy)
+        except Exception:
+            logger.exception("strategy %s: send-time plan failed", strategy_id)
+            session.rollback()
+
         strategy.status = StrategyStatus.VERIFYING
         session.commit()
         run_verification.delay(strategy_id)
@@ -210,6 +226,12 @@ def run_verification(self, strategy_id: str, max_attempts: int | None = None) ->
 
         with usage_meter.owner_scope(session, strategy, "verification"):
             final = run_verification_loop(session, strategy, max_attempts=max_attempts)
+        # Autopilot launch: a strategy that opted in moves on now (verified:
+        # find leads; needs review: wait and tell the owner). A no-op without
+        # an enabled Autopilot row; never raises (the 15-minute sweep backs it).
+        from app.workers import autopilot_tasks  # noqa: PLC0415
+
+        autopilot_tasks.enqueue_advance(session, _pk(strategy_id))
         return f"verification finished: {final.value}"
     except BudgetExceededError as exc:
         return _stop_for_budget(session, strategy_id, exc)

@@ -79,6 +79,8 @@ ACCOUNT_CAPPED_PURPOSES = (
     "displacement",     # competitor-displacement DMs (12-hourly sweep)
     "quickstart",       # F06 Quickstart run
     "reply_copilot",    # F04 Reply Copilot drafts
+    "autopilot",        # Autopilot sequence briefs (fixed briefs on refusal)
+    "send_time",        # send-time plan at pipeline end (priors on refusal)
 )
 COUNTED_ONLY_PURPOSES = (
     "outreach", "meeting_prep", "call_analysis", "reply_handling", "launch",

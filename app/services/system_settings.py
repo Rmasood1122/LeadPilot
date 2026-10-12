@@ -401,6 +401,32 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                      "linkedin, whatsapp, phone). A value with "
                                      "no valid channel name gates every "
                                      "channel."),
+    # Autopilot launch + best time to send (docs/features/autopilot-launch.md).
+    # Founder report 2026-10-11 ("when Pipeline is done it doesn't send"): the
+    # OPTION is offered by default; each strategy's own opt-in stays OFF until
+    # a person turns it on and confirms the lawful-basis text. Every automatic
+    # send still passes the whole send chokepoint, daily approval included.
+    "autopilot_launch_enabled": (True, "Offer Autopilot: when a strategy's "
+                                 "research finishes and verification passes, "
+                                 "find leads, write the sequence and start "
+                                 "outreach automatically -- only for "
+                                 "strategies whose owner opted in and "
+                                 "confirmed a lawful basis. Every send still "
+                                 "passes every gate (daily approval, "
+                                 "compliance, review, caps)."),
+    "autopilot_lead_target": (25, "Leads Autopilot sources for a strategy "
+                              "that has none yet (also capped by the plan "
+                              "and leads_max_per_run)."),
+    "best_time_scheduling_enabled": (True, "Place each scheduled message at "
+                                     "the best slot in the prospect's local "
+                                     "time (channel/industry priors, the "
+                                     "strategy's send-time plan, then the "
+                                     "account's own reply rates) instead of "
+                                     "as soon as sending hours open. Off = "
+                                     "the previous scheduling."),
+    "best_time_min_sends": (30, "Sends on a channel an account needs before "
+                            "its own reply rates by hour are blended into "
+                            "best-time scheduling."),
 }
 
 
