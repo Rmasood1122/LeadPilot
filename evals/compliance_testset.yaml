@@ -65,3 +65,9 @@ files:
   - tests/test_best_time_window_guard.py
   # Customer win-back: consent-only, never to opted-out people, never by phone, never healthcare
   - tests/test_customer_winback_guards.py
+  # Extended 2026-10-12 (gate PR, justification in
+  # docs/program/plans/phase5-seal-voice-twin.md).
+  # AI calls in the owner's cloned voice: AI disclosure + recording notice on every
+  # call/voicemail, no owner impersonation or claim to be human, clone consent,
+  # tenancy, provider deletion, outbound gates, signed inbound webhook
+  - tests/test_voice_twin_guards.py
