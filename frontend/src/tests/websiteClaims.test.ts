@@ -35,6 +35,10 @@ function sourceFiles(dir: string): string[] {
 }
 
 const PUBLIC_PAGES = [
+  // The home page (2026-10-11). Its copy lives in content.ts; the stricter
+  // home-only checks (flags, numbers, banned promises) are in homeClaims.test.ts.
+  "src/app/page.tsx",
+  "src/components/home/content.ts",
   "src/app/how-it-works/page.tsx",
   "src/app/about/page.tsx",
   "src/app/terms/page.tsx",

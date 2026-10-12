@@ -16,6 +16,8 @@ sources:
   - frontend/src/lib/statusIncidents.ts
   - frontend/src/lib/statusPage.ts
   - frontend/src/components/Footer.tsx
+  - frontend/src/components/home/HomePage.tsx
+  - frontend/src/app/pricing/page.tsx
   - app/api/status_public.py
   - app/api/support.py
   - app/services/support_chat.py
@@ -94,7 +96,7 @@ Yes. The public **Contact** page on the LeadPilot website offers a link to book 
 
 ## Is there a status page?
 
-Yes. The LeadPilot status page is at **www.calendarharvest.com/status**. You can open it from the **Status** link in the footer of the website's About, How it works, Contact, Privacy and Terms pages, or from the "Service status" icon in the header of the support panel in the app.
+Yes. The LeadPilot status page is at **www.calendarharvest.com/status**. You can open it from the **Status** link in the footer of the website's home page and its About, How it works, Pricing, Contact, Privacy and Terms pages, or from the "Service status" icon in the header of the support panel in the app.
 
 It shows:
 

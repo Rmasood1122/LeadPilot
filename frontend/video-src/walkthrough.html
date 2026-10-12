@@ -1,0 +1,376 @@
+<!doctype html>
+<!--
+  LeadPilot home-page walkthrough: the source of public/media/leadpilot-walkthrough.*
+
+  A product ANIMATION, not a screen recording. Every company and person in it
+  is obviously sample data ("Acme Fire Protection"), and the corner label says
+  so on every frame. The copy follows what the code does (help center articles
+  01, 06, 08, 13, 14, 20 and docs/features/daily-send-approval.md); do not add
+  a number or a promise here that the product cannot back.
+
+  Deterministic: nothing animates by itself. render(t) draws the frame for
+  time t (seconds); render.mjs steps t at the frame rate and screenshots each
+  frame, so two renders produce the same video.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LeadPilot walkthrough (video source)</title>
+<style>
+  :root {
+    --ink: #0f172a;
+    --ink-2: #1e293b;
+    --paper: #f8fafc;
+    --line: #e2e8f0;
+    --muted: #64748b;
+    --blue: #1d4ed8;
+    --sky: #93c5fd;
+    --teal: #0891b2;
+    --harvest: #f2b544;
+    --harvest-ink: #3b2a06;
+    --green: #15803d;
+    --red: #b91c1c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    background: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+  .stage { position: absolute; inset: 0; }
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(148,163,184,.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148,163,184,.07) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+  .brand { position: absolute; left: 64px; top: 40px; color: #fff; font-weight: 800; font-size: 26px; letter-spacing: -.02em; display: flex; gap: 12px; align-items: center; }
+  .brand i { width: 14px; height: 14px; border-radius: 4px; background: var(--harvest); display: inline-block; }
+  .tag { position: absolute; right: 64px; top: 46px; color: #cbd5e1; font-size: 15px; border: 1px solid rgba(203,213,225,.35); border-radius: 999px; padding: 6px 14px; }
+
+  /* Left rail: the six stages, mirrored on the home page stepper */
+  .rail { position: absolute; left: 64px; top: 132px; width: 280px; list-style: none; }
+  .rail li { position: relative; height: 72px; padding-left: 40px; color: #64748b; font-size: 24px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; }
+  .rail li .dot { position: absolute; left: 6px; top: 50%; width: 16px; height: 16px; margin-top: -8px; border-radius: 50%; border: 2px solid #475569; background: var(--ink); }
+  .rail li::after { content: ""; position: absolute; left: 13px; top: 50%; height: 72px; width: 2px; margin-top: 10px; background: #334155; }
+  .rail li:last-child::after { display: none; }
+  .rail li.done { color: #cbd5e1; }
+  .rail li.done .dot { background: var(--sky); border-color: var(--sky); }
+  .rail li.now { color: #fff; }
+  .rail li.now .dot { background: var(--harvest); border-color: var(--harvest); box-shadow: 0 0 0 6px rgba(242,181,68,.22); }
+  .rail small { display: block; }
+
+  /* The app window */
+  .win { position: absolute; left: 384px; top: 112px; width: 832px; height: 548px; background: var(--paper); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(2,6,23,.55); }
+  .win-bar { height: 52px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 24px; gap: 8px; background: #fff; }
+  .win-bar b { width: 11px; height: 11px; border-radius: 50%; background: #e2e8f0; display: inline-block; }
+  .win-bar span { margin-left: 14px; font-size: 16px; color: var(--muted); font-weight: 500; }
+  .scene { position: absolute; left: 0; right: 0; top: 52px; bottom: 0; padding: 34px 40px; opacity: 0; }
+  h2 { font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; }
+  .sub { margin-top: 8px; font-size: 18px; color: var(--muted); }
+
+  /* Scene 0: intake */
+  .field { margin-top: 26px; }
+  .field label { display: block; font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 8px; }
+  .input { height: 54px; border: 1.5px solid #cbd5e1; border-radius: 10px; background: #fff; font-size: 21px; padding: 0 16px; display: flex; align-items: center; }
+  .input.focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(29,78,216,.15); }
+  .caret { width: 2px; height: 26px; background: var(--blue); margin-left: 2px; }
+  .btn { display: inline-flex; align-items: center; height: 50px; padding: 0 22px; border-radius: 10px; background: var(--blue); color: #fff; font-weight: 700; font-size: 18px; margin-top: 28px; }
+
+  /* Scene 1: research */
+  .phases { margin-top: 22px; list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; }
+  .phases li { display: flex; align-items: center; gap: 12px; font-size: 19px; color: #94a3b8; height: 40px; }
+  .phases li .tick { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #cbd5e1; display: grid; place-items: center; font-size: 15px; color: #fff; font-weight: 800; }
+  .phases li.ok { color: var(--ink); }
+  .phases li.ok .tick { background: var(--teal); border-color: var(--teal); }
+  .bar { margin-top: 26px; height: 12px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--blue), var(--teal)); }
+  .count, .slot b, .cal .times, .bar { font-variant-numeric: tabular-nums; }
+  .count { margin-top: 10px; font-size: 17px; color: var(--muted); }
+  .verified { margin-top: 24px; display: inline-flex; align-items: center; gap: 12px; padding: 14px 20px; border-radius: 12px; background: #ecfdf5; color: var(--green); font-weight: 700; font-size: 20px; border: 1.5px solid #a7f3d0; }
+
+  /* Scene 2: leads */
+  table { margin-top: 22px; width: 100%; border-collapse: collapse; font-size: 18px; }
+  th { text-align: left; font-size: 14px; color: var(--muted); font-weight: 600; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  td.co { font-weight: 650; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 12px; font-size: 15px; font-weight: 650; }
+  .pill.ok { background: #ecfdf5; color: var(--green); }
+  .pill.no { background: #fef2f2; color: var(--red); }
+  tr.drop td.co, tr.drop td.who { text-decoration: line-through; color: #94a3b8; }
+
+  /* Scene 3: sequence email */
+  .mail { margin-top: 18px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px; font-size: 18px; line-height: 1.5; }
+  .mail .meta { font-size: 15px; color: var(--muted); }
+  .mail .subj { font-weight: 700; margin: 4px 0 10px; }
+  .mail .foot { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 14px; color: var(--muted); }
+  .mail .foot u { color: var(--blue); }
+  .steps { display: flex; gap: 10px; margin-top: 16px; }
+  .steps span { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 6px 14px; font-size: 16px; font-weight: 600; color: #334155; background: #fff; }
+
+  /* Scene 4: daily approval + send window */
+  .card { margin-top: 20px; border: 1.5px solid var(--line); background: #fff; border-radius: 14px; padding: 20px 24px; }
+  .card h3 { font-size: 21px; font-weight: 750; letter-spacing: -.01em; }
+  .card p { margin-top: 6px; font-size: 17px; color: var(--muted); }
+  .approve { display: inline-flex; margin-top: 16px; height: 48px; align-items: center; padding: 0 22px; border-radius: 10px; font-weight: 700; font-size: 18px; background: var(--blue); color: #fff; }
+  .approve.done { background: #ecfdf5; color: var(--green); border: 1.5px solid #a7f3d0; }
+  .slots { margin-top: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .slot { border-radius: 10px; padding: 12px 14px; background: #eff6ff; border: 1px solid #bfdbfe; font-size: 16px; }
+  .slot b { display: block; font-size: 20px; color: var(--blue); }
+
+  /* Scene 5: replies */
+  .inbox { margin-top: 18px; list-style: none; }
+  .inbox li { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+  .inbox .from { font-weight: 700; font-size: 18px; }
+  .inbox .snip { grid-column: 1; color: #475569; font-size: 16px; }
+  .inbox .lab { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+  .lab.int { background: #ecfdf5; color: var(--green); }
+  .lab.later { background: #fffbeb; color: #92400e; }
+  .lab.stop { background: #f1f5f9; color: #334155; }
+  .note { margin-top: 16px; font-size: 16px; color: var(--muted); }
+
+  /* Scene 6: calendar */
+  .cal { margin-top: 18px; display: grid; grid-template-columns: 64px repeat(5, 1fr); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; position: relative; height: 340px; }
+  .cal .hd { height: 40px; display: grid; place-items: center; font-size: 15px; font-weight: 650; color: #334155; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); }
+  .cal .hd:first-child { border-left: 0; }
+  .cal .times { position: absolute; left: 0; top: 40px; width: 64px; bottom: 0; }
+  .cal .times span { position: absolute; left: 10px; font-size: 13px; color: #94a3b8; }
+  .cal .col { position: absolute; top: 40px; bottom: 0; border-left: 1px solid var(--line); }
+  .cal .hr { position: absolute; left: 64px; right: 0; height: 1px; background: #f1f5f9; }
+  .ev { position: absolute; border-radius: 8px; background: var(--harvest); color: var(--harvest-ink); padding: 8px 10px; font-size: 14px; font-weight: 700; line-height: 1.25; box-shadow: 0 4px 12px rgba(146,64,14,.18); }
+  .ev small { display: block; font-weight: 550; opacity: .85; }
+
+  .endline { position: absolute; left: 384px; width: 832px; top: 672px; text-align: center; color: #e2e8f0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; opacity: 0; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="grid-bg"></div>
+  <div class="brand"><i></i>LeadPilot</div>
+  <div class="tag">Product animation with sample data</div>
+
+  <ol class="rail" id="rail">
+    <li><span class="dot"></span>Research</li>
+    <li><span class="dot"></span>Leads</li>
+    <li><span class="dot"></span>Sequences</li>
+    <li><span class="dot"></span>Sending</li>
+    <li><span class="dot"></span>Replies</li>
+    <li><span class="dot"></span>Meetings</li>
+  </ol>
+
+  <div class="win">
+    <div class="win-bar"><b></b><b></b><b></b><span id="crumb">New strategy</span></div>
+
+    <!-- 0 Intake -->
+    <section class="scene" id="s0">
+      <h2>Describe what you sell</h2>
+      <p class="sub">A name and a plain-language description is enough to start.</p>
+      <div class="field"><label>What do you sell?</label>
+        <div class="input" id="in1"><span id="t1"></span><span class="caret" id="c1"></span></div></div>
+      <div class="field"><label>Who buys it?</label>
+        <div class="input" id="in2"><span id="t2"></span><span class="caret" id="c2"></span></div></div>
+      <div class="btn" id="go">Create strategy</div>
+    </section>
+
+    <!-- 1 Research -->
+    <section class="scene" id="s1">
+      <h2>Research, once per strategy</h2>
+      <p class="sub">Your market, buyers, competitors, channels and messaging.</p>
+      <ul class="phases" id="phases">
+        <li><span class="tick">&#10003;</span>Ideal client profile</li>
+        <li><span class="tick">&#10003;</span>Market and demand</li>
+        <li><span class="tick">&#10003;</span>Competitors</li>
+        <li><span class="tick">&#10003;</span>Channels</li>
+        <li><span class="tick">&#10003;</span>Messaging</li>
+        <li><span class="tick">&#10003;</span>Go-to-market plan</li>
+      </ul>
+      <div class="bar"><div id="bar"></div></div>
+      <p class="count" id="count">Step 0 of 72</p>
+      <div class="verified" id="ver">&#10003; Strategy verified: 10 of 10 checks passed</div>
+    </section>
+
+    <!-- 2 Leads -->
+    <section class="scene" id="s2">
+      <h2>Business contacts, checked</h2>
+      <p class="sub">Every email address is verified. Undeliverable ones are removed.</p>
+      <table>
+        <thead><tr><th>Company</th><th>Contact</th><th>Email</th></tr></thead>
+        <tbody id="rows">
+          <tr><td class="co">Acme Fire Protection</td><td class="who">Dana Reyes, Owner</td><td><span class="pill ok">&#10003; Verified</span></td></tr>
+          <tr><td class="co">Northwind Sprinkler Co.</td><td class="who">Sam Patel, GM</td><td><span class="pill ok">&#10003; Verified</span></td></tr>
+          <tr class="drop"><td class="co">Example Alarm Services</td><td class="who">Lee Chen, Owner</td><td><span class="pill no">Undeliverable, removed</span></td></tr>
+          <tr><td class="co">Summit Safety Systems</td><td class="who">Jo Kim, Ops Lead</td><td><span class="pill ok">&#10003; Verified</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 3 Sequences -->
+    <section class="scene" id="s3">
+      <h2>Written for one person</h2>
+      <p class="sub">Each email is written when it is sent, from what LeadPilot stored about them.</p>
+      <div class="steps" id="steps"><span>Step 1, day 0</span><span>Step 2, day 4</span><span>Step 3, day 9</span></div>
+      <div class="mail">
+        <div class="meta">To: Dana Reyes, Acme Fire Protection</div>
+        <div class="subj" id="subj">Inspection season at Acme</div>
+        <div id="body"></div>
+        <div class="foot" id="foot">Sample Agency LLC, 100 Example St. Don't want these emails? <u>Unsubscribe instantly</u></div>
+      </div>
+    </section>
+
+    <!-- 4 Sending -->
+    <section class="scene" id="s4">
+      <h2>You approve today's sending</h2>
+      <p class="sub">Automatic sends wait until the owner says yes, once a day.</p>
+      <div class="card">
+        <h3>Automatic sending today</h3>
+        <p>Email steps are ready. Nothing goes out until you approve.</p>
+        <div class="approve" id="appr">Approve today's email</div>
+      </div>
+      <div class="slots" id="slots">
+        <div class="slot"><b>9:40 AM</b>Dana, Eastern time</div>
+        <div class="slot"><b>10:15 AM</b>Sam, Central time</div>
+        <div class="slot"><b>11:05 AM</b>Jo, Pacific time</div>
+      </div>
+      <p class="note" id="sendnote">Sent inside business hours in each prospect's time zone.</p>
+    </section>
+
+    <!-- 5 Replies -->
+    <section class="scene" id="s5">
+      <h2>Replies come to you</h2>
+      <p class="sub">Each reply is sorted and the sequence stops. You write the answer.</p>
+      <ul class="inbox" id="inbox">
+        <li><span class="from">Dana Reyes</span><span class="snip">"Sounds useful. Can we talk Thursday?"</span><span class="pill lab int">Interested</span></li>
+        <li><span class="from">Sam Patel</span><span class="snip">"Not now, try us after the new year."</span><span class="pill lab later">Not now, return visit set</span></li>
+        <li><span class="from">Jo Kim</span><span class="snip">"Please take me off your list."</span><span class="pill lab stop">Unsubscribed everywhere</span></li>
+      </ul>
+      <p class="note" id="repnote">Sequences stop on a reply. An unsubscribe suppresses the person on every channel.</p>
+    </section>
+
+    <!-- 6 Meetings -->
+    <section class="scene" id="s6">
+      <h2>Meetings on your calendar</h2>
+      <p class="sub">Prospects book on your LeadPilot booking page.</p>
+      <div class="cal" id="cal">
+        <div class="hd"></div><div class="hd">Mon</div><div class="hd">Tue</div><div class="hd">Wed</div><div class="hd">Thu</div><div class="hd">Fri</div>
+        <div class="times"><span style="top:12px">9 AM</span><span style="top:87px">11 AM</span><span style="top:162px">1 PM</span><span style="top:237px">3 PM</span></div>
+        <div class="col" style="left:calc(64px + 1*(100% - 64px)/5)"></div><div class="col" style="left:calc(64px + 2*(100% - 64px)/5)"></div><div class="col" style="left:calc(64px + 3*(100% - 64px)/5)"></div><div class="col" style="left:calc(64px + 4*(100% - 64px)/5)"></div>
+        <div class="col" style="left:64px"></div><div class="hr" style="top:115px"></div><div class="hr" style="top:190px"></div><div class="hr" style="top:265px"></div>
+        <div class="ev" id="e1" style="left:calc(64px + 3*(100% - 64px)/5 + 6px); width:calc((100% - 64px)/5 - 12px); top:84px; height:64px">Intro call<small>Acme Fire Protection</small></div>
+        <div class="ev" id="e2" style="left:calc(64px + 1*(100% - 64px)/5 + 6px); width:calc((100% - 64px)/5 - 12px); top:160px; height:64px">Intro call<small>Sample Builders</small></div>
+        <div class="ev" id="e3" style="left:calc(64px + 4*(100% - 64px)/5 + 6px); width:calc((100% - 64px)/5 - 12px); top:236px; height:64px">Intro call<small>Example Facilities</small></div>
+      </div>
+    </section>
+  </div>
+  <p class="endline" id="endline">From what you sell to meetings on your calendar.</p>
+</div>
+
+<script>
+  // ── timeline (seconds) ───────────────────────────────────────────────
+  const SCENES = [
+    { id: "s0", from: 0.0,  to: 3.6,  crumb: "New strategy",          rail: -1 },
+    { id: "s1", from: 3.6,  to: 7.4,  crumb: "Strategy research",     rail: 0 },
+    { id: "s2", from: 7.4,  to: 11.0, crumb: "Leads",                 rail: 1 },
+    { id: "s3", from: 11.0, to: 14.8, crumb: "Sequences",             rail: 2 },
+    { id: "s4", from: 14.8, to: 18.6, crumb: "Daily send approval",   rail: 3 },
+    { id: "s5", from: 18.6, to: 22.2, crumb: "Inbox",                 rail: 4 },
+    { id: "s6", from: 22.2, to: 26.0, crumb: "Calendar",              rail: 5 },
+  ];
+  window.DURATION = 26.0;
+  const FADE = 0.35;
+
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);
+  const p = (t, a, b) => ease((t - a) / (b - a));         // eased 0..1 progress
+  const $ = (id) => document.getElementById(id);
+  function show(el, k, dy = 14) {
+    el.style.opacity = k;
+    el.style.transform = `translateY(${(1 - k) * dy}px)`;
+  }
+  function typed(text, k) { return text.slice(0, Math.round(text.length * clamp(k))); }
+
+  const BODY = [
+    "Hi Dana,",
+    "Spring inspections usually fill your team's calendar. We run local",
+    "search audits for fire protection companies, so the jobs you want",
+    "find you first. Worth a 15-minute look?",
+  ];
+
+  window.render = function render(t) {
+    // scenes cross-fade
+    for (const s of SCENES) {
+      const el = $(s.id);
+      const kin = p(t, s.from, s.from + FADE);
+      const kout = s.to >= window.DURATION ? 1 : 1 - p(t, s.to - FADE, s.to);
+      const k = t < s.from || t > s.to ? 0 : Math.min(kin, kout);
+      el.style.opacity = k;
+      el.style.transform = `translateY(${(1 - kin) * 10}px)`;
+    }
+    const cur = SCENES.find((s) => t >= s.from && t < s.to) || SCENES[SCENES.length - 1];
+    $("crumb").textContent = cur.crumb;
+    [...$("rail").children].forEach((li, i) => {
+      li.className = i < cur.rail ? "done" : i === cur.rail ? "now" : "";
+    });
+
+    // s0 intake typing
+    const a = "Local SEO audits", b = "Fire protection companies";
+    $("t1").textContent = typed(a, (t - 0.4) / 1.1);
+    $("t2").textContent = typed(b, (t - 1.6) / 1.2);
+    const on1 = t < 1.6, blink = Math.floor(t * 2.4) % 2 === 0;
+    $("c1").style.opacity = on1 && blink ? 1 : 0;
+    $("c2").style.opacity = !on1 && t < 3.0 && blink ? 1 : 0;
+    $("in1").className = "input" + (on1 ? " focus" : "");
+    $("in2").className = "input" + (!on1 && t < 3.0 ? " focus" : "");
+    $("go").style.background = t > 3.0 ? "#1e40af" : "";
+    $("go").style.transform = t > 3.0 && t < 3.25 ? "scale(.97)" : "";
+
+    // s1 research
+    const rk = p(t, 3.9, 6.3);
+    $("bar").style.width = (rk * 100).toFixed(1) + "%";
+    $("count").textContent = `Step ${Math.round(rk * 72)} of 72`;
+    [...$("phases").children].forEach((li, i) => {
+      li.className = rk >= (i + 1) / 6 - 0.001 ? "ok" : "";
+    });
+    show($("ver"), p(t, 6.3, 6.7));
+
+    // s2 leads
+    [...$("rows").children].forEach((tr, i) => {
+      const k = p(t, 7.8 + i * 0.45, 8.2 + i * 0.45);
+      tr.style.opacity = k;
+    });
+    const drop = $("rows").children[2];
+    drop.className = t > 9.9 ? "drop" : "";
+    drop.querySelector(".pill").style.opacity = t > 9.6 ? 1 : 0;
+
+    // s3 sequence: the email writes itself line by line
+    show($("steps"), p(t, 11.3, 11.7), 8);
+    const lines = BODY.map((line, i) => typed(line, (t - (11.8 + i * 0.55)) / 0.5));
+    $("body").innerHTML = lines.map((l) => `<div>${l || "&nbsp;"}</div>`).join("");
+    show($("foot"), p(t, 14.0, 14.3), 6);
+
+    // s4 approval
+    const approved = t > 16.4;
+    $("appr").className = "approve" + (approved ? " done" : "");
+    $("appr").textContent = approved ? "✓ Approved for today" : "Approve today's email";
+    $("appr").style.transform = t > 16.15 && t < 16.4 ? "scale(.97)" : "";
+    [...$("slots").children].forEach((el, i) => show(el, p(t, 16.7 + i * 0.25, 17.1 + i * 0.25), 10));
+    show($("sendnote"), p(t, 17.6, 17.9), 6);
+
+    // s5 replies
+    [...$("inbox").children].forEach((li, i) => show(li, p(t, 19.0 + i * 0.6, 19.4 + i * 0.6), 10));
+    show($("repnote"), p(t, 21.0, 21.3), 6);
+
+    // s6 calendar fills
+    ["e1", "e2", "e3"].forEach((id, i) => {
+      const k = p(t, 22.8 + i * 0.5, 23.2 + i * 0.5);
+      $(id).style.opacity = k;
+      $(id).style.transform = `scale(${0.9 + 0.1 * k})`;
+    });
+    show($("endline"), p(t, 24.6, 25.0), 8);
+  };
+  window.render(0);
+</script>
+</body>
+</html>

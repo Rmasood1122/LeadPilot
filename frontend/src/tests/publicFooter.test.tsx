@@ -1,9 +1,11 @@
 /**
  * One shared footer on every public page (platform-gaps item 6), so the Legal
  * links and the Status link (when live) cannot drift between pages. /pricing
- * had its own page with no footer at all. The home page (src/app/page.tsx) is
- * not in the list: it renders nothing and only redirects (to /login, the
- * dashboard or /check-email), so a footer there would only flash.
+ * had its own page with no footer at all. The home page (src/app/page.tsx)
+ * became a real page on 2026-10-11 (founder request): its body lives in
+ * src/components/home/HomePage.tsx, which renders the same Footer. In the
+ * Android app and an installed PWA "/" still renders nothing and only routes
+ * (src/tests/homeEntry.test.ts, src/tests/homePage.test.tsx).
  */
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
@@ -19,6 +21,7 @@ const PUBLIC_PAGES = [
   "src/app/privacy/page.tsx",
   "src/app/terms/page.tsx",
   "src/app/pricing/page.tsx",
+  "src/components/home/HomePage.tsx",
 ];
 
 describe("shared public footer", () => {
@@ -30,10 +33,13 @@ describe("shared public footer", () => {
     });
   }
 
-  it("the home page is a redirect, not a page with content", () => {
+  it("the home page renders the home page body behind the app-shell gate", () => {
     const src = readFileSync("src/app/page.tsx", "utf8");
-    expect(src).toContain("router.replace");
-    expect(src).toMatch(/return null;/);
+    expect(src).toMatch(/<HomeGate>\s*<HomePage \/>\s*<\/HomeGate>/);
+    // in the app shell the gate renders nothing and routes (old behaviour)
+    const gate = readFileSync("src/components/home/HomeGate.tsx", "utf8");
+    expect(gate).toContain("router.replace");
+    expect(gate).toMatch(/if \(mode === "app"\) return null;/);
   });
 
   it("the theme tone keeps the legal links and the status link", () => {

@@ -61,3 +61,107 @@ body {
   .print-doc { max-width: none !important; padding: 0 !important; }
   body { background: white !important; color: black !important; }
 }
+
+/* ── Public home page (src/components/home) ──────────────────────────────
+   Fixed marketing palette, like the other public pages: ink #0f172a,
+   paper #f8fafc, blue #1d4ed8, teal #0e7490, harvest #f2b544. */
+
+/* The Android app and an installed PWA load "/" too: hide the marketing
+   markup before hydration (APP_SHELL_SCRIPT in src/lib/homeEntry.ts). */
+html[data-app-shell] .lp-home { display: none !important; }
+
+.lp-home [role="tabpanel"][hidden] { display: none !important; }
+
+.lp-skip {
+  position: absolute; left: 1rem; top: -4rem; z-index: 60;
+  background: #fff; color: #0f172a; padding: .6rem 1rem; border-radius: .5rem; font-weight: 600;
+}
+.lp-skip:focus { top: 1rem; }
+
+.lp-home :focus-visible { outline: 3px solid #f2b544; outline-offset: 3px; border-radius: 6px; }
+
+.lp-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, .08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, .08) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+
+.lp-h2 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); line-height: 1.08; font-weight: 800; letter-spacing: -.028em; }
+
+.lp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  height: 2.5rem; padding: 0 1rem; border-radius: .6rem; font-weight: 600; font-size: .95rem;
+  transition: background-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
+  white-space: nowrap;
+}
+.lp-btn-lg { height: 3rem; padding: 0 1.4rem; font-size: 1rem; }
+.lp-btn-primary { background: #1d4ed8; color: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.15) inset; }
+.lp-btn-primary:hover { background: #1e40af; }
+.lp-btn-ghost { color: #fff; box-shadow: inset 0 0 0 1.5px rgba(226,232,240,.4); }
+.lp-btn-ghost:hover { box-shadow: inset 0 0 0 1.5px #fff; background: rgba(255,255,255,.06); }
+.lp-btn-dark { background: #0f172a; color: #fff; }
+.lp-btn-dark:hover { background: #1e293b; }
+.lp-btn:active { transform: translateY(1px); }
+
+.lp-chip {
+  display: inline-flex; align-items: center; gap: .4rem; height: 2rem; padding: 0 .75rem;
+  border-radius: 999px; font-weight: 600; color: #fff; box-shadow: inset 0 0 0 1px rgba(226,232,240,.35);
+}
+.lp-chip:hover { background: rgba(255,255,255,.08); }
+.lp-chip[aria-pressed="false"] { color: #94a3b8; }
+
+.lp-video-frame { box-shadow: 0 30px 80px -20px rgba(2, 6, 23, .7); }
+.lp-video-frame video::cue { font-family: var(--font-family), system-ui, sans-serif; font-size: .95rem; }
+.lp-transcript summary::-webkit-details-marker { display: none; }
+
+/* Stage tabs: a vertical timeline on desktop, a chip row on phones. */
+.lp-stage-tab { color: #475569; }
+.lp-stage-tab:hover { color: #0f172a; }
+.lp-stage-tab[data-state="active"] { color: #0f172a; background: #fff; box-shadow: inset 0 0 0 1px #e2e8f0; }
+.lp-stage-dot {
+  display: grid; place-items: center; width: 1.1rem; height: 1.1rem; border-radius: 999px;
+  border: 2px solid #94a3b8; background: #f8fafc; color: #fff; flex-shrink: 0; position: relative; z-index: 1;
+}
+.lp-stage-tab[data-state="done"] .lp-stage-dot { background: #0e7490; border-color: #0e7490; }
+.lp-stage-tab[data-state="active"] .lp-stage-dot { background: #f2b544; border-color: #f2b544; box-shadow: 0 0 0 5px rgba(242,181,68,.25); }
+@media (min-width: 1024px) {
+  .lp-stage-tab[data-state="active"] { background: transparent; box-shadow: none; }
+  .lp-stage-tab:not(:last-child)::after {
+    content: ""; position: absolute; left: calc(.55rem - 1px); top: calc(50% + .55rem); height: calc(100% - 1.1rem);
+    width: 2px; background: #cbd5e1;
+  }
+  .lp-stage-tab[data-state="done"]::after { background: #0e7490; }
+}
+.lp-stage-tabs { scrollbar-width: none; }
+.lp-stage-tabs::-webkit-scrollbar { display: none; }
+
+.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-faq-mark { position: relative; width: 14px; height: 14px; flex-shrink: 0; }
+.lp-faq-mark::before, .lp-faq-mark::after {
+  content: ""; position: absolute; left: 0; top: 6px; width: 14px; height: 2px; background: #0f172a; border-radius: 2px;
+  transition: transform .2s ease;
+}
+.lp-faq-mark::after { transform: rotate(90deg); }
+.lp-faq[open] .lp-faq-mark::after { transform: rotate(0deg); }
+.lp-faq summary:hover { color: #1d4ed8; }
+
+.lp-menu summary::-webkit-details-marker { display: none; }
+
+/* Motion: one orchestrated entrance for the hero, a reveal for sections that
+   scroll in (Reveal.tsx sets data-reveal only after hydration), and the stage
+   panel easing in after a choice. All of it off for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html:has(.lp-home) { scroll-behavior: smooth; }
+  .lp-intro { animation: lp-rise .7s cubic-bezier(.2, .7, .2, 1) both; }
+  .lp-intro-late { animation-delay: .15s; }
+  .lp-home [data-reveal] { transition: opacity .6s ease, transform .6s cubic-bezier(.2, .7, .2, 1); }
+  .lp-home [data-reveal="pending"] { opacity: 0; transform: translateY(16px); }
+  .lp-panel-in { animation: lp-panel .35s ease both; }
+  .lp-btn:hover { transform: translateY(-1px); }
+}
+@keyframes lp-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes lp-panel { from { opacity: 0; transform: translateX(8px); } to { opacity: 1; transform: none; } }
+.lp-auth :focus-visible { outline: 3px solid #f2b544; outline-offset: 3px; }
