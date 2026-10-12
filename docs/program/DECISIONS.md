@@ -17,7 +17,16 @@ Help-center articles and specs may cite this file as a source.
 | D6 | Status page data (UptimeRobot key, DNS) | — | — | **Unanswered.** Blocks Phase 3. |
 | GH-PRO | Buy GitHub Pro | **No**, 2026-10-10 | 2026-10-10 | Will not be purchased. The Layer 4 ruleset (`STAR_PROMPT.md` §A.3: `ruleset_master.json`, `apply_ruleset.sh`, required status checks and approvals on `master`) is **dropped**. Phase 1 will use a replacement design the founders supply in the next session. Actions budget stays at 2,000 min/month (Free); see `BASELINE.md` §11.2. |
 | P0-D | Deployment model | **Self-hosted, single-tenant**, 2026-10-04 | 2026-10-10 | See below. |
-| P0-5-CAPS | Daily AI spend cap per plan (USD per UTC day) | — | — | **Unanswered.** `app/core/plans.py` ships placeholders so no plan is unlimited: free 10, starter 25, growth 60, pay_per_meeting 60, scale 150, pro 150, enterprise 400. Founders confirm or replace the numbers, and say whether a monthly cap is wanted as well (`BASELINE.md` §12 item 3 proposed monthly). Detail: `plans/p0-5-account-spend-cap.md`. |
+| P0-5-CAPS | Daily AI spend cap per plan (USD per UTC day) | **Keep the shipped numbers**, 2026-10-11 | 2026-10-11 | Founder chose the recommended option: free 10, starter 25, growth 60, pay_per_meeting 60, scale 150, pro 150, enterprise 400 (`app/core/plans.py`). No separate monthly plan cap: the customer-set monthly cap is F07 Spend Guard (`docs/features/f07-spend-guard.md`). |
+| PLAN-PRO | Legacy Pro plan channels | **All four channels**, 2026-10-11 | 2026-10-11 | Founder chose the recommended option: legacy Pro keeps email, LinkedIn, WhatsApp and phone (what it always had in practice; `docs/program/plans/plan-enforcement.md`). |
+| ANNUAL-PRICE | Annual plan price | **Monthly × 10**, 2026-10-11 | 2026-10-11 | Founder chose the recommended option (`ANNUAL_MONTHS_CHARGED = 10`, "2 months free"). The offer is switched on at runtime by an admin in System Settings (`annual_billing_enabled`); the code default stays off because the sealed `tests/test_annual_billing.py` pins it. |
+| AB-BACKFILL | Run `scripts/backfill_outcome_attribution.py --apply` | **No (not run)**, 2026-10-11 | 2026-10-11 | Founder chose the recommended option. A/B auto-promotion stays off (`ab_auto_promotion_enabled`): promotion markers are permanent and step variants are not randomised arms. |
+| PHONE-VERIFY | Production phone verification | **`REQUIRE_PHONE_VERIFICATION=false`**, 2026-10-11 | 2026-10-11 | Set by the founder on Render; Twilio is not configured, so a code could not be delivered. |
+| LINKEDIN-AUTO | Automatic LinkedIn sending | **Daily per-channel approval with risk acknowledgement**, 2026-10-11 | 2026-10-11 | Owner approves automatic sending once per day per channel; LinkedIn needs an explicit "may restrict your account, proceed?" acknowledgement; email + push + in-app banner (`docs/features/daily-send-approval.md`). |
+| PILOT-TRIAL | Pilot vs. trial | **Add an annual plan; a trial never ends inside an active pilot**, 2026-10-11 | 2026-10-11 | `docs/features/annual-billing.md`. |
+| F04-STRICT | Answering an earlier reply | **User decides**, 2026-10-11 | 2026-10-11 | Per-account `answer_earlier_replies` setting (default = previous behaviour). |
+| AUTOPILOT | Sending after research | **Autopilot, opt-in per strategy**, 2026-10-12 | 2026-10-12 | Founder: "when the pipeline is done it doesn't send; fix it; send at the best time". Autopilot enrolls only the leads it sourced, schedules at the best local time, keeps daily approval and every compliance gate; lawful-basis confirmation required (`docs/features/autopilot-launch.md`). |
+| LOCAL-BIZ | Restaurants, clinics, shops | **Local B2B prospecting + consent-only win-back**, 2026-10-12 | 2026-10-12 | No consumer cold outreach (TCPA/GDPR/CASL); healthcare patient lists refused (HIPAA). Win-back stays off until counsel confirms (`docs/features/local-business-mode.md`). |
 | FEATURE-SPECS | Feature specs and code ship together | **Same PR**, 2026-10-10 | 2026-10-10 | A feature's spec (`docs/features/*.md` or equivalent) and its code change land in the same PR, so the spec always describes merged behaviour. Founders review the spec and code together at merge (post-merge review under MERGE-B). |
 | AUTHOR | Commit author identity | **`Ahmad317-Engineer <devsahmad37@gmail.com>`**, 2026-10-10 | 2026-10-10 | New commits are authored as `Ahmad317-Engineer <devsahmad37@gmail.com>`. Existing open PRs are **not** rewritten to change their author. |
 
@@ -41,7 +50,9 @@ The decision is **not enforced by the code today**. `POST /auth/signup`
 deployment that leaves sign-up open is multi-tenant in practice, and the HIGH
 ratings return for it. Tracked as **P0-D-ENF** in `BASELINE.md`.
 
-**P0-D-ENF — unanswered decision.** The switch now exists (`SIGNUP_ENABLED`,
+**P0-D-ENF — decided 2026-10-11: sign-up stays OPEN** (founder chose the recommended option), with email verification required (`REQUIRE_EMAIL_VERIFICATION=true`, the default). Because sign-up is open, the deployment is multi-tenant in practice: the HIGH ratings above apply, and every query on tenant-owned rows needs an owner filter (CLAUDE.md). Original note, kept for history:
+
+**P0-D-ENF — was an unanswered decision.** The switch now exists (`SIGNUP_ENABLED`,
 `SIGNUP_ALLOWED_EMAIL_DOMAINS`; the defaults keep sign-up open to anyone).
 Founders choose per deployment: closed, limited to the customer's own email
 domains, or open (then the HIGH ratings above apply to it). Detail:

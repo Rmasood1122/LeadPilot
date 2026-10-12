@@ -23,7 +23,7 @@ const STEPS = [
   {
     number: "02",
     title: "Outreach",
-    body: "Personalised emails and LinkedIn messages, written in your voice when you add writing samples. Sequences send automatically from the Gmail and LinkedIn accounts you connect, only during permitted sending hours in the prospect's own time zone and within daily sending limits. Opt-outs are re-checked immediately before every send. By default, messages to senior decision-makers, to prospects whose last reply was an objection, or whose copy trips our tone checks are held for your approval before they go. A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call.",
+    body: "Personalised emails and LinkedIn messages, written in your voice when you add writing samples. Sequences send automatically from the Gmail and LinkedIn accounts you connect once you approve that day's automatic sending, only during permitted sending hours in the prospect's own time zone and within daily sending limits. Opt-outs are re-checked immediately before every send. By default, messages to senior decision-makers, to prospects whose last reply was an objection, or whose copy trips our tone checks are held for your approval before they go. A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call.",
   },
   {
     number: "03",
