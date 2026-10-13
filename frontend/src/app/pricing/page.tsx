@@ -47,6 +47,21 @@ function PricingIntro() {
 
 function StaticPlanList() {
   const plans = staticPlans();
+  const namesOnly = [...plans.monthly, plans.payPerMeeting].every((p) => p.features.length === 0);
+  if (namesOnly) {
+    // No snapshot yet (see src/lib/seo/staticPlans.ts): one compact card of names.
+    return (
+      <section aria-labelledby="static-plans" className="mx-auto mb-8 max-w-2xl rounded-xl border border-border bg-card p-6">
+        <h2 id="static-plans" className="text-xl font-semibold">Plans</h2>
+        <p className="mt-3 text-sm">
+          <span className="font-semibold">Monthly subscription:</span> {plans.monthly.map((p) => p.name).join(", ")}
+        </p>
+        <p className="mt-1 text-sm">
+          <span className="font-semibold">Or:</span> {plans.payPerMeeting.name}
+        </p>
+      </section>
+    );
+  }
   return (
     <div className="mx-auto mb-8 grid max-w-4xl gap-6 md:grid-cols-[1.6fr_1fr]">
       <section aria-labelledby="static-monthly" className="rounded-xl border border-border bg-card p-6">
