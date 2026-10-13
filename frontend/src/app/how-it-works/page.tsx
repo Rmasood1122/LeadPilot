@@ -9,6 +9,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
   title: "How LeadPilot by Calendarharvest works | Calendarharvest",
@@ -37,6 +39,7 @@ const STEPS = [
 export default function HowItWorksPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <JsonLd data={pageGraph({ path: "/how-it-works/", breadcrumb: "How it Works" })} />
       <SiteNav />
 
       <main>

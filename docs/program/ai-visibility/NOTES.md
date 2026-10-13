@@ -58,3 +58,10 @@
 - Titles: literal per page (approved), all contain "LeadPilot by Calendarharvest" and end "| Calendarharvest"; /pricing got a title and description.
 - Checks added: title has full product name; JSON-LD sameAs / Person values from the facts file; JSON-LD prices from plans-snapshot.json.
 - Next: 2.4.
+
+## 2.4 done
+- src/lib/seo/structuredData.ts + src/components/seo/JsonLd.tsx; one @graph per page.
+- Organization (Calendarharvest, footer) + WebSite on all 7; SoftwareApplication (name "LeadPilot by Calendarharvest", BusinessApplication, "Web, Android", no offers) on / and /pricing; FAQPage on / and /contact (visible FAQs); BreadcrumbList LeadPilot → nav/footer label on subpages; Person (Rehan Masood) on /about only.
+- check_static_seo.mjs: PASS (7 URLs) after 2.4.
+- Depends on 2.5: "Astoria, New York" must become visible on /about, and the facts description must be visible on / and /pricing.
+- Next: 2.5.

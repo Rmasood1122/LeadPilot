@@ -9,6 +9,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
   title: "Terms of Service for LeadPilot by Calendarharvest | Calendarharvest",
@@ -22,6 +24,7 @@ const EMAIL = "ahmadshahid@calendarharvest.com";
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <JsonLd data={pageGraph({ path: "/terms/", breadcrumb: "Terms of Service" })} />
       <SiteNav />
 
       <main className="px-6 py-24">

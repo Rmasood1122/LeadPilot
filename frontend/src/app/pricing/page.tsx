@@ -11,9 +11,11 @@ import type { Metadata } from "next";
 
 import planNames from "@/content/plan-names.json";
 import { Footer } from "@/components/Footer";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { staticPlans, type StaticPlan } from "@/lib/seo/staticPlans";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 import { PricingClient } from "./PricingClient";
 
@@ -26,7 +28,12 @@ export const metadata: Metadata = {
 };
 
 export default function PricingPage() {
-  return <PricingClient footer={<Footer tone="theme" />} staticPlans={<StaticPlanList />} />;
+  return (
+    <>
+      <JsonLd data={pageGraph({ path: "/pricing/", breadcrumb: "Pricing", software: true })} />
+      <PricingClient footer={<Footer tone="theme" />} staticPlans={<StaticPlanList />} />
+    </>
+  );
 }
 
 function StaticPlanList() {
