@@ -87,3 +87,10 @@
 - Founder command after deploy: cd frontend && node scripts/seo/indexnow_submit.mjs
 - check_static_seo.mjs: key file must be in the export and contain the key.
 - Next: 2.9.
+
+## 2.9 done
+- Clone was shallow → `git fetch --unshallow origin` (now false).
+- scripts/seo/lastmod.mjs → src/content/sitemap-lastmod.json (git commit dates of each page's `sources` in site-pages.json); sitemap.ts reads it. Refuses a shallow clone or uncommitted page sources.
+- check_static_seo.mjs: every sitemap URL needs an entry, and its <lastmod> must equal it.
+- Founder step: after any page change run `cd frontend && node scripts/seo/lastmod.mjs` and commit its JSON on the same branch before merge; after the deploy run the IndexNow command.
+- Next: Phase 3 on Part A. Part B is next-session work (trademark not reviewed).

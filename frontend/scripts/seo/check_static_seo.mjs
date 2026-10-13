@@ -261,6 +261,9 @@ function main() {
     });
   }
 
+  // ---------- 2.9: lastmod from git for every sitemap URL ----------
+  checkLastmod(sitemapXml);
+
   // ---------- 2.8: IndexNow key file ----------
   checkIndexNowKey();
 
@@ -326,6 +329,26 @@ function checkFactsInJsonLd(where, nodes) {
     Object.values(value).forEach(visit);
   };
   visit(nodes);
+}
+
+function checkLastmod(sitemapXml) {
+  const file = path.join(FRONTEND, 'src', 'content', 'sitemap-lastmod.json');
+  const dates = fs.existsSync(file) ? readJson(file) : {};
+  if (!fs.existsSync(file)) fail('sitemap-lastmod.json', 'missing; run node scripts/seo/lastmod.mjs');
+  for (const m of sitemapXml.matchAll(/<url>([\s\S]*?)<\/url>/g)) {
+    const loc = m[1].match(/<loc>\s*([^<\s]+)\s*<\/loc>/)?.[1];
+    if (!loc) continue;
+    let urlPath;
+    try {
+      urlPath = new URL(loc).pathname;
+    } catch {
+      continue;
+    }
+    if (!dates[urlPath]) fail(loc, 'no entry in sitemap-lastmod.json (run node scripts/seo/lastmod.mjs)');
+    const lm = m[1].match(/<lastmod>\s*([^<\s]+)\s*<\/lastmod>/)?.[1];
+    if (!lm) fail(loc, 'sitemap entry has no <lastmod>');
+    else if (dates[urlPath] && lm !== dates[urlPath]) fail(loc, `sitemap <lastmod> ${lm} is not the git date ${dates[urlPath]}`);
+  }
 }
 
 function checkIndexNowKey() {
