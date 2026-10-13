@@ -261,6 +261,9 @@ function main() {
     });
   }
 
+  // ---------- 2.8: IndexNow key file ----------
+  checkIndexNowKey();
+
   // ---------- pricing page: plan names ----------
   checkPlans(rows);
 
@@ -323,6 +326,13 @@ function checkFactsInJsonLd(where, nodes) {
     Object.values(value).forEach(visit);
   };
   visit(nodes);
+}
+
+function checkIndexNowKey() {
+  const { key } = readJson(path.join(HERE, 'indexnow.json'));
+  const keyFile = path.join(OUT, `${key}.txt`);
+  if (!fs.existsSync(keyFile)) fail('IndexNow', `key file ${key}.txt missing from the export`);
+  else if (fs.readFileSync(keyFile, 'utf8').trim() !== key) fail('IndexNow', `${key}.txt does not contain the key`);
 }
 
 function readJson(file) {

@@ -81,3 +81,9 @@
 - DECISIONS.md D1: appended the 2026-10-13 founder answer (email automatic; LinkedIn not live).
 - Kept (founder questions): /about H1 + meta "used it to find his own clients"; /how-it-works H1 "Your pipeline. Running without you."; /contact "done-with-you system" and "a pipeline that runs without you in it".
 - Next: 2.8.
+
+## 2.8 done
+- Key 99b0961bddf18b9b8d31299dc0962e3b: frontend/public/<key>.txt + scripts/seo/indexnow.json; scripts/seo/indexnow_submit.mjs (--sitemap, --dry-run); state in scripts/seo/.indexnow-state.json (gitignored). IndexNow API NOT called.
+- Founder command after deploy: cd frontend && node scripts/seo/indexnow_submit.mjs
+- check_static_seo.mjs: key file must be in the export and contain the key.
+- Next: 2.9.
