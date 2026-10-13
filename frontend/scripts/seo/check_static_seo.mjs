@@ -7,6 +7,7 @@
 //
 //   node scripts/seo/check_static_seo.mjs            # from frontend/, after `npm run build`
 //   node scripts/seo/check_static_seo.mjs --out out --report   # also print a per-URL table
+//   npm run build   # runs it as the postbuild hook (--postbuild: website builds only)
 //
 // Spec: docs/program/ai-visibility/SPEC.md (items 1.2, 2.3, 2.8, 2.9).
 // Checks may be added; never remove or weaken one.
@@ -154,6 +155,15 @@ function fileForPath(urlPath) {
 }
 
 function main() {
+  // As the npm postbuild hook, check website builds only. A mobile build
+  // (NEXT_PUBLIC_BUILD_TARGET=mobile-dev|mobile-prod, the Android app) renders
+  // no marketing markup on "/" by design (src/lib/homeEntry.ts) and is never
+  // deployed as the website. Run directly, the check always runs.
+  const target = process.env.NEXT_PUBLIC_BUILD_TARGET ?? 'web';
+  if (args.includes('--postbuild') && target.startsWith('mobile')) {
+    console.log(`check_static_seo: skipped for NEXT_PUBLIC_BUILD_TARGET=${target} (not the website build)`);
+    return;
+  }
   if (!fs.existsSync(OUT)) {
     console.error(`No export found at ${OUT}. Run \`npm run build\` first.`);
     process.exit(2);
