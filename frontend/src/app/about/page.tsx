@@ -12,7 +12,7 @@ import { Footer } from "@/components/Footer";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
-  title: "About LeadPilot Enterprise | Calendarharvest",
+  title: "About LeadPilot by Calendarharvest | Calendarharvest",
   description:
     "LeadPilot Enterprise was built by a founder who used it to find his own clients. Here is the story.",
   ...canonicalMeta("/about/"),

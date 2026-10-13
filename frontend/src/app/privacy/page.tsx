@@ -26,7 +26,7 @@ import { Footer } from "@/components/Footer";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Calendarharvest",
+  title: "Privacy Policy for LeadPilot by Calendarharvest | Calendarharvest",
   description: "How LeadPilot Enterprise collects, uses, and protects your data.",
   robots: "index, follow",
   ...canonicalMeta("/privacy/"),

@@ -41,6 +41,12 @@ const argValue = (name) => {
 const OUT = path.resolve(process.cwd(), argValue('--out') ?? path.join(FRONTEND, 'out'));
 const REPORT = args.includes('--report');
 
+// 2.3: the one source of product facts.
+const FACTS_FILE = path.join(FRONTEND, 'src', 'content', 'product-facts.json');
+const FACTS = JSON.parse(fs.readFileSync(FACTS_FILE, 'utf8'));
+const PRODUCT_FULL_NAME = `${FACTS.brand.product_name} by ${FACTS.brand.company_name}`;
+const SNAPSHOT_FILE = path.join(FRONTEND, 'src', 'content', 'plans-snapshot.json');
+
 const failures = [];
 const fail = (where, msg) => failures.push(`${where}: ${msg}`);
 
@@ -237,6 +243,10 @@ function main() {
 
     if (html.includes('TODO')) fail(where, 'HTML contains the string TODO');
 
+    // 2.3: titles carry the full product name built from the brand constant.
+    if (title && !title.includes(PRODUCT_FULL_NAME)) fail(where, `title lacks "${PRODUCT_FULL_NAME}"`);
+    checkFactsInJsonLd(where, nodes);
+
     const bodyText = (doc.querySelector('main') ?? doc.body)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
     rows.push({
       path: urlPath,
@@ -262,6 +272,57 @@ function main() {
     process.exit(1);
   }
   console.log(`check_static_seo: PASS (${locs.length} sitemap URLs)`);
+}
+
+// 2.3: every sameAs and founder value in JSON-LD comes from the facts file,
+// and every JSON-LD price from the 2.2 plans snapshot.
+function stringLeaves(value, out = []) {
+  if (typeof value === 'string' || typeof value === 'number') out.push(String(value));
+  else if (Array.isArray(value)) value.forEach((v) => stringLeaves(v, out));
+  else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      if (k === '@type' || k === '@id' || k === '@context') continue;
+      stringLeaves(v, out);
+    }
+  }
+  return out;
+}
+
+function snapshotPrices() {
+  if (!fs.existsSync(SNAPSHOT_FILE)) return new Set();
+  const c = readJson(SNAPSHOT_FILE).catalog ?? {};
+  const cents = [
+    ...(c.monthly?.tiers ?? []).map((t) => t.price_cents),
+    ...(c.annual?.tiers ?? []).map((t) => t.annual_price_cents),
+    c.pay_per_meeting?.monthly_fee_cents,
+    c.pay_per_meeting?.price_per_meeting_cents,
+  ].filter((n) => typeof n === 'number');
+  return new Set(cents.flatMap((n) => [String(n / 100), (n / 100).toFixed(2)]));
+}
+
+function checkFactsInJsonLd(where, nodes) {
+  const allowedSameAs = new Set(FACTS.same_as ?? []);
+  const founderValues = new Set(stringLeaves(FACTS.founders ?? []));
+  const prices = snapshotPrices();
+  const visit = (value) => {
+    if (Array.isArray(value)) return value.forEach(visit);
+    if (!value || typeof value !== 'object') return;
+    for (const s of [].concat(value.sameAs ?? [])) {
+      if (!allowedSameAs.has(s)) fail(where, `JSON-LD sameAs ${s} is not in product-facts.json same_as`);
+    }
+    if (typesOf(value).includes('Person')) {
+      for (const leaf of stringLeaves(value)) {
+        if (!founderValues.has(leaf)) fail(where, `JSON-LD Person value "${leaf}" is not a founder fact in product-facts.json`);
+      }
+    }
+    for (const key of ['price', 'lowPrice', 'highPrice']) {
+      if (value[key] !== undefined && !prices.has(String(value[key]))) {
+        fail(where, `JSON-LD ${key} ${value[key]} is not in plans-snapshot.json`);
+      }
+    }
+    Object.values(value).forEach(visit);
+  };
+  visit(nodes);
 }
 
 function readJson(file) {

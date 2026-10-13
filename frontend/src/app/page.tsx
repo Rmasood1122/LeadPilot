@@ -20,7 +20,7 @@ import { APP_SHELL_SCRIPT } from "@/lib/homeEntry";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
-  title: "LeadPilot: from what you sell to meetings on your calendar | Calendarharvest",
+  title: "LeadPilot by Calendarharvest: from what you sell to meetings on your calendar | Calendarharvest",
   description: HOME_DESCRIPTION,
   ...canonicalMeta("/", {
     title: HOME_TITLE,

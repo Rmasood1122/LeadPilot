@@ -50,3 +50,11 @@
 - Stripe checkout not live → no static prices, no offers; TODO(founder) in src/lib/seo/staticPlans.ts.
 - Open: the live-loaded feature bullets (lib/pricing.ts channelList) list "LinkedIn" for Growth+; LinkedIn is not live → handle in 2.5.
 - Next: 2.3.
+
+## 2.3 done
+- frontend/src/content/product-facts.json (beside site-pages.json / plan-names.json; JSON so the .mjs check reads it with no build step) + src/lib/productFacts.ts (PRODUCT_FULL_NAME built from brand.product_name + brand.company_name).
+- Capability statuses from Phase 0 Q3/Q6 and the LinkedIn status answer; off-by-default ones from system_settings.py flag defaults (same list as the home FEATURES).
+- Description unchanged from the spec: every capability it names (research, contacts, writing, sending, booking) is live per Q6.
+- Titles: literal per page (approved), all contain "LeadPilot by Calendarharvest" and end "| Calendarharvest"; /pricing got a title and description.
+- Checks added: title has full product name; JSON-LD sameAs / Person values from the facts file; JSON-LD prices from plans-snapshot.json.
+- Next: 2.4.

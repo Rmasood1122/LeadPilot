@@ -11,7 +11,7 @@ import { Footer } from "@/components/Footer";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
-  title: "How LeadPilot Works | Calendarharvest",
+  title: "How LeadPilot by Calendarharvest works | Calendarharvest",
   description: "LeadPilot builds and runs your outbound pipeline. Here is exactly how it works.",
   ...canonicalMeta("/how-it-works/"),
 };

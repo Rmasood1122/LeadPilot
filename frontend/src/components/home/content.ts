@@ -14,7 +14,7 @@
  *   - none of the test's banned promises (see BANNED there) appears here.
  */
 
-export const HOME_TITLE = "LeadPilot: from what you sell to meetings on your calendar | Calendarharvest";
+export const HOME_TITLE = "LeadPilot by Calendarharvest: from what you sell to meetings on your calendar | Calendarharvest";
 export const HOME_DESCRIPTION =
   "Describe what you sell. LeadPilot researches your market, finds and checks business contacts, " +
   "writes each email for one person, sends on a schedule you approve each day, and routes every reply to you.";
