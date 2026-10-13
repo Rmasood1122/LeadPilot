@@ -1,0 +1,311 @@
+#!/usr/bin/env node
+// Static SEO / AI-crawler readiness check for the marketing site.
+//
+// Reads the static export (frontend/out by default) and its sitemap.xml and
+// robots.txt, and exits non-zero when any sitemap URL fails a check. It never
+// makes a network request.
+//
+//   node scripts/seo/check_static_seo.mjs            # from frontend/, after `npm run build`
+//   node scripts/seo/check_static_seo.mjs --out out --report   # also print a per-URL table
+//
+// Spec: docs/program/ai-visibility/SPEC.md (items 1.2, 2.3, 2.8, 2.9).
+// Checks may be added; never remove or weaken one.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { JSDOM } from 'jsdom';
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const FRONTEND = path.resolve(HERE, '..', '..');
+
+const CANONICAL_HOST = 'www.calendarharvest.com';
+const CRAWLERS = [
+  'Googlebot',
+  'Bingbot',
+  'OAI-SearchBot',
+  'Claude-SearchBot',
+  'Claude-User',
+  'PerplexityBot',
+  'Meta-WebIndexer',
+  'Google-Extended',
+];
+const SOFTWARE_APP_PATHS = new Set(['/', '/pricing/']);
+const PRICING_PATH = '/pricing/';
+
+const args = process.argv.slice(2);
+const argValue = (name) => {
+  const i = args.indexOf(name);
+  return i >= 0 ? args[i + 1] : undefined;
+};
+const OUT = path.resolve(process.cwd(), argValue('--out') ?? path.join(FRONTEND, 'out'));
+const REPORT = args.includes('--report');
+
+const failures = [];
+const fail = (where, msg) => failures.push(`${where}: ${msg}`);
+
+// ---------- robots.txt ----------
+
+function parseRobots(text) {
+  // Returns [{agents: [...lowercase], rules: [{allow, path}]}], plus sitemaps.
+  const groups = [];
+  const sitemaps = [];
+  let current = null;
+  let lastWasAgent = false;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    if (!line) continue;
+    const idx = line.indexOf(':');
+    if (idx < 0) continue;
+    const key = line.slice(0, idx).trim().toLowerCase();
+    const value = line.slice(idx + 1).trim();
+    if (key === 'user-agent') {
+      if (!current || !lastWasAgent) {
+        current = { agents: [], rules: [] };
+        groups.push(current);
+      }
+      current.agents.push(value.toLowerCase());
+      lastWasAgent = true;
+      continue;
+    }
+    lastWasAgent = false;
+    if (key === 'sitemap') sitemaps.push(value);
+    else if ((key === 'allow' || key === 'disallow') && current) {
+      current.rules.push({ allow: key === 'allow', path: value });
+    }
+  }
+  return { groups, sitemaps };
+}
+
+function ruleMatches(rulePath, urlPath) {
+  if (rulePath === '') return false; // "Disallow:" with no value allows everything
+  const anchored = rulePath.endsWith('$');
+  const body = anchored ? rulePath.slice(0, -1) : rulePath;
+  const re = new RegExp(
+    '^' + body.split('*').map((s) => s.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*') + (anchored ? '$' : ''),
+  );
+  return re.test(urlPath);
+}
+
+function isDisallowed(robots, agent, urlPath) {
+  const token = agent.toLowerCase();
+  let groups = robots.groups.filter((g) => g.agents.includes(token));
+  if (groups.length === 0) groups = robots.groups.filter((g) => g.agents.includes('*'));
+  const rules = groups.flatMap((g) => g.rules).filter((r) => ruleMatches(r.path, urlPath));
+  if (rules.length === 0) return false;
+  rules.sort((a, b) => b.path.length - a.path.length || Number(b.allow) - Number(a.allow));
+  return !rules[0].allow;
+}
+
+// ---------- JSON-LD ----------
+
+function collectNodes(value, out) {
+  if (Array.isArray(value)) value.forEach((v) => collectNodes(v, out));
+  else if (value && typeof value === 'object') {
+    if (value['@type']) out.push(value);
+    if (value['@graph']) collectNodes(value['@graph'], out);
+  }
+  return out;
+}
+
+function typesOf(node) {
+  const t = node['@type'];
+  return Array.isArray(t) ? t : [t];
+}
+
+function findKeyDeep(value, keys, trail = []) {
+  if (Array.isArray(value)) {
+    for (const v of value) {
+      const hit = findKeyDeep(v, keys, trail);
+      if (hit) return hit;
+    }
+  } else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      if (keys.includes(k)) return [...trail, k].join('.');
+      if (k === '@type' && typesOf(value).some((t) => keys.includes(String(t).charAt(0).toLowerCase() + String(t).slice(1)))) {
+        return [...trail, `@type=${v}`].join('.');
+      }
+      const hit = findKeyDeep(v, keys, [...trail, k]);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+// ---------- main ----------
+
+function hostOf(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return `(unparseable: ${url})`;
+  }
+}
+
+function fileForPath(urlPath) {
+  const rel = urlPath.replace(/^\/+/, '');
+  return path.join(OUT, rel, 'index.html');
+}
+
+function main() {
+  if (!fs.existsSync(OUT)) {
+    console.error(`No export found at ${OUT}. Run \`npm run build\` first.`);
+    process.exit(2);
+  }
+
+  const sitemapFile = path.join(OUT, 'sitemap.xml');
+  const robotsFile = path.join(OUT, 'robots.txt');
+  if (!fs.existsSync(sitemapFile)) fail('sitemap.xml', 'missing from the export');
+  if (!fs.existsSync(robotsFile)) fail('robots.txt', 'missing from the export');
+  const sitemapXml = fs.existsSync(sitemapFile) ? fs.readFileSync(sitemapFile, 'utf8') : '';
+  const robots = parseRobots(fs.existsSync(robotsFile) ? fs.readFileSync(robotsFile, 'utf8') : '');
+
+  if (robots.sitemaps.length === 0) fail('robots.txt', 'no Sitemap line');
+  for (const s of robots.sitemaps) {
+    if (hostOf(s) !== CANONICAL_HOST) fail('robots.txt', `Sitemap URL ${s} is not on ${CANONICAL_HOST}`);
+  }
+
+  const locs = [...sitemapXml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1]);
+  if (locs.length === 0) fail('sitemap.xml', 'no <loc> entries');
+
+  const rows = [];
+  for (const loc of locs) {
+    const where = loc;
+    if (hostOf(loc) !== CANONICAL_HOST) fail(where, `sitemap <loc> is not on ${CANONICAL_HOST}`);
+    let urlPath;
+    try {
+      urlPath = new URL(loc).pathname;
+    } catch {
+      fail(where, 'sitemap <loc> does not parse as a URL');
+      continue;
+    }
+
+    for (const agent of ['*', ...CRAWLERS]) {
+      if (isDisallowed(robots, agent, urlPath)) fail(where, `disallowed in robots.txt for ${agent}`);
+    }
+
+    const file = fileForPath(urlPath);
+    if (!fs.existsSync(file)) {
+      fail(where, `in the sitemap but missing from the export (${path.relative(OUT, file)})`);
+      rows.push({ path: urlPath, missing: true });
+      continue;
+    }
+    const html = fs.readFileSync(file, 'utf8');
+    const doc = new JSDOM(html).window.document;
+    const meta = (sel) => doc.querySelector(sel)?.getAttribute('content')?.trim() ?? '';
+
+    const title = doc.querySelector('head > title')?.textContent?.trim() ?? '';
+    const description = meta('meta[name="description"]');
+    const canonical = doc.querySelector('link[rel="canonical"]')?.getAttribute('href')?.trim() ?? '';
+    const ogUrl = meta('meta[property="og:url"]');
+    const h1 = doc.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+    if (!title) fail(where, 'no <title>');
+    if (!description) fail(where, 'no meta description');
+    if (!canonical) fail(where, 'no canonical link');
+    if (!h1) fail(where, 'no <h1>');
+    if (canonical && hostOf(canonical) !== CANONICAL_HOST) fail(where, `canonical ${canonical} is not on ${CANONICAL_HOST}`);
+    if (canonical && canonical !== loc) fail(where, `canonical ${canonical} is not exactly its sitemap <loc>`);
+    if (!ogUrl) fail(where, 'no og:url');
+    if (ogUrl && hostOf(ogUrl) !== CANONICAL_HOST) fail(where, `og:url ${ogUrl} is not on ${CANONICAL_HOST}`);
+    if (ogUrl && ogUrl !== loc) fail(where, `og:url ${ogUrl} is not exactly its sitemap <loc>`);
+
+    for (const m of doc.querySelectorAll('meta[name="robots"], meta[name="googlebot"], meta[name="bingbot"]')) {
+      if (/noindex/i.test(m.getAttribute('content') ?? '')) fail(where, `carries noindex (${m.outerHTML})`);
+    }
+
+    const nodes = [];
+    for (const s of doc.querySelectorAll('script[type="application/ld+json"]')) {
+      let parsed;
+      try {
+        parsed = JSON.parse(s.textContent);
+      } catch (e) {
+        fail(where, `JSON-LD does not parse: ${e.message}`);
+        continue;
+      }
+      const ratingKey = findKeyDeep(parsed, ['aggregateRating', 'review', 'reviews']);
+      if (ratingKey) fail(where, `JSON-LD contains rating/review markup (${ratingKey})`);
+      collectNodes(parsed, nodes);
+    }
+    const types = new Set(nodes.flatMap(typesOf));
+    for (const t of ['Organization', 'WebSite']) {
+      if (!types.has(t)) fail(where, `no JSON-LD ${t}`);
+    }
+    if (SOFTWARE_APP_PATHS.has(urlPath) && !types.has('SoftwareApplication')) {
+      fail(where, 'no JSON-LD SoftwareApplication');
+    }
+
+    if (html.includes('TODO')) fail(where, 'HTML contains the string TODO');
+
+    const bodyText = (doc.querySelector('main') ?? doc.body)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    rows.push({
+      path: urlPath,
+      title,
+      description,
+      canonical,
+      h1,
+      words: bodyText ? bodyText.split(' ').length : 0,
+      jsonld: [...types].join(', ') || '—',
+      html,
+      doc,
+    });
+  }
+
+  // ---------- pricing page: plan names ----------
+  checkPlans(rows);
+
+  if (REPORT) printReport(rows);
+
+  if (failures.length) {
+    console.log(`check_static_seo: FAIL (${failures.length})`);
+    for (const f of failures) console.log(`  - ${f}`);
+    process.exit(1);
+  }
+  console.log(`check_static_seo: PASS (${locs.length} sitemap URLs)`);
+}
+
+function readJson(file) {
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function checkPlans(rows) {
+  const expectedFile = path.join(HERE, 'expected_plans.json');
+  const expected = fs.existsSync(expectedFile) ? readJson(expectedFile) : null;
+  const names = expected?.plan_names ?? [];
+  if (names.length === 0) {
+    fail(PRICING_PATH, 'PLAN CHECK BLOCKED: no confirmed plan names');
+    return;
+  }
+  const pricing = rows.find((r) => r.path === PRICING_PATH);
+  if (!pricing || pricing.missing) {
+    fail(PRICING_PATH, 'pricing page not in the export, cannot check plan names');
+    return;
+  }
+  const text = pricing.doc.body.textContent.replace(/\s+/g, ' ');
+  for (const name of names) {
+    if (!text.includes(name)) fail(PRICING_PATH, `plan name "${name}" not in the static HTML`);
+  }
+  if (expected.prices_approved && expected.checkout_live) {
+    for (const price of expected.prices ?? []) {
+      if (!text.includes(price)) fail(PRICING_PATH, `approved price "${price}" not in the static HTML`);
+    }
+  }
+}
+
+function printReport(rows) {
+  const cell = (s) => String(s ?? '').replace(/\|/g, '\\|').slice(0, 90);
+  console.log('| Path | Title | Meta description | Canonical | H1 | Words in raw HTML main | JSON-LD types |');
+  console.log('|---|---|---|---|---|---|---|');
+  for (const r of rows) {
+    if (r.missing) {
+      console.log(`| ${r.path} | MISSING FROM EXPORT | | | | | |`);
+      continue;
+    }
+    console.log(
+      `| ${r.path} | ${cell(r.title) || '—'} | ${cell(r.description) || '—'} | ${cell(r.canonical) || '—'} | ${cell(r.h1) || '—'} | ${r.words} | ${cell(r.jsonld)} |`,
+    );
+  }
+  console.log('');
+}
+
+main();
