@@ -97,8 +97,8 @@ export const STAGES: Stage[] = [
     title: "Business contacts, checked before they count",
     body:
       "LeadPilot searches for people at companies that match the verified strategy, adds what it can " +
-      "find about them, and checks every email address. Undeliverable addresses are dropped, anyone " +
-      "on your suppression list is skipped, and each lead is scored for fit.",
+      "find about them, and checks every email address. Undeliverable addresses are dropped, and anyone " +
+      "on your suppression list is skipped.",
     facts: ["Every email address verified", "Suppressed people never imported"],
     you: "You review the strategy and the leads before outreach launches.",
   },
@@ -131,8 +131,8 @@ export const STAGES: Stage[] = [
     title: "Replies come to you, sorted",
     body:
       "Email and WhatsApp replies land in one inbox. Each reply is classified, and the " +
-      "prospect's sequence stops on every channel. A \"not now\" becomes a dated return visit. " +
-      "LeadPilot suggests a next step and a draft, but it never answers for you.",
+      "prospect's sequence stops on every channel. LeadPilot suggests a next step and a draft, but it " +
+      "never answers for you.",
     facts: ["A reply stops the sequence everywhere", "An unsubscribe suppresses the person on every channel"],
     you: "You write every answer to a prospect.",
   },
@@ -141,16 +141,16 @@ export const STAGES: Stage[] = [
     name: "Meetings",
     title: "Meetings on your calendar",
     body:
-      "Prospects book on your own LeadPilot booking page, and a booking pauses their sequence. Before " +
-      "the call you get a prep brief and reminders the day before and an hour before. The meeting room " +
-      "keeps your notes and writes an AI summary afterwards.",
-    facts: ["Booking pages on your own availability", "Prep brief written for every booked meeting"],
+      "Prospects book on your own LeadPilot booking page, and a booking pauses their sequence.",
+    facts: ["Booking pages on your own availability", "A booking pauses the prospect's sequence"],
     you: "You take the call.",
   },
 ];
 
-/** "not_live": built and tested only against simulated services (product-facts.json). */
-export type Availability = "available" | "on_request" | "not_live";
+/** "not_live": built and tested only against simulated services; "unconfirmed":
+ *  built and switched on, but not yet confirmed working end to end in production
+ *  (founders, 2026-10-13). Both from product-facts.json. */
+export type Availability = "available" | "on_request" | "not_live" | "unconfirmed";
 
 export interface Feature {
   name: string;
@@ -171,7 +171,7 @@ export const FEATURES: Feature[] = [
   {
     name: "Lead scoring",
     body: "Every sourced lead gets an AI estimate of how likely they are to book.",
-    status: "available",
+    status: "unconfirmed",
     flag: "lead_scoring_enabled",
   },
   {
@@ -208,13 +208,18 @@ export const FEATURES: Feature[] = [
   {
     name: "\"Not now\" memory",
     body: "A timing objection becomes a dated return visit with the reason the prospect gave.",
-    status: "available",
+    status: "unconfirmed",
     flag: "reengagement_memory_enabled",
   },
   {
-    name: "Booking pages and meeting prep",
-    body: "Your own booking pages, a prep brief for each meeting, and reminders before the call.",
+    name: "Booking pages",
+    body: "Your own booking pages; a booking pauses the prospect's sequence.",
     status: "available",
+  },
+  {
+    name: "Meeting prep",
+    body: "A prep brief for each booked meeting, reminders before the call, and an AI summary afterwards.",
+    status: "unconfirmed",
     flag: "meeting_prep_enabled",
   },
   {
@@ -226,7 +231,7 @@ export const FEATURES: Feature[] = [
   {
     name: "Workspaces for agencies",
     body: "Separate client workspaces, roles for your team, and per-client sending domains for email.",
-    status: "available",
+    status: "unconfirmed",
   },
   {
     name: "Android app",
@@ -285,6 +290,7 @@ export const FEATURES: Feature[] = [
 ];
 
 export const NOT_LIVE_TITLE = statusLabel("simulated_only");
+export const UNCONFIRMED_TITLE = statusLabel("unconfirmed");
 
 /** Who it is for, and not for: product-facts.json, shared with /about and the JSON-LD. */
 export const AUDIENCES = PRODUCT_FACTS.fit;
@@ -308,8 +314,8 @@ export const TRUST = [
   {
     name: "Daily send approval",
     body:
-      "On by default. Automatic sending waits each day until the account owner approves it, and " +
-      "LinkedIn needs its own approval.",
+      "On by default. Automatic sending waits each day until the account owner approves it. LinkedIn " +
+      "steps, once live, need their own approval.",
   },
   {
     name: "GDPR deletion and export",

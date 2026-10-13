@@ -9,7 +9,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
-import { PRODUCT_FACTS } from "@/lib/productFacts";
+import { PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
@@ -17,7 +17,7 @@ import { pageGraph } from "@/lib/seo/structuredData";
 export const metadata: Metadata = {
   title: "Book a call about LeadPilot by Calendarharvest | Calendarharvest",
   description:
-    "Talk to Rehan directly about LeadPilot by Calendarharvest. If it is a fit, we will tell you honestly. If it is not, we will tell you that too.",
+    `Talk to Rehan directly about ${PRODUCT_FULL_NAME}. If it is a fit, we will tell you honestly. If it is not, we will tell you that too.`,
   ...canonicalMeta("/contact/"),
 };
 
@@ -41,6 +41,8 @@ const FOR_YOU = [
 
 const NOT_FOR_YOU = [
   "You have a dedicated SDR team and a working outbound system.",
+  // Where it is offered: Terms of Service ("currently available only to clients based in ...").
+  "You are based outside the countries LeadPilot is currently offered in: the United States, the United Kingdom, Canada, Australia, New Zealand, Ireland and Singapore (see the Terms of Service).",
   // Not a fit: product-facts.json, the same list as the home page.
   ...PRODUCT_FACTS.not_fit,
   "You need clients in the next 7 days. Research comes first and new mailboxes warm up gradually, so this is not a quick fix.",
@@ -84,7 +86,7 @@ export default function ContactPage() {
               Talk to Rehan directly.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-300">
-              No sales team. No SDR handoff. If LeadPilot by Calendarharvest is a fit for your business,
+              No sales team. No SDR handoff. If {PRODUCT_FULL_NAME} is a fit for your business,
               we will tell you honestly. If it is not, we will tell you that too.
             </p>
           </div>

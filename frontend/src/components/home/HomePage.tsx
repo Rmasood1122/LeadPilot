@@ -24,6 +24,7 @@ import {
   HOW_IT_WORKS_ID,
   NOT_A_FIT,
   NOT_LIVE_TITLE,
+  UNCONFIRMED_TITLE,
   PRICING_PATH,
   PRODUCT_DESCRIPTION,
   PRICING_TEASER,
@@ -42,6 +43,7 @@ export function HomePage() {
   const available = FEATURES.filter((f) => f.status === "available");
   const onRequest = FEATURES.filter((f) => f.status === "on_request");
   const notLive = FEATURES.filter((f) => f.status === "not_live");
+  const unconfirmed = FEATURES.filter((f) => f.status === "unconfirmed");
 
   return (
     <div className="lp-home min-h-screen bg-[#f8fafc] text-[#0f172a]">
@@ -127,6 +129,17 @@ export function HomePage() {
               </p>
               <ul className="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="features-on-request">
                 {onRequest.map((f) => (
+                  <li key={f.name} className="text-[0.95rem]">
+                    <span className="font-semibold">{f.name}.</span>{" "}
+                    <span className="text-[#475569]">{f.body}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-6 rounded-2xl border border-[#cbd5e1] p-6 sm:p-8">
+              <h3 className="text-lg font-semibold tracking-tight">{UNCONFIRMED_TITLE}</h3>
+              <ul className="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="features-unconfirmed">
+                {unconfirmed.map((f) => (
                   <li key={f.name} className="text-[0.95rem]">
                     <span className="font-semibold">{f.name}.</span>{" "}
                     <span className="text-[#475569]">{f.body}</span>

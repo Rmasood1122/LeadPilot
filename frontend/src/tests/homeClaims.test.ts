@@ -53,7 +53,11 @@ describe("home page claims match the code (D1)", () => {
     it(`${f.name}: "${f.status}" matches ${f.flag}'s default`, () => {
       const def = flagDefault(f.flag!);
       expect(def, `${f.flag} not found in system_settings.py DEFAULTS`).not.toBeUndefined();
-      expect(f.status).toBe(def ? "available" : "on_request");
+      // "unconfirmed": switched on by default, but the founders have not confirmed it
+      // works end to end in production (2026-10-13, product-facts.json); it is listed
+      // under that heading instead of as available. Only an ON flag may be unconfirmed.
+      if (f.status === "unconfirmed") expect(def).toBe(true);
+      else expect(f.status).toBe(def ? "available" : "on_request");
     });
   }
 

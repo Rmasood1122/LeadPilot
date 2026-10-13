@@ -13,7 +13,7 @@
  * scripts/seo/check_static_seo.mjs enforces these on the exported HTML.
  */
 
-import { COMPANY_NAME, PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { COMPANY_NAME, PRODUCT_FACTS, PRODUCT_FULL_NAME, PRODUCT_NAME } from "@/lib/productFacts";
 import { SITE_ORIGIN, absoluteUrl, type SitePath } from "@/lib/seo/pageMeta";
 
 type Node = Record<string, unknown>;
@@ -75,7 +75,7 @@ function breadcrumbs(path: SitePath, name: string): Node {
   return {
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "LeadPilot", item: `${SITE_ORIGIN}/` },
+      { "@type": "ListItem", position: 1, name: PRODUCT_NAME, item: `${SITE_ORIGIN}/` },
       { "@type": "ListItem", position: 2, name, item: absoluteUrl(path) },
     ],
   };

@@ -17,14 +17,14 @@ import { pageGraph } from "@/lib/seo/structuredData";
 export const metadata: Metadata = {
   title: "About LeadPilot by Calendarharvest | Calendarharvest",
   description:
-    "LeadPilot by Calendarharvest was built by a founder who used it to find his own clients. Here is the story.",
+    `${PRODUCT_FULL_NAME} was built by a founder who used it to find his own clients. Here is the story.`,
   ...canonicalMeta("/about/"),
 };
 
 const STEPS = [
   {
     title: "Research",
-    body: "Research runs once per campaign strategy before a single message is written: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability and prospects are scored for fit, and right before an email is written LeadPilot can pull company news so the opening references something real. The AI is instructed never to invent a detail.",
+    body: "Research runs once per campaign strategy before a single message is written: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability, and right before an email is written LeadPilot can pull company news so the opening references something real. The AI is instructed never to invent a detail.",
   },
   {
     title: "Outreach",
@@ -50,7 +50,7 @@ export default function AboutPage() {
         {/* 1. Hero */}
         <section className="px-6 py-24">
           <div className="mx-auto max-w-4xl">
-            <p className="text-sm font-medium uppercase tracking-wider text-blue-500">About LeadPilot</p>
+            <p className="text-sm font-medium uppercase tracking-wider text-blue-500">About {PRODUCT_FULL_NAME}</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
               Built by a founder who used it to find his own clients.
             </h1>

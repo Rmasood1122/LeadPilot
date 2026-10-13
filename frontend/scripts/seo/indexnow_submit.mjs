@@ -26,6 +26,10 @@ const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
 const i = args.indexOf('--sitemap');
 const sitemapSource = i >= 0 ? args[i + 1] : DEFAULT_SITEMAP;
+if (i >= 0 && (!sitemapSource || sitemapSource.startsWith('--'))) {
+  console.error('usage: node scripts/seo/indexnow_submit.mjs [--sitemap <path-or-url>] [--dry-run]');
+  process.exit(2);
+}
 
 async function readSitemap(source) {
   if (/^https?:\/\//.test(source)) {

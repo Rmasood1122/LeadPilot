@@ -8,6 +8,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
@@ -15,7 +16,7 @@ import { pageGraph } from "@/lib/seo/structuredData";
 export const metadata: Metadata = {
   title: "How LeadPilot by Calendarharvest works | Calendarharvest",
   description:
-    "How LeadPilot by Calendarharvest researches your market, finds and verifies business contacts, writes each email for one person, sends after your daily approval, and routes replies to you.",
+    `How ${PRODUCT_FULL_NAME} researches your market, finds and verifies business contacts, writes each email for one person, sends after your daily approval, and routes replies to you.`,
   ...canonicalMeta("/how-it-works/"),
 };
 
@@ -23,7 +24,7 @@ const STEPS = [
   {
     number: "01",
     title: "Research",
-    body: "Research runs once per campaign strategy: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses go through a verification check, undeliverable ones are dropped, and the prospects that remain are scored for fit. Right before an email is written, LeadPilot can pull company news so the first line references something real, and the AI is instructed never to invent a detail. Using a prospect's recent LinkedIn posts goes through the LinkedIn connection, which is not live yet.",
+    body: "Research runs once per campaign strategy: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses go through a verification check, and undeliverable ones are dropped. Right before an email is written, LeadPilot can pull company news so the first line references something real, and the AI is instructed never to invent a detail. Using a prospect's recent LinkedIn posts goes through the LinkedIn connection, which is not live yet.",
   },
   {
     number: "02",
@@ -52,7 +53,7 @@ export default function HowItWorksPage() {
               Your pipeline. Running without you.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-300">
-              LeadPilot by Calendarharvest does the research, finds and checks the prospects, writes and
+              {PRODUCT_FULL_NAME} does the research, finds and checks the prospects, writes and
               sends the outreach after your daily approval, and follows up. You answer the replies and take
               the meetings.
             </p>

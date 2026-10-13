@@ -8,7 +8,9 @@
     "url": "https://www.calendarharvest.com/",
     "logo": "https://www.calendarharvest.com/icons/icon-512.png"
   },
-  "same_as": [],
+  "same_as": [
+    "https://www.linkedin.com/company/leadpilot-app"
+  ],
   "founders": [
     {
       "name": "Rehan Masood",
@@ -41,7 +43,8 @@
   "status_labels": {
     "live": "Live",
     "off_by_default": "Built, switched off by default, available on request",
-    "simulated_only": "Built and tested only against simulated services; not live yet"
+    "simulated_only": "Built and tested only against simulated services; not live yet",
+    "unconfirmed": "Built and switched on, but not yet confirmed working end to end in production"
   },
   "capabilities": [
     { "id": "market_research", "name": "Market and strategy research", "status": "live" },
@@ -51,6 +54,12 @@
     { "id": "whatsapp_steps", "name": "WhatsApp steps", "status": "live" },
     { "id": "reply_routing", "name": "Reply classification and routing", "status": "live" },
     { "id": "meeting_booking", "name": "Meeting booking", "status": "live" },
+    { "id": "smart_send_time", "name": "Smart send time", "status": "live" },
+    { "id": "android_app", "name": "Android app", "status": "live" },
+    { "id": "lead_scoring", "name": "Lead scoring", "status": "unconfirmed" },
+    { "id": "reengagement_memory", "name": "\"Not now\" memory", "status": "unconfirmed" },
+    { "id": "meeting_prep", "name": "Meeting prep briefs and reminders", "status": "unconfirmed" },
+    { "id": "agency_workspaces", "name": "Workspaces for agencies", "status": "unconfirmed" },
     { "id": "linkedin_steps", "name": "LinkedIn steps", "status": "simulated_only" },
     { "id": "stripe_checkout", "name": "Stripe checkout (paying for a plan online)", "status": "simulated_only" },
     { "id": "reply_copilot", "name": "Reply Copilot", "status": "off_by_default" },

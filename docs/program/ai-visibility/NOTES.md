@@ -94,3 +94,21 @@
 - check_static_seo.mjs: every sitemap URL needs an entry, and its <lastmod> must equal it.
 - Founder step: after any page change run `cd frontend && node scripts/seo/lastmod.mjs` and commit its JSON on the same branch before merge; after the deploy run the IndexNow command.
 - Next: Phase 3 on Part A. Part B is next-session work (trademark not reviewed).
+
+## Phase 3 review follow-up — founder answers (verbatim, 2026-10-13)
+- Which further home-page capabilities work end to end now: "Android app + smart send" (not selected: "Lead scoring + Not-now memory", "Meeting prep + reminders", "Agency workspaces").
+- Free trial while checkout is not live: "Leave as is; I'll decide".
+- Is linkedin.com/company/leadpilot-app yours: "https://www.linkedin.com/company/leadpilot-app this is my linkedin" → added to Organization sameAs (an official profile the founder confirmed).
+- /about H1, /how-it-works H1, /contact "done-with-you", "runs without you", "No sales team. No SDR handoff.": "Keep all; I confirm them".
+- May homeClaims.test.ts change so an ON-flag feature can be listed "unconfirmed": "Yes, change the test".
+
+## Phase 3 review fixes
+- New status "unconfirmed" (built and switched on, not yet confirmed working end to end in production): Lead scoring, "Not now" memory, Meeting prep, Workspaces for agencies; their mentions removed from stage/step text (/, /how-it-works, /about). Smart send time and Android app: live.
+- homeClaims.test.ts: an "unconfirmed" flagged feature must have its flag ON; otherwise unchanged (shown failing for Reply Copilot marked unconfirmed).
+- /about eyebrow → "About LeadPilot by Calendarharvest"; body text and meta descriptions use PRODUCT_FULL_NAME; breadcrumb uses PRODUCT_NAME.
+- /contact: restored the country restriction, now quoting the Terms of Service list (my 2.5 note "no definition in code" was wrong: Terms §4 defines it).
+- Home TRUST: "LinkedIn needs its own approval" → "LinkedIn steps, once live, need their own approval."
+- /pricing meta description: dropped "each with a free trial" (checkout not live). Other free-trial lines kept per founder; listed in REPORT.
+- site-pages.json sources: + src/lib/productFacts.ts for / and /pricing; + staticPlans.ts, lib/pricing.ts for /pricing.
+- indexnow_submit.mjs: usage message for a bare --sitemap.
+- Not changed: "Loading plans…" stays next to the static list (2.2: leave the browser-loaded display as is).

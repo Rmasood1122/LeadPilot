@@ -8,13 +8,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
   title: "Terms of Service for LeadPilot by Calendarharvest | Calendarharvest",
-  description: "The terms that govern your use of LeadPilot by Calendarharvest.",
+  description: `The terms that govern your use of ${PRODUCT_FULL_NAME}.`,
   robots: "index, follow",
   ...canonicalMeta("/terms/"),
 };

@@ -23,13 +23,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
   title: "Privacy Policy for LeadPilot by Calendarharvest | Calendarharvest",
-  description: "How LeadPilot by Calendarharvest collects, uses, and protects your data.",
+  description: `How ${PRODUCT_FULL_NAME} collects, uses, and protects your data.`,
   robots: "index, follow",
   ...canonicalMeta("/privacy/"),
 };

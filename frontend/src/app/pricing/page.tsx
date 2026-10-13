@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   title: "LeadPilot by Calendarharvest pricing | Calendarharvest",
   description:
     `Plans for ${PRODUCT_FULL_NAME}: monthly plans (${planNames.monthly_tiers.join(", ")}), ` +
-    `each with a free trial for a new account, or ${planNames.pay_per_meeting.toLowerCase()} booked.`,
+    `or ${planNames.pay_per_meeting.toLowerCase()} booked.`,
   ...canonicalMeta("/pricing/"),
 };
 

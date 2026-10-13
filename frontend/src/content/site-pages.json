@@ -11,7 +11,8 @@
         "src/components/home/HomePage.tsx",
         "src/components/home/StageStepper.tsx",
         "src/components/home/HomeVideo.tsx",
-        "src/content/product-facts.json"
+        "src/content/product-facts.json",
+        "src/lib/productFacts.ts"
       ]
     },
     {
@@ -31,7 +32,10 @@
         "src/app/pricing/PricingClient.tsx",
         "src/content/plan-names.json",
         "src/content/plans-snapshot.json",
-        "src/content/product-facts.json"
+        "src/content/product-facts.json",
+        "src/lib/productFacts.ts",
+        "src/lib/seo/staticPlans.ts",
+        "src/lib/pricing.ts"
       ]
     },
     {
