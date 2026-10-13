@@ -282,6 +282,22 @@ function checkPlans(rows) {
     return;
   }
   const text = pricing.doc.body.textContent.replace(/\s+/g, ' ');
+  // 2.2: once committed, the plans snapshot (a copy of the live catalog) is
+  // the source of plan names; it must still carry every expected name.
+  const snapshotFile = path.join(FRONTEND, 'src', 'content', 'plans-snapshot.json');
+  if (fs.existsSync(snapshotFile)) {
+    const catalog = readJson(snapshotFile).catalog;
+    const snapNames = [...(catalog?.monthly?.tiers ?? []).map((t) => t.name), catalog?.pay_per_meeting?.name].filter(Boolean);
+    const removed = new Set(expected.removed_by_founders ?? []);
+    for (const name of names) {
+      if (!removed.has(name) && !snapNames.includes(name)) {
+        fail(PRICING_PATH, `plan name "${name}" is missing from plans-snapshot.json (not in removed_by_founders)`);
+      }
+    }
+    for (const name of snapNames) {
+      if (!text.includes(name)) fail(PRICING_PATH, `snapshot plan name "${name}" not in the static HTML`);
+    }
+  }
   for (const name of names) {
     if (!text.includes(name)) fail(PRICING_PATH, `plan name "${name}" not in the static HTML`);
   }

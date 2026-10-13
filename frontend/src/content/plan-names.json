@@ -1,0 +1,5 @@
+{
+  "source": "Plan names in app/core/billing_catalog.py (MONTHLY_TIERS, then PAY_PER_MEETING_PLAN). src/tests/planNames.test.ts fails if they drift.",
+  "monthly_tiers": ["Starter", "Growth", "Scale", "Enterprise"],
+  "pay_per_meeting": "Pay per meeting"
+}

@@ -42,3 +42,11 @@
 - robots.txt Sitemap → www; public/sitemap.xml replaced by src/app/sitemap.ts reading src/content/site-pages.json (7 pages; 4 dead /blog/ URLs removed); canonical + og:url on all 7 pages via src/lib/seo/pageMeta.ts; /pricing split into server page.tsx + PricingClient.tsx.
 - Check after 2.1: host/canonical failures gone; remaining = JSON-LD (2.4) and plan names (2.2).
 - Next: 2.2.
+
+## 2.2 done
+- Plans source: GET /billing/catalog (app/api/billing.py:73, public) → app/core/billing_catalog.py + app/core/plans.py.
+- Live API (https://leadpilot-api-ph3t.onrender.com) unreachable from this sandbox (proxy 403) → no snapshot committed; snapshot check NOT RUN.
+- Static HTML renders plan names from src/content/plan-names.json (names in billing_catalog.py; src/tests/planNames.test.ts keeps them in sync; shown failing on a renamed tier). Features render once plans-snapshot.json exists.
+- Stripe checkout not live → no static prices, no offers; TODO(founder) in src/lib/seo/staticPlans.ts.
+- Open: the live-loaded feature bullets (lib/pricing.ts channelList) list "LinkedIn" for Growth+; LinkedIn is not live → handle in 2.5.
+- Next: 2.3.

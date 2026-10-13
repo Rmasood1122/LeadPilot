@@ -47,8 +47,10 @@ import { LogoMark } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
 
 /** The interactive pricing page. Rendered by ./page.tsx (a server component,
- *  so the page has its own metadata), which passes in the shared footer. */
-export function PricingClient({ footer }: { footer: ReactNode }) {
+ *  so the page has its own metadata), which passes in the shared footer and
+ *  the static plan list shown until the live catalog loads (so the exported
+ *  HTML names every plan for crawlers that do not run JavaScript). */
+export function PricingClient({ footer, staticPlans }: { footer: ReactNode; staticPlans: ReactNode }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   // Signed-in state (and whether the account already has a plan). Restores a
@@ -176,6 +178,7 @@ export function PricingClient({ footer }: { footer: ReactNode }) {
           </p>
         )}
 
+        {!catalog && staticPlans}
         {isLoading && <p className="text-center text-muted-foreground">Loading plans…</p>}
         {isError && <p className="text-center text-destructive">Plans could not be loaded. Refresh to try again.</p>}
 

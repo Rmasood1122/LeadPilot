@@ -1,7 +1,14 @@
 {
-  "source": "Plan names found in app/core/billing_catalog.py (MONTHLY_TIERS and PAY_PER_MEETING_PLAN) on 2026-10-13. Prices approved for HTML by founders (Phase 0 Q2) but Stripe checkout is not live (Q6b), so no price check.",
-  "plan_names": ["Starter", "Growth", "Scale", "Enterprise", "Pay per meeting"],
+  "source": "Plan names found in app/core/billing_catalog.py (MONTHLY_TIERS and PAY_PER_MEETING_PLAN) on 2026-10-13. Prices approved for HTML by founders (Phase 0 Q2) but Stripe checkout is not live (Q6b), so no price check. Since 2.2, src/content/plans-snapshot.json (when committed) is the source of names; every name below must also be in it unless listed in removed_by_founders.",
+  "plan_names": [
+    "Starter",
+    "Growth",
+    "Scale",
+    "Enterprise",
+    "Pay per meeting"
+  ],
   "prices_approved": true,
   "checkout_live": false,
-  "prices": []
+  "prices": [],
+  "removed_by_founders": []
 }
