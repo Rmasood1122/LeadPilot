@@ -52,7 +52,7 @@
     { "id": "reply_routing", "name": "Reply classification and routing", "status": "live" },
     { "id": "meeting_booking", "name": "Meeting booking", "status": "live" },
     { "id": "linkedin_steps", "name": "LinkedIn steps", "status": "simulated_only" },
-    { "id": "stripe_checkout", "name": "Paying for a plan online (Stripe checkout)", "status": "simulated_only" },
+    { "id": "stripe_checkout", "name": "Stripe checkout (paying for a plan online)", "status": "simulated_only" },
     { "id": "reply_copilot", "name": "Reply Copilot", "status": "off_by_default" },
     { "id": "deliverability_autopilot", "name": "Deliverability Autopilot", "status": "off_by_default" },
     { "id": "waterfall_enrichment", "name": "Waterfall enrichment", "status": "off_by_default" },

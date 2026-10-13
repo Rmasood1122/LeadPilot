@@ -65,3 +65,19 @@
 - check_static_seo.mjs: PASS (7 URLs) after 2.4.
 - Depends on 2.5: "Astoria, New York" must become visible on /about, and the facts description must be visible on / and /pricing.
 - Next: 2.5.
+
+## 2.5 done — removals and rewordings (for REPORT.md)
+- Home: "LinkedIn and WhatsApp steps … available / LinkedIn from Growth" → WhatsApp steps (available, from Starter) + LinkedIn steps listed under "Built and tested only against simulated services; not live yet" (with Stripe checkout).
+- Home: "Email, LinkedIn and WhatsApp replies land in one inbox" → "Email and WhatsApp replies…".
+- Home: "Recent LinkedIn posts and company news can shape the opening" → company news; LinkedIn posts go through the LinkedIn connection, not live yet (app/integrations/linkedin_posts.py uses Unipile/RapidAPI).
+- Home FAQ "What has not been verified yet?" (Apollo, Hunter, Gmail, WhatsApp, Calendly, Stripe simulated) → "What is not live yet?" built from product-facts.json (LinkedIn steps, Stripe checkout), per Q6.
+- Home FAQ: messaging uploaded LinkedIn connections → states LinkedIn steps are not live.
+- Home: first mention "LeadPilot by Calendarharvest" above the H1; facts description shown in "Who it's for"; AUDIENCES / NOT_A_FIT now read product-facts.json.
+- /how-it-works: "72-step research pipeline" → "once per campaign strategy: 72 … or 144"; "Personalised emails and LinkedIn messages … from the Gmail and LinkedIn accounts" → email from Gmail; WhatsApp on plans; LinkedIn not live; removed "A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call" (no code source); "Learning" step (ICP refined, compounds, Revenue & ROI dashboard: not founder-confirmed) → "Replies and meetings" (live per Q6); "Your only job is to show up … You handle the calls we book … LeadPilot handles [following up]" → "What you still do" consistent with home (daily approval, held messages, you write every answer).
+- /about: Faisalabad, Pakistan → Astoria, New York (Q1); removed "has published more than 18 public repositories on GitHub", "today it is the system that finds LeadPilot's own clients", "He uses it himself, every day, to find LeadPilot's own clients"; "72-step" → 72 or 144 per strategy; LinkedIn sending → not live; "Learning" → "Replies and meetings"; audience list (boutique agencies 3–30 staff in 7 countries, coaches, early SaaS founders, fractional consultants "resell or white-label") → product-facts fit (same as home).
+- /contact: "boutique agency with 3–30 staff in [7 countries]" → facts fit groups; removed "You are based outside our approved geographies" (no definition in code) → facts not-a-fit list; LinkedIn FAQ → included in plans but not live.
+- /pricing: intro shows the facts description and the not-live sentence.
+- /privacy, /terms: only title, description, canonical, og:url, JSON-LD changed.
+- DECISIONS.md D1: appended the 2026-10-13 founder answer (email automatic; LinkedIn not live).
+- Kept (founder questions): /about H1 + meta "used it to find his own clients"; /how-it-works H1 "Your pipeline. Running without you."; /contact "done-with-you system" and "a pipeline that runs without you in it".
+- Next: 2.8.

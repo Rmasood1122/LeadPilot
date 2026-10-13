@@ -14,7 +14,7 @@ import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
   title: "Terms of Service for LeadPilot by Calendarharvest | Calendarharvest",
-  description: "The terms that govern your use of LeadPilot Enterprise.",
+  description: "The terms that govern your use of LeadPilot by Calendarharvest.",
   robots: "index, follow",
   ...canonicalMeta("/terms/"),
 };

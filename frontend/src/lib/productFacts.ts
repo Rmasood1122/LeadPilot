@@ -35,3 +35,10 @@ export function statusLabel(status: CapabilityStatus): string {
 export function capabilitiesWithStatus(status: CapabilityStatus) {
   return facts.capabilities.filter((c) => c.status === status);
 }
+
+/** "LinkedIn steps and Stripe checkout (…): built and tested only against
+ *  simulated services, not yet live." Shown wherever those are mentioned. */
+export function notLiveSentence(): string {
+  const names = capabilitiesWithStatus("simulated_only").map((c) => c.name);
+  return `${names.join(" and ")}: built and tested only against simulated services, not yet live.`;
+}

@@ -50,7 +50,12 @@ import { cn } from "@/lib/utils";
  *  so the page has its own metadata), which passes in the shared footer and
  *  the static plan list shown until the live catalog loads (so the exported
  *  HTML names every plan for crawlers that do not run JavaScript). */
-export function PricingClient({ footer, staticPlans }: { footer: ReactNode; staticPlans: ReactNode }) {
+export function PricingClient({ footer, staticPlans, intro }: {
+  footer: ReactNode;
+  staticPlans: ReactNode;
+  /** Product description and capability status from product-facts.json. */
+  intro: ReactNode;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   // Signed-in state (and whether the account already has a plan). Restores a
@@ -164,6 +169,7 @@ export function PricingClient({ footer, staticPlans }: { footer: ReactNode; stat
           <p className="mt-3 text-muted-foreground">
             A predictable monthly plan, or pay only when a prospect books a meeting.
           </p>
+          {intro}
           {needsPlan && (
             <p role="status" className="mt-4 rounded-lg border border-border bg-card p-3 text-sm">
               Welcome, {viewer?.email}. Choose a plan to start using LeadPilot.

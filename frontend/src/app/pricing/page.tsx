@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 import planNames from "@/content/plan-names.json";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { PRODUCT_FACTS, PRODUCT_FULL_NAME, notLiveSentence } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { staticPlans, type StaticPlan } from "@/lib/seo/staticPlans";
 import { pageGraph } from "@/lib/seo/structuredData";
@@ -31,8 +31,17 @@ export default function PricingPage() {
   return (
     <>
       <JsonLd data={pageGraph({ path: "/pricing/", breadcrumb: "Pricing", software: true })} />
-      <PricingClient footer={<Footer tone="theme" />} staticPlans={<StaticPlanList />} />
+      <PricingClient footer={<Footer tone="theme" />} staticPlans={<StaticPlanList />} intro={<PricingIntro />} />
     </>
+  );
+}
+
+function PricingIntro() {
+  return (
+    <div className="mt-4 space-y-2 text-sm text-muted-foreground">
+      <p>{PRODUCT_FACTS.description}</p>
+      <p>{notLiveSentence()}</p>
+    </div>
   );
 }
 

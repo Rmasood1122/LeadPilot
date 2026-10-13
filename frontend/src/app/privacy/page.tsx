@@ -29,7 +29,7 @@ import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
   title: "Privacy Policy for LeadPilot by Calendarharvest | Calendarharvest",
-  description: "How LeadPilot Enterprise collects, uses, and protects your data.",
+  description: "How LeadPilot by Calendarharvest collects, uses, and protects your data.",
   robots: "index, follow",
   ...canonicalMeta("/privacy/"),
 };

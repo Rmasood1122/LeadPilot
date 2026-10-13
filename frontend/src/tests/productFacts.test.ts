@@ -31,6 +31,16 @@ describe("product facts", () => {
     expect(text).not.toMatch(/\b(CAN-SPAM|GDPR|CASL|PDPA|TCPA)[- ]compliant\b|compliant with|fully compliant|compliance (maintained|guaranteed)/i);
   });
 
+  it("keeps the home page's banned promises out of the facts it now supplies", () => {
+    // The same phrases src/tests/homeClaims.test.ts bans in the home files;
+    // AUDIENCES and NOT_A_FIT moved from content.ts into this file.
+    const text = JSON.stringify(PRODUCT_FACTS);
+    for (const phrase of [/guarantee/i, /no credit card/i, /unlimited/i, /auto-?repl(y|ies)/i,
+      /upload (your|a) (contact )?list/i, /\b\d+x\b|\b\d+%\s+(more|higher|better)/i]) {
+      expect(text).not.toMatch(phrase);
+    }
+  });
+
   it("names no rating, review, customer count or superlative", () => {
     const text = JSON.stringify(PRODUCT_FACTS);
     expect(text).not.toMatch(/\b(#1|best|leading|rated|customers? trust)\b|(?<!send-)\breviews?\b/i);
