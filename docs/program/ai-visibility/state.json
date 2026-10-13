@@ -5,7 +5,7 @@
     {
       "id": "2.1",
       "title": "canonical host",
-      "status": "not_started"
+      "status": "done"
     },
     {
       "id": "2.2",
@@ -48,5 +48,5 @@
       "status": "not_started"
     }
   ],
-  "phase": "1 done, awaiting 1.4 plan approval"
+  "phase": "2"
 }

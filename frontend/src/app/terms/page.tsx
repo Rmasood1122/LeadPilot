@@ -8,11 +8,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
   title: "Terms of Service | Calendarharvest",
   description: "The terms that govern your use of LeadPilot Enterprise.",
   robots: "index, follow",
+  ...canonicalMeta("/terms/"),
 };
 
 const EMAIL = "ahmadshahid@calendarharvest.com";

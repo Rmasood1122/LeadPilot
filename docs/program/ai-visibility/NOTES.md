@@ -33,3 +33,12 @@
 ## Open questions
 
 - Own-use numbers: which, with date and source.
+
+## 1.4 plan approval (verbatim, 2026-10-13)
+- Plan: "Approve as written (Recommended)" — titles stay literal (no test changes); spec-literal pricing fallback; remove 4 dead blog URLs; add postbuild hook after the check passes.
+- LinkedIn status: "Tested only vs simulated"
+
+## 2.1 done
+- robots.txt Sitemap → www; public/sitemap.xml replaced by src/app/sitemap.ts reading src/content/site-pages.json (7 pages; 4 dead /blog/ URLs removed); canonical + og:url on all 7 pages via src/lib/seo/pageMeta.ts; /pricing split into server page.tsx + PricingClient.tsx.
+- Check after 2.1: host/canonical failures gone; remaining = JSON-LD (2.4) and plan names (2.2).
+- Next: 2.2.

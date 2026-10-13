@@ -17,15 +17,16 @@ import { HomeGate } from "@/components/home/HomeGate";
 import { HomePage } from "@/components/home/HomePage";
 import { HOME_DESCRIPTION, HOME_TITLE } from "@/components/home/content";
 import { APP_SHELL_SCRIPT } from "@/lib/homeEntry";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
   title: "LeadPilot: from what you sell to meetings on your calendar | Calendarharvest",
   description: HOME_DESCRIPTION,
-  openGraph: {
+  ...canonicalMeta("/", {
     title: HOME_TITLE,
     description: HOME_DESCRIPTION,
     images: ["/media/leadpilot-walkthrough-poster.jpg"],
-  },
+  }),
 };
 
 export default function Home() {

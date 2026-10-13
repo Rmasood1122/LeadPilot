@@ -9,11 +9,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
   title: "Book a Call | LeadPilot Enterprise",
   description:
     "Talk to Rehan directly. If LeadPilot is a fit, we will tell you honestly. If it is not, we will tell you that too.",
+  ...canonicalMeta("/contact/"),
 };
 
 const CALENDLY_URL = "https://calendly.com/rmasood112224/30min";

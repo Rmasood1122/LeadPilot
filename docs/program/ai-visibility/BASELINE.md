@@ -10,11 +10,11 @@ Run from `frontend/` with Node v22.22.0 after `npm ci` (exit 0).
 |---|---|---|
 | `npm run type-check` | 0 | clean |
 | `npm run lint` (no env) | 1 | **not a lint finding**: `next.config.js` refuses to load without `NEXT_PUBLIC_API_URL` ("BUILD FAILED: NEXT_PUBLIC_API_URL is not set."). CI sets `NEXT_PUBLIC_API_URL: https://api.example.invalid` for this reason (`.github/workflows/verify.yml`, job `verify-frontend`). |
-| `NEXT_PUBLIC_API_URL=https://leadpilot-api-ph3t.onrender.com npm run lint` | 0 | 2 warnings (`@next/next/no-img-element`, `src/components/ui/Logo.tsx:34,55`), 0 errors |
+| `NEXT_PUBLIC_API_URL=https://leadpilot-api-ph3t.onrender.com npm run lint` | 0 | 6 warnings, 0 errors: `react-hooks/exhaustive-deps` (`src/app/(app)/network/page.tsx:34`) and `@next/next/no-img-element` (`(app)/team/page.tsx:418`, `share/roi/page.tsx:68`, `components/shell/Shell.tsx:34`, `components/ui/Logo.tsx:34,55`). Corrected in the 2.1 commit: the first count read only the end of the log. |
 | `npm test` | 0 | 96 files, 1145 tests passed, 41.6 s |
 | `NEXT_PUBLIC_API_URL=https://leadpilot-api-ph3t.onrender.com npm run build` | 0 | static export in `frontend/out/` |
 
-Pre-existing failures: **none** when the frontend checks run with `NEXT_PUBLIC_API_URL` set, as CI runs them. The only baseline warnings are the two lint warnings above.
+Pre-existing failures: **none** when the frontend checks run with `NEXT_PUBLIC_API_URL` set, as CI runs them. The only baseline findings are the six lint warnings above.
 
 Screenshots of `/`, `/pricing/`, `/how-it-works/`, `/about/`, `/contact/` were taken from the local export (Playwright + Chromium, 1280 px wide; kept outside the repo). In this sandbox the API is unreachable, so `/pricing/` shows "Plans could not be loaded. Refresh to try again." under the H1 and a "Server temporarily unreachable" banner; a crawler that does not run JavaScript sees "Loading plans…" instead (the server-rendered state).
 

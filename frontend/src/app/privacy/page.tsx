@@ -23,11 +23,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | Calendarharvest",
   description: "How LeadPilot Enterprise collects, uses, and protects your data.",
   robots: "index, follow",
+  ...canonicalMeta("/privacy/"),
 };
 
 const EMAIL = "ahmadshahid@calendarharvest.com";

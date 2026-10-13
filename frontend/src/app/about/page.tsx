@@ -9,11 +9,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
 
 export const metadata: Metadata = {
   title: "About LeadPilot Enterprise | Calendarharvest",
   description:
     "LeadPilot Enterprise was built by a founder who used it to find his own clients. Here is the story.",
+  ...canonicalMeta("/about/"),
 };
 
 const STEPS = [
