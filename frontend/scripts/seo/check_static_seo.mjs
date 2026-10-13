@@ -375,7 +375,11 @@ function checkPlans(rows) {
     fail(PRICING_PATH, 'pricing page not in the export, cannot check plan names');
     return;
   }
-  const text = pricing.doc.body.textContent.replace(/\s+/g, ' ');
+  // Visible text only: <script> bodies (JSON-LD, the inline Next.js data)
+  // must not satisfy the check when the rendered HTML lacks a plan.
+  const body = pricing.doc.body.cloneNode(true);
+  for (const el of body.querySelectorAll('script, style, noscript, template')) el.remove();
+  const text = body.textContent.replace(/\s+/g, ' ');
   // 2.2: once committed, the plans snapshot (a copy of the live catalog) is
   // the source of plan names; it must still carry every expected name.
   const snapshotFile = path.join(FRONTEND, 'src', 'content', 'plans-snapshot.json');
