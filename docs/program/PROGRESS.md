@@ -2,6 +2,8 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-13 — AI visibility Part A (seo/ai-visibility): canonical www host, static plan names, product-facts source, JSON-LD, copy contradictions removed, IndexNow script, git lastmod, check_static_seo.mjs as postbuild; Part B waits for trademark review — `docs/program/ai-visibility/REPORT.md`.
+
 ## 2026-10-10 — Phase 1, items 1.6 and 1.7, cloud session
 
 **State: all Phase 1 PRs open: #47, #48, #49, #50, #51, #52 and this one (GATES.md). Merge order: #48 → #47 → #49 → #50 → #51 → #52 → this.**

@@ -112,3 +112,8 @@
 - site-pages.json sources: + src/lib/productFacts.ts for / and /pricing; + staticPlans.ts, lib/pricing.ts for /pricing.
 - indexnow_submit.mjs: usage message for a bare --sitemap.
 - Not changed: "Loading plans…" stays next to the static list (2.2: leave the browser-loaded display as is).
+
+## Phase 3 / 4
+- Final: frontend checks exit 0 (1153 tests), build exit 0 with postbuild PASS, check_static_seo PASS (7 URLs), IndexNow dry-run pasted in REPORT.md.
+- Part B deferred (trademark not reviewed); resume prompt in REPORT.md.
+- Next step: push seo/ai-visibility, open PR to master. Open questions: see REPORT.md TODO(founder) and founder/legal questions.
