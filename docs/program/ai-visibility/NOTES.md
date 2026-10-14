@@ -117,3 +117,12 @@
 - Final: frontend checks exit 0 (1153 tests), build exit 0 with postbuild PASS, check_static_seo PASS (7 URLs), IndexNow dry-run pasted in REPORT.md.
 - Part B deferred (trademark not reviewed); resume prompt in REPORT.md.
 - Next step: push seo/ai-visibility, open PR to master. Open questions: see REPORT.md TODO(founder) and founder/legal questions.
+
+## 2026-10-14 follow-up — official profiles (founder answers, verbatim)
+- Listings the founders created and control: "G2: leadpilot-2026-10-14,GetApp + Capterra 'LeadsPilot',Crunchbase: leadpilot"
+- GetApp/Capterra listing shows "from $299/month": "I'll fix the listing first" → not linked until its name and price match the site.
+- @LeadPilotEnterprise: "YouTube"
+- Added to product-facts.json same_as: g2.com/products/leadpilot-2026-10-14, crunchbase.com/organization/leadpilot, youtube.com/@LeadPilotEnterprise (LinkedIn already there).
+- TODO(founder): after correcting GetApp/Capterra, ask to add getapp.com/all-software/a/leadpilot and capterra.com/p/10186469/LeadsPilot.
+- lastmod not refreshed: sameAs appears only in the site-wide JSON-LD, not in any page body (spec 2.9).
+- Post-merge status (founder screenshots, 2026-10-14): production deploy 7de6767 Ready; apex → www 308 in Vercel; IndexNow submitted 7 URLs (HTTP 202); Google Search Console domain property verified, sitemap submitted (7 discovered), /, /how-it-works/, /pricing/, /about/, /contact/ indexed, Breadcrumbs valid; Bing site added, sitemap processing.
