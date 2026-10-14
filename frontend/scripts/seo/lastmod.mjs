@@ -40,7 +40,8 @@ for (const page of PAGES) {
     console.error(`lastmod: no commit found for ${page.path} (${page.sources.join(', ')})`);
     process.exit(1);
   }
-  out[page.path] = date;
+  // One format on every OS and git version (some print +00:00, some Z).
+  out[page.path] = new Date(date).toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 fs.writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n');
 console.log(`Wrote ${path.relative(process.cwd(), OUT)}:`);
