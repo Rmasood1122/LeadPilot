@@ -71,3 +71,9 @@ files:
   # call/voicemail, no owner impersonation or claim to be human, clone consent,
   # tenancy, provider deletion, outbound gates, signed inbound webhook
   - tests/test_voice_twin_guards.py
+  # Extended 2026-10-12 (gate PR, justification in
+  # docs/program/plans/phase5-seal-email-network.md).
+  # Email network: headers only (no subject/body/Message-ID stored), B2B-only filtering,
+  # suppression/F05/erasure respected, tenancy, sends only via the chokepoint with the
+  # compliant footer, strictest regime for unknown region, CASL at send
+  - tests/test_email_network_guards.py
