@@ -260,6 +260,9 @@ export interface RequestOptions {
    *  own Content-Type -- the server streams it on without a multipart parser
    *  that would spool it to disk. */
   raw?: { body: Blob; contentType: string; filename?: string };
+  /** Extra request headers (email network: the user's own addresses travel
+   *  in a header so they stay out of URLs and access logs). */
+  headers?: Record<string, string>;
   /** Read the response as a Blob (audio) instead of JSON. */
   blob?: boolean;
   auth?: boolean; // default true
@@ -274,6 +277,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
       // throw. Percent-encoded here, decoded by the server.
       if (opts.raw.filename) headers["X-Filename"] = encodeURIComponent(opts.raw.filename);
     } else if (!opts.formData) headers["Content-Type"] = "application/json";
+    if (opts.headers) Object.assign(headers, opts.headers);
     if (opts.auth !== false) {
       const token = getAccessTokenSync();
       if (token) headers["Authorization"] = `Bearer ${token}`;

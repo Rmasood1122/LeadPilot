@@ -131,7 +131,24 @@ def lead_region(lead: Lead) -> str | None:
     return region_for_timezone(tz if isinstance(tz, str) else None)
 
 
+#: Lead sources whose UNKNOWN region is treated as the strictest regime
+#: rather than as "allowed": the email network imports people from a user's
+#: own mailbox, anywhere in the world, with no location data at all
+#: (docs/features/email-network.md, review round H2).
+STRICT_WHEN_UNKNOWN_SOURCES = frozenset({"email_network"})
+
+
+def strictest_when_unknown(lead: Lead) -> bool:
+    """True for a lead whose region is unknown AND whose source says unknown
+    must mean strictest (EU/UK rules: region notice on, no tracking pixel)."""
+    return (getattr(lead, "source", None) in STRICT_WHEN_UNKNOWN_SOURCES
+            and lead_region(lead) is None)
+
+
 def open_tracking_allowed(lead: Lead) -> bool:
     """False for EU/EEA/UK leads: a tracking pixel is 'storing or accessing
-    information on terminal equipment' and needs prior consent there."""
+    information on terminal equipment' and needs prior consent there. Also
+    False for an email-network lead of unknown region (strictest)."""
+    if strictest_when_unknown(lead):
+        return False
     return lead_region(lead) not in ("eu", "uk")

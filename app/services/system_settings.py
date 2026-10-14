@@ -462,6 +462,17 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                  "check. Healthcare businesses are always "
                                  "refused. Off = imports refused and queued "
                                  "win-back messages cancelled."),
+    # Email network (docs/features/email-network.md). OFF by default until
+    # founder/legal confirm the GDPR / CASL / PECR readings in the spec. Off =
+    # imports, Gmail scans, drafts, saves, attaching and add-to-campaign are
+    # refused (409); status, stored recommendations and DELETE keep working.
+    # A saved first email ALREADY attached to a campaign lead is still sent by
+    # the normal send path, with every check (the flag gates entry, not sends).
+    "email_network_enabled": (False, "Let users upload their own email contacts "
+                              "(Google / Outlook CSV, vCard) or a mailbox export, "
+                              "or scan their connected Gmail -- headers only, "
+                              "never bodies or subjects -- to find warm B2B "
+                              "matches for their products."),
 }
 
 

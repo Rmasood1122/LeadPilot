@@ -1,7 +1,10 @@
 "use client";
 
-/** Your LinkedIn network: upload your own export, see who is relevant to what
- *  you sell. Private to this account. Growth plan and up. */
+/** Your network: two tabs. LinkedIn -- upload your own export, see who is
+ *  relevant to what you sell. Email contacts -- the same for the people you
+ *  already email (contacts files, a mailbox export read for headers only, or
+ *  a scan of your connected Gmail). Private to this account. Growth plan and
+ *  up. The LinkedIn tab opens by default. */
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/client";
@@ -18,6 +21,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmailNetworkPanel } from "@/components/network/EmailNetworkPanel";
 
 /** One connection's message: write (or have it drafted), edit, save, then
  *  choose how it goes out. Nothing is sent from a draft. */
@@ -123,6 +128,26 @@ function MessageBox({ match, productId, message, onChanged, selected, onToggle }
 }
 
 export default function NetworkPage() {
+  return (
+    <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-6">
+      <Tabs defaultValue="linkedin">
+        <TabsList aria-label="Network source">
+          <TabsTrigger value="linkedin">LinkedIn</TabsTrigger>
+          <TabsTrigger value="email">Email contacts</TabsTrigger>
+        </TabsList>
+        <TabsContent value="linkedin"><LinkedInNetworkTab /></TabsContent>
+        <TabsContent value="email">
+          <header className="mb-4">
+            <h1 className="text-xl font-semibold">Your email contacts</h1>
+          </header>
+          <EmailNetworkPanel />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function LinkedInNetworkTab() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -181,12 +206,12 @@ export default function NetworkPage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
-  if (status.isLoading) return <p className="p-6 text-sm">Loading…</p>;
-  if (status.isError || !status.data) return <p className="p-6 text-sm">Could not load your network.</p>;
+  if (status.isLoading) return <p className="text-sm">Loading…</p>;
+  if (status.isError || !status.data) return <p className="text-sm">Could not load your network.</p>;
   const s = status.data;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <header>
         <h1 className="text-xl font-semibold">Your LinkedIn network</h1>
         <p className="text-sm text-muted-foreground">

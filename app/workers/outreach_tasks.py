@@ -522,6 +522,32 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         engine.skip_message(session, message, reason="skipped_consent_required", now=now)
         return "skipped_consent_required"
 
+    # ---- Email network: CASL two-year rule, re-checked NOW (review M3) ------
+    # A lead added from the user's own email contacts with a Canadian (.ca)
+    # address may only be emailed while the last TWO-WAY exchange is under
+    # two years old (CASL s.10(10) implied consent -- needs legal
+    # confirmation). Every other lead: one attribute read, nothing else.
+    # Skipped like a missing consent; a lookup error defers an hour.
+    if lead.source == "email_network" and not (is_whatsapp or is_linkedin or is_phone):
+        from app.services import email_network_messages  # noqa: PLC0415
+
+        try:
+            casl = email_network_messages.casl_send_block(
+                session, lead, notifications_owner(session, strategy), now=now)
+        except Exception:
+            logger.exception("CASL check failed for message %s -- deferred", message_id)
+            session.rollback()
+            message = session.get(Message, message_id)
+            message.scheduled_at = now + timedelta(hours=1)
+            message.error = "CASL check could not be run -- deferred (fails closed)"
+            session.commit()
+            return "deferred_casl_check_unavailable"
+        if casl is not None:
+            _audit(session, strategy, lead, message, "skipped_casl_window",
+                   extra={"reason": casl})
+            engine.skip_message(session, message, reason="skipped_casl_window", now=now)
+            return "skipped_casl_window"
+
     # ---- send window --------------------------------------------------------
     tz = engine.lead_timezone(lead)
     if rules.window_empty:
@@ -782,8 +808,25 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
                 # Local business mode, Part B: the owner's own win-back copy.
                 outbound = _render_customer_email_outbound(session, strategy, lead, message)
             else:
-                outbound = _render_email_outbound(session, strategy, lead,
-                                                  sequence, message, now=now)
+                # Email network (docs/features/email-network.md): a lead's
+                # step-1 email may carry the first email its owner wrote and
+                # SAVED for this person. Those words are rendered here -- with
+                # the claim check and build_compliant_email -- and then pass
+                # every gate below (review queue, forbidden phrases, the
+                # erasure re-claim) exactly like a written step. Every gate
+                # above already ran. None = the step is written as usual.
+                from app.services import email_network_messages  # noqa: PLC0415
+
+                opener = email_network_messages.saved_opener(session, message, lead,
+                                                             strategy)
+                if opener is not None:
+                    outbound = _render_saved_opener_outbound(session, strategy, lead,
+                                                             message, opener)
+                    if outcome_source is None:
+                        outcome_source = email_network_messages.OPENER_SOURCE
+                else:
+                    outbound = _render_email_outbound(session, strategy, lead,
+                                                      sequence, message, now=now)
             # F03: an email without both RFC 8058 one-click unsubscribe
             # headers never transmits (ComplianceError -> FAILED below).
             if autopilot:
@@ -800,6 +843,19 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         if not is_phone:
             from app.services import send_review  # noqa: PLC0415
 
+            # Email network: a lead whose attached saved first email was
+            # deleted gets this step-1 email HELD for a person instead of
+            # AI words sent silently in its place (review round LOW).
+            if lead.source == "email_network" and not (is_whatsapp or is_linkedin):
+                from app.services import email_network_messages  # noqa: PLC0415
+
+                if email_network_messages.hold_if_opener_deleted(
+                        session, lead, message, outbound.subject, outbound.body,
+                        notifications_owner(session, strategy)):
+                    message.status = MessageStatus.AWAITING_REVIEW
+                    message.error = None
+                    session.commit()
+                    return "held_for_review"
             decision = send_review.gate(session, lead, message,
                                         outbound.subject, outbound.body, now=now)
             if decision["action"] == "hold":
@@ -835,6 +891,19 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
         banned = guardrails.send_copy_block(session, strategy, outbound.subject, outbound.body)
         if banned:
             raise guardrails.ForbiddenPhraseBlocked(banned)
+        # Email network (review M5): the words that will actually go out to a
+        # person from the user's own contacts -- written, saved or edited by
+        # a reviewer -- may not claim a meeting, a call or a conversation the
+        # email history does not show. Same handling as a forbidden phrase.
+        if lead.source == "email_network" and not (is_whatsapp or is_linkedin or is_phone):
+            from app.services import email_network_messages  # noqa: PLC0415
+
+            overclaim = email_network_messages.send_time_wording_problems(
+                session, lead, notifications_owner(session, strategy),
+                outbound.subject, outbound.body, now=now)
+            if overclaim:
+                raise guardrails.ForbiddenPhraseBlocked(
+                    ["relationship claim not supported by your email history"])
 
         if channel is None:
             if is_linkedin:
@@ -982,6 +1051,13 @@ def send_message_impl(session: Session, message_id: uuid.UUID,
     return "sent"
 
 
+def notifications_owner(session: Session, strategy: Strategy):
+    """The account owning `strategy`, or None."""
+    from app.services import notifications  # noqa: PLC0415
+
+    return notifications.owner_of_strategy(session, strategy)
+
+
 def _owner_or_raise(session: Session, strategy: Strategy):
     """The account owning `strategy`. Raises when it cannot be resolved, so a
     guard that needs it fails closed (the caller defers the send)."""
@@ -1113,6 +1189,37 @@ def _render_reply_copilot_outbound(session: Session, strategy: Strategy, lead: L
         body=body,
         headers=headers,
         thread_ref=thread_ref,
+    )
+
+
+def _render_saved_opener_outbound(session: Session, strategy: Strategy, lead: Lead,
+                                  message: Message, opener: tuple[str, str]) -> OutboundMessage:
+    """Email network: the first email the account owner wrote and SAVED for
+    this person (email_network_messages.saved_opener). No model call. Like
+    the Reply Copilot render: the claim engine checks the words, and
+    build_compliant_email adds the unsubscribe link, the sender's postal
+    address, the region notice and the one-click List-Unsubscribe headers. No
+    open/click tracking on a personal first email."""
+    from app.services import claim_verification  # noqa: PLC0415
+
+    subject, body = opener
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead,
+                                         message=message, channel="email",
+                                         fields={"subject": subject, "body": body})
+    subject, body = checked["subject"], checked["body"]
+    subject, body, headers, token = engine.build_compliant_email(lead, subject, body)
+    message.subject = subject
+    message.body = body
+    message.unsubscribe_token = token
+    message.personalization_json = {"email_network_saved_opener": True}
+    return OutboundMessage(
+        message_id=str(message.id),
+        lead_id=str(lead.id),
+        to_address=lead.email,
+        subject=subject,
+        body=body,
+        headers=headers,
+        thread_ref=None,
     )
 
 

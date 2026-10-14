@@ -262,6 +262,11 @@ celery_app.conf.beat_schedule = {
         "task": "leadpilot.network.weekly_refresh",
         "schedule": crontab(day_of_week="monday", hour=4, minute=10),
     },
+    # Email network: re-filter + re-score stored contacts, Monday 04:25 UTC.
+    "email-network-weekly-refresh": {
+        "task": "leadpilot.network.email_weekly_refresh",
+        "schedule": crontab(day_of_week="monday", hour=4, minute=25),
+    },
     "dispatch-due-messages": {
         "task": "leadpilot.outreach.dispatch",
         "schedule": float(settings.dispatch_interval_seconds),
