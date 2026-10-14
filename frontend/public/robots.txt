@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://calendarharvest.com/sitemap.xml
+
+Sitemap: https://www.calendarharvest.com/sitemap.xml

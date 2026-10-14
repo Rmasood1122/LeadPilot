@@ -1,0 +1,54 @@
+{
+  "branch": "seo/ai-visibility",
+  "base": "master",
+  "items": [
+    {
+      "id": "2.1",
+      "title": "canonical host",
+      "status": "done"
+    },
+    {
+      "id": "2.2",
+      "title": "static plans",
+      "status": "done"
+    },
+    {
+      "id": "2.3",
+      "title": "product facts source",
+      "status": "done"
+    },
+    {
+      "id": "2.4",
+      "title": "JSON-LD",
+      "status": "done"
+    },
+    {
+      "id": "2.5",
+      "title": "contradictions",
+      "status": "done"
+    },
+    {
+      "id": "2.6",
+      "title": "content pages (Part B)",
+      "status": "deferred_next_session",
+      "reason": "Trademark not reviewed (Phase 0 Q5)"
+    },
+    {
+      "id": "2.7",
+      "title": "llms.txt (Part B)",
+      "status": "deferred_next_session",
+      "reason": "Trademark not reviewed (Phase 0 Q5)"
+    },
+    {
+      "id": "2.8",
+      "title": "IndexNow",
+      "status": "done"
+    },
+    {
+      "id": "2.9",
+      "title": "sitemap lastmod from git",
+      "status": "done"
+    }
+  ],
+  "phase": "4 (hand-over): REPORT, PROMPT_TRACKER, PROGRESS line written; push + PR"
+}

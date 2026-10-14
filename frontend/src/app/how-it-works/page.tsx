@@ -8,33 +8,40 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "How LeadPilot Works | Calendarharvest",
-  description: "LeadPilot builds and runs your outbound pipeline. Here is exactly how it works.",
+  title: "How LeadPilot by Calendarharvest works | Calendarharvest",
+  description:
+    `How ${PRODUCT_FULL_NAME} researches your market, finds and verifies business contacts, writes each email for one person, sends after your daily approval, and routes replies to you.`,
+  ...canonicalMeta("/how-it-works/"),
 };
 
 const STEPS = [
   {
     number: "01",
     title: "Research",
-    body: "Each campaign starts with a 72-step research pipeline (144 steps if you have no past clients yet) covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses go through a verification check, undeliverable ones are dropped, and the prospects that remain are scored for fit. Right before an email is written, LeadPilot can pull the prospect's recent LinkedIn posts and company news so the first line references something real, and the AI is instructed never to invent a detail.",
+    body: "Research runs once per campaign strategy: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses go through a verification check, and undeliverable ones are dropped. Right before an email is written, LeadPilot can pull company news so the first line references something real, and the AI is instructed never to invent a detail. Using a prospect's recent LinkedIn posts goes through the LinkedIn connection, which is not live yet.",
   },
   {
     number: "02",
     title: "Outreach",
-    body: "Personalised emails and LinkedIn messages, written in your voice when you add writing samples. Sequences send automatically from the Gmail and LinkedIn accounts you connect once you approve that day's automatic sending, only during permitted sending hours in the prospect's own time zone and within daily sending limits. Opt-outs are re-checked immediately before every send. By default, messages to senior decision-makers, to prospects whose last reply was an objection, or whose copy trips our tone checks are held for your approval before they go. A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call.",
+    body: "Personalised emails, written in your voice when you add writing samples. Sequences send automatically from the Gmail account you connect once you approve that day's automatic sending, only during permitted sending hours in the prospect's own time zone and within daily sending limits. WhatsApp steps are available on the plans that include WhatsApp. LinkedIn steps are built and tested only against simulated services, and are not live yet. Opt-outs are re-checked immediately before every send. By default, messages to senior decision-makers, to prospects whose last reply was an objection, or whose copy trips our tone checks are held for your approval before they go.",
   },
   {
     number: "03",
-    title: "Learning",
-    body: "Every reply makes the next campaign smarter. Reply rates tracked. ICP refined. The system compounds over time. A Revenue & ROI dashboard shows what each campaign has won, what it cost, and your cost per booked meeting.",
+    title: "Replies and meetings",
+    body: "Email and WhatsApp replies land in one inbox. Each reply is classified and the prospect's sequence stops. LeadPilot suggests a next step and a draft, but you write every answer. Prospects book on your own LeadPilot booking page, and a booking pauses their sequence.",
   },
 ];
 
 export default function HowItWorksPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <JsonLd data={pageGraph({ path: "/how-it-works/", breadcrumb: "How it Works" })} />
       <SiteNav />
 
       <main>
@@ -46,8 +53,9 @@ export default function HowItWorksPage() {
               Your pipeline. Running without you.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-300">
-              LeadPilot does the prospecting, research, outreach, and follow-up. You show up to
-              conversations that are already warm.
+              {PRODUCT_FULL_NAME} does the research, finds and checks the prospects, writes and
+              sends the outreach after your daily approval, and follows up. You answer the replies and take
+              the meetings.
             </p>
           </div>
         </section>
@@ -70,10 +78,11 @@ export default function HowItWorksPage() {
         {/* 3. What you do */}
         <section className="border-t border-white/10 px-6 py-24">
           <div className="mx-auto max-w-4xl">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Your only job is to show up.</h2>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">What you still do.</h2>
             <p className="mt-6 text-lg leading-relaxed text-gray-300">
-              You review prospect research before outreach launches. You handle the calls we book.
-              Everything between — finding, qualifying, messaging, following up — LeadPilot handles.
+              You review the strategy and the leads before outreach launches, approve sending once a day,
+              approve any message held for review, write every answer to a prospect, and take the calls
+              prospects book. Finding, checking, writing and sending in between, LeadPilot handles.
             </p>
           </div>
         </section>

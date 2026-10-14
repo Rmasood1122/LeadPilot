@@ -7,6 +7,8 @@
  *   docs/help-center/01, 02, 06, 08, 12, 13, 14, 15, 20, 21, 22, 26, 29
  *   docs/features/daily-send-approval.md, docs/features/gdpr-erasure.md
  *   app/services/system_settings.py DEFAULTS (feature flags)
+ *   src/content/product-facts.json (who it is for, capability status per the
+ *     founders' Phase 0 answers, docs/program/ai-visibility/NOTES.md)
  *
  * src/tests/homeClaims.test.ts enforces:
  *   - a feature marked "available" whose flag defaults OFF fails the test
@@ -14,7 +16,9 @@
  *   - none of the test's banned promises (see BANNED there) appears here.
  */
 
-export const HOME_TITLE = "LeadPilot: from what you sell to meetings on your calendar | Calendarharvest";
+import { PRODUCT_FACTS, notLiveSentence, statusLabel } from "@/lib/productFacts";
+
+export const HOME_TITLE = "LeadPilot by Calendarharvest: from what you sell to meetings on your calendar | Calendarharvest";
 export const HOME_DESCRIPTION =
   "Describe what you sell. LeadPilot researches your market, finds and checks business contacts, " +
   "writes each email for one person, sends on a schedule you approve each day, and routes every reply to you.";
@@ -93,8 +97,8 @@ export const STAGES: Stage[] = [
     title: "Business contacts, checked before they count",
     body:
       "LeadPilot searches for people at companies that match the verified strategy, adds what it can " +
-      "find about them, and checks every email address. Undeliverable addresses are dropped, anyone " +
-      "on your suppression list is skipped, and each lead is scored for fit.",
+      "find about them, and checks every email address. Undeliverable addresses are dropped, and anyone " +
+      "on your suppression list is skipped.",
     facts: ["Every email address verified", "Suppressed people never imported"],
     you: "You review the strategy and the leads before outreach launches.",
   },
@@ -126,9 +130,9 @@ export const STAGES: Stage[] = [
     name: "Replies",
     title: "Replies come to you, sorted",
     body:
-      "Email, LinkedIn and WhatsApp replies land in one inbox. Each reply is classified, and the " +
-      "prospect's sequence stops on every channel. A \"not now\" becomes a dated return visit. " +
-      "LeadPilot suggests a next step and a draft, but it never answers for you.",
+      "Email and WhatsApp replies land in one inbox. Each reply is classified, and the " +
+      "prospect's sequence stops on every channel. LeadPilot suggests a next step and a draft, but it " +
+      "never answers for you.",
     facts: ["A reply stops the sequence everywhere", "An unsubscribe suppresses the person on every channel"],
     you: "You write every answer to a prospect.",
   },
@@ -137,15 +141,16 @@ export const STAGES: Stage[] = [
     name: "Meetings",
     title: "Meetings on your calendar",
     body:
-      "Prospects book on your own LeadPilot booking page, and a booking pauses their sequence. Before " +
-      "the call you get a prep brief and reminders the day before and an hour before. The meeting room " +
-      "keeps your notes and writes an AI summary afterwards.",
-    facts: ["Booking pages on your own availability", "Prep brief written for every booked meeting"],
+      "Prospects book on your own LeadPilot booking page, and a booking pauses their sequence.",
+    facts: ["Booking pages on your own availability", "A booking pauses the prospect's sequence"],
     you: "You take the call.",
   },
 ];
 
-export type Availability = "available" | "on_request";
+/** "not_live": built and tested only against simulated services; "unconfirmed":
+ *  built and switched on, but not yet confirmed working end to end in production
+ *  (founders, 2026-10-13). Both from product-facts.json. */
+export type Availability = "available" | "on_request" | "not_live" | "unconfirmed";
 
 export interface Feature {
   name: string;
@@ -166,12 +171,14 @@ export const FEATURES: Feature[] = [
   {
     name: "Lead scoring",
     body: "Every sourced lead gets an AI estimate of how likely they are to book.",
-    status: "available",
+    status: "unconfirmed",
     flag: "lead_scoring_enabled",
   },
   {
     name: "Personal first lines",
-    body: "Recent LinkedIn posts and company news can shape the opening, never invented details.",
+    body:
+      "Company news can shape the opening, never invented details. Using a prospect's recent LinkedIn " +
+      "posts goes through the LinkedIn connection, which is not live yet.",
     status: "available",
     flag: "linkedin_personalization_enabled",
   },
@@ -201,25 +208,30 @@ export const FEATURES: Feature[] = [
   {
     name: "\"Not now\" memory",
     body: "A timing objection becomes a dated return visit with the reason the prospect gave.",
-    status: "available",
+    status: "unconfirmed",
     flag: "reengagement_memory_enabled",
   },
   {
-    name: "Booking pages and meeting prep",
-    body: "Your own booking pages, a prep brief for each meeting, and reminders before the call.",
+    name: "Booking pages",
+    body: "Your own booking pages; a booking pauses the prospect's sequence.",
     status: "available",
+  },
+  {
+    name: "Meeting prep",
+    body: "A prep brief for each booked meeting, reminders before the call, and an AI summary afterwards.",
+    status: "unconfirmed",
     flag: "meeting_prep_enabled",
   },
   {
-    name: "LinkedIn and WhatsApp steps",
-    body: "Add LinkedIn or WhatsApp steps to a sequence on the plans that include those channels.",
+    name: "WhatsApp steps",
+    body: "Add WhatsApp steps to a sequence on the plans that include WhatsApp.",
     status: "available",
-    plan: "WhatsApp from Starter, LinkedIn from Growth",
+    plan: "WhatsApp from Starter",
   },
   {
     name: "Workspaces for agencies",
     body: "Separate client workspaces, roles for your team, and per-client sending domains for email.",
-    status: "available",
+    status: "unconfirmed",
   },
   {
     name: "Android app",
@@ -263,34 +275,28 @@ export const FEATURES: Feature[] = [
     status: "on_request",
     flag: "quickstart_enabled",
   },
-];
-
-export const AUDIENCES = [
+  // Built, not live yet: tested only against simulated services (founders,
+  // 2026-10-13; product-facts.json status "simulated_only").
   {
-    name: "Agencies",
-    body:
-      "Marketing, web and design agencies where the founder still does the selling and the pipeline " +
-      "stalls whenever client work gets busy.",
+    name: "LinkedIn steps",
+    body: "Add LinkedIn steps to a sequence, on the plans that include LinkedIn (Growth and up).",
+    status: "not_live",
   },
   {
-    name: "B2B service firms",
-    body:
-      "Staffing and recruiting agencies, consultancies and fractional experts who sell to other " +
-      "businesses and have no sales team yet.",
-  },
-  {
-    name: "Local businesses with business clients",
-    body:
-      "Commercial cleaning, facilities, HVAC and fire protection companies looking for property " +
-      "managers, offices and other business accounts nearby.",
+    name: "Stripe checkout",
+    body: "Choosing and paying for a plan online.",
+    status: "not_live",
   },
 ];
 
-export const NOT_A_FIT = [
-  "Selling to consumers or homeowners. LeadPilot only finds people at companies.",
-  "Emailing a list you already have. Leads come from LeadPilot's own sourcing; you cannot import them.",
-  "High-volume sending. By default each mailbox sends at most 100 emails a day.",
-];
+export const NOT_LIVE_TITLE = statusLabel("simulated_only");
+export const UNCONFIRMED_TITLE = statusLabel("unconfirmed");
+
+/** Who it is for, and not for: product-facts.json, shared with /about and the JSON-LD. */
+export const AUDIENCES = PRODUCT_FACTS.fit;
+export const NOT_A_FIT = PRODUCT_FACTS.not_fit;
+/** The one-sentence description, shown on the page and used in the JSON-LD. */
+export const PRODUCT_DESCRIPTION = PRODUCT_FACTS.description;
 
 export const TRUST = [
   {
@@ -308,8 +314,8 @@ export const TRUST = [
   {
     name: "Daily send approval",
     body:
-      "On by default. Automatic sending waits each day until the account owner approves it, and " +
-      "LinkedIn needs its own approval.",
+      "On by default. Automatic sending waits each day until the account owner approves it. LinkedIn " +
+      "steps, once live, need their own approval.",
   },
   {
     name: "GDPR deletion and export",
@@ -348,8 +354,8 @@ export const FAQ = [
     q: "Can I upload my own contact list?",
     a:
       "Not as leads. Leads come from LeadPilot's own sourcing, which checks every email address. On " +
-      "Growth plans and up you can upload your LinkedIn connections export and message people who " +
-      "are already your connections.",
+      "Growth plans and up you can upload your LinkedIn connections export; messaging those " +
+      "connections uses LinkedIn steps, which are not live yet.",
   },
   {
     q: "How many emails does it send a day?",
@@ -371,11 +377,10 @@ export const FAQ = [
       "is no iPhone app. Contact us for the current way to install it.",
   },
   {
-    q: "What has not been verified yet?",
+    q: "What is not live yet?",
     a:
-      "LeadPilot connects to outside services such as Apollo, Hunter, Gmail, WhatsApp, Calendly and " +
-      "Stripe. These integrations were built and tested against simulated responses and have not yet " +
-      "been verified end to end against the live services.",
+      `${notLiveSentence()} Several other features are built but switched off by default; they ` +
+      "are listed above as available on request.",
   },
 ];
 

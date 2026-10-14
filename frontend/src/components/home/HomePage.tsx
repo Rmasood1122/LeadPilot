@@ -13,6 +13,7 @@ import Link from "next/link";
 import { CalendarCheck, Check, MailX, ShieldBan, Trash2, X } from "lucide-react";
 
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import {
   AUDIENCES,
   CLOSING,
@@ -22,7 +23,10 @@ import {
   HERO,
   HOW_IT_WORKS_ID,
   NOT_A_FIT,
+  NOT_LIVE_TITLE,
+  UNCONFIRMED_TITLE,
   PRICING_PATH,
+  PRODUCT_DESCRIPTION,
   PRICING_TEASER,
   SIGNUP_PATH,
   TRUST,
@@ -38,6 +42,8 @@ const TRUST_ICONS = [MailX, ShieldBan, CalendarCheck, Trash2];
 export function HomePage() {
   const available = FEATURES.filter((f) => f.status === "available");
   const onRequest = FEATURES.filter((f) => f.status === "on_request");
+  const notLive = FEATURES.filter((f) => f.status === "not_live");
+  const unconfirmed = FEATURES.filter((f) => f.status === "unconfirmed");
 
   return (
     <div className="lp-home min-h-screen bg-[#f8fafc] text-[#0f172a]">
@@ -52,6 +58,7 @@ export function HomePage() {
           <div aria-hidden className="lp-grid absolute inset-0" />
           <div className="relative mx-auto grid max-w-6xl gap-12 px-4 pb-20 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:pb-24 lg:pt-20">
             <div className="lp-intro">
+              <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-[#94a3b8]">{PRODUCT_FULL_NAME}</p>
               <h1
                 id="hero-title"
                 className="max-w-[17ch] text-[2.6rem] font-extrabold leading-[1.02] tracking-[-0.035em] sm:text-6xl lg:text-[3.5rem] xl:text-[3.85rem]"
@@ -129,6 +136,28 @@ export function HomePage() {
                 ))}
               </ul>
             </div>
+            <div className="mt-6 rounded-2xl border border-[#cbd5e1] p-6 sm:p-8">
+              <h3 className="text-lg font-semibold tracking-tight">{UNCONFIRMED_TITLE}</h3>
+              <ul className="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="features-unconfirmed">
+                {unconfirmed.map((f) => (
+                  <li key={f.name} className="text-[0.95rem]">
+                    <span className="font-semibold">{f.name}.</span>{" "}
+                    <span className="text-[#475569]">{f.body}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-6 rounded-2xl border border-[#cbd5e1] p-6 sm:p-8">
+              <h3 className="text-lg font-semibold tracking-tight">{NOT_LIVE_TITLE}</h3>
+              <ul className="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="features-not-live">
+                {notLive.map((f) => (
+                  <li key={f.name} className="text-[0.95rem]">
+                    <span className="font-semibold">{f.name}.</span>{" "}
+                    <span className="text-[#475569]">{f.body}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </section>
 
@@ -138,6 +167,7 @@ export function HomePage() {
             <h2 id="who-title" className="lp-h2 max-w-3xl">
               For businesses that sell to other businesses
             </h2>
+            <p className="mt-4 max-w-3xl text-[1.0625rem] leading-relaxed text-[#475569]">{PRODUCT_DESCRIPTION}</p>
             <Reveal className="mt-12 grid gap-10 lg:grid-cols-[2fr_1fr] lg:gap-14">
               <ul className="grid gap-8 sm:grid-cols-3 sm:gap-6">
                 {AUDIENCES.map((a) => (

@@ -1,0 +1,90 @@
+{
+  "brand": {
+    "product_name": "LeadPilot",
+    "company_name": "Calendarharvest"
+  },
+  "organization": {
+    "name": "Calendarharvest",
+    "url": "https://www.calendarharvest.com/",
+    "logo": "https://www.calendarharvest.com/icons/icon-512.png"
+  },
+  "same_as": [
+    "https://www.linkedin.com/company/leadpilot-app"
+  ],
+  "founders": [
+    {
+      "name": "Rehan Masood",
+      "job_title": "Founder",
+      "description": "AI engineer",
+      "home_location": "Astoria, New York"
+    }
+  ],
+  "description": "LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings.",
+  "tagline": "AI outbound sales for agencies and B2B service firms",
+  "fit": [
+    {
+      "name": "Agencies",
+      "body": "Marketing, web and design agencies where the founder still does the selling and the pipeline stalls whenever client work gets busy."
+    },
+    {
+      "name": "B2B service firms",
+      "body": "Staffing and recruiting agencies, consultancies and fractional experts who sell to other businesses and have no sales team yet."
+    },
+    {
+      "name": "Local businesses with business clients",
+      "body": "Commercial cleaning, facilities, HVAC and fire protection companies looking for property managers, offices and other business accounts nearby."
+    }
+  ],
+  "not_fit": [
+    "Selling to consumers or homeowners. LeadPilot only finds people at companies.",
+    "Emailing a list you already have. Leads come from LeadPilot's own sourcing; you cannot import them.",
+    "High-volume sending. By default each mailbox sends at most 100 emails a day."
+  ],
+  "status_labels": {
+    "live": "Live",
+    "off_by_default": "Built, switched off by default, available on request",
+    "simulated_only": "Built and tested only against simulated services; not live yet",
+    "unconfirmed": "Built and switched on, but not yet confirmed working end to end in production"
+  },
+  "capabilities": [
+    { "id": "market_research", "name": "Market and strategy research", "status": "live" },
+    { "id": "contact_finding", "name": "Finding and verifying business contacts", "status": "live" },
+    { "id": "email_writing", "name": "Writing each email for one person", "status": "live" },
+    { "id": "email_sending", "name": "Sending email from your Gmail account after daily approval", "status": "live" },
+    { "id": "whatsapp_steps", "name": "WhatsApp steps", "status": "live" },
+    { "id": "reply_routing", "name": "Reply classification and routing", "status": "live" },
+    { "id": "meeting_booking", "name": "Meeting booking", "status": "live" },
+    { "id": "smart_send_time", "name": "Smart send time", "status": "live" },
+    { "id": "android_app", "name": "Android app", "status": "live" },
+    { "id": "lead_scoring", "name": "Lead scoring", "status": "unconfirmed" },
+    { "id": "reengagement_memory", "name": "\"Not now\" memory", "status": "unconfirmed" },
+    { "id": "meeting_prep", "name": "Meeting prep briefs and reminders", "status": "unconfirmed" },
+    { "id": "agency_workspaces", "name": "Workspaces for agencies", "status": "unconfirmed" },
+    { "id": "linkedin_steps", "name": "LinkedIn steps", "status": "simulated_only" },
+    { "id": "stripe_checkout", "name": "Stripe checkout (paying for a plan online)", "status": "simulated_only" },
+    { "id": "reply_copilot", "name": "Reply Copilot", "status": "off_by_default" },
+    { "id": "deliverability_autopilot", "name": "Deliverability Autopilot", "status": "off_by_default" },
+    { "id": "waterfall_enrichment", "name": "Waterfall enrichment", "status": "off_by_default" },
+    { "id": "signal_radar", "name": "Signal Radar", "status": "off_by_default" },
+    { "id": "spend_guard", "name": "Spend Guard", "status": "off_by_default" },
+    { "id": "quickstart", "name": "Start from your website", "status": "off_by_default" }
+  ],
+  "channels": [
+    { "name": "Email (Gmail)", "capability": "email_sending" },
+    { "name": "WhatsApp", "capability": "whatsapp_steps" },
+    { "name": "LinkedIn", "capability": "linkedin_steps" }
+  ],
+  "limits": [
+    "By default a newly connected Gmail account sends 10 emails on its first day, adds 10 a day, and stops at 100 a day.",
+    "Leads come only from LeadPilot's own sourcing; you cannot import a contact list as leads.",
+    "Automatic sending waits each day until the account owner approves it."
+  ],
+  "compliance_features": [
+    "Adds your business identity, an unsubscribe link and one-click unsubscribe headers to every email.",
+    "Suppresses a person who unsubscribes or replies \"stop\" on email, LinkedIn, WhatsApp and phone.",
+    "Re-checks the suppression list right before every send.",
+    "Holds high-risk messages in a send-review queue for your approval.",
+    "Leaves out the open-tracking pixel for leads in the EU, EEA or UK.",
+    "Lets you erase a prospect, download your data and delete your account."
+  ]
+}

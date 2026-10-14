@@ -9,64 +9,55 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "About LeadPilot Enterprise | Calendarharvest",
+  title: "About LeadPilot by Calendarharvest | Calendarharvest",
   description:
-    "LeadPilot Enterprise was built by a founder who used it to find his own clients. Here is the story.",
+    `${PRODUCT_FULL_NAME} was built by a founder who used it to find his own clients. Here is the story.`,
+  ...canonicalMeta("/about/"),
 };
 
 const STEPS = [
   {
     title: "Research",
-    body: "A 72-step research pipeline runs for each campaign before a single message is written, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability and prospects are scored for fit, and right before an email is written LeadPilot can pull the prospect's recent LinkedIn posts so the opening references something real. The AI is instructed never to invent a detail.",
+    body: "Research runs once per campaign strategy before a single message is written: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability, and right before an email is written LeadPilot can pull company news so the opening references something real. The AI is instructed never to invent a detail.",
   },
   {
     title: "Outreach",
-    body: "Personalised sequences across email and LinkedIn send automatically from the accounts you connect once you approve that day's automatic sending, within permitted sending hours and daily per-account limits. By default, high-risk messages, such as those to senior executives or to prospects who last replied with an objection, are held for your approval before they send.",
+    body: "Personalised email sequences send automatically from the Gmail account you connect once you approve that day's automatic sending, within permitted sending hours and daily per-account limits. LinkedIn steps are built and tested only against simulated services, and are not live yet. By default, high-risk messages, such as those to senior executives or to prospects who last replied with an objection, are held for your approval before they send.",
   },
   {
-    title: "Learning",
-    body: "Every campaign makes the next one smarter. Reply rates are tracked, your ICP is refined against real responses, and the system compounds over time.",
+    title: "Replies and meetings",
+    body: "Replies come to you, classified, and a reply stops the prospect's sequence. You write every answer. Prospects book on your own LeadPilot booking page.",
   },
 ];
 
-const AUDIENCE = [
-  {
-    title: "Boutique agency owners",
-    body: "Agencies of 3 to 30 staff in the US, UK, Canada, Australia, New Zealand, Ireland, and Singapore, where the founder is still doing all of the selling with no dedicated SDR team.",
-  },
-  {
-    title: "Independent consultants and coaches",
-    body: "Practitioners who have lived on referrals for years, know they need outbound, and have no system to run it.",
-  },
-  {
-    title: "Early B2B SaaS founders",
-    body: "Pre-Series A founders doing founder-led sales by hand while also building the product.",
-  },
-  {
-    title: "Fractional sales consultants",
-    body: "Consultants who want to resell or white-label LeadPilot for the clients they already serve.",
-  },
-];
+/** Who it is for: the same list as the home page (src/content/product-facts.json). */
+const AUDIENCE = PRODUCT_FACTS.fit.map((a) => ({ title: a.name, body: a.body }));
+const FOUNDER = PRODUCT_FACTS.founders[0];
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <JsonLd data={pageGraph({ path: "/about/", breadcrumb: "About", founders: true })} />
       <SiteNav />
 
       <main>
         {/* 1. Hero */}
         <section className="px-6 py-24">
           <div className="mx-auto max-w-4xl">
-            <p className="text-sm font-medium uppercase tracking-wider text-blue-500">About LeadPilot</p>
+            <p className="text-sm font-medium uppercase tracking-wider text-blue-500">About {PRODUCT_FULL_NAME}</p>
             <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
               Built by a founder who used it to find his own clients.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-300">
               Rehan Masood is an AI engineer. He could build delivery systems for clients, but every
               time he went deep on delivery, his pipeline went quiet. So he built the system he wished
-              existed, and today it is the system that finds LeadPilot&apos;s own clients.
+              existed: {PRODUCT_FULL_NAME}.
             </p>
           </div>
         </section>
@@ -123,12 +114,10 @@ export default function AboutPage() {
           <div className="mx-auto max-w-4xl">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Rehan Masood — Founder</h2>
             <p className="mt-6 text-lg leading-relaxed text-gray-300">
-              Rehan is an AI engineer based in Faisalabad, Pakistan, working with clients around the
-              world. He builds AI-powered automation and agent systems, and has published more than 18
-              public repositories on GitHub spanning enterprise AI projects. His strongest conviction is
+              Rehan is an AI engineer based in {FOUNDER.home_location}, working with clients around the
+              world. He builds AI-powered automation and agent systems. His strongest conviction is
               simple: a founder who is excellent at delivery should never have to choose between doing the
-              work and finding the next client. LeadPilot is his answer to that problem. He uses it himself,
-              every day, to find LeadPilot&apos;s own clients.
+              work and finding the next client. LeadPilot is his answer to that problem.
             </p>
           </div>
         </section>

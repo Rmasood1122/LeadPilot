@@ -1,0 +1,77 @@
+{
+  "origin": "https://www.calendarharvest.com",
+  "pages": [
+    {
+      "path": "/",
+      "changefreq": "weekly",
+      "priority": 1.0,
+      "sources": [
+        "src/app/page.tsx",
+        "src/components/home/content.ts",
+        "src/components/home/HomePage.tsx",
+        "src/components/home/StageStepper.tsx",
+        "src/components/home/HomeVideo.tsx",
+        "src/content/product-facts.json",
+        "src/lib/productFacts.ts"
+      ]
+    },
+    {
+      "path": "/how-it-works/",
+      "changefreq": "weekly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/how-it-works/page.tsx"
+      ]
+    },
+    {
+      "path": "/pricing/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/pricing/page.tsx",
+        "src/app/pricing/PricingClient.tsx",
+        "src/content/plan-names.json",
+        "src/content/plans-snapshot.json",
+        "src/content/product-facts.json",
+        "src/lib/productFacts.ts",
+        "src/lib/seo/staticPlans.ts",
+        "src/lib/pricing.ts"
+      ]
+    },
+    {
+      "path": "/about/",
+      "changefreq": "monthly",
+      "priority": 0.7,
+      "sources": [
+        "src/app/about/page.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/contact/",
+      "changefreq": "monthly",
+      "priority": 0.7,
+      "sources": [
+        "src/app/contact/page.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/privacy/",
+      "changefreq": "yearly",
+      "priority": 0.3,
+      "sources": [
+        "src/app/privacy/page.tsx"
+      ]
+    },
+    {
+      "path": "/terms/",
+      "changefreq": "yearly",
+      "priority": 0.3,
+      "sources": [
+        "src/app/terms/page.tsx"
+      ]
+    }
+  ],
+  "_sources_note": "sources: the page's own files, the plans snapshot for /pricing, and product-facts.json only where the page body renders it. Shared layout, header and footer files are left out on purpose. scripts/seo/lastmod.mjs reads them."
+}

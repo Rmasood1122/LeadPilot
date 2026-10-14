@@ -23,11 +23,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | Calendarharvest",
-  description: "How LeadPilot Enterprise collects, uses, and protects your data.",
+  title: "Privacy Policy for LeadPilot by Calendarharvest | Calendarharvest",
+  description: `How ${PRODUCT_FULL_NAME} collects, uses, and protects your data.`,
   robots: "index, follow",
+  ...canonicalMeta("/privacy/"),
 };
 
 const EMAIL = "ahmadshahid@calendarharvest.com";
@@ -35,6 +40,7 @@ const EMAIL = "ahmadshahid@calendarharvest.com";
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <JsonLd data={pageGraph({ path: "/privacy/", breadcrumb: "Privacy Policy" })} />
       <SiteNav />
 
       <main className="px-6 py-24">

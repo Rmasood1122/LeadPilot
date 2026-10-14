@@ -9,11 +9,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
+import { PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { canonicalMeta } from "@/lib/seo/pageMeta";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "Book a Call | LeadPilot Enterprise",
+  title: "Book a call about LeadPilot by Calendarharvest | Calendarharvest",
   description:
-    "Talk to Rehan directly. If LeadPilot is a fit, we will tell you honestly. If it is not, we will tell you that too.",
+    `Talk to Rehan directly about ${PRODUCT_FULL_NAME}. If it is a fit, we will tell you honestly. If it is not, we will tell you that too.`,
+  ...canonicalMeta("/contact/"),
 };
 
 const CALENDLY_URL = "https://calendly.com/rmasood112224/30min";
@@ -26,7 +31,8 @@ const WHATSAPP = [
 ];
 
 const FOR_YOU = [
-  "You run a boutique agency with 3–30 staff in the US, UK, Canada, Australia, New Zealand, Ireland, or Singapore.",
+  // Who it is for: product-facts.json, the same list as the home page and /about.
+  `You are in one of the groups LeadPilot is built for: ${PRODUCT_FACTS.fit.map((a) => a.name).join(", ")}.`,
   "You are doing all sales personally and your pipeline stops every time a client project gets heavy.",
   "You have tried cold email or LinkedIn outreach and it has not produced consistent results.",
   "You are open to a done-with-you system rather than a tool you configure yourself.",
@@ -35,7 +41,10 @@ const FOR_YOU = [
 
 const NOT_FOR_YOU = [
   "You have a dedicated SDR team and a working outbound system.",
-  "You are based outside our approved geographies.",
+  // Where it is offered: Terms of Service ("currently available only to clients based in ...").
+  "You are based outside the countries LeadPilot is currently offered in: the United States, the United Kingdom, Canada, Australia, New Zealand, Ireland and Singapore (see the Terms of Service).",
+  // Not a fit: product-facts.json, the same list as the home page.
+  ...PRODUCT_FACTS.not_fit,
   "You need clients in the next 7 days. Research comes first and new mailboxes warm up gradually, so this is not a quick fix.",
 ];
 
@@ -59,13 +68,14 @@ const FAQ = [
     // Scale, Enterprise and Pay per meeting (app/core/plans.py
     // PLANS[...]["channels"]; legacy Pro has it too), not Free or Starter.
     q: "Do I need to be on LinkedIn?",
-    a: "No. Email is the default channel, sent from the Gmail account you connect. LinkedIn outreach is optional, using a LinkedIn account you connect, and is included in the Growth, Scale, Enterprise and Pay per meeting plans.",
+    a: "No. Email is the default channel, sent from the Gmail account you connect. LinkedIn steps are included in the Growth, Scale, Enterprise and Pay per meeting plans, but they are built and tested only against simulated services, and are not live yet.",
   },
 ];
 
 export default function ContactPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <JsonLd data={pageGraph({ path: "/contact/", breadcrumb: "Contact", faq: FAQ })} />
       <SiteNav />
 
       <main>
@@ -76,8 +86,8 @@ export default function ContactPage() {
               Talk to Rehan directly.
             </h1>
             <p className="mt-6 max-w-3xl text-lg leading-relaxed text-gray-300">
-              No sales team. No SDR handoff. If LeadPilot is a fit for your agency, we will tell you
-              honestly. If it is not, we will tell you that too.
+              No sales team. No SDR handoff. If {PRODUCT_FULL_NAME} is a fit for your business,
+              we will tell you honestly. If it is not, we will tell you that too.
             </p>
           </div>
         </section>
