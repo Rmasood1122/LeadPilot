@@ -50,9 +50,12 @@ import { cn } from "@/lib/utils";
  *  so the page has its own metadata), which passes in the shared footer and
  *  the static plan list shown until the live catalog loads (so the exported
  *  HTML names every plan for crawlers that do not run JavaScript). */
-export function PricingClient({ footer, staticPlans, intro }: {
+export function PricingClient({ footer, staticPlans, intro, checkoutLive }: {
   footer: ReactNode;
   staticPlans: ReactNode;
+  /** False until Stripe checkout is live (product-facts.json): no trial or
+   *  "cancel online" promise, and a "checkout opens soon" note instead. */
+  checkoutLive: boolean;
   /** Product description and capability status from product-facts.json. */
   intro: ReactNode;
 }) {
@@ -203,7 +206,9 @@ export function PricingClient({ footer, staticPlans, intro }: {
                   {showAnnual ? catalog.annual?.name : catalog.monthly.name}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  A {catalog.trial_days}-day free trial for a new account. Cancel anytime online.
+                  {checkoutLive
+                    ? `A ${catalog.trial_days}-day free trial for a new account. Cancel anytime online.`
+                    : "Billed monthly. Online checkout opens soon."}
                 </p>
                 {annualOffered && (
                   <div role="radiogroup" aria-label="Billing period"

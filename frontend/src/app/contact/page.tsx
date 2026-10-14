@@ -9,7 +9,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/Footer";
-import { PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
+import { CHECKOUT_LIVE, PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
@@ -60,7 +60,9 @@ const FAQ = [
     // Code truth (platform-gaps item 8): prices are public on /pricing, read
     // from GET /billing/catalog (app/core/billing_catalog.py).
     q: "What does LeadPilot cost?",
-    a: "Every plan and price is published on the Pricing page: monthly plans with a free trial, and a pay-per-booked-meeting plan. On the call we can help you choose between them.",
+    a: CHECKOUT_LIVE
+      ? "Every plan and price is published on the Pricing page: monthly plans with a free trial, and a pay-per-booked-meeting plan. On the call we can help you choose between them."
+      : "Every plan and price is published on the Pricing page: monthly plans and a pay-per-booked-meeting plan. Online checkout opens soon; until then, book a call to start, and we can help you choose a plan.",
   },
   {
     // Code truth: email is the default channel (app/api/sequences.py
