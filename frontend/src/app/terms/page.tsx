@@ -22,6 +22,11 @@ export const metadata: Metadata = {
 
 const EMAIL = "ahmadshahid@calendarharvest.com";
 
+// DRAFT for legal review (founders, 2026-10-14). Open questions for counsel, not rendered:
+//  - No legal entity yet: "Calendarharvest" is a trading name. Who is the contracting party?
+//  - Governing law England and Wales, arbitration in London, while the founder is in
+//    Astoria, New York: confirm the choice of law and forum.
+//  - No postal address for notices.
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
@@ -46,10 +51,13 @@ export default function TermsPage() {
 
           <Section title="2. Description of service">
             <p>
+              {/* DRAFT for legal review (founders, 2026-10-14): LinkedIn sending is not live yet;
+                  email (Gmail) is the main channel, with WhatsApp on plans that include it. */}
               LeadPilot Enterprise is a done-with-you outbound pipeline system. We research prospects
-              who match your ideal client profile, write personalised outreach, and manage LinkedIn direct
-              message and email sequences on your behalf. These sequences are sent automatically by our
-              software through the LinkedIn and email accounts you connect. The specific scope, volumes,
+              who match your ideal client profile, write personalised outreach, and manage email sequences
+              (and WhatsApp messages, on plans that include WhatsApp) on your behalf. These sequences are
+              sent automatically by our software, after you approve each day&apos;s sending, through the
+              accounts you connect. LinkedIn steps are not yet available. The specific scope, volumes,
               and deliverables for your account are set out in your client engagement, which forms part of
               these Terms. Where the engagement and these Terms conflict, the engagement prevails for that
               point only.
@@ -69,9 +77,9 @@ export default function TermsPage() {
           <Section title="4. Client responsibilities">
             <p>
               You agree to give us accurate, complete information about your business, your offer, and your
-              ideal client profile, and to tell us promptly when any of it changes. Because LinkedIn is the
-              primary outreach channel, you must maintain an active LinkedIn profile for the duration of
-              your engagement.
+              ideal client profile, and to tell us promptly when any of it changes. You must keep the email
+              account you connect for sending active and in good standing for the duration of your
+              engagement.
             </p>
             <p>
               You must not use LeadPilot for illegal outreach, spam, or any communication you would not be

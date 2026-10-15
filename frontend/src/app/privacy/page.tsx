@@ -37,6 +37,10 @@ export const metadata: Metadata = {
 
 const EMAIL = "ahmadshahid@calendarharvest.com";
 
+// DRAFT for legal review (founders, 2026-10-14). Open questions for counsel, not rendered:
+//  - No legal entity, postal address or named data controller / EU-UK representative.
+//  - Unipile is listed for LinkedIn sending and receiving although LinkedIn steps are not live
+//    yet: keep (the integration exists) or narrow until launch?
 export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white">
