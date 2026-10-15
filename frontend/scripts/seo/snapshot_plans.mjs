@@ -18,7 +18,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const SNAPSHOT_FILE = path.resolve(HERE, '..', '..', 'src', 'content', 'plans-snapshot.json');
@@ -48,7 +48,9 @@ async function main() {
   console.log(`Wrote ${path.relative(process.cwd(), SNAPSHOT_FILE)} from ${url}: ${names.join(', ')}`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run only when called directly (not when imported by check_plans_snapshot.mjs).
+// pathToFileURL, so this also matches on Windows (C:\... paths).
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   main().catch((e) => {
     console.error(`snapshot_plans: ${e.message}`);
     process.exit(1);

@@ -16,7 +16,7 @@
  *   - none of the test's banned promises (see BANNED there) appears here.
  */
 
-import { PRODUCT_FACTS, notLiveSentence, statusLabel } from "@/lib/productFacts";
+import { CHECKOUT_LIVE, PRODUCT_FACTS, notLiveSentence, statusLabel } from "@/lib/productFacts";
 
 export const HOME_TITLE = "LeadPilot by Calendarharvest: from what you sell to meetings on your calendar | Calendarharvest";
 export const HOME_DESCRIPTION =
@@ -44,7 +44,10 @@ export const HERO = {
     "each day. Replies come to you. Meetings land on your booking calendar.",
   primary: "Start free",
   secondary: "See how it works",
-  note: "Creating an account is free. Monthly plans start with a free trial.",
+  // The trial starts through Stripe checkout, so it is promised only once checkout is live.
+  note: CHECKOUT_LIVE
+    ? "Creating an account is free. Monthly plans start with a free trial."
+    : "Creating an account is free. Online checkout opens soon; to start a plan now, book a call.",
 };
 
 export const VIDEO = {
@@ -332,7 +335,10 @@ export const PRICING_TEASER = {
   title: "Pay monthly, or pay per booked meeting",
   body:
     "Plans differ by how many strategies and leads you can run, how long a sequence can be, and which " +
-    "channels you can use. Monthly plans start with a free trial and can be cancelled online.",
+    "channels you can use. " +
+    (CHECKOUT_LIVE
+      ? "Monthly plans start with a free trial and can be cancelled online."
+      : "Online checkout opens soon; to start a plan now, book a call."),
   cta: "See pricing",
 };
 

@@ -8,11 +8,12 @@
  */
 
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import planNames from "@/content/plan-names.json";
 import { Footer } from "@/components/Footer";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { PRODUCT_FACTS, PRODUCT_FULL_NAME, notLiveSentence } from "@/lib/productFacts";
+import { CHECKOUT_LIVE, CHECKOUT_SOON, PRODUCT_FACTS, PRODUCT_FULL_NAME, notLiveSentence } from "@/lib/productFacts";
 import { canonicalMeta } from "@/lib/seo/pageMeta";
 import { staticPlans, type StaticPlan } from "@/lib/seo/staticPlans";
 import { pageGraph } from "@/lib/seo/structuredData";
@@ -31,7 +32,7 @@ export default function PricingPage() {
   return (
     <>
       <JsonLd data={pageGraph({ path: "/pricing/", breadcrumb: "Pricing", software: true })} />
-      <PricingClient footer={<Footer tone="theme" />} staticPlans={<StaticPlanList />} intro={<PricingIntro />} />
+      <PricingClient footer={<Footer tone="theme" />} staticPlans={<StaticPlanList />} intro={<PricingIntro />} checkoutLive={CHECKOUT_LIVE} />
     </>
   );
 }
@@ -41,6 +42,12 @@ function PricingIntro() {
     <div className="mt-4 space-y-2 text-sm text-muted-foreground">
       <p>{PRODUCT_FACTS.description}</p>
       <p>{notLiveSentence()}</p>
+      {!CHECKOUT_LIVE && (
+        <p className="font-medium text-foreground">
+          {CHECKOUT_SOON}{" "}
+          <Link href="/contact" className="underline">Book a call</Link>
+        </p>
+      )}
     </div>
   );
 }
@@ -66,7 +73,7 @@ function StaticPlanList() {
     <div className="mx-auto mb-8 grid max-w-4xl gap-6 md:grid-cols-[1.6fr_1fr]">
       <section aria-labelledby="static-monthly" className="rounded-xl border border-border bg-card p-6">
         <h2 id="static-monthly" className="text-xl font-semibold">Monthly subscription</h2>
-        {plans.trialDays ? (
+        {CHECKOUT_LIVE && plans.trialDays ? (
           <p className="text-sm text-muted-foreground">A {plans.trialDays}-day free trial for a new account.</p>
         ) : null}
         <ul className="mt-4 space-y-4">

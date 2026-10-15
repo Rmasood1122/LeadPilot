@@ -11,7 +11,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { AUDIENCES, FAQ, FEATURES, HERO, HOME_TITLE, NOT_A_FIT, STAGES } from "@/components/home/content";
+import { AUDIENCES, FAQ, FEATURES, HERO, HOME_TITLE, NOT_A_FIT, PRICING_TEASER, STAGES } from "@/components/home/content";
+import { CHECKOUT_LIVE } from "@/lib/productFacts";
 
 const SETTINGS = readFileSync("../app/services/system_settings.py", "utf8");
 
@@ -93,10 +94,17 @@ describe("home page claims match the code (D1)", () => {
     expect(text).toContain("starts at 10 emails on its first day, adds 10 a day");
   });
 
-  it("the hero promises an account, not free use: monthly plans have a trial", () => {
-    expect(HERO.note).toBe("Creating an account is free. Monthly plans start with a free trial.");
-    const catalog = readFileSync("../app/core/billing_catalog.py", "utf8");
-    expect(catalog).toMatch(/^TRIAL_DAYS = [1-9]\d*/m);
+  it("the hero promises an account, not free use: a trial only once checkout is live", () => {
+    // The trial starts through Stripe checkout; until the founders mark checkout
+    // live in product-facts.json, no trial is promised (founders, 2026-10-14).
+    if (CHECKOUT_LIVE) {
+      expect(HERO.note).toBe("Creating an account is free. Monthly plans start with a free trial.");
+      const catalog = readFileSync("../app/core/billing_catalog.py", "utf8");
+      expect(catalog).toMatch(/^TRIAL_DAYS = [1-9]\d*/m);
+    } else {
+      expect(HERO.note).toBe("Creating an account is free. Online checkout opens soon; to start a plan now, book a call.");
+      expect(JSON.stringify({ HERO, PRICING_TEASER, FAQ })).not.toMatch(/free trial|cancel(led)? online/i);
+    }
   });
 
   it("no consumer outreach: consumers appear only in the not-a-fit list", () => {

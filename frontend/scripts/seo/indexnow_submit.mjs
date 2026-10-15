@@ -24,6 +24,14 @@ const DEFAULT_SITEMAP = `https://${CONFIG.host}/sitemap.xml`;
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+// Refuse anything unknown, so a typo such as --dry-runb never sends for real.
+const KNOWN = new Set(['--dry-run', '--sitemap']);
+const unknown = args.filter((a, idx) => a.startsWith('--') && !KNOWN.has(a) && args[idx - 1] !== '--sitemap');
+if (unknown.length) {
+  console.error(`indexnow_submit: unknown option ${unknown.join(' ')}`);
+  console.error('usage: node scripts/seo/indexnow_submit.mjs [--sitemap <path-or-url>] [--dry-run]');
+  process.exit(2);
+}
 const i = args.indexOf('--sitemap');
 const sitemapSource = i >= 0 ? args[i + 1] : DEFAULT_SITEMAP;
 if (i >= 0 && (!sitemapSource || sitemapSource.startsWith('--'))) {

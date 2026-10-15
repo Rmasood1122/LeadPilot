@@ -36,6 +36,12 @@ export function capabilitiesWithStatus(status: CapabilityStatus) {
   return facts.capabilities.filter((c) => c.status === status);
 }
 
+/** True once the founders mark Stripe checkout "live" in product-facts.json.
+ *  Until then the site promises no free trial and no online cancellation,
+ *  and says checkout opens soon (founders, 2026-10-14). */
+export const CHECKOUT_LIVE = capability("stripe_checkout").status === "live";
+export const CHECKOUT_SOON = "Online checkout opens soon. To start now, book a call.";
+
 /** "LinkedIn steps and Stripe checkout (…): built and tested only against
  *  simulated services, not yet live." Shown wherever those are mentioned. */
 export function notLiveSentence(): string {
