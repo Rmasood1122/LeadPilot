@@ -88,6 +88,7 @@ function founders(): Node[] {
     jobTitle: f.job_title,
     description: f.description,
     homeLocation: { "@type": "Place", name: f.home_location },
+    ...(f.same_as?.length ? { sameAs: f.same_as } : {}),
     worksFor: { "@id": ORGANIZATION_ID },
   }));
 }

@@ -93,7 +93,13 @@ function StaticPlanList() {
 function PlanItem({ plan, hideName = false }: { plan: StaticPlan; hideName?: boolean }) {
   return (
     <li>
-      {!hideName && <h3 className="font-semibold">{plan.name}</h3>}
+      {!hideName && (
+        <h3 className="font-semibold">
+          {plan.name}
+          {plan.price && <span className="font-normal text-muted-foreground"> {plan.price}</span>}
+        </h3>
+      )}
+      {hideName && plan.price && <p className="font-semibold">{plan.price}</p>}
       {plan.tagline && <p className="text-sm text-muted-foreground">{plan.tagline}</p>}
       {plan.features.length > 0 && (
         <ul className="mt-1 list-disc pl-5 text-sm">

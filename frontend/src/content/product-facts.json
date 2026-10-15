@@ -19,7 +19,8 @@
       "name": "Rehan Masood",
       "job_title": "Founder",
       "description": "AI engineer",
-      "home_location": "Astoria, New York"
+      "home_location": "Astoria, New York",
+      "same_as": ["https://www.linkedin.com/in/rehan-rana-leadpilot"]
     }
   ],
   "description": "LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings.",
