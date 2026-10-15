@@ -134,3 +134,9 @@
 - plans-snapshot.json generated from app/core/billing_catalog.py catalog(annual_enabled=False) (live API unreachable here); founder verifies with check_plans_snapshot.mjs.
 - Checkout box on /pricing (renewal disclosure "14-day free trial … cancel online", "Start 14-day trial" button, "Pay per meeting" button) replaced with "Online checkout opens soon … Book a call" while stripe_checkout is not live — completes the 2026-10-14 decision.
 - Note: PR #101 (legal draft, "do not merge until a lawyer reviews it") was merged before review.
+
+## 2026-10-15 (later) — founder reports
+- PR #101 (Terms draft): "PR 101 reviewved and confirmed by laywer" → recorded as LEGAL-101 in DECISIONS.md.
+- PR #102 deployed: /pricing raw HTML contains "$1,499" (founder view-source screenshot); /pricing and /about indexed in Google; /pricing breadcrumb valid.
+- IndexNow: 6 URLs submitted (HTTP 200).
+- Snapshot check: the founder's first OK compared a stale local snapshot (pull had failed); re-run after `git pull` pending.
