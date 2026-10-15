@@ -8,25 +8,26 @@
  *   2. src/content/plan-names.json, the plan names in app/core/billing_catalog.py
  *      (src/tests/planNames.test.ts keeps them in sync). Names only.
  *
- * TODO(founder): no snapshot exists yet; the live API could not be reached from
- * the session that wrote this. From frontend/, run
+ * Refresh the snapshot when prices or limits change: from frontend/, run
  *   node scripts/seo/snapshot_plans.mjs && node scripts/seo/lastmod.mjs
- * and commit both JSON files, so plan features also render statically.
+ * and commit both JSON files; node scripts/seo/check_plans_snapshot.mjs
+ * reports drift from the live catalog.
  *
- * TODO(founder): prices are deliberately NOT rendered here, and no offers go in
- * the JSON-LD, because Stripe checkout is not live (Phase 0, 2026-10-13). Decide
- * whether showing prices before checkout is live implies an offer buyers can
- * purchase; then set checkout_live in scripts/seo/expected_plans.json.
+ * Prices render in the static HTML (founders, 2026-10-14: keep prices, with an
+ * "online checkout opens soon" note while Stripe checkout is not live). No
+ * offers go in the JSON-LD until checkout is live.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 
 import planNames from "@/content/plan-names.json";
-import { featureList, type Catalog } from "@/lib/pricing";
+import { featureList, formatPrice, type Catalog } from "@/lib/pricing";
 
 export interface StaticPlan {
   name: string;
+  /** "$149/mo", "$179 per booked meeting"; absent without a snapshot. */
+  price?: string;
   tagline?: string;
   features: string[];
 }
@@ -53,9 +54,17 @@ export function staticPlans(): StaticPlans {
     };
   }
   return {
-    monthly: catalog.monthly.tiers.map((t) => ({ name: t.name, tagline: t.tagline, features: featureList(t.limits) })),
+    monthly: catalog.monthly.tiers.map((t) => ({
+      name: t.name,
+      price: `${formatPrice(t.price_cents, catalog.currency)}/mo`,
+      tagline: t.tagline,
+      features: featureList(t.limits),
+    })),
     payPerMeeting: {
       name: catalog.pay_per_meeting.name,
+      price:
+        `${formatPrice(catalog.pay_per_meeting.price_per_meeting_cents, catalog.currency)} per booked meeting, ` +
+        `${formatPrice(catalog.pay_per_meeting.monthly_fee_cents, catalog.currency)} monthly fee`,
       tagline: catalog.pay_per_meeting.tagline,
       features: featureList(catalog.pay_per_meeting.limits),
     },

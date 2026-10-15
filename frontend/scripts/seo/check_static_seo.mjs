@@ -317,7 +317,7 @@ function snapshotPrices() {
 }
 
 function checkFactsInJsonLd(where, nodes) {
-  const allowedSameAs = new Set(FACTS.same_as ?? []);
+  const allowedSameAs = new Set([...(FACTS.same_as ?? []), ...(FACTS.founders ?? []).flatMap((f) => f.same_as ?? [])]);
   const founderValues = new Set(stringLeaves(FACTS.founders ?? []));
   const prices = snapshotPrices();
   const visit = (value) => {
@@ -408,6 +408,20 @@ function checkPlans(rows) {
   }
   for (const name of names) {
     if (!text.includes(name)) fail(PRICING_PATH, `plan name "${name}" not in the static HTML`);
+  }
+  // 2026-10-15: prices shown in the static HTML before checkout is live
+  // (founder decision): every snapshot price must be on the page.
+  if (expected.prices_approved && expected.prices_in_html) {
+    if (!fs.existsSync(snapshotFile)) {
+      fail(PRICING_PATH, 'prices_in_html is set but plans-snapshot.json is missing');
+    } else {
+      const c = readJson(snapshotFile).catalog;
+      const usd = (cents) => '$' + (cents / 100).toLocaleString('en-US');
+      const cents = [...c.monthly.tiers.map((t) => t.price_cents), c.pay_per_meeting.price_per_meeting_cents];
+      for (const n of cents) {
+        if (!text.includes(usd(n))) fail(PRICING_PATH, `snapshot price "${usd(n)}" not in the static HTML`);
+      }
+    }
   }
   if (expected.prices_approved && expected.checkout_live) {
     for (const price of expected.prices ?? []) {

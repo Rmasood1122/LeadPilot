@@ -126,3 +126,11 @@
 - TODO(founder): after correcting GetApp/Capterra, ask to add getapp.com/all-software/a/leadpilot and capterra.com/p/10186469/LeadsPilot.
 - lastmod not refreshed: sameAs appears only in the site-wide JSON-LD, not in any page body (spec 2.9).
 - Post-merge status (founder screenshots, 2026-10-14): production deploy 7de6767 Ready; apex → www 308 in Vercel; IndexNow submitted 7 URLs (HTTP 202); Google Search Console domain property verified, sitemap submitted (7 discovered), /, /how-it-works/, /pricing/, /about/, /contact/ indexed, Breadcrumbs valid; Bing site added, sitemap processing.
+
+## 2026-10-15 follow-up (founder answers, verbatim)
+- Prices in static HTML: "Yes add Pricing to html"
+- Founder LinkedIn: "https://www.linkedin.com/in/rehan-rana-leadpilot" → founders[0].same_as and the /about Person sameAs.
+- Prompt-tracker run (founder, 2026-10-15): ChatGPT and Meta AI answers quoted the private repo (CLAUDE.md, test counts); repo verified private via GitHub API, so those answers came from the founder's own account context. Re-run logged out. Not ranked on any niche/comparison question; founder misnamed "Ramish Masood"; G2 6 reviews / 4.7 belong to LeadPilot AB; Meta AI said /pricing could not be fetched.
+- plans-snapshot.json generated from app/core/billing_catalog.py catalog(annual_enabled=False) (live API unreachable here); founder verifies with check_plans_snapshot.mjs.
+- Checkout box on /pricing (renewal disclosure "14-day free trial … cancel online", "Start 14-day trial" button, "Pay per meeting" button) replaced with "Online checkout opens soon … Book a call" while stripe_checkout is not live — completes the 2026-10-14 decision.
+- Note: PR #101 (legal draft, "do not merge until a lawyer reviews it") was merged before review.

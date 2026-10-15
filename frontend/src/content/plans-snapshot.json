@@ -1,0 +1,141 @@
+{
+  "source_url": "app/core/billing_catalog.py catalog(annual_enabled=False), the code GET /billing/catalog returns; generated 2026-10-15 in a session that could not reach the live API. Verify: node scripts/seo/check_plans_snapshot.mjs",
+  "fetched_at": "2026-10-15T12:05:48+00:00",
+  "catalog": {
+    "currency": "usd",
+    "trial_days": 14,
+    "annual_available": false,
+    "renewal_disclosure_version": "2026-10-11.2",
+    "recommended": "monthly",
+    "monthly": {
+      "id": "monthly",
+      "name": "Monthly subscription",
+      "recommended": true,
+      "tiers": [
+        {
+          "id": "starter",
+          "name": "Starter",
+          "price_cents": 14900,
+          "tagline": "For a founder running outbound themselves.",
+          "plan": "starter",
+          "trial_days": 14,
+          "limits": {
+            "max_strategies": 10,
+            "max_leads_per_strategy": 500,
+            "max_sequence_steps": 10,
+            "channels": [
+              "gmail",
+              "whatsapp"
+            ],
+            "ab_testing": true,
+            "multi_variate": false,
+            "playbook_access": true,
+            "website_builder": true,
+            "max_site_pages": 10,
+            "analytics_history_days": 90
+          }
+        },
+        {
+          "id": "growth",
+          "name": "Growth",
+          "price_cents": 34900,
+          "tagline": "For a small team adding LinkedIn to email.",
+          "plan": "growth",
+          "trial_days": 14,
+          "limits": {
+            "max_strategies": 25,
+            "max_leads_per_strategy": 2500,
+            "max_sequence_steps": 15,
+            "channels": [
+              "gmail",
+              "whatsapp",
+              "linkedin"
+            ],
+            "ab_testing": true,
+            "multi_variate": true,
+            "playbook_access": true,
+            "website_builder": true,
+            "max_site_pages": 25,
+            "analytics_history_days": 365
+          }
+        },
+        {
+          "id": "scale",
+          "name": "Scale",
+          "price_cents": 69900,
+          "tagline": "For an agency running every channel at volume.",
+          "plan": "scale",
+          "trial_days": 14,
+          "limits": {
+            "max_strategies": -1,
+            "max_leads_per_strategy": 10000,
+            "max_sequence_steps": 20,
+            "channels": [
+              "gmail",
+              "whatsapp",
+              "linkedin",
+              "phone"
+            ],
+            "ab_testing": true,
+            "multi_variate": true,
+            "playbook_access": true,
+            "website_builder": true,
+            "max_site_pages": -1,
+            "analytics_history_days": -1
+          }
+        },
+        {
+          "id": "enterprise",
+          "name": "Enterprise",
+          "price_cents": 149900,
+          "tagline": "No caps on campaigns, leads or API throughput.",
+          "plan": "enterprise",
+          "trial_days": 14,
+          "limits": {
+            "max_strategies": -1,
+            "max_leads_per_strategy": -1,
+            "max_sequence_steps": 20,
+            "channels": [
+              "gmail",
+              "whatsapp",
+              "linkedin",
+              "phone"
+            ],
+            "ab_testing": true,
+            "multi_variate": true,
+            "playbook_access": true,
+            "website_builder": true,
+            "max_site_pages": -1,
+            "analytics_history_days": -1
+          }
+        }
+      ]
+    },
+    "pay_per_meeting": {
+      "id": "pay_per_meeting",
+      "name": "Pay per meeting",
+      "monthly_fee_cents": 0,
+      "price_per_meeting_cents": 17900,
+      "grace_hours": 48,
+      "tagline": "Pay only when a prospect books a meeting through LeadPilot.",
+      "plan": "pay_per_meeting",
+      "recommended": false,
+      "limits": {
+        "max_strategies": 10,
+        "max_leads_per_strategy": 1000,
+        "max_sequence_steps": 10,
+        "channels": [
+          "gmail",
+          "whatsapp",
+          "linkedin"
+        ],
+        "ab_testing": true,
+        "multi_variate": false,
+        "playbook_access": true,
+        "website_builder": false,
+        "max_site_pages": 0,
+        "analytics_history_days": 365
+      }
+    }
+  }
+}

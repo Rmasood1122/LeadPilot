@@ -277,23 +277,29 @@ export function PricingClient({ footer, staticPlans, intro, checkoutLive }: {
                   ))}
                 </ul>
 
-                <p data-testid="renewal-disclosure"
-                   className="mt-6 rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
-                  {disclosure ?? (termsLoading ? "Loading your terms…" : "Your terms could not be loaded. Refresh to try again.")}
-                </p>
-                {/* Every auto-renewing plan, monthly and annual, needs the tick. */}
-                <label className="mt-3 flex items-start gap-2 text-sm">
-                  <input type="checkbox" className="mt-1" checked={agreed} disabled={!disclosure}
-                         onChange={(e) => setAgreed(e.target.checked)} />
-                  <span>I agree to these renewal terms.</span>
-                </label>
-                <Button
-                  className="mt-4 w-full"
-                  disabled={checkout.isPending || !terms || !disclosure || (signedIn && !agreed)}
-                  onClick={() => choose(chosenInterval, tier.id)}
-                >
-                  {terms ? checkoutButtonLabel(terms, tier.name, chosenInterval) : "Loading…"}
-                </Button>
+                {checkoutLive ? (
+                  <>
+                    <p data-testid="renewal-disclosure"
+                       className="mt-6 rounded-lg border border-border bg-muted/40 p-3 text-xs leading-relaxed">
+                      {disclosure ?? (termsLoading ? "Loading your terms…" : "Your terms could not be loaded. Refresh to try again.")}
+                    </p>
+                    {/* Every auto-renewing plan, monthly and annual, needs the tick. */}
+                    <label className="mt-3 flex items-start gap-2 text-sm">
+                      <input type="checkbox" className="mt-1" checked={agreed} disabled={!disclosure}
+                             onChange={(e) => setAgreed(e.target.checked)} />
+                      <span>I agree to these renewal terms.</span>
+                    </label>
+                    <Button
+                      className="mt-4 w-full"
+                      disabled={checkout.isPending || !terms || !disclosure || (signedIn && !agreed)}
+                      onClick={() => choose(chosenInterval, tier.id)}
+                    >
+                      {terms ? checkoutButtonLabel(terms, tier.name, chosenInterval) : "Loading…"}
+                    </Button>
+                  </>
+                ) : (
+                  <CheckoutSoon />
+                )}
               </article>
 
               {/* ── Option 2: Pay per meeting ─────────────────────────────── */}
@@ -323,14 +329,18 @@ export function PricingClient({ footer, staticPlans, intro, checkoutLive }: {
                   ))}
                 </ul>
 
-                <Button
-                  variant="outline"
-                  className="mt-6 w-full"
-                  disabled={checkout.isPending}
-                  onClick={() => choose("pay_per_meeting")}
-                >
-                  Pay per meeting
-                </Button>
+                {checkoutLive ? (
+                  <Button
+                    variant="outline"
+                    className="mt-6 w-full"
+                    disabled={checkout.isPending}
+                    onClick={() => choose("pay_per_meeting")}
+                  >
+                    Pay per meeting
+                  </Button>
+                ) : (
+                  <CheckoutSoon />
+                )}
               </article>
             </div>
 
@@ -347,6 +357,19 @@ export function PricingClient({ footer, staticPlans, intro, checkoutLive }: {
       </section>
       {footer}
     </main>
+  );
+}
+
+/** Until Stripe checkout is live (product-facts.json), no trial, renewal or
+ *  checkout promise: say checkout opens soon and offer a call instead. */
+function CheckoutSoon() {
+  return (
+    <div className="mt-6 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+      <p>Online checkout opens soon. To start now, book a call.</p>
+      <Link href="/contact" className="mt-3 inline-block w-full rounded-md bg-[rgb(var(--primary))] px-4 py-2 text-center font-medium text-primary-foreground">
+        Book a call
+      </Link>
+    </div>
   );
 }
 
