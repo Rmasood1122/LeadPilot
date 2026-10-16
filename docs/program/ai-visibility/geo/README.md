@@ -13,7 +13,7 @@ the queries it honestly fits. Built 2026-10-15 on top of the existing program in
   generation tool") belong to Apollo, ZoomInfo and HubSpot, which have thousands of reviews; LeadPilot has
   none yet. The realistic goal is to be the named answer for its niche, then to grow from there.
 - **Starting point (measured 2026-10-15):** LeadPilot by Calendarharvest and calendarharvest.com appeared in
-  **0 of 8** web searches, including its own name. "LeadPilot" alone returns other companies (LeadPilot AB first).
+  **0 of 8** web searches (a search tool that does not reflect Google's index: Search Console showed 5 pages indexed on 2026-10-14), including its own name. "LeadPilot" alone returns other companies (LeadPilot AB first).
 
 ## Index
 | Folder | File | What it is |
@@ -27,7 +27,11 @@ the queries it honestly fits. Built 2026-10-15 on top of the existing program in
 | authority/ | `citation_acquisition_plan.md` · `reddit_strategy.md` · `syndication_map.md` | Off-site work |
 | monitoring/ | `ai_mention_tracker.md` · `content_update_calendar.md` | Measurement and upkeep |
 
-## Gates before anything goes public
+## Status 2026-10-16
+Founder answers (questions.md, all 15 answered): publish 12 pages and the help center now, before the trademark review.
+**Built and verified in `frontend/`** (branch `claude/relaxed-lamport-ab7g3j`, not yet merged or deployed): the 12 GEO pages, /help/ with 30 articles, /llms.txt, explicit robots.txt, both founders on /about and in JSON-LD. Live copy is in `frontend/src/content/geo/*.ts` and is the source of truth from now on; the `content/` drafts here are the research versions.
+
+## Gates before anything goes public (original; superseded 2026-10-16 by the founder answers above)
 1. **Trademark review** of "LeadPilot" (Q-04). Already a founder rule from SPEC Part B.
 2. **Competitor facts checked in a browser** with dated screenshots (Q-09).
 3. Page cap: Wave 1 = the 6 founder-approved pages; Wave 2 needs approval (Q-13).
@@ -39,7 +43,7 @@ the queries it honestly fits. Built 2026-10-15 on top of the existing program in
 |---|---|---|---|
 | 1 | Answer Q-04 (trademark), Q-02 (founder name), Q-06 (own-use numbers) | Founders | questions.md |
 | 1 | Run the live crawl checks (REPORT.md "Live checks to run"); fix anything not 200 | Founder | REPORT.md |
-| 1–2 | Google Search Console + Bing Webmaster Tools: verify, submit sitemap, request indexing, IndexNow | Founder | gemini / chatgpt_bing playbooks |
+| 1–2 | Search Console and Bing are already set up (2026-10-14): after the 50-page deploy, resubmit the sitemap, request indexing for the 12 GEO pages, run IndexNow | Founder | gemini / chatgpt_bing playbooks |
 | 3 | AI-app baseline: 20 prompts × 6 platforms (~90 min) | Founder | ai_mention_tracker.md |
 | 3–5 | Complete the existing G2, Crunchbase, LinkedIn and YouTube profiles with the copy blocks | Founder | citation_acquisition_plan.md P1 |
 | 5–10 | Browser-check competitor facts; record them in NOTES.md | Founder / session | comparison pages' checklists |

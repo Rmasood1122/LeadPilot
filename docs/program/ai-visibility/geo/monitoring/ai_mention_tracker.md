@@ -87,7 +87,11 @@ searches were run on 2026-10-15:
 | "best lead generation tools 2026" | **No** | Apollo, ZoomInfo, HubSpot, Clay … |
 | "Apollo alternative for small agencies" | **No** | Instantly, Smartlead, Reply.io, Nimble … |
 
-**Baseline result: 0 of 8.** Expected AI-app baseline: 0 of 120 mentions, and brand questions answered about
+**Baseline result: 0 of 8** (web search tool; this tool does not show Google's index, where 5 pages were indexed on 2026-10-14).
+
+**Founder run, 2026-10-15 (NOTES.md):** not ranked on any niche or comparison question; the founder was misnamed "Ramish Masood"; LeadPilot AB's G2 rating (6 reviews, 4.7) was attributed to LeadPilot; Meta AI said /pricing could not be fetched; the first ChatGPT and Meta AI runs drew on the founder's signed-in account context and must be re-run signed out.
+
+ Expected AI-app baseline: 0 of 120 mentions, and brand questions answered about
 LeadPilot AB or another "LeadPilot". The most important early metric is **accuracy on the brand questions**,
 not position on category questions.
 

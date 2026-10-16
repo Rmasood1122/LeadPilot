@@ -14,7 +14,8 @@
 
 ## Step-by-step
 
-### A. Google Search Console (week 1) [founder, 30 min]
+### A. Google Search Console [done 2026-10-14; after each deploy: steps 2–3]
+**Correction 2026-10-16:** the domain property was verified and the sitemap submitted on 2026-10-14, and /, /how-it-works/, /pricing/, /about/ and /contact/ are indexed (NOTES.md). The web search tool used for this plan's baseline does not reflect Google's index.
 1. https://search.google.com/search-console → **Add property** → Domain property `calendarharvest.com`
    (DNS TXT record at the registrar). It covers www and apex.
 2. **Sitemaps** → submit `https://www.calendarharvest.com/sitemap.xml`.
@@ -69,7 +70,7 @@ pages that visibly show the FAQ → BreadcrumbList (live) → Product/Offer once
 | Signal | What to do | Status |
 |---|---|---|
 | Experience | Founder's own-use story with real numbers, dated (Q-06) and screenshots of the actual product | Missing: needs numbers |
-| Expertise | Byline "Rehan Masood, Founder, AI engineer" on comparison and statistics pages, linking to /about/ | Add when Wave 1 ships |
+| Expertise | Founders named on /about/ (Rehan Masood and Ahmad Shahid); comparison pages say "Written by LeadPilot's founders" | Live in code 2026-10-16 |
 | Authoritativeness | Third-party profiles and mentions (`authority/`) | In progress (G2, Crunchbase exist) |
 | Trust | "What is not live yet" section (live), Known limitations, privacy/terms (lawyer-confirmed per LEGAL-101), disclosed authorship on comparisons, "last checked" dates | Strong; keep it |
 

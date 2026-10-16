@@ -16,7 +16,8 @@
 
 ## Step-by-step (in order; owner and time in brackets)
 
-### A. Get indexed in Bing (week 1) [founder, 45 min]
+### A. Get indexed in Bing [site added 2026-10-14; remaining steps below]
+**Correction 2026-10-16:** the site was added to Bing Webmaster Tools on 2026-10-14 (NOTES.md). Steps 1–2 are done; do 3–6 after the 50-page deploy.
 1. Go to https://www.bing.com/webmasters and sign in. Choose **Import from Google Search Console** (fastest:
    it carries over verified sites and sitemaps), or add `https://www.calendarharvest.com/` and verify with
    the XML file or a DNS CNAME record.

@@ -13,12 +13,12 @@ help center articles 01, 02, 14, 22, 29).
 
 | Field | Value | Never write |
 |---|---|---|
-| Product | **LeadPilot** | Lead Pilot, LeadsPilot, LeadPilot AI |
+| Product | **LeadPilot** | Lead Pilot, LeadsPilot, LeadPilot AI (note: the founders' own GetApp/Capterra listing is currently named "LeadsPilot" and shows a wrong $299/month price; fix the listing, see NOTES.md 2026-10-14) |
 | Company / site name | **Calendarharvest** | CalendarHarvest, Calendar Harvest |
 | Full name on first mention | **LeadPilot by Calendarharvest** | "LeadPilot" alone on first mention (collides with LeadPilot AB) |
 | Website | **https://www.calendarharvest.com/** (www is canonical) | leadpilot.com (that is LeadPilot AB, Sweden — a different company) |
 | LinkedIn | https://www.linkedin.com/company/leadpilot-app | linkedin.com/company/leadpilot (LeadPilot AB) |
-| Founder (public) | Rehan Masood, Founder, Astoria, New York | see questions.md Q-02 |
+| Founders (public) | **Rehan Masood**, Founder (Astoria, New York) and **Ahmad Shahid**, Founder | founder answer Q-02, 2026-10-16 |
 | Category (one phrase) | **AI outbound sales tool** | "lead database", "calendar app", "CRM", "AI SDR that replies for you" |
 
 **Disambiguation line** (use at the end of any About/FAQ section and in llms.txt):

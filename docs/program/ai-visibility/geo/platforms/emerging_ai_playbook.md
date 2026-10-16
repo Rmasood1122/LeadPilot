@@ -3,8 +3,13 @@
 ## A note on the named tools
 - **Gamma** (gamma.app) generates presentations and documents. When it researches a topic it pulls web
   content, so the general principles below apply. It isn't a recommendation engine in its own right.
-- **"Sudo":** which product this means couldn't be confirmed (several AI products use the name). Logged as
-  questions.md Q-15. The general principles cover it whichever product it is.
+- **Sudowrite** (sudowrite.com; founder answer Q-15, 2026-10-16) is an AI writing tool for fiction authors
+  (Story Bible, Write, Rewrite, Expand, Brainstorm; its own fiction model, Muse, plus third-party models).
+  Research on 2026-10-16 found no sign that it searches the web, answers "which tool should I use" questions, or
+  recommends software. It has no ad or sponsored-placement program. A B2B product can only appear in its output
+  if a user writes it into their own manuscript or Story Bible. **Conclusion: Sudowrite is not a recommendation
+  channel for LeadPilot; spend no effort on it.** The general principles below cover it anyway (if it ever adds
+  web grounding, an indexed, unambiguous site is what it would read).
 - **Meta AI** uses Meta-WebIndexer for search; **Apple Intelligence/Siri** uses Applebot; **DuckDuckGo
   AI answers** use DuckAssistBot; **Mistral Le Chat** uses MistralAI-User. All are allowed in robots.txt.
 

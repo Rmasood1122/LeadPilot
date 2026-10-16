@@ -15,6 +15,14 @@
   agency lead-gen lists: Apollo appeared in all seven, Instantly in five, Reply.io in five,
   Smartlead in two. This analysis agrees with that.
 
+## 0. Price corroboration (2026-10-16, founder answer Q-09)
+Re-checked against independent 2026 sources (third-party pricing guides; G2, Capterra, Vendr pages were not returned by search).
+What the published pages use:
+- **Corroborated (≥2 independent sources agree), stated on the site:** Apollo Free; Basic $49 / Professional $79 / Organization $119 per user per month billed annually, Organization minimum 3 users, monthly costs more. Instantly Growth $47 / Hypergrowth $97 / Light Speed $358 per month (Growth rose from $37 between Dec 2025 and Jan 2026); leads and CRM are separate subscriptions; Light Speed 500,000 emails. Smartlead Base $39 / Pro $94 per month (raised from $32/$78 on 2026-07-14 per usagepricing.com); ~17% off annual.
+- **Conflicting, not stated (the page links the vendor's pricing page instead):** Clay Launch/Growth billing basis ($185/$495 vs $167/$446); Instantly Hypergrowth email allowance (100K vs 125K); Smartlead Pro email allowance (90K vs 150K); every database-size claim (Apollo 210M–275M across sources).
+- **Changed:** Artisan reportedly removed its public $250/$600 self-serve plans around July 2026 (usagepricing.com 2026-07-14; joinvalley.co, a competitor) and is now sales-quoted; the page says "plans through its sales team".
+- **Own profiles (search, 2026-10-16):** g2.com/products/leadpilot-2026-10-14, crunchbase.com/organization/leadpilot, youtube.com/@LeadPilotEnterprise and linkedin.com/company/leadpilot-app were not returned by web search. The founders confirmed on 2026-10-14 that they created these; **founder to open crunchbase.com/organization/leadpilot once and confirm it is Calendarharvest's page, not LeadPilot AB's**.
+
 ## 1. Which competitors actually compete with LeadPilot's niche
 
 The brief suggested Apollo, Hunter, Calendly, Lemlist, Outreach, SalesLoft, Clay, Instantly,
@@ -165,7 +173,7 @@ are the lists found on 2026-10-15:
 | LeadPilot AB (leadpilot.com, Stockholm, since 2019) | AI B2B prospecting assistant; G2 profile (4.7/5, 6 reviews per G2 excerpt); linkedin.com/company/leadpilot | **Highest:** same category, owns the .com |
 | LeadPilot AI Sales Assistant (AWS Marketplace) | Self-hosted AI outbound | High |
 | LeadPilot AI (Rish AI Labs, GetApp) | SMB lead gen, $9–30/mo | High |
-| LeadsPilot (GetApp/Software Advice) | Lead capture; possibly a garbled listing of LeadPilot AB | Medium |
+| LeadsPilot (GetApp/Capterra/Software Advice) | **Correction 2026-10-16:** this is the founders' own listing (NOTES.md 2026-10-14), not another company. It shows the wrong name spelling and a wrong "from $299/month" price; fix it before linking it | Self-inflicted: fix the listing |
 | Lead Pilot (Twenty Over Ten / FMG) | Inbound marketing for financial advisors | Medium |
 | leadpilot.live, Lead Pilot (BetaList), LeadsPilot.ai, hf.space LeadPilot | Various | Low–medium |
 

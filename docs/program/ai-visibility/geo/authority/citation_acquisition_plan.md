@@ -27,7 +27,7 @@
 
 **Categories to pick (where offered):** Sales Engagement · AI Sales Assistant / AI SDR · Lead Generation · Cold Email · Sales Prospecting
 **Anchor text for backlinks:** "LeadPilot by Calendarharvest" (preferred) or "LeadPilot" when the full name already appears nearby. Never "best lead gen tool".
-**Founder:** Rehan Masood, Founder (add a second founder only after Q-02).
+**Founders:** Rehan Masood, Founder · Ahmad Shahid, Founder (Q-02, 2026-10-16). Claim listings with a calendarharvest.com email (e.g. ahmadshahid@calendarharvest.com, Q-11) so the domain matches the site.
 **Pricing line:** Starter $149/mo · Growth $349/mo · Scale $699/mo · Enterprise $1,499/mo (flat per account) · Pay per meeting $0/mo + $179 per booked meeting. Online checkout not live yet.
 **Screenshots:** strategy/research view, daily send-approval screen, reply inbox, booking page, Android app (real product, no mockups).
 
@@ -38,8 +38,8 @@
 | # | Platform | Create / claim URL | ✔? | What to include / note |
 |---|---|---|---|---|
 | 1 | G2 (profile exists: g2.com/products/leadpilot-2026-10-14) | https://sell.g2.com/create-free-profile (claim/manage) | ✔ | Rename display to "LeadPilot by Calendarharvest" if allowed; long description; categories; pricing; screenshots; founder as contact. Ask real users for reviews only after they've used it. |
-| 2 | Capterra | https://digital-markets.gartner.com/capterra-vendor-signup | ✔ | One signup covers Capterra, GetApp and Software Advice. Free listing. |
-| 3 | GetApp | (same Gartner Digital Markets signup) | ✔ | Check the listing name; GetApp already shows "LeadsPilot" and "LeadPilot AI", so use the full name. |
+| 2 | Capterra | https://digital-markets.gartner.com/capterra-vendor-signup | ✔ | **Listing exists** ("LeadsPilot", capterra.com/p/10186469/LeadsPilot, NOTES.md 2026-10-14). Fix the name to "LeadPilot by Calendarharvest" and the price (it shows "from $299/month"; real: $149/month or $179 per booked meeting). Then add it to sameAs. |
+| 3 | GetApp | (same Gartner Digital Markets vendor portal) | ✔ | **Listing exists** (getapp.com/all-software/a/leadpilot); same name and price fix as Capterra. |
 | 4 | Software Advice | (same signup) | ✔ | Same. |
 | 5 | Product Hunt | https://www.producthunt.com/posts/new (Submit → New product) | verify | **Launch from a maker's personal account** (company accounts are not allowed). Launch only after checkout is live, so visitors can start. Tagline = tagline block. First comment: founder story + "what's not live yet". |
 | 6 | AlternativeTo | https://alternativeto.net/ → profile menu → "Suggest new application" | home | Add as alternative to Apollo.io, Instantly, Smartlead, Clay. Released apps only (not beta). |
@@ -47,8 +47,8 @@
 | 8 | LinkedIn Company Page (exists: linkedin.com/company/leadpilot-app) | https://www.linkedin.com/company/leadpilot-app/admin/ | ✔ | About = long description; website; industry "Software Development"; specialties: outbound sales, cold email, AI SDR, lead generation; weekly post. |
 | 9 | Wellfound (formerly AngelList Talent) | https://wellfound.com/ → Post a job / recruiter signup | home | Company profile is created through the hiring flow; create one only if you'll actually hire. Otherwise skip. |
 | 10 | SaaSHub | https://www.saashub.com/submit | verify | Short + long description; add as alternative to Apollo, Instantly. |
-| 11 | Google Search Console | https://search.google.com/search-console | ✔ | Domain property; sitemap (see Gemini playbook). |
-| 12 | Bing Webmaster Tools | https://www.bing.com/webmasters | ✔ | Import from GSC; sitemap; IndexNow; AI Performance report. |
+| 11 | Google Search Console | https://search.google.com/search-console | ✔ | **Done 2026-10-14** (domain property verified, sitemap submitted, 5 pages indexed; NOTES.md). Next: resubmit the sitemap after the 50-page deploy; request indexing for the 12 GEO pages. |
+| 12 | Bing Webmaster Tools | https://www.bing.com/webmasters | ✔ | **Site added 2026-10-14** (NOTES.md). Next: confirm the sitemap processed; run IndexNow after the deploy; record the AI Performance baseline. |
 | 13 | YouTube (exists: @LeadPilotEnterprise) | https://studio.youtube.com/ | ✔ | Channel description = long description; 1 walkthrough video with full captions. |
 | 14 | BetaList | https://betalist.com/submit | verify | Only if positioned as early-stage; free queue ~2 months. |
 | 15 | Google Play listing (Android app is live per facts file) | https://play.google.com/console | ✔ | If the app is published: description opens with the canonical sentence; developer website calendarharvest.com. Follow `docs/PLAY_STORE_CHECKLIST.md`. |

@@ -1,5 +1,5 @@
 # LeadPilot GEO Domination — Live State
-Last Updated: 2026-10-15 19:45 UTC
+Last Updated: 2026-10-16 11:45 UTC
 
 ## Overall Progress
 [x] Phase 1 — Research & Intelligence
@@ -11,10 +11,10 @@ Last Updated: 2026-10-15 19:45 UTC
 [x] Phase 7 — Monitoring Framework
 [x] Phase 8 — Final Verification
 
-## Current Step: COMPLETE — handed over for founder review
-## Status: COMPLETE (publishing gated on questions.md Q-04, Q-09, Q-13)
-## Last completed action: Phase 8 audit — 284/284 automated checks PASS
-## Next action: founder: see "Top 3 things to do first" below
+## Current Step: Publish round (founder answers 2026-10-16) — COMPLETE in code, waiting for merge + deploy
+## Status: 12 GEO pages + help center + llms.txt built and verified on branch claude/relaxed-lamport-ab7g3j; all 15 questions answered
+## Last completed action: frontend build + check_static_seo PASS (50 URLs); 1,217 frontend tests pass; geo docs corrected
+## Next action: founder: see "Top 3 things to do next (2026-10-16)" at the end
 ## Blockers: none (questions logged in questions.md)
 
 ---
@@ -159,3 +159,58 @@ That's the job of the authority plan, measured by the tracker.)
    calendarharvest.com doesn't appear in search at all. Without indexing, no assistant can cite anything here.
 3. **Run the AI-app baseline (~90 min, `monitoring/ai_mention_tracker.md`) and complete the 4 existing profiles** (G2,
    Crunchbase, LinkedIn, YouTube) with the copy blocks in `authority/citation_acquisition_plan.md`.
+
+---
+
+## 2026-10-16 — Publish round (founder answers)
+
+### 10:55 UTC — Answers recorded
+All 15 questions answered (verbatim in `docs/program/ai-visibility/NOTES.md`, summary in questions.md). Decisions that
+change the plan: publish 12 pages and the help center now (Q-13, Q-14), although the trademark is not reviewed (Q-04:
+"Not yet"; rename risk recorded); both founders public (Q-02); competitor prices from independent research (Q-09);
+Stripe checkout stays "not live" until the founder confirms a real payment (Q-08).
+
+### 11:00 UTC — Three corrections to yesterday's work, found in NOTES.md
+1. Search Console was verified on 2026-10-14 (sitemap submitted, 5 pages indexed) and the site was added to Bing.
+   Yesterday's "calendarharvest.com doesn't appear in search at all" came from a web search tool that does not reflect
+   Google's index. That was wrong, and the corrected text is now in README, playbooks, tracker and citation plan.
+2. The "LeadsPilot" GetApp/Capterra listing is the founders' own (wrong name spelling, wrong $299/month price), not a
+   name collision. Corrected in the entity card, competitor analysis and citation plan.
+3. A partial AI-app baseline already exists (founder, 2026-10-15). Added to the tracker.
+
+### 11:05–11:40 UTC — Built in `frontend/` (commits accb5aa, lastmod commit after it)
+- Founders: Ahmad Shahid added to `product-facts.json` (name + "Founder" only, nothing invented); /about lists both;
+  Organization JSON-LD carries both; the Person node emits only the fields the facts file has.
+- 12 pages (`src/content/geo/*.ts`, one renderer `src/components/content/ContentPage.tsx`): /what-is-leadpilot/,
+  /faq/ (30 Q&A + FAQPage JSON-LD built from the visible answers), /outbound-statistics/, /compare/ hub,
+  /compare/leadpilot-vs-{apollo,instantly,smartlead,clay,artisan}/, /for/{agencies,b2b-service-firms,local-businesses}/.
+- Competitor prices: only where ≥2 independent sources agreed (Apollo, Instantly, Smartlead). Clay and Artisan link
+  their pricing pages instead. No database sizes.
+- Statuses, founders, prices, checkout and trial wording are generated from the facts file and plans snapshot. When
+  Stripe goes live, flip `stripe_checkout` to "live" and the FAQ trial answer, checkout sentences, help status note
+  and llms.txt all change with it.
+- /help/ + 30 articles, copied from docs/help-center by `scripts/help/sync_help_center.mjs`, with a drift test. Every
+  article carries a status note from the facts file, so articles that describe LinkedIn or the trial never contradict the
+  marketing pages.
+- /llms.txt (route, generated from facts); robots.txt names 22 crawlers (still allow-all).
+- Footer: Who it's for / Compare / Resources columns, so every new page is one click from any public page.
+
+### 11:40 UTC — Verification (commands run from frontend/ with NEXT_PUBLIC_API_URL set, as CI does)
+| Command | Result |
+|---|---|
+| `npx tsc --noEmit -p .` | exit 0 |
+| `npm run lint` | exit 0; the 6 pre-existing warnings only (none in new files) |
+| `npx vitest run src/tests` | exit 0; 102 files, **1,217 tests** (was 1,169; +48 new in geoPages.test.ts, helpCenterCopy.test.ts) |
+| Pre-fix proof | Edited a help copy and inserted "LinkedIn steps are live": helpCenterCopy and geoPages each failed 1 test; restored → 48/48 pass |
+| `npm run build` (postbuild check) | exit 0; `check_static_seo: PASS (50 sitemap URLs)` (first build: 86 expected lastmod failures before the lastmod commit) |
+| Export scan (all 50 pages) | 0 raw markdown, 0 broken internal links, 0 missing anchors; FAQ JSON-LD 30 questions; Organization founders = both |
+| Browser (Chromium, 390 px and 1280 px) | 0 px horizontal overflow on /compare/leadpilot-vs-apollo/, /help/plans-limits-billing/, /about/; tables wrap on mobile |
+
+### Top 3 things to do next (2026-10-16)
+1. **Merge and deploy.** Open the PR from `claude/relaxed-lamport-ab7g3j`, then merge with `scripts/gate/safe_merge.sh <PR>` (merge policy B).
+   After the Vercel deploy: `cd frontend && node scripts/seo/indexnow_submit.mjs`, resubmit the sitemap in Search Console,
+   and request indexing for the 12 GEO pages.
+2. **Fix the GetApp/Capterra listing** (name "LeadPilot by Calendarharvest", real prices) and **open
+   crunchbase.com/organization/leadpilot once** to confirm it is your page, not LeadPilot AB's.
+3. **When Stripe works end to end:** change `stripe_checkout` to "live" in `frontend/src/content/product-facts.json` (the
+   site, FAQ, help notes and llms.txt follow); then send the own-use numbers (Q-06) and finish the signed-out AI baseline (Q-12).

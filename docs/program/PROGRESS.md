@@ -2,6 +2,7 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-16 — GEO publish round (claude/relaxed-lamport-ab7g3j, not merged): 12 GEO pages, /help/ (30 articles), /llms.txt, explicit robots.txt, both founders (Ahmad Shahid, Rehan Masood); founder answers in `docs/program/ai-visibility/NOTES.md`; published before trademark review by founder choice — `docs/program/ai-visibility/geo/state.md`.
 - 2026-10-15 — GEO/AEO system (docs only, claude/relaxed-lamport-ab7g3j): entity card, niche statement, 50-query library, competitor analysis, page drafts (definition, 10 use cases, 5 comparisons, 30 FAQs, sourced statistics), JSON-LD/robots/llms.txt/architecture, 5 platform playbooks, 50-platform citation plan, Reddit and syndication plans, tracker; nothing published (trademark gate, Q-04); 15 founder questions — `docs/program/ai-visibility/geo/state.md`.
 - 2026-10-13 — AI visibility Part A (seo/ai-visibility): canonical www host, static plan names, product-facts source, JSON-LD, copy contradictions removed, IndexNow script, git lastmod, check_static_seo.mjs as postbuild; Part B waits for trademark review — `docs/program/ai-visibility/REPORT.md`.
 
