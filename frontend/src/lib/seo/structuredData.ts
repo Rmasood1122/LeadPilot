@@ -30,6 +30,8 @@ function organization(): Node {
     name: org.name,
     url: org.url,
     logo: org.logo,
+    // Both founders (founder answer 2026-10-16: "Display Ahmad Shahid and Rehan Masood both as Founder").
+    founder: PRODUCT_FACTS.founders.map((f: FounderFact) => ({ "@type": "Person", name: f.name, jobTitle: f.job_title })),
     // Only profiles the founders confirmed (none yet, Phase 0 Q4).
     ...(PRODUCT_FACTS.same_as.length ? { sameAs: PRODUCT_FACTS.same_as } : {}),
   };
@@ -81,16 +83,26 @@ function breadcrumbs(path: SitePath, name: string): Node {
   };
 }
 
+/** One Person per founder. Only the fields the facts file holds for that
+ *  founder are emitted: nothing is filled in for a founder who gave less. */
 function founders(): Node[] {
-  return PRODUCT_FACTS.founders.map((f) => ({
+  return PRODUCT_FACTS.founders.map((f: FounderFact) => ({
     "@type": "Person",
     name: f.name,
     jobTitle: f.job_title,
-    description: f.description,
-    homeLocation: { "@type": "Place", name: f.home_location },
+    ...(f.description ? { description: f.description } : {}),
+    ...(f.home_location ? { homeLocation: { "@type": "Place", name: f.home_location } } : {}),
     ...(f.same_as?.length ? { sameAs: f.same_as } : {}),
     worksFor: { "@id": ORGANIZATION_ID },
   }));
+}
+
+interface FounderFact {
+  name: string;
+  job_title: string;
+  description?: string;
+  home_location?: string;
+  same_as?: string[];
 }
 
 export interface PageGraphOptions {

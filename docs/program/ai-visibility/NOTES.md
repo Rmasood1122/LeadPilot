@@ -140,3 +140,21 @@
 - PR #102 deployed: /pricing raw HTML contains "$1,499" (founder view-source screenshot); /pricing and /about indexed in Google; /pricing breadcrumb valid.
 - IndexNow: 6 URLs submitted (HTTP 200).
 - Snapshot check: the founder's first OK compared a stale local snapshot (pull had failed); re-run after `git pull` pending.
+
+## 2026-10-16 — GEO system questions (founder answers, verbatim; geo/questions.md)
+- Q1 (location of geo files): "Good and it is ok store state.md and questions.md in docs/program/ai-visibility/geo/"
+- Q2 (founders): "Display Ahmad Shahid and Rehan Masood both as Founder"
+- Q3 (positioning): "use real thing every where"
+- Q4 (trademark review): "Not yet"
+- Q5 (spelling): "use Calendarharvest every where"
+- Q6 (own-use numbers): "I will give it later"
+- Q7 (no review markup until real reviews): "ok"
+- Q8 (checkout/trial): "no I am getting stripe keys Today i will make live Full Payment with test" → stripe_checkout stays "simulated_only" in product-facts.json until the founder confirms a real end-to-end payment.
+- Q9 (competitor prices): "you research on G2 cunchbase youtube and other things"
+- Q10 (Reddit by hand): "ok"
+- Q11 (GBP / Bing Places): "I have a Business Mail ahmadshahid@calendarharvest.com"
+- Q12 (AI-app baseline): "ok i will complete"
+- Q13 (page cap): "you can Publish 12 new Pages" → supersedes the SPEC 2.6 cap of 6.
+- Q14 (help center): "Publish it"
+- Q15 (Sudo): "Sudowrite is ai for writing"
+- Consequence of Q4 + Q13/Q14: the founder chose to publish before the trademark review (SPEC Part B condition waived by the founder). Rename risk recorded in geo/questions.md Q-04.

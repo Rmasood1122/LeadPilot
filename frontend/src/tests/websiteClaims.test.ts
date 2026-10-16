@@ -24,7 +24,8 @@ const BANNED: { phrase: RegExp; why: string }[] = [
   { phrase: /pages\s+and\s+features\s+you\s+use/i, why: "no page or feature tracking exists" },
 ];
 
-const ROOTS = ["src/app", "src/components"];
+// src/content: the GEO page copy (geo/*.ts) and the published help center (help-center/*.md).
+const ROOTS = ["src/app", "src/components", "src/content"];
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
