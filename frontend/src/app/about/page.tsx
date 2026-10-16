@@ -39,6 +39,8 @@ const STEPS = [
 /** Who it is for: the same list as the home page (src/content/product-facts.json). */
 const AUDIENCE = PRODUCT_FACTS.fit.map((a) => ({ title: a.name, body: a.body }));
 const FOUNDER = PRODUCT_FACTS.founders[0];
+/** Every founder in product-facts.json, each with the title recorded there. */
+const FOUNDERS = PRODUCT_FACTS.founders;
 
 export default function AboutPage() {
   return (
@@ -109,11 +111,19 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* 5. Founder bio */}
+        {/* 5. Founders */}
         <section className="border-t border-white/10 px-6 py-24">
           <div className="mx-auto max-w-4xl">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Rehan Masood — Founder</h2>
-            <p className="mt-6 text-lg leading-relaxed text-gray-300">
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Founders</h2>
+            <ul className="mt-8 space-y-2 text-lg text-gray-300" data-testid="founder-list">
+              {FOUNDERS.map((f) => (
+                <li key={f.name}>
+                  <span className="font-semibold text-white">{f.name}</span>, {f.job_title}
+                </li>
+              ))}
+            </ul>
+            <h3 className="mt-12 text-xl font-semibold">Rehan Masood</h3>
+            <p className="mt-4 text-lg leading-relaxed text-gray-300">
               Rehan is an AI engineer based in {FOUNDER.home_location}, working with clients around the
               world. He builds AI-powered automation and agent systems. His strongest conviction is
               simple: a founder who is excellent at delivery should never have to choose between doing the

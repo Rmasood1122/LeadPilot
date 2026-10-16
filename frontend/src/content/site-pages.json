@@ -71,6 +71,594 @@
       "sources": [
         "src/app/terms/page.tsx"
       ]
+    },
+    {
+      "path": "/what-is-leadpilot/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/what-is-leadpilot/page.tsx",
+        "src/content/geo/whatIs.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/faq/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/faq/page.tsx",
+        "src/content/geo/faq.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/outbound-statistics/",
+      "changefreq": "monthly",
+      "priority": 0.7,
+      "sources": [
+        "src/app/outbound-statistics/page.tsx",
+        "src/content/geo/statistics.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/compare/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/compare/page.tsx",
+        "src/content/geo/compare.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/compare/leadpilot-vs-apollo/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/compare/[slug]/page.tsx",
+        "src/content/geo/compare.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/compare/leadpilot-vs-instantly/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/compare/[slug]/page.tsx",
+        "src/content/geo/compare.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/compare/leadpilot-vs-smartlead/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/compare/[slug]/page.tsx",
+        "src/content/geo/compare.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/compare/leadpilot-vs-clay/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/compare/[slug]/page.tsx",
+        "src/content/geo/compare.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/compare/leadpilot-vs-artisan/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/compare/[slug]/page.tsx",
+        "src/content/geo/compare.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/for/agencies/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/for/[slug]/page.tsx",
+        "src/content/geo/forPages.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/for/b2b-service-firms/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/for/[slug]/page.tsx",
+        "src/content/geo/forPages.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/for/local-businesses/",
+      "changefreq": "monthly",
+      "priority": 0.8,
+      "sources": [
+        "src/app/for/[slug]/page.tsx",
+        "src/content/geo/forPages.ts",
+        "src/content/geo/shared.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json",
+        "src/content/plans-snapshot.json"
+      ]
+    },
+    {
+      "path": "/help/",
+      "changefreq": "weekly",
+      "priority": 0.7,
+      "sources": [
+        "src/app/help/page.tsx",
+        "src/content/help-center/01-what-is-leadpilot.md",
+        "src/content/help-center/02-who-its-for-and-not-for.md",
+        "src/content/help-center/03-getting-started.md",
+        "src/content/help-center/04-research-pipeline.md",
+        "src/content/help-center/05-strategy-verification.md",
+        "src/content/help-center/06-lead-sourcing-and-email-verification.md",
+        "src/content/help-center/07-personalization-and-claim-verification.md",
+        "src/content/help-center/08-sequences-and-follow-ups.md",
+        "src/content/help-center/09-email-sending-gmail.md",
+        "src/content/help-center/10-whatsapp-outreach.md",
+        "src/content/help-center/11-linkedin.md",
+        "src/content/help-center/12-send-review-queue.md",
+        "src/content/help-center/13-replies-and-unified-inbox.md",
+        "src/content/help-center/14-booking-and-calendar.md",
+        "src/content/help-center/15-meetings-prep-room-transcripts.md",
+        "src/content/help-center/16-crm-and-integrations.md",
+        "src/content/help-center/17-learning-loop-and-ab-tests.md",
+        "src/content/help-center/18-analytics-health-score-roi.md",
+        "src/content/help-center/19-deliverability-and-mailbox-health.md",
+        "src/content/help-center/20-compliance.md",
+        "src/content/help-center/21-privacy-data-retention-deletion.md",
+        "src/content/help-center/22-plans-limits-billing.md",
+        "src/content/help-center/23-account-security.md",
+        "src/content/help-center/24-workspaces-and-agency-mode.md",
+        "src/content/help-center/25-pause-stop-kill-switch.md",
+        "src/content/help-center/26-mobile-app.md",
+        "src/content/help-center/27-troubleshooting.md",
+        "src/content/help-center/28-glossary.md",
+        "src/content/help-center/29-known-limitations.md",
+        "src/content/help-center/30-contact-support-and-status.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/what-is-leadpilot/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/01-what-is-leadpilot.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/who-its-for-and-not-for/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/02-who-its-for-and-not-for.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/getting-started/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/03-getting-started.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/research-pipeline/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/04-research-pipeline.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/strategy-verification/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/05-strategy-verification.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/lead-sourcing-and-email-verification/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/06-lead-sourcing-and-email-verification.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/personalization-and-claim-verification/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/07-personalization-and-claim-verification.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/sequences-and-follow-ups/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/08-sequences-and-follow-ups.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/email-sending-gmail/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/09-email-sending-gmail.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/whatsapp-outreach/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/10-whatsapp-outreach.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/linkedin/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/11-linkedin.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/send-review-queue/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/12-send-review-queue.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/replies-and-unified-inbox/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/13-replies-and-unified-inbox.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/booking-and-calendar/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/14-booking-and-calendar.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/meetings-prep-room-transcripts/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/15-meetings-prep-room-transcripts.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/crm-and-integrations/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/16-crm-and-integrations.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/learning-loop-and-ab-tests/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/17-learning-loop-and-ab-tests.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/analytics-health-score-roi/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/18-analytics-health-score-roi.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/deliverability-and-mailbox-health/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/19-deliverability-and-mailbox-health.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/compliance/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/20-compliance.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/privacy-data-retention-deletion/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/21-privacy-data-retention-deletion.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/plans-limits-billing/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/22-plans-limits-billing.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/account-security/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/23-account-security.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/workspaces-and-agency-mode/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/24-workspaces-and-agency-mode.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/pause-stop-kill-switch/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/25-pause-stop-kill-switch.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/mobile-app/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/26-mobile-app.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/troubleshooting/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/27-troubleshooting.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/glossary/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/28-glossary.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/known-limitations/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/29-known-limitations.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/contact-support-and-status/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/30-contact-support-and-status.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
     }
   ],
   "_sources_note": "sources: the page's own files, the plans snapshot for /pricing, and product-facts.json only where the page body renders it. Shared layout, header and footer files are left out on purpose. scripts/seo/lastmod.mjs reads them."

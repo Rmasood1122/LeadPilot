@@ -1,6 +1,8 @@
 /**
  * components/Footer.tsx — footer for the public pages
- * (/about, /contact, /how-it-works, /privacy, /terms, /pricing, /status).
+ * (/about, /contact, /how-it-works, /privacy, /terms, /pricing, /status, and the
+ * GEO and help pages). Its Who it's for / Compare / Resources columns keep every
+ * one of those pages one click from any public page.
  *
  * Server component. Not used by the dashboard, which has its own shell.
  * One footer everywhere so the Legal links and the Status link (when live)
@@ -19,6 +21,34 @@ const COLUMNS = [
       { href: "/about", label: "About" },
       { href: "/contact", label: "Contact" },
       { href: "/pricing", label: "Pricing" },
+    ],
+  },
+  {
+    heading: "Who it's for",
+    links: [
+      { href: "/for/agencies", label: "Agencies" },
+      { href: "/for/b2b-service-firms", label: "B2B service firms" },
+      { href: "/for/local-businesses", label: "Local businesses" },
+    ],
+  },
+  {
+    heading: "Compare",
+    links: [
+      { href: "/compare/leadpilot-vs-apollo", label: "vs Apollo" },
+      { href: "/compare/leadpilot-vs-instantly", label: "vs Instantly" },
+      { href: "/compare/leadpilot-vs-smartlead", label: "vs Smartlead" },
+      { href: "/compare/leadpilot-vs-clay", label: "vs Clay" },
+      { href: "/compare/leadpilot-vs-artisan", label: "vs Artisan" },
+      { href: "/compare", label: "All comparisons" },
+    ],
+  },
+  {
+    heading: "Resources",
+    links: [
+      { href: "/what-is-leadpilot", label: "What is LeadPilot" },
+      { href: "/faq", label: "FAQ" },
+      { href: "/help", label: "Help center" },
+      { href: "/outbound-statistics", label: "Outbound statistics" },
     ],
   },
   {
@@ -55,7 +85,7 @@ export function Footer({
   return (
     <footer className={`border-t ${t.border} px-6 py-12`}>
       <div className="mx-auto max-w-6xl">
-        <div className="grid grid-cols-2 gap-8 sm:max-w-md">
+        <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:grid-cols-5">
           {COLUMNS.map((col) => (
             <nav key={col.heading} aria-label={col.heading}>
               <h2 className={`text-sm font-semibold uppercase tracking-wider ${t.heading}`}>{col.heading}</h2>
