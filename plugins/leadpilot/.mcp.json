@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "leadpilot": {
+      "type": "http",
+      "url": "https://api.calendarharvest.com/mcp"
+    }
+  }
+}

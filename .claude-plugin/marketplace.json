@@ -1,0 +1,13 @@
+{
+  "name": "leadpilot",
+  "owner": {
+    "name": "LeadPilot"
+  },
+  "plugins": [
+    {
+      "name": "leadpilot",
+      "source": "./plugins/leadpilot",
+      "description": "The LeadPilot connector (remote MCP) and the leadpilot-outbound skill."
+    }
+  ]
+}
