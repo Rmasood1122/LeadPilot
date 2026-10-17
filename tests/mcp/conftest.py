@@ -49,9 +49,21 @@ def mcp_sessions(db_session, monkeypatch):
 
 def mcp_token(user, *, scope: str = "leadpilot:read", audience: str = RESOURCE,
               ttl_seconds: int = 600) -> str:
+    """A connector access token backed by a real connector session row, as
+    the token endpoint issues them (the verifier requires a live session)."""
+    from app.services import auth_sessions
+
+    db = mcp_context.session_factory()
+    try:
+        tokens = auth_sessions.start_connector_session(
+            db, db.get(m.User, user.id), client_id="test-client", scope=scope)
+        db.commit()
+        session_id, family_id = tokens.session.id, tokens.session.family_id
+    finally:
+        db.close()
     return auth_svc.issue_mcp_access_token(
         user.id, client_id="test-client", scope=scope, audience=audience,
-        ttl_seconds=ttl_seconds)
+        session_id=session_id, family_id=family_id, ttl_seconds=ttl_seconds)
 
 
 def _run(token: str, fn):

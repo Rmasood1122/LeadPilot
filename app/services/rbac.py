@@ -29,6 +29,9 @@ SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 # act as the signed-in user, whatever workspace is selected.
 PERSONAL_PREFIXES = ("/auth", "/me", "/devices", "/support", "/tutorials", "/onboarding",
                      "/workspaces", "/branding",
+                     # Connector consent (app/api/oauth.py): always the signed-in
+                     # person's own account (DECISIONS.md CONN-WORKSPACE).
+                     "/oauth",
                      # Section E: a member buys/cancels only for their own account.
                      "/billing")
 

@@ -7,6 +7,7 @@ import { isUnverifiedError, login, me } from "@/lib/api/auth";
 import { ApiError, restoreSession } from "@/lib/api/client";
 import { isPhoneDeferred } from "@/lib/identity";
 import { postLoginDestination } from "@/lib/post-login";
+import { takeConsentReturn, withConsentReturn } from "@/lib/oauthConsent";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -54,7 +55,10 @@ export default function LoginPage() {
       try {
         if (!(await restoreSession())) return;
         const user = await me();
-        if (mounted) router.replace(postLoginDestination(user, { phoneDeferred: isPhoneDeferred() }));
+        if (mounted) {
+          router.replace(withConsentReturn(
+            postLoginDestination(user, { phoneDeferred: isPhoneDeferred() }), takeConsentReturn()));
+        }
       } catch (err) {
         if (mounted && isUnverifiedError(err)) router.replace("/check-email");
         // Anything else (API unreachable): fall through to the form.
@@ -78,7 +82,11 @@ export default function LoginPage() {
       // decision (verify email / verify identity / choose a plan / dashboard)
       // is made from the response, which the server computes fresh. This is the
       // ONE place the plan check runs (afterLogin); session restores skip it.
-      router.replace(postLoginDestination(user, { phoneDeferred: isPhoneDeferred(), afterLogin: true }));
+      // A pending Claude / ChatGPT connection (lib/oauthConsent.ts) goes back
+      // to its consent page instead of the dashboard or pricing.
+      router.replace(withConsentReturn(
+        postLoginDestination(user, { phoneDeferred: isPhoneDeferred(), afterLogin: true }),
+        takeConsentReturn()));
     } catch (err) {
       setError(err instanceof ApiError ? err.detail : "Could not sign in");
       setBusy(false);

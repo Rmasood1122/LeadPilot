@@ -48,6 +48,9 @@ OWNERSHIP: dict[str, list[str]] = {
     "api_usage": ["user_id"],
     "attribution_entries": ["user_id"],
     "auth_sessions": ["user_id"],
+    # Connector consent: which client was approved, when, for which scopes
+    # (the code itself is a one-way hash and never exported).
+    "oauth_authorization_codes": ["user_id"],
     "billable_meetings": ["user_id"],
     "billing_renewal_notices": ["user_id"],        # auto-renewal notices sent
     "billing_subscriptions": ["user_id"],
@@ -177,6 +180,9 @@ EXCLUDED: dict[str, str] = {
     "password_reset_tokens": ("one-way token hashes; each request (time, IP) is "
                               "exported as a security_audit_events row"),
     "phone_verification_codes": "one-way code hashes only",
+    "oauth_clients": ("connector OAuth client registrations (RFC 7591): anonymous, no "
+                      "owner column; the person is bound at consent, in "
+                      "oauth_authorization_codes and auth_sessions"),
     "voice_clone_deletions": ("voice twin: provider voice ids still to be deleted at "
                               "ElevenLabs after an erasure; no owner column, nothing "
                               "personal"),

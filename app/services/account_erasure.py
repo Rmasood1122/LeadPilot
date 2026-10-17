@@ -126,6 +126,9 @@ KEPT: dict[str, str] = {
 # tests/test_account_erasure.py fails.
 DELETED: frozenset[str] = frozenset({
     "api_keys", "api_usage", "attribution_entries", "auth_sessions",
+    # Connector consent records (docs/features/mcp-connector.md); the
+    # sessions they started are auth_sessions rows, deleted above.
+    "oauth_authorization_codes",
     "autopilot_launches",  # opt-in proof stays in compliance_audit_log (E2)
     "daily_send_approvals",  # the decisions themselves stay in compliance_audit_log (E2)
     # Local business win-back import log (attestation, counts, refused line

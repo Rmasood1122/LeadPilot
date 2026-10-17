@@ -62,6 +62,14 @@ AUTH_PASSWORD_RESET_REQUESTED = "auth.password_reset_requested"
 AUTH_PASSWORD_RESET = "auth.password_reset"
 AUTH_PASSWORD_RESET_REFUSED = "auth.password_reset_refused"
 AUTH_REFRESH_REUSE = "auth.refresh_reuse_detected"
+# Claude / ChatGPT connector (docs/features/mcp-connector.md): consent given or
+# refused on the consent page, a connection revoked, and each write tool call
+# (action "mcp.<tool>", details: actor_channel="mcp", oauth_client_id).
+OAUTH_CONSENT_GRANTED = "oauth.consent_granted"
+OAUTH_CONSENT_DENIED = "oauth.consent_denied"
+OAUTH_CODE_REUSE = "oauth.code_reuse_detected"
+OAUTH_TOKEN_REVOKED = "oauth.token_revoked"
+MCP_TOOL_PREFIX = "mcp."
 ACCOUNT_EXPORTED = "account.data_exported"
 ACCOUNT_EXPORT_DENIED = "account.data_export_denied"
 # GDPR Art. 17: the account erased itself (app/services/account_erasure.py).

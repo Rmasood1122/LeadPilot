@@ -7,10 +7,13 @@ refused here, and an MCP token is refused by the REST API, because each
 side checks `typ` (DECISIONS.md CONN-AS).
 
 The token resolves to the same User get_current_user would return for that
-person, and passes the same account checks (erased, suspended, unverified
-email: auth.check_account_usable) plus the password-change sign-out. A
-token that fails any of them is answered 401 by the SDK's bearer middleware
--- the client's refresh then fails too, and the person reconnects.
+person. Its connector session must still be live (a disconnect, a family
+logout or a refresh-token reuse ends it at once:
+auth_sessions.connector_session_live), and it passes the same account
+checks (erased, suspended, unverified email: auth.check_account_usable) plus
+the password-change sign-out. A token that fails any of them is answered 401
+by the SDK's bearer middleware -- the client's refresh then fails too, and
+the person reconnects.
 
 Never logs the token.
 """
@@ -28,7 +31,10 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.models import User
 from app.services import auth as auth_svc
-from app.services.auth_sessions import _issued_before_password_change
+from app.services.auth_sessions import (
+    _issued_before_password_change,
+    connector_session_live,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +53,9 @@ def load_principal(db: Session, claims: dict) -> User:
     user = db.get(User, uuid.UUID(str(claims["sub"])))
     if user is None:
         raise PrincipalRejected("user not found")
+    if not connector_session_live(db, session_id=claims.get("sid"),
+                                  family_id=claims.get("fam"), user_id=user.id):
+        raise PrincipalRejected("connection revoked")
     if _issued_before_password_change(user, claims):
         raise PrincipalRejected("session expired")
     try:
@@ -64,7 +73,7 @@ def access_token_from_claims(token: str, claims: dict) -> AccessToken:
         expires_at=int(claims["exp"]),
         resource=str(claims.get("aud") or ""),
         subject=str(claims["sub"]),
-        claims={k: claims[k] for k in ("sid", "iat") if k in claims},
+        claims={k: claims[k] for k in ("sid", "fam", "iat") if k in claims},
     )
 
 
