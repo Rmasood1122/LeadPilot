@@ -72,9 +72,21 @@ def test_the_revision_follows_0051():
     assert module.down_revision == "0051_compliance_rules"
 
 
+# Columns (and their index) a LATER migration adds. 0052 is judged against the
+# model minus these; 0091 is proven by tests/test_oauth_connector_migration.py.
+LATER_COLUMNS = {"auth_sessions": {"oauth_client_id": "0091_oauth_connector",
+                                   "scope": "0091_oauth_connector"}}
+LATER_INDEXES = {"auth_sessions": {"ix_auth_sessions_oauth_client_id": "0091_oauth_connector"}}
+
+
 @pytest.mark.parametrize("table", TABLES)
 def test_table_matches_the_model(from_models, from_migration, table):
-    assert _describe(from_migration, table) == _describe(from_models, table)
+    model_shape = _describe(from_models, table)
+    for column in LATER_COLUMNS.get(table, {}):
+        model_shape["columns"].pop(column)
+    for index in LATER_INDEXES.get(table, {}):
+        model_shape["indexes"].pop(index)
+    assert _describe(from_migration, table) == model_shape
 
 
 def test_downgrade_round_trips(tmp_path):

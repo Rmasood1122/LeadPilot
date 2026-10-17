@@ -127,6 +127,9 @@ def issue_tokens(user_id: uuid.UUID) -> dict:
 # this `typ` (and its `aud`), and decode_mcp_access_token refuses everything
 # else. `aud` is the MCP URL exactly as published in the RFC 9728 metadata.
 MCP_ACCESS_TYP = "mcp_access"
+# A connector refresh token: only the OAuth token endpoint accepts it, and it
+# names its auth_sessions row (jti) and family (fam) like a web refresh token.
+MCP_REFRESH_TYP = "mcp_refresh"
 
 
 class TokenRejected(Exception):
@@ -135,19 +138,46 @@ class TokenRejected(Exception):
 
 
 def issue_mcp_access_token(user_id: uuid.UUID, *, client_id: str, scope: str,
-                           audience: str, ttl_seconds: int | None = None,
-                           session_id: uuid.UUID | None = None) -> str:
-    extra = {"aud": audience, "client_id": client_id, "scope": scope}
-    if session_id is not None:
-        extra["sid"] = str(session_id)
+                           audience: str, session_id: uuid.UUID,
+                           family_id: uuid.UUID, ttl_seconds: int | None = None) -> str:
+    """`sid`/`fam` bind the token to its connector session, so disconnecting
+    (or a refresh-token reuse) stops it before it expires
+    (auth_sessions.connector_session_live)."""
+    extra = {"aud": audience, "client_id": client_id, "scope": scope,
+             "sid": str(session_id), "fam": str(family_id)}
     ttl = settings.mcp_access_ttl_seconds if ttl_seconds is None else ttl_seconds
     return _issue(user_id, MCP_ACCESS_TYP, ttl, extra)
+
+
+def issue_mcp_refresh_token(user_id: uuid.UUID, *, client_id: str, session_id: uuid.UUID,
+                            family_id: uuid.UUID, ttl_seconds: int) -> str:
+    return _issue(user_id, MCP_REFRESH_TYP, ttl_seconds,
+                  {"jti": str(session_id), "fam": str(family_id), "client_id": client_id})
+
+
+def decode_mcp_refresh_token(token: str, *, verify_exp: bool = True) -> dict:
+    try:
+        payload = jwt.decode(token, _secret(), algorithms=["HS256"],
+                             options={"verify_exp": verify_exp,
+                                      "require": ["exp", "iat", "sub", "jti"]})
+    except jwt.ExpiredSignatureError:
+        raise TokenRejected("expired") from None
+    except jwt.InvalidTokenError:
+        raise TokenRejected("invalid") from None
+    if payload.get("typ") != MCP_REFRESH_TYP:
+        raise TokenRejected("not a connector refresh token")
+    try:
+        uuid.UUID(str(payload.get("sub")))
+        uuid.UUID(str(payload.get("jti")))
+    except ValueError:
+        raise TokenRejected("invalid") from None
+    return payload
 
 
 def decode_mcp_access_token(token: str, *, audience: str) -> dict:
     try:
         payload = jwt.decode(token, _secret(), algorithms=["HS256"], audience=audience,
-                             options={"require": ["exp", "iat", "sub", "aud"]})
+                             options={"require": ["exp", "iat", "sub", "aud", "sid", "fam"]})
     except jwt.ExpiredSignatureError:
         raise TokenRejected("expired") from None
     except jwt.InvalidAudienceError:

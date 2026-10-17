@@ -349,6 +349,12 @@ class Settings(BaseSettings):
     # The cap is enforced identically in mock mode, where a message costs
     # nothing. That is on purpose: a user must not build a habit against a
     # limit that tightens the day a real key is added.
+    # Connector OAuth (app/api/oauth.py): client registrations and authorize
+    # requests per IP per HOUR. Deliberately far above RATE_LIMIT_AUTH:
+    # Claude registers from Anthropic's shared egress range (160.79.104.0/21)
+    # for every user who connects, so a per-IP limit sized for one person
+    # would lock every Claude user out. It only stops a flood.
+    RATE_LIMIT_OAUTH: int = 600
     RATE_LIMIT_SUPPORT_CHAT: int = 20
     """Max login/signup attempts per 15-minute window. Default: 10.
 

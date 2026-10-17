@@ -4916,6 +4916,79 @@ class AuthSession(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # Claude / ChatGPT connector (migration 0091, DECISIONS.md CONN-AS). Set
+    # on sessions issued by the OAuth token endpoint: the registered client
+    # (oauth_clients.client_id) and the scopes granted. NULL = a web/app
+    # sign-in, exactly what every row before the connector is. A connector
+    # session's refresh token is typ="mcp_refresh", so /auth/refresh refuses
+    # it and the OAuth token endpoint refuses web refresh tokens.
+    oauth_client_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    scope: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class OAuthClient(Base):
+    """An OAuth client registered by RFC 7591 Dynamic Client Registration --
+    in practice one per Claude or ChatGPT connection.
+
+    Public clients only (token_endpoint_auth_method "none", PKCE S256
+    required). There is no owner: registration is anonymous, and the person
+    is bound later, at consent, to the authorization code and the session.
+    Rows are kept while their sessions are in use; ChatGPT reuses its
+    registered client for the life of a connection.
+    """
+
+    __tablename__ = "oauth_clients"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    client_id: Mapped[str] = mapped_column(String(100), unique=True, index=True, nullable=False)
+    client_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Exact strings as registered; every one passed the allowlist in
+    # app/services/oauth_server.py::redirect_uri_allowed.
+    redirect_uris: Mapped[list] = mapped_column(JSON, nullable=False)
+    scope: Mapped[str] = mapped_column(String(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OAuthAuthorizationCode(Base):
+    """One /oauth/authorize request, from "pending consent" to "code used".
+
+    Created unauthenticated (the client's redirect), shown on the consent page
+    by its opaque id, bound to the signed-in user when they approve. The code
+    itself is stored only as a SHA-256 hash, is single-use (used_at, claimed
+    atomically) and short-lived; a second redemption revokes the session
+    family the first one started (session_family_id).
+    """
+
+    __tablename__ = "oauth_authorization_codes"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    # oauth_clients.client_id, matched in code (app/services/oauth_server.py
+    # looks the client up on every use). No foreign key: this is an
+    # account-owned table and oauth_clients is not, and clients are never
+    # deleted while a connection may still use them.
+    client_id: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    redirect_uri: Mapped[str] = mapped_column(String(500), nullable=False)
+    scope: Mapped[str] = mapped_column(String(200), nullable=False)
+    code_challenge: Mapped[str] = mapped_column(String(128), nullable=False)
+    # The client's opaque `state`, echoed back on the redirect.
+    state: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # approved | denied; NULL = waiting for the person on the consent page.
+    decision: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    code_hash: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    session_family_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class SecurityAuditEvent(Base):

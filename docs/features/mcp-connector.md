@@ -1,7 +1,8 @@
 # LeadPilot connector for Claude and ChatGPT (remote MCP server)
 
-Status: **Phase 1 — read-only server.** Off by default (`MCP_ENABLED=false`)
-until the OAuth authorization server (Phase 2) ships. Decisions:
+Status: **Phase 2 — read-only server + OAuth 2.1 authorization server.** Off
+by default (`MCP_ENABLED=false`); switched on per deployment once the write
+tools (Phase 3) and the Skill (Phase 4) are in. Decisions:
 `docs/program/DECISIONS.md` CONN-AS, CONN-WRITES, CONN-HOST, CONN-SERVICES,
 CONN-DEPS, CONN-WORKSPACE, CONN-AUDIT. Recon: `docs/program/plans/connector-00-recon.md`.
 
@@ -58,11 +59,45 @@ the `<<<EXTERNAL_TEXT` / `EXTERNAL_TEXT>>>` delimiters of
 other field are built from ids, enums, numbers and timestamps. `fetch` puts
 the third-party text in one delimited block after a notice.
 
-## Not in Phase 1
+## Authorization server (Phase 2)
 
-- Obtaining a token: the OAuth 2.1 authorization server (DCR, PKCE S256,
-  consent page, refresh rotation) is Phase 2. Until then the endpoint stays
-  off in production.
+Built into the API (CONN-AS); no external identity provider. Every rule is in
+`app/services/oauth_server.py`; the HTTP surface is `app/api/oauth.py`.
+
+| Endpoint | What it does |
+|---|---|
+| `GET /.well-known/oauth-authorization-server` | RFC 8414 metadata. `issuer` = the API origin (`https://api.calendarharvest.com`), byte-identical to the resource metadata's `authorization_servers[0]`. `code_challenge_methods_supported: ["S256"]`, `token_endpoint_auth_methods_supported: ["none"]`, `authorization_response_iss_parameter_supported: true`, scopes `leadpilot:read`, `leadpilot:write`, `offline_access`. |
+| `POST /oauth/register` | RFC 7591 Dynamic Client Registration (JSON). Public clients only: the answer is always `token_endpoint_auth_method: "none"`, no secret. Redirect URIs are allowlisted (below). 600 per IP per hour (`RATE_LIMIT_OAUTH`): Claude registers from Anthropic's shared egress range. |
+| `GET /oauth/authorize` | Validates client, redirect URI, `response_type=code`, PKCE `S256`, `resource` (must equal the MCP URL), scope; records the request (10 minutes) and sends the browser to the consent page. An unknown client or unregistered redirect URI is answered 400 and **never** redirected. Every redirect back to the client carries `state` and `iss` (RFC 9207). |
+| `GET /oauth/requests/{id}`, `POST /oauth/requests/{id}/decision` | Used by the consent page (`/oauth/consent/`), signed in as the person (web session; API keys refused; workspace header ignored — `/oauth` is a personal path). Shows the app name, the redirect host and the scopes in plain words; Allow returns the client redirect with a single-use code (2 minutes, stored as a SHA-256 hash); Decline returns `error=access_denied`. Both are written to `security_audit_events` (`oauth.consent_granted` / `oauth.consent_denied`). |
+| `POST /oauth/token` | `application/x-www-form-urlencoded`. `authorization_code`: code + `code_verifier` (PKCE S256) + the same `redirect_uri` + `client_id`; a code redeemed twice is refused and the session the first redemption started is revoked. `refresh_token`: rotates; a reused refresh token is `invalid_grant` and revokes the whole session family; a refresh cannot add scopes. Refresh tokens are issued only when `offline_access` was granted. `Cache-Control: no-store`. |
+| `POST /oauth/revoke` | RFC 7009; ends the session family of a refresh or access token. |
+
+Allowed redirect URIs: `https://claude.ai/api/mcp/auth_callback` (exact; every
+hosted Claude app), `https://chatgpt.com/connector_platform_oauth_redirect`
+(exact; ChatGPT's stable URI for servers that return `iss`), and
+`http://localhost/callback` / `http://127.0.0.1/callback` with any port
+(Claude Code; RFC 8252 §7.3). Nothing else can be registered.
+
+Sessions: a connector token is a row in `auth_sessions` with
+`oauth_client_id` and `scope` set (migration `0091_oauth_connector`). Access
+tokens (`typ="mcp_access"`, 1 hour) name their session and family; `/mcp`
+refuses them once the family is revoked, the password changes, or the account
+is suspended, erased or unverified. Refresh tokens (`typ="mcp_refresh"`, 30
+days sliding) are refused by `/auth/refresh`, and web refresh tokens are
+refused by `/oauth/token`. A password change revokes every session, connector
+sessions included.
+
+Not supported in v1: Client ID Metadata Documents (CIMD), client
+authentication (`private_key_jwt`), `client_credentials`, static API keys at
+`/mcp`.
+
+GDPR: `oauth_authorization_codes` is account-owned (exported; deleted on
+erasure). `oauth_clients` has no owner (registration is anonymous) and is
+listed as excluded from export with that reason.
+
+## Not in Phase 2
+
 - Write tools (`create_strategy`, `pause_campaign`, `resume_campaign`) are
   Phase 3; nothing sends or schedules outreach from a connector in v1.
 
@@ -72,8 +107,12 @@ the third-party text in one delimited block after a notice.
 `app/services/strategy_read.py` and `app/services/message_read.py` (moved
 out of `app/api/ui_support.py` and `app/api/strategies.py`, which now call
 them), `app/services/auth.py` (`check_account_usable`, `issue_mcp_access_token`,
-`decode_mcp_access_token`), `app/config.py` (`MCP_*` settings).
-Tests: `tests/mcp/`.
+`decode_mcp_access_token`, `issue_mcp_refresh_token`), `app/config.py` (`MCP_*`
+settings), `app/services/oauth_server.py`, `app/api/oauth.py`,
+`app/services/auth_sessions.py` (connector sessions),
+`alembic/versions/0091_oauth_connector.py`, `frontend/src/app/oauth/consent/page.tsx`,
+`frontend/src/lib/oauthConsent.ts`. Tests: `tests/mcp/`,
+`tests/test_oauth_connector_migration.py`, `frontend/src/tests/oauthConsent.test.ts`.
 
 ## Settings
 

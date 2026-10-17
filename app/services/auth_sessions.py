@@ -282,3 +282,205 @@ def revoke(db: Session, refresh_token: str, *, request: Request | None = None,
                           target_id=row.family_id)
     db.commit()
     return True
+
+
+# --------------------------------------------------------------------------
+# Connector (OAuth) sessions -- Claude / ChatGPT, DECISIONS.md CONN-AS
+# --------------------------------------------------------------------------
+#
+# The same table, family and atomic-claim machinery as web sessions, with
+# three differences the OAuth clients require:
+#   * the row carries the client id and the granted scope, and a refresh
+#     token is only honoured for the client it was issued to;
+#   * a refresh token is issued only when offline_access was granted;
+#   * NO grace window. A rotated refresh token presented again is
+#     `invalid_grant` -- and, as for web sessions, revokes the family -- and
+#     the loser of a concurrent double refresh gets `invalid_grant` too
+#     (without revoking anything): the client retries with the token the
+#     winner received. An access-only answer is not an OAuth response.
+
+CONNECTOR_REVOKED = "connector_revoked"
+
+OFFLINE_ACCESS = "offline_access"
+
+
+class OAuthGrantError(Exception):
+    """An RFC 6749 token-endpoint error. `error` is the wire code."""
+
+    def __init__(self, error: str = "invalid_grant", description: str = ""):
+        super().__init__(description or error)
+        self.error = error
+        self.description = description
+
+
+@dataclass
+class ConnectorTokens:
+    user: User
+    session: AuthSession
+    access_token: str
+    refresh_token: str | None
+    scope: str
+
+    def response(self) -> dict:
+        """The token endpoint's JSON body (RFC 6749 §5.1)."""
+        out = {"access_token": self.access_token, "token_type": "Bearer",
+               "expires_in": settings.mcp_access_ttl_seconds, "scope": self.scope}
+        if self.refresh_token is not None:
+            out["refresh_token"] = self.refresh_token
+        return out
+
+
+def _connector_tokens(user: User, row: AuthSession) -> ConnectorTokens:
+    scope = row.scope or ""
+    access = auth_svc.issue_mcp_access_token(
+        user.id, client_id=row.oauth_client_id, scope=scope,
+        audience=settings.mcp_resource, session_id=row.id, family_id=row.family_id)
+    refresh = None
+    if OFFLINE_ACCESS in scope.split():
+        refresh = auth_svc.issue_mcp_refresh_token(
+            user.id, client_id=row.oauth_client_id, session_id=row.id,
+            family_id=row.family_id, ttl_seconds=ttl_seconds(True))
+    return ConnectorTokens(user=user, session=row, access_token=access,
+                           refresh_token=refresh, scope=scope)
+
+
+def start_connector_session(db: Session, user: User, *, client_id: str, scope: str,
+                            request: Request | None = None,
+                            family_id: uuid.UUID | None = None,
+                            now: datetime | None = None) -> ConnectorTokens:
+    """A new connector session (a new family unless `family_id`). Flushes,
+    does not commit: the token endpoint commits it together with the code
+    it redeemed."""
+    row = _start(db, user, persistent=True, request=request, family_id=family_id,
+                 now=now or _now())
+    row.oauth_client_id = client_id
+    row.scope = scope
+    db.flush()
+    return _connector_tokens(user, row)
+
+
+def rotate_connector(db: Session, refresh_token: str, *, client_id: str,
+                     request: Request | None = None,
+                     now: datetime | None = None) -> ConnectorTokens:
+    """Exchange a connector refresh token, or raise OAuthGrantError. Commits."""
+    now = now or _now()
+    try:
+        payload = auth_svc.decode_mcp_refresh_token(refresh_token)
+    except auth_svc.TokenRejected:
+        raise OAuthGrantError("invalid_grant", "refresh token is invalid or expired") from None
+    row = db.get(AuthSession, uuid.UUID(payload["jti"]))
+    if row is None or str(row.user_id) != str(payload["sub"]) or row.oauth_client_id is None:
+        raise OAuthGrantError("invalid_grant", "refresh token is not recognised")
+    if row.oauth_client_id != client_id or payload.get("client_id") != client_id:
+        raise OAuthGrantError("invalid_grant", "refresh token was issued to another client")
+
+    if row.revoked_at is not None:
+        if row.revoked_reason == ROTATED:
+            revoked = revoke_family(db, row.family_id, REUSE_DETECTED, now)
+            security_audit.record(
+                db, action=security_audit.AUTH_REFRESH_REUSE, request=request,
+                user_id=row.user_id, target_type="auth_session_family",
+                target_id=row.family_id,
+                details={"session_id": str(row.id), "sessions_revoked": revoked,
+                         "oauth_client_id": client_id})
+            db.commit()
+            logger.warning("oauth: refresh token reuse for user %s, client %s; family %s revoked",
+                           row.user_id, client_id, row.family_id)
+        raise OAuthGrantError("invalid_grant", "refresh token has been used or revoked")
+    if _aware(row.expires_at) <= now:
+        raise OAuthGrantError("invalid_grant", "refresh token has expired")
+    try:
+        user = _live_user(db, row.user_id)
+    except HTTPException:
+        raise OAuthGrantError("invalid_grant", "the account cannot sign in") from None
+    if _issued_before_password_change(user, payload) or not _account_usable(user):
+        raise OAuthGrantError("invalid_grant", "the account cannot sign in")
+
+    claimed = db.execute(
+        update(AuthSession)
+        .where(AuthSession.id == row.id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=now, revoked_reason=ROTATED, rotated_at=now, last_used_at=now)
+        .execution_options(synchronize_session=False)
+    ).rowcount
+    if not claimed:
+        db.rollback()
+        raise OAuthGrantError("invalid_grant", "refresh token has been used")
+
+    tokens = start_connector_session(db, user, client_id=client_id, scope=row.scope or "",
+                                     request=request, family_id=row.family_id, now=now)
+    db.execute(update(AuthSession).where(AuthSession.id == row.id)
+               .values(replaced_by_id=tokens.session.id)
+               .execution_options(synchronize_session=False))
+    db.commit()
+    return tokens
+
+
+def _account_usable(user: User) -> bool:
+    try:
+        auth_svc.check_account_usable(user)
+    except HTTPException:
+        return False
+    return True
+
+
+def revoke_connector_token(db: Session, token: str, *, client_id: str,
+                           request: Request | None = None,
+                           now: datetime | None = None) -> bool:
+    """RFC 7009: end the connector session family a refresh OR access token
+    belongs to. Never raises; a token of another client or of no session is
+    ignored. Commits. Returns whether a family was revoked."""
+    now = now or _now()
+    family = None
+    user_id = None
+    try:
+        payload = auth_svc.decode_mcp_refresh_token(token, verify_exp=False)
+        row = db.get(AuthSession, uuid.UUID(payload["jti"]))
+        if row is not None and row.oauth_client_id == client_id:
+            family, user_id = row.family_id, row.user_id
+    except auth_svc.TokenRejected:
+        try:
+            payload = auth_svc.decode_mcp_access_token(token, audience=settings.mcp_resource)
+            row = db.get(AuthSession, uuid.UUID(payload["sid"]))
+            if row is not None and row.oauth_client_id == client_id:
+                family, user_id = row.family_id, row.user_id
+        except (auth_svc.TokenRejected, ValueError):
+            return False
+    if family is None:
+        return False
+    revoke_family(db, family, CONNECTOR_REVOKED, now)
+    security_audit.record(db, action=security_audit.OAUTH_TOKEN_REVOKED, request=request,
+                          user_id=user_id, target_type="auth_session_family",
+                          target_id=family, details={"oauth_client_id": client_id})
+    db.commit()
+    return True
+
+
+def connector_session_live(db: Session, *, session_id, family_id, user_id) -> bool:
+    """May a connector access token naming this session still be used?
+
+    Its own row must exist for this user and not be ended for any reason but
+    rotation (a rotated row's access token stays good until it expires --
+    Claude refreshes ahead of expiry and may still be using it). And no row
+    of its family may have been ended by a logout, a reuse detection or a
+    disconnect: revoke_family leaves already-rotated rows as they were, so
+    the family has to be checked as a whole.
+    """
+    try:
+        sid = uuid.UUID(str(session_id))
+        fam = uuid.UUID(str(family_id))
+    except ValueError:
+        return False
+    row = db.get(AuthSession, sid)
+    if (row is None or str(row.user_id) != str(user_id) or row.family_id != fam
+            or row.oauth_client_id is None):
+        return False
+    if row.revoked_at is not None and row.revoked_reason != ROTATED:
+        return False
+    ended = db.execute(
+        select(AuthSession.id).where(
+            AuthSession.family_id == fam,
+            AuthSession.revoked_at.is_not(None),
+            AuthSession.revoked_reason != ROTATED,
+        ).limit(1)
+    ).first()
+    return ended is None
