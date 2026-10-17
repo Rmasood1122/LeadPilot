@@ -20,7 +20,10 @@ dependencies = [
     # 0.111 (app/main.py's lifespan note; the whole suite runs on 0.111.x) and
     # uses nothing introduced later, so 0.111.x is the range in both files.
     "fastapi>=0.111.0,<0.112",
-    "uvicorn[standard]>=0.30.0,<0.31",
+    # uvicorn >=0.31.1 is required by mcp 2.x (connector Q5, DECISIONS.md CONN-DEPS).
+    "uvicorn[standard]>=0.31.1,<0.32",
+    # Remote MCP server (app/mcp/); same exact pin as requirements.txt.
+    "mcp==2.3.0",
     "pydantic[email]>=2.7.0,<3.0",
     "pydantic-settings>=2.3.0",
     "sqlalchemy>=2.0.30,<2.1",

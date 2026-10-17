@@ -4,7 +4,11 @@
 
 # ── Web framework ─────────────────────────────────────────────────────────────
 fastapi>=0.111.0,<0.112
-uvicorn[standard]>=0.30.0,<0.31
+uvicorn[standard]>=0.31.1,<0.32   # mcp 2.x requires uvicorn>=0.31.1
+# Remote MCP server for Claude / ChatGPT connectors (app/mcp/). Exact pin: the 2.x
+# API (MCPServer, TokenVerifier, stateless Streamable HTTP) is what app/mcp is
+# written against; docs/program/plans/connector-00-recon.md section 3.
+mcp==2.3.0
 python-multipart>=0.0.9       # file uploads (theme background images)
 
 # ── Database ──────────────────────────────────────────────────────────────────

@@ -4,7 +4,7 @@ Date: 2026-10-17. Branch `claude/awesome-lovelace-okii9j`, read at `master @ 281
 Scope: Phase 0 of the LeadPilot ↔ Claude/ChatGPT integration. That integration has three parts: a remote MCP server in the FastAPI app, an OAuth 2.1 authorization server, and a Skill plus a Claude Code plugin.
 No code changed in this phase. Every citation below was read in this session. Where a sub-agent found a citation, it was spot-checked against the file.
 
-**Status: STOPPED. The founder questions are in §9. No production code will be written until they are answered.**
+**Status: ANSWERED 2026-10-17.** The founder approved every recommendation in §9 and set the host to `https://api.calendarharvest.com/mcp`. Recorded in `DECISIONS.md` as CONN-AS, CONN-WRITES, CONN-HOST, CONN-SERVICES, CONN-DEPS, CONN-WORKSPACE and CONN-AUDIT.
 
 ---
 
