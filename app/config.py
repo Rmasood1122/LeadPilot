@@ -6,6 +6,7 @@ repo root for documentation of every variable.
 """
 
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -192,6 +193,24 @@ class Settings(BaseSettings):
     # session) keeps everyone signed in across the deploy. Turn this off once
     # jwt_refresh_ttl_seconds has passed since that deploy.
     auth_accept_legacy_refresh_tokens: bool = True
+
+    # --- Claude / ChatGPT connector (app/mcp/, DECISIONS.md CONN-*) ---------
+    # Off until the OAuth authorization server is deployed: /mcp and its
+    # metadata answer 404 while this is false.
+    mcp_enabled: bool = False
+    # The MCP URL exactly as a user types it into Claude or ChatGPT; RFC 9728
+    # `resource` and every connector token's `aud` must equal it.
+    # Production: https://api.calendarharvest.com/mcp (CONN-HOST). Empty =
+    # PUBLIC_BASE_URL + "/mcp".
+    mcp_resource_url: str = ""
+    mcp_access_ttl_seconds: int = 3600
+    # Host headers /mcp accepts besides the resource URL's own host
+    # (DNS-rebinding protection), comma-separated -- e.g. "localhost:8000"
+    # for MCP Inspector against a local server. "host:*" allows any port.
+    mcp_allowed_hosts: str = ""
+    # Origin headers /mcp accepts, comma-separated. Claude and ChatGPT call
+    # from their servers and send none; a request with no Origin passes.
+    mcp_allowed_origins: str = ""
     # Where theme background images are stored + served from.
     media_dir: str = "media"
 
@@ -554,6 +573,27 @@ class Settings(BaseSettings):
         """
         env = (self.app_env or "").strip().lower()
         return bool(self.enable_debug_routes) and env in DEBUG_ROUTE_ENVS
+
+    @property
+    def mcp_resource(self) -> str:
+        return (self.mcp_resource_url or
+                f"{(self.public_base_url or '').rstrip('/')}/mcp").strip()
+
+    @property
+    def mcp_issuer(self) -> str:
+        """The OAuth issuer: the MCP URL's origin, no trailing slash. Clients
+        compare it to the metadata `issuer` and to `iss` byte for byte."""
+        parsed = urlparse(self.mcp_resource)
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    @property
+    def mcp_extra_allowed_hosts(self) -> tuple[str, ...]:
+        return tuple(h.strip() for h in (self.mcp_allowed_hosts or "").split(",") if h.strip())
+
+    @property
+    def mcp_allowed_origins_list(self) -> tuple[str, ...]:
+        return tuple(o.strip() for o in (self.mcp_allowed_origins or "").split(",")
+                     if o.strip())
 
     @property
     def refresh_cookie_samesite(self) -> str:
