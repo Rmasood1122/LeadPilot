@@ -1,8 +1,8 @@
 # LeadPilot connector for Claude and ChatGPT (remote MCP server)
 
-Status: **Phase 2 — read-only server + OAuth 2.1 authorization server.** Off
-by default (`MCP_ENABLED=false`); switched on per deployment once the write
-tools (Phase 3) and the Skill (Phase 4) are in. Decisions:
+Status: **Phase 3 — read tools, OAuth 2.1 authorization server, three write
+tools.** Off by default (`MCP_ENABLED=false`); a deployment switches it on
+(see "Turning it on" below). Decisions:
 `docs/program/DECISIONS.md` CONN-AS, CONN-WRITES, CONN-HOST, CONN-SERVICES,
 CONN-DEPS, CONN-WORKSPACE, CONN-AUDIT. Recon: `docs/program/plans/connector-00-recon.md`.
 
@@ -96,10 +96,52 @@ GDPR: `oauth_authorization_codes` is account-owned (exported; deleted on
 erasure). `oauth_clients` has no owner (registration is anonymous) and is
 listed as excluded from export with that reason.
 
-## Not in Phase 2
+## Write tools (Phase 3, CONN-WRITES)
 
-- Write tools (`create_strategy`, `pause_campaign`, `resume_campaign`) are
-  Phase 3; nothing sends or schedules outreach from a connector in v1.
+| Tool | Does | Through | Refused when |
+|---|---|---|---|
+| `list_products` (read) | the user's products with past-client and strategy counts | `strategy_read.list_products` | — |
+| `create_strategy` | creates a strategy and starts its AI research | `strategy_write.create` (the same function `POST /products/{id}/strategies` calls) | rate limit (`RATE_LIMIT_STRATEGIES`, shared with the web app), product not owned (404), plan `max_strategies` (402), today's AI cap (429), budget too small (422), `with_clients` without past clients (422), F07 monthly forecast (429) |
+| `pause_campaign` | `campaign_state=paused_manual`; same outbound webhook as the web app | `campaign_control.pause` | strategy not owned (404) |
+| `resume_campaign` | `campaign_state=active` | `campaign_control.resume` | strategy not owned (404), deliverability preflight blocked (409) |
+
+All three are `destructiveHint: true` (Claude asks the person before every
+call) and need `leadpilot:write`. A token without it gets, at the HTTP layer,
+`403` with `WWW-Authenticate: Bearer error="insufficient_scope",
+scope="leadpilot:read leadpilot:write", resource_metadata="…"` (the MCP scope
+challenge, `app/mcp/stepup.py`); the tool also checks the scope itself. A
+refusal reaches the model as the web app's own detail text (the SDK frames it
+as `Error executing tool <name>: <detail>`).
+
+`create_strategy` never opts into Autopilot, and no connector tool sends,
+schedules or approves a message (`approve_message` is out of v1: approving a
+review item releases it to send). Resuming lets an approved campaign's
+scheduled messages continue; each still passes the full send-time gate in
+`app/workers/outreach_tasks.py::send_message_impl`, daily send approval
+included.
+
+Audit (CONN-AUDIT): every write call, done or refused, writes one
+`security_audit_events` row: `action="mcp.<tool>"`,
+`details={"actor_channel": "mcp", "oauth_client_id": …, "outcome": "created"
+| "paused" | "resumed" | "refused_<status>"}`.
+
+## Turning it on (a deployment)
+
+1. Deploy a build containing migration `0091_oauth_connector`.
+2. Set `MCP_ENABLED=true` and `MCP_RESOURCE_URL=https://api.calendarharvest.com/mcp`
+   on the API service (Render: `leadpilot-api`), and on the worker too so both
+   read the same settings.
+3. Check `https://api.calendarharvest.com/.well-known/oauth-protected-resource/mcp`
+   and `https://api.calendarharvest.com/.well-known/oauth-authorization-server`
+   answer 200, and that `https://<frontend>/oauth/consent/` loads.
+4. Connect from claude.ai (Settings → Connectors → Add custom connector) and
+   from ChatGPT (Developer Mode) — `docs/connectors/README.md`.
+
+## Not in v1
+
+- Sending, scheduling or approving messages from a connector.
+- Workspaces: a connection acts on the signed-in person's own account only.
+- CIMD client registration and `private_key_jwt` client authentication.
 
 ## Code
 
@@ -111,7 +153,9 @@ them), `app/services/auth.py` (`check_account_usable`, `issue_mcp_access_token`,
 settings), `app/services/oauth_server.py`, `app/api/oauth.py`,
 `app/services/auth_sessions.py` (connector sessions),
 `alembic/versions/0091_oauth_connector.py`, `frontend/src/app/oauth/consent/page.tsx`,
-`frontend/src/lib/oauthConsent.ts`. Tests: `tests/mcp/`,
+`frontend/src/lib/oauthConsent.ts`, `app/services/strategy_write.py`,
+`app/services/campaign_control.py`, `app/mcp/tools/campaigns.py`,
+`app/mcp/stepup.py`. Tests: `tests/mcp/`,
 `tests/test_oauth_connector_migration.py`, `frontend/src/tests/oauthConsent.test.ts`.
 
 ## Settings

@@ -44,9 +44,16 @@ class ToolCall:
 
 
 def http_detail(exc: HTTPException) -> str:
+    """The text the web app would show for this refusal. A structured detail
+    without a `message` (e.g. the rate limiter's) is spelled out."""
     detail = exc.detail
     if isinstance(detail, dict):
-        return detail.get("message") or json.dumps(detail, default=str)
+        if detail.get("message"):
+            return str(detail["message"])
+        if detail.get("error"):
+            rest = ", ".join(f"{k}={v}" for k, v in detail.items() if k != "error")
+            return str(detail["error"]).replace("_", " ") + (f" ({rest})" if rest else "")
+        return json.dumps(detail, default=str)
     return str(detail)
 
 

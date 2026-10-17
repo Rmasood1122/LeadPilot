@@ -27,13 +27,13 @@ from datetime import datetime, timezone
 from app.config import settings
 from app.db.models import (
     EnrollmentStatus, FlowType, GmailAccount, Lead, LeadStatus, Message, MessageStatus,
-    Outcome, OutcomeEvent, PastClient, Product, Sequence as SequenceModel,
+    Outcome, OutcomeEvent, Product, Sequence as SequenceModel,
     SequenceEnrollment, Strategy, StrategyStatus, User,
 )
 from app.api import spend_guard as spend_guard_api
 from app.pipeline import budget_plan
 from app.services import auth as auth_svc
-from app.services import security_audit, strategy_read, usage_meter, verification_override
+from app.services import security_audit, strategy_read, strategy_write, usage_meter, verification_override
 from app.services import sequence_engine as engine
 from app.workers import tasks as worker_tasks
 
@@ -152,54 +152,12 @@ def create_strategy(
     # burned a slot without creating anything. See
     # app/core/rate_limiting.py::enforce_rate_limit.
     enforce_rate_limit(str(current_user.id), "strategies", "RATE_LIMIT_STRATEGIES")
-
-    product = db.get(Product, product_id)
-    if product is None or product.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="product not found")
-
-    # Autopilot launch: an opt-in is validated (lawful basis, role, flag)
-    # BEFORE anything is created, so a refused opt-in leaves no strategy.
-    from app.api import autopilot as autopilot_api  # noqa: PLC0415
-
-    autopilot_api.validate_opt_in(db, request, body.autopilot)
-
-    # After the ownership check, so a foreign product id is 404 whatever the
-    # count.
-    check_new_strategy_allowed(db, current_user)
-    service_area, local_offer = local_context_or_422(db, product, body.service_area,
-                                                     body.local_offer)
-
-    has_clients = (
-        db.execute(
-            select(func.count(PastClient.id)).where(PastClient.product_id == product_id)
-        ).scalar_one()
-        > 0
-    )
-
-    flow_type = body.flow_type
-    if flow_type is None:
-        flow_type = FlowType.WITH_CLIENTS if has_clients else FlowType.NO_CLIENTS
-    elif flow_type is FlowType.WITH_CLIENTS and not has_clients:
-        raise HTTPException(
-            status_code=422,
-            detail="flow_type=with_clients requires at least one past client "
-                   "(POST /products/{id}/past-clients first)",
-        )
-
-    budget_micros, steps_per_phase = plan_budget(db, flow_type, body.max_budget_usd)
-    # F07: forecast first; refused (429) before anything is created.
-    forecast = spend_guard_api.guard_new_strategy(db, current_user, flow_type, steps_per_phase)
-    strategy = Strategy(product_id=product.id, flow_type=flow_type,
-                        budget_micros=budget_micros, steps_per_phase=steps_per_phase,
-                        service_area_json=service_area, local_offer=local_offer)
-    db.add(strategy)
-    db.commit()
-    db.refresh(strategy)
-    spend_guard_api.link(db, forecast, strategy_id=strategy.id)  # F07
-    if body.autopilot is not None and body.autopilot.enabled:
-        autopilot_api.record_opt_in(db, request, strategy, current_user, body.autopilot)
-
-    worker_tasks.run_pipeline.delay(str(strategy.id))
+    # Every check and the enqueue: strategy_write.create, shared with the
+    # connector (app/mcp/tools/campaigns.py).
+    strategy = strategy_write.create(
+        db, current_user, product_id, flow_type=body.flow_type,
+        max_budget_usd=body.max_budget_usd, service_area=body.service_area,
+        local_offer=body.local_offer, autopilot=body.autopilot, request=request)
     return _strategy_out(db, strategy)
 
 
