@@ -27,10 +27,10 @@ from app.core.plans import get_plan
 from app.db.base import get_db
 from app.db.models import Lead, Message, Outcome, OutcomeEvent, Product, Strategy, User
 from app.services import (
+    campaign_control,
     pipeline_health,
     reply_intent,
     sequence_completion,
-    sequence_engine as engine,
 )
 
 router = APIRouter(tags=["analytics"])
@@ -146,22 +146,9 @@ def pause_campaign(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
+    # Shared with the connector (app/mcp/tools/campaigns.py).
     strategy = _owned_strategy(strategy_id, db, current_user)
-    strategy.campaign_state = "paused_manual"
-    strategy.campaign_pause_reason = "paused by user"
-    db.commit()
-    # Feature Group 4: outbound webhooks only -- the user just did this, so
-    # neither a push nor a Slack message would tell them anything.
-    from app.workers import notification_tasks  # noqa: PLC0415
-
-    notification_tasks.enqueue_event(
-        current_user.id, "campaign_paused", push=False, slack=False, title="Campaign paused",
-        body="Paused by you.", deep_link=f"/campaigns?strategy={strategy.id}",
-        webhook_payload={"strategy_id": str(strategy.id), "trigger": "manual",
-                         "reason": strategy.campaign_pause_reason},
-    )
-    return {"campaign_state": strategy.campaign_state,
-            "campaign_pause_reason": strategy.campaign_pause_reason}
+    return campaign_control.pause(db, strategy, current_user)
 
 
 @router.post("/strategies/{strategy_id}/campaign/resume")
@@ -171,18 +158,7 @@ def resume_campaign(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     strategy = _owned_strategy(strategy_id, db, current_user)
-    # F03 Deliverability Autopilot: resuming restarts sending, so it passes
-    # the same preflight as a launch. Flag off: no-op.
-    from app.services import deliverability_autopilot  # noqa: PLC0415
-
-    blocked = deliverability_autopilot.launch_block(db, strategy, action="resume")
-    if blocked:
-        raise HTTPException(status_code=409, detail=blocked)
-    strategy.campaign_state = engine.CAMPAIGN_ACTIVE
-    strategy.campaign_pause_reason = None
-    db.commit()
-    return {"campaign_state": strategy.campaign_state,
-            "campaign_pause_reason": None}
+    return campaign_control.resume(db, strategy)
 
 
 # ---------------------------------------------------------------------------

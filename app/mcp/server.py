@@ -35,12 +35,13 @@ from mcp.shared.auth import ProtectedResourceMetadata
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route
-from starlette.types import Receive, Scope, Send
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.config import settings
 from app.mcp import context, scopes
 from app.mcp.auth import McpTokenVerifier
-from app.mcp.tools import chatgpt, insights, leads, messages, strategies
+from app.mcp.stepup import ScopeChallenge
+from app.mcp.tools import campaigns, chatgpt, insights, leads, messages, strategies
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,8 @@ def build_server() -> MCPServer:
     server = MCPServer(
         name=SERVER_NAME,
         title="LeadPilot",
-        description="Read the LeadPilot account: leads, strategies, outreach, attribution.",
+        description=("Read the LeadPilot account (leads, strategies, outreach, attribution) "
+                     "and create strategies or pause and resume campaigns."),
         website_url=settings.frontend_url,
         token_verifier=McpTokenVerifier(lambda: context.session_factory()),
         auth=AuthSettings(
@@ -81,7 +83,7 @@ def build_server() -> MCPServer:
             validate_token_resource=True,
         ),
     )
-    for module in (leads, strategies, messages, insights, chatgpt):
+    for module in (leads, strategies, messages, insights, chatgpt, campaigns):
         module.register(server)
     return server
 
@@ -105,7 +107,7 @@ class McpEndpoint:
     instance (not a function) as a raw ASGI endpoint."""
 
     def __init__(self) -> None:
-        self.http_app: Starlette | None = None
+        self.http_app: ASGIApp | None = None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if not settings.mcp_enabled:
@@ -139,7 +141,8 @@ def routes() -> list[Route]:
 async def running() -> AsyncIterator[None]:
     """Build a fresh server and run its session manager for one app lifespan."""
     server = build_server()
-    endpoint.http_app = build_http_app(server)
+    # Write tools without leadpilot:write get the MCP scope challenge (403).
+    endpoint.http_app = ScopeChallenge(build_http_app(server), campaigns.WRITE_TOOLS)
     try:
         async with server.session_manager.run():
             yield

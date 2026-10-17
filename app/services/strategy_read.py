@@ -18,7 +18,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Product, ResearchStep, Strategy, User
+from app.db.models import PastClient, Product, ResearchStep, Strategy, User
 from app.pipeline import budget_plan
 from app.pipeline.engine import pipelines_for_flow
 from app.pipeline.registry import phase_title
@@ -116,3 +116,38 @@ def pipeline_status(db: Session, strategy: Strategy) -> dict:
         "steps_per_phase": strategy.steps_per_phase,
         "planned_steps": planned_steps(strategy),
     }
+
+
+def list_products(db: Session, user: User, *, limit: int, offset: int = 0) -> dict:
+    """The user's products (what a strategy is created for), oldest first,
+    with whether each has past clients (which picks the strategy flow) and
+    how many strategies it has."""
+    query = select(Product).where(Product.user_id == user.id)
+    total = int(db.execute(
+        select(func.count()).select_from(query.subquery())
+    ).scalar_one())
+    rows = db.execute(
+        query.order_by(Product.created_at, Product.id).limit(limit).offset(offset)
+    ).scalars().all()
+    ids = [p.id for p in rows]
+    past = dict(db.execute(
+        select(PastClient.product_id, func.count(PastClient.id))
+        .where(PastClient.product_id.in_(ids)).group_by(PastClient.product_id)
+    ).all()) if ids else {}
+    strategies = dict(db.execute(
+        select(Strategy.product_id, func.count(Strategy.id))
+        .where(Strategy.product_id.in_(ids)).group_by(Strategy.product_id)
+    ).all()) if ids else {}
+    items = [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "type": p.type.value,
+            "business_type": p.business_type,
+            "past_clients": int(past.get(p.id, 0)),
+            "strategies": int(strategies.get(p.id, 0)),
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in rows
+    ]
+    return {"items": items, "total": total}

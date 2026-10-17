@@ -18,6 +18,7 @@ READ_TOOLS = {
     "list_leads", "get_lead", "list_strategies", "get_strategy",
     "get_pipeline_status", "list_messages", "get_message",
     "get_attribution_summary", "get_claim_verification", "search", "fetch",
+    "list_products",
 }
 
 
@@ -26,10 +27,15 @@ READ_TOOLS = {
 # ---------------------------------------------------------------------------
 
 
+WRITE_TOOLS = {"create_strategy", "pause_campaign", "resume_campaign"}
+
+
 def test_every_read_tool_is_listed_with_a_title_and_read_only_hint(world):
     tools = {t.name: t for t in list_tools(world.me).tools}
-    assert set(tools) == READ_TOOLS
+    assert set(tools) == READ_TOOLS | WRITE_TOOLS
     for name, tool in tools.items():
+        if name in WRITE_TOOLS:
+            continue      # tests/mcp/test_write_tools.py
         assert len(name) <= 64
         assert tool.title, name
         assert tool.description and len(tool.description) > 40, name
@@ -252,6 +258,7 @@ def _valid_calls(world):
         ("get_attribution_summary", {}),
         ("get_claim_verification", {"lead_id": str(mine.leads[0].id)}),
         ("search", {"query": "Lead"}), ("fetch", {"id": f"lead:{mine.leads[0].id}"}),
+        ("list_products", {}),
     ]
 
 
