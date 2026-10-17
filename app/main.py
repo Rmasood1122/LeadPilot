@@ -157,7 +157,13 @@ async def _lifespan(_app: FastAPI):
     log_config_warnings()
 
     bootstrap_admin()
-    yield
+    # Claude / ChatGPT connector (app/mcp/server.py): a fresh MCP server per
+    # lifespan, run in this process so it shares settings and the DB session
+    # factory. Answers 404 while MCP_ENABLED is false.
+    from app.mcp import server as mcp_server  # noqa: PLC0415
+
+    async with mcp_server.running():
+        yield
 
 
 app = FastAPI(
@@ -354,6 +360,13 @@ app.include_router(autopilot_router)             # /strategies/{id}/autopilot|be
 # local-business and /strategies/{id}/customers/import are new sub-paths.
 app.include_router(local_business_router)        # local business mode + win-back import
 app.include_router(voice_twin_router)            # voice twin: /me/voice-clone*, /voice-twin/*
+
+# Remote MCP server for the Claude / ChatGPT connector: the MCP path and its
+# RFC 9728 metadata (app/mcp/server.py). Plain routes, not a Mount, so the
+# rest of the app's routing (404/405 answers) is unchanged.
+from app.mcp.server import routes as _mcp_routes  # noqa: E402
+
+app.router.routes.extend(_mcp_routes())
 
 
 # ---------------------------------------------------------------------------

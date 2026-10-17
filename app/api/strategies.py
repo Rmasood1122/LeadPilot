@@ -14,8 +14,6 @@ from app.api.metering import refuse_if_daily_limit_reached
 from app.core.plans import PlanLimitExceeded, check_plan_limit, plan_limit_response
 from app.core.rate_limiting import AUTH_WINDOW_SECONDS, enforce_rate_limit
 from app.api.schemas import (
-    PhaseProgress,
-    PipelineProgress,
     StrategyCreate,
     StrategyOut,
     StrategyResumeIn,
@@ -29,16 +27,14 @@ from datetime import datetime, timezone
 from app.config import settings
 from app.db.models import (
     EnrollmentStatus, FlowType, GmailAccount, Lead, LeadStatus, Message, MessageStatus,
-    Outcome, OutcomeEvent, PastClient, Product, ResearchStep, Sequence as SequenceModel,
+    Outcome, OutcomeEvent, PastClient, Product, Sequence as SequenceModel,
     SequenceEnrollment, Strategy, StrategyStatus, User,
 )
 from app.api import spend_guard as spend_guard_api
 from app.pipeline import budget_plan
 from app.services import auth as auth_svc
-from app.services import security_audit, usage_meter, verification_override
+from app.services import security_audit, strategy_read, usage_meter, verification_override
 from app.services import sequence_engine as engine
-from app.pipeline.engine import pipelines_for_flow
-from app.pipeline.registry import phase_title
 from app.workers import tasks as worker_tasks
 
 logger = logging.getLogger(__name__)
@@ -72,8 +68,7 @@ def _budget_micros(usd: float) -> int:
 
 
 def _planned_steps(strategy: Strategy) -> int:
-    per_pipeline = len(budget_plan.planned_step_nos(strategy.steps_per_phase))
-    return per_pipeline * len(pipelines_for_flow(strategy.flow_type))
+    return strategy_read.planned_steps(strategy)
 
 
 def _strategy_out(db: Session, strategy: Strategy) -> StrategyOut:
@@ -282,56 +277,12 @@ def get_strategy(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StrategyStatusOut:
-    """Overall status + per-phase progress for every pipeline in the flow."""
+    """Overall status + per-phase progress for every pipeline in the flow.
+
+    Built by strategy_read.pipeline_status, which the connector also uses
+    (app/mcp/tools/strategies.py)."""
     strategy = _owned_strategy(db, strategy_id, current_user)
-
-    k = strategy.steps_per_phase or 9
-    planned = budget_plan.planned_step_nos(strategy.steps_per_phase)
-    progress: list[PipelineProgress] = []
-    for pipeline in pipelines_for_flow(strategy.flow_type):
-        counts = dict(
-            db.execute(
-                select(ResearchStep.phase, func.count(ResearchStep.id))
-                .where(
-                    ResearchStep.strategy_id == strategy.id,
-                    ResearchStep.pipeline == pipeline,
-                )
-                .group_by(ResearchStep.phase)
-            ).all()
-        )
-        phases = [
-            PhaseProgress(
-                phase=p,
-                title=phase_title(pipeline, p),
-                done=counts.get(p, 0),
-                total=k,
-            )
-            for p in range(1, 9)
-        ]
-        progress.append(
-            PipelineProgress(
-                pipeline=pipeline.value,
-                done=sum(counts.values()),
-                total=len(planned),
-                phases=phases,
-            )
-        )
-
-    return StrategyStatusOut(
-        id=strategy.id,
-        flow_type=strategy.flow_type,
-        status=strategy.status,
-        progress=progress,
-        verification=strategy.verified_passes_json or [],
-        strategy_document_ready=bool(strategy.strategy_document),
-        gtm_document_ready=bool(strategy.gtm_document),
-        error=strategy.error,
-        budget_usd=(strategy.budget_micros / 1_000_000
-                    if strategy.budget_micros is not None else None),
-        spent_usd=usage_meter.spent_micros(db, strategy.id) / 1_000_000,
-        steps_per_phase=strategy.steps_per_phase,
-        planned_steps=_planned_steps(strategy),
-    )
+    return StrategyStatusOut(**strategy_read.pipeline_status(db, strategy))
 
 
 @router.post("/strategies/{strategy_id}/resume", response_model=StrategyOut, status_code=202)

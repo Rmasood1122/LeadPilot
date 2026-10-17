@@ -118,6 +118,51 @@ def issue_tokens(user_id: uuid.UUID) -> dict:
     }
 
 
+# --------------------------------------------------------------------------
+# Connector (MCP) access tokens -- DECISIONS.md CONN-AS
+# --------------------------------------------------------------------------
+
+# A separate token type so a web session token and a connector token can
+# never stand in for each other: decode_token_payload(..., "access") refuses
+# this `typ` (and its `aud`), and decode_mcp_access_token refuses everything
+# else. `aud` is the MCP URL exactly as published in the RFC 9728 metadata.
+MCP_ACCESS_TYP = "mcp_access"
+
+
+class TokenRejected(Exception):
+    """A connector token that cannot be used. The message says why in a few
+    words and never contains the token."""
+
+
+def issue_mcp_access_token(user_id: uuid.UUID, *, client_id: str, scope: str,
+                           audience: str, ttl_seconds: int | None = None,
+                           session_id: uuid.UUID | None = None) -> str:
+    extra = {"aud": audience, "client_id": client_id, "scope": scope}
+    if session_id is not None:
+        extra["sid"] = str(session_id)
+    ttl = settings.mcp_access_ttl_seconds if ttl_seconds is None else ttl_seconds
+    return _issue(user_id, MCP_ACCESS_TYP, ttl, extra)
+
+
+def decode_mcp_access_token(token: str, *, audience: str) -> dict:
+    try:
+        payload = jwt.decode(token, _secret(), algorithms=["HS256"], audience=audience,
+                             options={"require": ["exp", "iat", "sub", "aud"]})
+    except jwt.ExpiredSignatureError:
+        raise TokenRejected("expired") from None
+    except jwt.InvalidAudienceError:
+        raise TokenRejected("issued for another resource") from None
+    except jwt.InvalidTokenError:
+        raise TokenRejected("invalid") from None
+    if payload.get("typ") != MCP_ACCESS_TYP:
+        raise TokenRejected("not a connector token")
+    try:
+        uuid.UUID(str(payload.get("sub")))
+    except ValueError:
+        raise TokenRejected("invalid") from None
+    return payload
+
+
 def decode_token_payload(token: str, expected_typ: str, *,
                          verify_exp: bool = True) -> dict:
     try:
@@ -208,6 +253,17 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
 
         if _issued_before_password_change(user, claims):
             raise HTTPException(status_code=401, detail="session expired")
+    check_account_usable(user)
+    return _workspace_principal(request, db, user)
+
+
+def check_account_usable(user: User) -> None:
+    """Raise unless this account may act right now, whatever the credential.
+
+    Shared by get_current_user and the connector (app/mcp/auth.py), so an
+    erased, suspended or unverified account is refused by both with the same
+    status and detail.
+    """
     # GDPR erasure (app/services/account_erasure.py): an erased account is a
     # tombstone row, not a missing one, so an access token issued before the
     # erasure would still resolve. It gets the same answer as a missing user
@@ -225,7 +281,6 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
         raise HTTPException(status_code=403, detail="account suspended")
     if settings.require_email_verification and not user.email_verified:
         raise HTTPException(status_code=403, detail=EMAIL_NOT_VERIFIED)
-    return _workspace_principal(request, db, user)
 
 
 def _workspace_principal(request: Request, db: Session, actor: User) -> User:

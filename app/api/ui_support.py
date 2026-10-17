@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_admin
 from app.config import settings
 from app.db.base import get_db
+from app.services import strategy_read
 from app.db.models import (
     GmailAccount,
     Lead,
@@ -93,24 +94,8 @@ def list_strategies(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
-    rows = db.execute(
-        select(Strategy, Product.name)
-        .join(Product, Product.id == Strategy.product_id)
-        .where(Product.user_id == current_user.id)
-        .order_by(Strategy.created_at.desc())
-    ).all()
-    return [
-        {
-            "id": str(s.id),
-            "product_id": str(s.product_id),
-            "product_name": name,
-            "flow_type": s.flow_type.value,
-            "status": s.status.value,
-            "campaign_state": s.campaign_state,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-        }
-        for s, name in rows
-    ]
+    # Shared with the connector (app/mcp/tools/strategies.py).
+    return strategy_read.list_owned(db, current_user)["items"]
 
 
 @router.get("/strategies/{strategy_id}/document")
