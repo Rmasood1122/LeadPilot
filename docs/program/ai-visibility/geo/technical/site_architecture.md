@@ -32,7 +32,7 @@
 **Wave 2 (after Q-13 approval):**
 ```
 ├── /faq/                                  depth 1  (footer)
-├── /what-is-leadpilot/                    depth 1  (footer "About LeadPilot"; linked from Home hero)
+├── /what-is-leadpilot/                    depth 1  (footer "About Vectorae"; linked from Home hero)
 ├── /outbound-statistics/                  depth 1  (footer "Resources")
 ├── /compare/                              depth 1  hub (footer "Compare"; lists all comparisons)
 │   ├── /compare/leadpilot-vs-clay/        depth 2
@@ -44,10 +44,10 @@ the /compare/ hub, which is itself in the footer). **All within 2 clicks.** ✅
 
 ## URL slug rules
 - Lowercase, hyphenated, trailing slash (matches the existing static export: `/how-it-works/`).
-- The slug carries the query: `/compare/leadpilot-vs-apollo/` matches "LeadPilot vs Apollo";
+- The slug carries the query: `/compare/leadpilot-vs-apollo/` matches "Vectorae vs Apollo";
   `/for/agencies/` matches "… for agencies".
 - The brand appears in comparison slugs (`leadpilot-vs-…`), not use-case slugs (people search
-  "outbound for agencies", not "LeadPilot agencies").
+  "outbound for agencies", not "Vectorae agencies").
 - No dates in URLs (pages get updated; `lastmod` carries freshness).
 - Never `/comparison`, `/page-2`, `/blog/post-123`.
 
@@ -75,12 +75,12 @@ depth-1 GEO page.
 
 | From | Links to | Anchor text (exact) | Why |
 |---|---|---|---|
-| Home "Who it's for" section | /for/agencies/, /for/b2b-service-firms/, /for/local-businesses/ | "LeadPilot for agencies", "for B2B service firms", "for local businesses that sell to businesses" | Home already lists these three groups (facts file `fit`); turn each into a link |
-| Home "How it's different" / FAQ "How is it different from Apollo?" | /compare/leadpilot-vs-apollo/ | "LeadPilot vs Apollo" | Most-asked comparison |
+| Home "Who it's for" section | /for/agencies/, /for/b2b-service-firms/, /for/local-businesses/ | "Vectorae for agencies", "for B2B service firms", "for local businesses that sell to businesses" | Home already lists these three groups (facts file `fit`); turn each into a link |
+| Home "How it's different" / FAQ "How is it different from Apollo?" | /compare/leadpilot-vs-apollo/ | "Vectorae vs Apollo" | Most-asked comparison |
 | Footer "Compare" column | all comparison pages (W1), /compare/ hub (W2) | "vs Apollo", "vs Instantly", "vs Smartlead" | Keeps every comparison within one click |
 | Footer "Who it's for" column | 3 /for/ pages | buyer-group names | Same |
-| Each /for/ page | /how-it-works/, /pricing/, the 1–2 most relevant comparisons, /contact/ | "how LeadPilot works", "LeadPilot pricing", "LeadPilot vs Instantly for agencies", "Book a call" | Reader's next questions |
-| Each comparison page | the other comparisons, /pricing/, the matching /for/ page, the competitor's official pricing page (external, `rel="nofollow"` not needed) | "LeadPilot vs Smartlead", "LeadPilot pricing", competitor name | Lateral comparison browsing; cited sources build trust |
+| Each /for/ page | /how-it-works/, /pricing/, the 1–2 most relevant comparisons, /contact/ | "how Vectorae works", "Vectorae pricing", "Vectorae vs Instantly for agencies", "Book a call" | Reader's next questions |
+| Each comparison page | the other comparisons, /pricing/, the matching /for/ page, the competitor's official pricing page (external, `rel="nofollow"` not needed) | "Vectorae vs Smartlead", "Vectorae pricing", competitor name | Lateral comparison browsing; cited sources build trust |
 | /how-it-works/ | /pricing/, /for/* , /faq/ (W2) | as above | — |
 | /pricing/ | /compare/* , /faq/ (W2) "pricing questions" | — | Price comparisons live on comparison pages |
 | /faq/ (W2) | each answer links its source page (pricing, how-it-works, a comparison) | page names | FAQ as router |

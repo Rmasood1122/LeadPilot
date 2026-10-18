@@ -101,7 +101,7 @@ class TestDayZeroRules:
         assert any("no question" in p for p in dm.validate_dm("Saw your post."))
 
     def test_naming_the_product_is_rejected(self):
-        problems = dm.validate_dm("LeadPilot fixes this. Want a look?")
+        problems = dm.validate_dm("Vectorae fixes this. Want a look?")
         assert any("names the product" in p for p in problems)
 
     def test_banned_words_are_rejected(self):
@@ -127,7 +127,7 @@ class TestDmGeneration:
                                                        fake_claude):
         _strategy, lead = watched
         fake_claude.displacement_dm_response = [
-            {"dm": "LeadPilot fixes this. One. Two. Three. Want a look?"},
+            {"dm": "Vectorae fixes this. One. Two. Three. Want a look?"},
             {"dm": "You said the pipeline dried up. Usually that is the list. "
                    "What changed?"},
         ]
@@ -143,7 +143,7 @@ class TestDmGeneration:
         """An alert with no DM still shows the evidence. A rule-breaking DM
         one click from being sent is strictly worse."""
         _strategy, lead = watched
-        fake_claude.displacement_dm_response = {"dm": "LeadPilot is a platform. Yes?"}
+        fake_claude.displacement_dm_response = {"dm": "Vectorae is a platform. Yes?"}
 
         assert dm.generate_displacement_dm(lead, "x", ["Apollo"]) is None
         assert len(fake_claude.displacement_dm_prompts) == 2

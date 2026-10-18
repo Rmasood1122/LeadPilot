@@ -54,7 +54,7 @@ PAGE_TYPES = ("landing", "blog", "case_study", "comparison", "location")
 SYSTEM_PROMPT = (
     "You are an expert SEO content engineer and conversion copywriter. "
     "You write HTML pages that rank on Google and convert agency founders "
-    "into LeadPilot Enterprise leads. You write as a founder who solved "
+    "into Vectorae Enterprise leads. You write as a founder who solved "
     "his own pipeline problem — direct, specific, no buzzwords. "
     "Banned words: solution, platform, synergy, game-changer, leverage, "
     "excited, seamless, disruptive, revolutionary, innovative. "
@@ -72,7 +72,7 @@ EXISTING PAGES TO LINK TO:
 {existing_pages}
 
 BRAND CONTEXT:
-Product: LeadPilot Enterprise
+Product: Vectorae Enterprise
 Also known as: Calendarharvest
 Founder: Rehan Masood
 ICP: Boutique agency founders, 3-30 staff
@@ -85,7 +85,7 @@ Complete HTML5 document with DOCTYPE html
 head must contain:
   meta charset UTF-8
   meta viewport width=device-width initial-scale=1.0
-  title tag: {meta_title} | LeadPilot Enterprise
+  title tag: {meta_title} | Vectorae Enterprise
   meta name description content {meta_description}
   meta property og:title content {meta_title}
   meta property og:description content {meta_description}

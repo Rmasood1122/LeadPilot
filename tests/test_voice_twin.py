@@ -107,7 +107,7 @@ class TestCloneLifecycle:
         assert _consent(client).status_code == 409            # one live clone at a time
         for _ in range(2):
             assert _upload(client).status_code == 201
-        assert eleven.created == ["LeadPilot - Rehan"]
+        assert eleven.created == ["Vectorae - Rehan"]
         state = client.post("/me/voice-clone/submit").json()
         assert state["clone"]["status"] == "verifying"
 
@@ -289,7 +289,7 @@ class TestProviderShapes:
                           _Resp(content=b"\x89PNG", ctype="image/png"),
                           _Resp(data={"status": "ok"}), _Resp(status=404, data={}))
         el = vp.ElevenLabsClient("k")
-        assert el.pvc_create(name="LeadPilot - Rehan", language="en") == "v9"
+        assert el.pvc_create(name="Vectorae - Rehan", language="en") == "v9"
         el.pvc_add_sample("v9", filename="a.mp3", content=b"ID3", content_type="audio/mpeg")
         el.pvc_train("v9", "eleven_flash_v2_5")
         assert el.pvc_captcha("v9")["kind"] == "image"

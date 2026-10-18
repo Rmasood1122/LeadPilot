@@ -1,4 +1,4 @@
-# LeadPilot status page — Phase 3
+# Vectorae status page — Phase 3
 
 **Primary location (2026-10-11): https://www.calendarharvest.com/status/** — a public page
 inside the main frontend (`frontend/src/app/status/`), deployed by the existing Vercel project
@@ -22,7 +22,7 @@ the page still loads and says so. If it cannot check something, it says "No data
  browser ──► www.calendarharvest.com/status/   (Vercel project "lead-pilot", static export:
                │                                out/status/index.html, no server code)
                │  on load, then every 30 s while the tab is visible; 8 s timeout
-               └─► LeadPilot API  GET ${NEXT_PUBLIC_API_URL}/status/public   (Render)
+               └─► Vectorae API  GET ${NEXT_PUBLIC_API_URL}/status/public   (Render)
                      the same checks as GET /health (app/services/health_checks.py)
 ```
 
@@ -33,7 +33,7 @@ the page still loads and says so. If it cannot check something, it says "No data
   A "Check now" button forces a check. One request in flight at a time.
 - **Unreachable:** network error, CORS rejection, 8 s timeout, any non-2xx other than 429
   (for example the host's error page while the service is down), or a body that is not the expected
-  JSON → headline **"LeadPilot API unreachable — major outage"**, API shown as Major outage,
+  JSON → headline **"Vectorae API unreachable — major outage"**, API shown as Major outage,
   the other components "No data", plus one plain sentence (e.g. "did not answer within 8
   seconds"). Earlier good data is dropped, never shown as current.
 - **429** (rate limited) is not an outage: the last good result stays, marked with its time,
@@ -121,7 +121,7 @@ two lists are separate.
   failure, 5xx page, 429, degraded component, all ok, missing/unknown component, tab hidden →
   no polling → visible → immediate check.
 - `NEXT_PUBLIC_API_URL=https://api.example.test npm run build`: the export contains
-  `out/status/index.html` (title "LeadPilot Status | Calendarharvest", static "Checking
+  `out/status/index.html` (title "Vectorae Status | Calendarharvest", static "Checking
   status…" and "No incidents reported."), the API origin is compiled into the page chunk, and
   `out/about/index.html` links `href="/status/"`. (Google Fonts is blocked in the sandbox; the
   build used Next's `NEXT_FONT_GOOGLE_MOCKED_RESPONSES` test hook for the Inter font.)
@@ -156,7 +156,7 @@ site links can stay on `/status/` (Part A) or point at the subdomain; decide the
                ├─► UptimeRobot API v2 getMonitors      read-only key, server-side env only
                │     6 external monitors (section 4): up/down now + 90 daily uptime values
                │
-               └─► LeadPilot API  GET /status/public   5 s timeout
+               └─► Vectorae API  GET /status/public   5 s timeout
                      the same checks as GET /health (app/services/health_checks.py)
 ```
 
@@ -199,7 +199,7 @@ preview URL (section 10).
 | Component | Normal source | When `/status/public` cannot be read |
 |---|---|---|
 | Website & app | UptimeRobot: Website + App login monitors. All up = Operational; one down = Partial outage; both down = Major outage; otherwise No data | same |
-| API | Backend: DB `SELECT 1` + Redis PING. Both ok = Operational; Redis down = Partial outage; DB down = Major outage | "LeadPilot - API" monitor: up = Operational, down = Major outage, else No data. Note: "Detail unavailable — status from external monitoring" |
+| API | Backend: DB `SELECT 1` + Redis PING. Both ok = Operational; Redis down = Partial outage; DB down = Major outage | "Vectorae - API" monitor: up = Operational, down = Major outage, else No data. Note: "Detail unavailable — status from external monitoring" |
 | Background processing | Backend: Celery heartbeat age. ≤120 s = Operational; 120–300 s = Degraded; missing, unreadable or Redis down = Major outage | Keyword monitor up = Operational; worker monitor down, or API up but keyword down = Major outage; else No data |
 | AI features | Backend: Anthropic Models API with the gateway key (no model call, no tokens billed). 200 = Operational; 429/5xx/529/timeout = Degraded; 401/403/404 or no key = Major outage | Never derived: No data |
 | Booking pages | Backend: DB reachable and the 3 booking tables queryable = Operational, else Major outage. Also Major outage if the "Booking page" monitor is down | API monitor down or booking monitor down = Major outage; else No data |
@@ -253,9 +253,9 @@ Names must match exactly (case ignored): the site finds monitors by name.
 
 | id | name | type | state |
 |---|---|---|---|
-| 804163676 | LeadPilot API /health (keyword) | Keyword, alert if `"status":"ok"` does NOT exist | UP for 7 days |
-| 804162778 | LeadPilot API | HTTP | PAUSED (duplicate) |
-| 804162687 | LeadPilot API /health | HTTP | PAUSED (duplicate) |
+| 804163676 | Vectorae API /health (keyword) | Keyword, alert if `"status":"ok"` does NOT exist | UP for 7 days |
+| 804162778 | Vectorae API | HTTP | PAUSED (duplicate) |
+| 804162687 | Vectorae API /health | HTTP | PAUSED (duplicate) |
 
 **The active keyword monitor cannot detect the outage it was made for.** A degraded `/health`
 body still contains `"status":"ok"` inside its healthy sub-components:
@@ -281,24 +281,24 @@ the founders: the Part A page only shows status to whoever opens it.
 
 Steps:
 1. **Delete** the two paused duplicates (804162778, 804162687).
-2. **Edit** 804163676: rename to `LeadPilot - API healthy`; keyword value
+2. **Edit** 804163676: rename to `Vectorae - API healthy`; keyword value
    `{"status":"ok","components"`; keep "alert when keyword does not exist", 5-minute interval.
    Expect it to go DOWN immediately while the worker is asleep — that is the truth (D2).
 3. **Create** five monitors (5-minute interval, HTTP(s), follow redirects):
 
 | Friendly name | Type | URL | Notes |
 |---|---|---|---|
-| `LeadPilot - Website` | HTTP(s) | `https://calendarharvest.com/` | Marketing home |
-| `LeadPilot - App login` | HTTP(s) | `https://calendarharvest.com/login/` | Static export uses trailing slashes |
-| `LeadPilot - Booking page` | HTTP(s) | `https://calendarharvest.com/book/` | The public booking shell (`/book/<slug>` rewrites to it). Proves the page is served; the backend half is in `/status/public` |
-| `LeadPilot - API` | HTTP(s) | `https://leadpilot-api-ph3t.onrender.com/health` | Down on 503 (DB/Redis down) or no answer. 200 for "degraded", so this means "API answers" |
-| `LeadPilot - Worker` | HTTP(s) | `https://leadpilot-worker-708k.onrender.com/health` | **Needs D2 first.** The worker does expose HTTP: `render.yaml` runs it as a free web service, `scripts/render_worker_entrypoint.sh` starts `app/worker_health.py`, which answers 503 when a Celery child died. A 5-minute ping keeps the free worker awake (D2 option A) but uses ~730 of the 750 free instance-hours per month shared with the API (`BASELINE.md` §6, unverified against Render's current terms). If D2 = paid Background Worker, the service has no HTTP; skip this monitor and the page derives background status from the keyword monitor. |
+| `Vectorae - Website` | HTTP(s) | `https://calendarharvest.com/` | Marketing home |
+| `Vectorae - App login` | HTTP(s) | `https://calendarharvest.com/login/` | Static export uses trailing slashes |
+| `Vectorae - Booking page` | HTTP(s) | `https://calendarharvest.com/book/` | The public booking shell (`/book/<slug>` rewrites to it). Proves the page is served; the backend half is in `/status/public` |
+| `Vectorae - API` | HTTP(s) | `https://leadpilot-api-ph3t.onrender.com/health` | Down on 503 (DB/Redis down) or no answer. 200 for "degraded", so this means "API answers" |
+| `Vectorae - Worker` | HTTP(s) | `https://leadpilot-worker-708k.onrender.com/health` | **Needs D2 first.** The worker does expose HTTP: `render.yaml` runs it as a free web service, `scripts/render_worker_entrypoint.sh` starts `app/worker_health.py`, which answers 503 when a Celery child died. A 5-minute ping keeps the free worker awake (D2 option A) but uses ~730 of the 750 free instance-hours per month shared with the API (`BASELINE.md` §6, unverified against Render's current terms). If D2 = paid Background Worker, the service has no HTTP; skip this monitor and the page derives background status from the keyword monitor. |
 
 4. **Read-only API key** (only needed for the optional Part B app; Part A does not use UptimeRobot): UptimeRobot dashboard → Integrations & API (older dashboards: My
    Settings → API Settings) → Read-Only API Key → create. Menu labels unverified; the key type is
    "read-only" (it can call `get*` methods only). Do not use the main or a monitor-specific key.
 5. Do **not** create an UptimeRobot public status page; www.calendarharvest.com/status/ replaces it.
-6. Optional: an HTTP(s) monitor `LeadPilot - Status page` on `https://www.calendarharvest.com/status/`
+6. Optional: an HTTP(s) monitor `Vectorae - Status page` on `https://www.calendarharvest.com/status/`
    (proves the page itself is served; it is static, so it does not test the API).
 
 ## 5. Vercel — what the founders do (optional Part B only)
@@ -376,7 +376,7 @@ processing showed "No data" rather than Operational. Data layer alone (`npm run 
 API down):
 ```
 sources        uptimerobot=ok backend=unreachable
-DATA NOTICE    Detail unavailable: LeadPilot's own component checks could not be reached. ...
+DATA NOTICE    Detail unavailable: Vectorae's own component checks could not be reached. ...
 BANNER         Major outage
   Website & app          Operational           source=external
   API                    Major outage          source=external Detail unavailable — status from external monitoring
@@ -390,7 +390,7 @@ BANNER         Major outage
 ```
 notice: Status data unavailable — External monitoring is not configured for this page, so uptime
         history is missing and the Website & app component cannot be checked. The other
-        components show LeadPilot's own checks.
+        components show Vectorae's own checks.
 Website & app = unknown (No data); API, Background processing, Booking pages = operational
 (backend); AI features = major_outage (backend); uptime bars rendered: 0
 ```

@@ -22,7 +22,7 @@ GOOD_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Outbound Pipeline for Agencies | LeadPilot</title>
+<title>Outbound Pipeline for Agencies | Vectorae</title>
 <meta name="description" content="Your pipeline runs when you push it and stops when you stop. Here is how to build an outbound pipeline for agencies that does not need you.">
 <meta property="og:title" content="Outbound Pipeline for Agencies">
 <meta property="og:description" content="A pipeline that runs without the founder in it.">
@@ -45,7 +45,7 @@ structural reason every time.</p>
 <p>Read <a href="/blog/cold-email-not-working-agency">why cold email stops
 working</a> and <a href="/blog/apollo-clay-leadpilot-comparison">how the tools
 compare</a>.</p>
-<footer><p>&copy; 2026 LeadPilot.
+<footer><p>&copy; 2026 Vectorae.
 <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p></footer>
 </body>
 </html>"""
@@ -58,7 +58,7 @@ def _body(**overrides) -> dict:
         "page_type": "blog",
         "slug": "blog/test-page",
         "title": "A Test Page About Agency Pipelines",
-        "meta_title": "A Test Page About Agency Pipelines | LeadPilot",
+        "meta_title": "A Test Page About Agency Pipelines | Vectorae",
         "meta_description": "A test page used to exercise the website builder end to end.",
         "target_keyword": "agency pipeline",
         "secondary_keywords": ["agency outbound"],
@@ -86,7 +86,7 @@ def _make_page(db_session, **overrides) -> m.SitePage:
         "page_type": m.PageType.BLOG,
         "slug": f"blog/{uuid.uuid4().hex[:8]}",
         "title": "Seeded page",
-        "meta_title": "Seeded page | LeadPilot",
+        "meta_title": "Seeded page | Vectorae",
         "meta_description": "Seeded directly in the database.",
         "target_keyword": KEYWORD,
         "brief": "x" * 60,
@@ -397,7 +397,7 @@ class TestScorePageSeoUnit:
 
     def test_an_over_long_title_fails_the_title_rule(self):
         long_title = "x" * 80
-        page = GOOD_HTML.replace("Outbound Pipeline for Agencies | LeadPilot", long_title)
+        page = GOOD_HTML.replace("Outbound Pipeline for Agencies | Vectorae", long_title)
         assert any("70 characters" in issue
                    for issue in score_page_seo(page, KEYWORD)["issues"])
 

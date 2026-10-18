@@ -81,7 +81,7 @@ def validate_opt_out(body: str | None, category) -> None:
             "a marketing template must tell the recipient how to opt out, with "
             "the word STOP in capitals in an instruction, e.g. "
             f'"{STANDARD_OPT_OUT}" or "STOP to unsubscribe" (STOP is the '
-            "keyword LeadPilot acts on to stop messaging a contact)"
+            "keyword Vectorae acts on to stop messaging a contact)"
         )
 # Meta template names: lowercase letters, digits, underscores.
 # TODO: verify against current WhatsApp docs (exact charset + max length)
@@ -379,7 +379,7 @@ def sendable_template(session: Session, name: str,
 # --------------------------------------------------------------------------
 
 _GENERATE_SYSTEM = (
-    "You are LeadPilot's WhatsApp template drafter. Produce COMPLIANT Meta "
+    "You are Vectorae's WhatsApp template drafter. Produce COMPLIANT Meta "
     "message-template candidates for B2B outreach. Respond with ONLY a JSON "
     'object: {"templates": [ ... ]} containing 2 or 3 items, each: '
     '{"name": "<lowercase_snake_case>", "language": "<e.g. en_US>", '

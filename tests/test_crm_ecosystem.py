@@ -590,7 +590,7 @@ def test_salesforce_push_and_relay(client, db_session, test_user, sf, verified_l
     rid = crm_sync.push_lead(db_session, test_user.id, lead.id)["salesforce"]
     record = sf.fake.records["Lead"][rid]
     assert (record["LastName"], record["Company"], record["LeadSource"]) == (
-        "Madonna", "Unknown", "LeadPilot")
+        "Madonna", "Unknown", "Vectorae")
     assert record["Status"] == "Working - Contacted"
 
     client.headers.pop("Authorization", None)

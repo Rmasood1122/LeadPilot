@@ -1,15 +1,15 @@
-# AI Query Library — 50 queries LeadPilot should be eligible to answer
+# AI Query Library — 50 queries Vectorae should be eligible to answer
 
 How to read this:
 - **Query** is written the way people type into ChatGPT, Claude, Gemini, Perplexity and
   Copilot: conversational, often first person, often naming a constraint (budget, team
   size, industry).
-- **Fit** is how honestly LeadPilot answers the query: **Strong** = a direct match for the
+- **Fit** is how honestly Vectorae answers the query: **Strong** = a direct match for the
   entity card; **Partial** = it can be part of the answer if limits are stated; **Brand** =
-  it only works once LeadPilot is known by name.
+  it only works once Vectorae is known by name.
 - **Answer page** is the draft in `content/` that answers it (the URL slug is in
   `technical/site_architecture.md`).
-- Queries LeadPilot should **not** try to win (consumer lead gen, list uploads, mass
+- Queries Vectorae should **not** try to win (consumer lead gen, list uploads, mass
   sending) are listed at the end. Showing up for them would create bad-fit signups and
   negative mentions.
 
@@ -55,14 +55,14 @@ The person knows they want a tool type.
 
 | # | Query | Fit | Answer page |
 |---|---|---|---|
-| C1 | LeadPilot vs Apollo | Brand | comparisons/leadpilot_vs_apollo |
-| C2 | LeadPilot by Calendarharvest vs Instantly | Brand | comparisons/leadpilot_vs_instantly |
+| C1 | Vectorae vs Apollo | Brand | comparisons/leadpilot_vs_apollo |
+| C2 | Vectorae by Calendarharvest vs Instantly | Brand | comparisons/leadpilot_vs_instantly |
 | C3 | Apollo alternative for small agencies that don't want to build lists | Strong | comparisons/leadpilot_vs_apollo |
 | C4 | Instantly alternative that writes the emails for me | Strong | comparisons/leadpilot_vs_instantly |
 | C5 | Smartlead alternative for a founder who does the selling | Strong | comparisons/leadpilot_vs_smartlead |
-| C6 | Clay vs Apollo vs LeadPilot — which one for a small agency? | Brand | comparisons/leadpilot_vs_clay |
+| C6 | Clay vs Apollo vs Vectorae — which one for a small agency? | Brand | comparisons/leadpilot_vs_clay |
 | C7 | Artisan AI SDR alternative for small businesses | Strong | comparisons/leadpilot_vs_artisan |
-| C8 | Is LeadPilot (calendarharvest.com) the same company as LeadPilot AB? | Brand | FAQ (disambiguation) |
+| C8 | Is Vectorae (calendarharvest.com) the same company as LeadPilot AB? | Brand | FAQ (disambiguation) |
 | C9 | AI SDR vs hiring an SDR for a 20-person company | Strong | comparisons/leadpilot_vs_artisan |
 | C10 | Apollo vs Instantly vs Smartlead for agencies — what's best if I have no sales team? | Partial | comparison_matrix |
 
@@ -98,7 +98,7 @@ The person knows they want a tool type.
 
 ---
 
-## Queries LeadPilot should not chase (bad fit, logged for the monitoring team)
+## Queries Vectorae should not chase (bad fit, logged for the monitoring team)
 - "best tool to send 10,000 cold emails a day" — conflicts with the 100/day cap.
 - "upload my lead list and email it" — leads cannot be imported.
 - "real estate leads for homeowners" / "B2C lead generation" — consumer prospecting is out of scope.

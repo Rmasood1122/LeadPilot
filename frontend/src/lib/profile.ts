@@ -76,7 +76,7 @@ export const DELETE_ACCOUNT_COPY = {
   ],
   outside: [
     "Stripe keeps its own customer record of you (name, email, payment details).",
-    "Access you gave LeadPilot inside Google, HubSpot, Salesforce or Slack is not revoked on " +
+    "Access you gave Vectorae inside Google, HubSpot, Salesforce or Slack is not revoked on " +
       "their side; remove it there.",
     "Cached answers from contact-finding providers expire within 30 days; hosting logs with IP " +
       "addresses are kept for the period the hosting provider sets.",

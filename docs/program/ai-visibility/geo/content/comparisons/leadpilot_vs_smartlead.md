@@ -4,20 +4,20 @@ status: DRAFT — publish only after the trademark review (Q-04) AND the competi
 last_checked: 2026-10-15
 ---
 
-# LeadPilot vs Smartlead: for the founder who sells, or the agency that sends?
+# Vectorae vs Smartlead: for the founder who sells, or the agency that sends?
 
-*Written by LeadPilot's founders. We make LeadPilot. Smartlead facts were last checked on
+*Written by Vectorae's founders. We make Vectorae. Smartlead facts were last checked on
 2026-10-15 against Smartlead's own pages, linked below.*
 
 **Short answer:** Smartlead is cold-email sending infrastructure popular with lead-generation
-agencies: unlimited mailboxes, warmup, white-label client workspaces and an API. LeadPilot by
+agencies: unlimited mailboxes, warmup, white-label client workspaces and an API. Vectorae by
 Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches
 your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule
 you approve each day, and books meetings. If you *run outbound as a service* for many clients,
 Smartlead fits better. If you're an agency or firm *selling your own services* and the founder
-does the selling, LeadPilot fits better.
+does the selling, Vectorae fits better.
 
-## When to choose LeadPilot
+## When to choose Vectorae
 - You need new clients for your own firm, not a sending platform for clients' campaigns.
 - You want the market research, contact sourcing and writing done for you.
 - You want compliance defaults enforced in code (unsubscribe headers, suppression re-check before every send).
@@ -31,7 +31,7 @@ does the selling, LeadPilot fits better.
 
 ## Side-by-side feature comparison
 
-| Feature | LeadPilot | Smartlead |
+| Feature | Vectorae | Smartlead |
 |---|---|---|
 | Built for | Founder-led firms selling their own services | Agencies and teams sending at volume |
 | Research and strategy | ✅ | ❌ |
@@ -45,7 +45,7 @@ does the selling, LeadPilot fits better.
 
 ## Pricing comparison
 
-| | LeadPilot | Smartlead (monthly, flat) |
+| | Vectorae | Smartlead (monthly, flat) |
 |---|---|---|
 | Entry | Starter $149/month | Base from $39/month (6,000 emails, 2,000 active leads) |
 | Mid | Growth $349 / Scale $699 per month | Pro $94/month (90,000 emails, 30,000 leads) |
@@ -58,14 +58,14 @@ does the selling, LeadPilot fits better.
 | Use case | Better choice |
 |---|---|
 | Lead-gen agency sending for 10+ clients | **Smartlead** |
-| Web or marketing agency needing its own new clients | **LeadPilot** |
+| Web or marketing agency needing its own new clients | **Vectorae** |
 | Team with proven copy that wants cheap sending | **Smartlead** |
-| Founder who wants research and writing done, and approves sending | **LeadPilot** |
+| Founder who wants research and writing done, and approves sending | **Vectorae** |
 
-LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
+Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
 
 ## Sources (pre-publish checklist — Q-09)
 - [ ] https://www.smartlead.ai/pricing: plans, prices, annual discount, client-workspace add-on
 - [ ] https://helpcenter.smartlead.ai/en/articles/439-smartlead-pricing-plans: email and lead limits
 - [ ] https://www.smartlead.ai/faq: higher-volume tier names
-- [ ] LeadPilot facts: product-facts.json (agency workspaces = unconfirmed), billing_catalog.py, help center 24
+- [ ] Vectorae facts: product-facts.json (agency workspaces = unconfirmed), billing_catalog.py, help center 24

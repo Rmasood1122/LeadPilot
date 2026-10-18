@@ -12,7 +12,7 @@ by a decision made about the first.
 WHY A FLAG AT ALL, rather than deriving it. "The latest inbound is newer than
 the latest outbound" is a good default and it is what an unhandled reply looks
 like -- but it cannot represent the two cases that matter most: a reply
-answered OUTSIDE LeadPilot (picked up the phone, replied from Gmail directly),
+answered OUTSIDE Vectorae (picked up the phone, replied from Gmail directly),
 and a reply that needs no answer. Both are "done" and neither produces an
 outbound row here. Without this column the inbox would keep showing them
 forever, and an inbox that lies about what is outstanding stops being opened.

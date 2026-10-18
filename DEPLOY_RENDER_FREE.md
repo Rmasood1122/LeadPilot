@@ -422,7 +422,7 @@ Built with the real Render URL and inspected the output:
 
 * URL baked into **8 bundle files** as `a="https://leadpilot-api-ph3t.onrender.com"` — correct scheme, no trailing slash.
 * **Zero** files containing `localhost:8000` or `127.0.0.1:8000`.
-* 20 HTML pages, `out/index.html` present, 2.2 MB total, `<title>LeadPilot</title>`, manifest name `LeadPilot`.
+* 20 HTML pages, `out/index.html` present, 2.2 MB total, `<title>Vectorae</title>`, manifest name `Vectorae`.
 * Served the export over HTTP: `/`, `/login/`, `/strategies/`, `/settings/` all 200.
 
 Build guard exercised in all three states:

@@ -5,20 +5,20 @@ status: DRAFT — publish only after the trademark review (Q-04) AND the competi
 last_checked: 2026-10-15
 ---
 
-# LeadPilot vs Apollo.io: which one fits a small agency or service firm?
+# Vectorae vs Apollo.io: which one fits a small agency or service firm?
 
-*Written by LeadPilot's founders. We make LeadPilot, so weigh this accordingly. We've tried to
+*Written by Vectorae's founders. We make Vectorae, so weigh this accordingly. We've tried to
 say plainly where Apollo is the better choice. Apollo facts were last checked on 2026-10-15
 against Apollo's own pages, linked at the bottom.*
 
 **Short answer:** Apollo.io is a sales database with sequencing. You search its contacts, build
-a list, write a sequence and run it. LeadPilot by Calendarharvest is an AI outbound sales tool
+a list, write a sequence and run it. Vectorae by Calendarharvest is an AI outbound sales tool
 for agencies and B2B service firms: it researches your market, finds and verifies business
 contacts, writes one-to-one emails, sends on a schedule you approve each day, and books
 meetings. If you want data and control, choose Apollo. If you're a founder-led firm with no
-time to run outbound yourself, LeadPilot is built for you.
+time to run outbound yourself, Vectorae is built for you.
 
-## When to choose LeadPilot
+## When to choose Vectorae
 - You run an agency or B2B service firm of roughly 5–50 people, and the founder or owner does the selling.
 - You don't have time to choose a market, build lists and write sequences, and you want that done for you.
 - You want to approve each day's sending before anything goes out.
@@ -28,13 +28,13 @@ time to run outbound yourself, LeadPilot is built for you.
 ## When to choose Apollo
 - You want to search and export from a large B2B contact database. Apollo cites "240 million+ contacts".
 - You have someone (you, or an SDR) to build lists and run sequences.
-- You need LinkedIn steps, a built-in dialer, or deep CRM sync today. LeadPilot's LinkedIn steps are not live, and its phone channel is off by default.
+- You need LinkedIn steps, a built-in dialer, or deep CRM sync today. Vectorae's LinkedIn steps are not live, and its phone channel is off by default.
 - You want a free plan or the lowest per-seat entry price.
-- You want a mature product with thousands of reviews. LeadPilot is new and has none yet.
+- You want a mature product with thousands of reviews. Vectorae is new and has none yet.
 
 ## Side-by-side feature comparison
 
-| Feature | LeadPilot | Apollo.io |
+| Feature | Vectorae | Apollo.io |
 |---|---|---|
 | Starting point | Describe what you sell | Search the database |
 | Market research + strategy | ✅ 72-step pipeline (144 with no past clients), then 10 verification checks | ❌ you decide the market |
@@ -49,7 +49,7 @@ time to run outbound yourself, LeadPilot is built for you.
 
 ## Pricing comparison
 
-| | LeadPilot | Apollo.io |
+| | Vectorae | Apollo.io |
 |---|---|---|
 | Entry | Starter $149/month, flat per account | Free plan; Basic $49 per user/month billed annually |
 | Mid | Growth $349/month; Scale $699/month | Professional $79 per user/month billed annually |
@@ -58,25 +58,25 @@ time to run outbound yourself, LeadPilot is built for you.
 | Notes | Online checkout not live yet; contact to start | Monthly billing available on some plans at higher rates |
 
 For one person who already knows their market and will write their own sequences, Apollo is far
-cheaper. LeadPilot costs more per month because it does the research and writing, which is the
+cheaper. Vectorae costs more per month because it does the research and writing, which is the
 work Apollo leaves to you.
 
 ## Verdict: which is better for which use case
 
 | Use case | Better choice |
 |---|---|
-| Agency founder with no sales team, no time to prospect | **LeadPilot** |
+| Agency founder with no sales team, no time to prospect | **Vectorae** |
 | SDR team that needs data, dialer and LinkedIn | **Apollo** |
 | Solo founder on a tight budget who enjoys writing outreach | **Apollo** (free or Basic) |
-| Firm that wants to pay only for booked meetings | **LeadPilot** (pay per meeting) |
-| Anyone needing to email or upload their own list | **Apollo** (LeadPilot can't import leads) |
-| Firm worried about compliance mistakes in cold email | **LeadPilot** (compliance enforced by default) |
+| Firm that wants to pay only for booked meetings | **Vectorae** (pay per meeting) |
+| Anyone needing to email or upload their own list | **Apollo** (Vectorae can't import leads) |
+| Firm worried about compliance mistakes in cold email | **Vectorae** (compliance enforced by default) |
 
-LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
+Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
 
 ## Sources (pre-publish checklist — Q-09)
 - [ ] https://www.apollo.io/pricing: plan names, prices, billing basis, minimum users (excerpt seen via apollo.io/insights/apollo-vs-zoominfo on 2026-10-15)
 - [ ] https://www.apollo.io/: "240 million+ contacts" and the self-description
 - [ ] https://knowledge.apollo.io/hc/en-us/articles/4409231193101-Create-a-Sequence: sequence step types incl. LinkedIn
-- [ ] LeadPilot facts: `frontend/src/content/product-facts.json`, `app/core/billing_catalog.py`, help center 01, 14, 22, 29
+- [ ] Vectorae facts: `frontend/src/content/product-facts.json`, `app/core/billing_catalog.py`, help center 01, 14, 22, 29
 - Record each Apollo fact (URL, fetch date, exact text) in `docs/program/ai-visibility/NOTES.md`. If a fact can't be confirmed, delete its row.

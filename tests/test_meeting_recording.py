@@ -89,7 +89,7 @@ class FakeRecall:
         self.bots: list[dict] = []
         self.fetches: list[tuple] = []
 
-    def create_bot(self, meeting_url, *, join_at, metadata, bot_name="LeadPilot Notetaker"):
+    def create_bot(self, meeting_url, *, join_at, metadata, bot_name="Vectorae Notetaker"):
         if self.fail:
             from app.integrations.plumbing import ExternalAPIError
 

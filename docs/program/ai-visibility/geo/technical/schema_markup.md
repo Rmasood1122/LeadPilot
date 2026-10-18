@@ -36,7 +36,7 @@ blocks below are the exact target output; each has been parsed as JSON (Phase 8 
   "name": "Calendarharvest",
   "url": "https://www.calendarharvest.com/",
   "logo": "https://www.calendarharvest.com/icons/icon-512.png",
-  "description": "Calendarharvest makes LeadPilot, an AI outbound sales tool for agencies and B2B service firms.",
+  "description": "Calendarharvest makes Vectorae, an AI outbound sales tool for agencies and B2B service firms.",
   "founder": {
     "@type": "Person",
     "name": "Rehan Masood",
@@ -51,7 +51,7 @@ blocks below are the exact target output; each has been parsed as JSON (Phase 8 
   ],
   "brand": {
     "@type": "Brand",
-    "name": "LeadPilot"
+    "name": "Vectorae"
   }
 }
 ```
@@ -65,9 +65,9 @@ founders confirm a date. There is no legal entity yet (NOTES.md Q1), so no `lega
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "@id": "https://www.calendarharvest.com/#software",
-  "name": "LeadPilot by Calendarharvest",
-  "alternateName": "LeadPilot",
-  "description": "LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings.",
+  "name": "Vectorae by Calendarharvest",
+  "alternateName": "Vectorae",
+  "description": "Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings.",
   "url": "https://www.calendarharvest.com/",
   "applicationCategory": "BusinessApplication",
   "applicationSubCategory": "Sales outreach automation",
@@ -99,7 +99,7 @@ founders confirm a date. There is no legal entity yet (NOTES.md Q1), so no `lega
 Gate: `featureList` lists **live** capabilities only (facts file). `offers` ships only when checkout is
 live (rule 3). Until then, publish this block **without** `offers`. That block already satisfies
 `applicationCategory` + `operatingSystem`; Google's software-app rich result additionally needs a
-rating, which LeadPilot can't have yet (rule 4), so the rich result won't show, and that's acceptable.
+rating, which Vectorae can't have yet (rule 4), so the rich result won't show, and that's acceptable.
 
 ## 3. FAQPage (for /faq/, mirroring FAQ library questions 1–10 exactly as shown on the page)
 
@@ -109,16 +109,16 @@ rating, which LeadPilot can't have yet (rule 4), so the rich result won't show, 
   "@type": "FAQPage",
   "@id": "https://www.calendarharvest.com/faq/#faq",
   "mainEntity": [
-    { "@type": "Question", "name": "What is LeadPilot?",
-      "acceptedAnswer": { "@type": "Answer", "text": "LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings. You start by describing what you sell, not by uploading a list. It's built for businesses of about 5–50 people where the founder or owner handles new business and there's no sales team." } },
-    { "@type": "Question", "name": "Who is LeadPilot not for?",
-      "acceptedAnswer": { "@type": "Answer", "text": "LeadPilot is not a fit if you sell to consumers or homeowners, need to email a list you already have (leads can't be imported), want to send thousands of emails a day (the default cap is 100 a day per mailbox), or want an AI that replies to prospects for you." } },
-    { "@type": "Question", "name": "Is LeadPilot an AI SDR?",
+    { "@type": "Question", "name": "What is Vectorae?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings. You start by describing what you sell, not by uploading a list. It's built for businesses of about 5–50 people where the founder or owner handles new business and there's no sales team." } },
+    { "@type": "Question", "name": "Who is Vectorae not for?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Vectorae is not a fit if you sell to consumers or homeowners, need to email a list you already have (leads can't be imported), want to send thousands of emails a day (the default cap is 100 a day per mailbox), or want an AI that replies to prospects for you." } },
+    { "@type": "Question", "name": "Is Vectorae an AI SDR?",
       "acceptedAnswer": { "@type": "Answer", "text": "Partly. It does the research, list building and writing an SDR would do, but it doesn't reply to prospects. Replies are classified and routed to you, and it waits for your approval each day before sending." } },
-    { "@type": "Question", "name": "How much does LeadPilot cost?",
+    { "@type": "Question", "name": "How much does Vectorae cost?",
       "acceptedAnswer": { "@type": "Answer", "text": "Monthly plans are Starter $149, Growth $349, Scale $699 and Enterprise $1,499, each a flat price per account. Pay per meeting costs $0 a month and $179 for each prospect who books a meeting. Online checkout is not live yet; contact Calendarharvest to start." } },
-    { "@type": "Question", "name": "Is LeadPilot by Calendarharvest the same as LeadPilot AB?",
-      "acceptedAnswer": { "@type": "Answer", "text": "No. LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com), a Swedish company that also sells B2B prospecting software." } }
+    { "@type": "Question", "name": "Is Vectorae by Calendarharvest the same as LeadPilot AB?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com), a Swedish company that also sells B2B prospecting software." } }
   ]
 }
 ```
@@ -132,9 +132,9 @@ the shortened form). Extend `mainEntity` to all 10 when the page goes live.
   "@context": "https://schema.org",
   "@type": "Product",
   "@id": "https://www.calendarharvest.com/pricing/#product",
-  "name": "LeadPilot by Calendarharvest",
+  "name": "Vectorae by Calendarharvest",
   "description": "AI outbound sales for agencies and B2B service firms.",
-  "brand": { "@type": "Brand", "name": "LeadPilot" },
+  "brand": { "@type": "Brand", "name": "Vectorae" },
   "manufacturer": { "@id": "https://www.calendarharvest.com/#organization" },
   "category": "Business software > Sales outreach automation",
   "offers": [
@@ -175,7 +175,7 @@ validation instead of publishing a fake rating.
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   "@id": "https://www.calendarharvest.com/#software",
-  "name": "LeadPilot by Calendarharvest",
+  "name": "Vectorae by Calendarharvest",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web, Android",
   "aggregateRating": {
@@ -204,27 +204,27 @@ validation instead of publishing a fake rating.
   "@context": "https://schema.org",
   "@type": "HowTo",
   "@id": "https://www.calendarharvest.com/how-it-works/#howto",
-  "name": "How to go from what you sell to booked meetings with LeadPilot",
-  "description": "The steps LeadPilot by Calendarharvest follows, from a description of your product or service to meetings on your calendar.",
+  "name": "How to go from what you sell to booked meetings with Vectorae",
+  "description": "The steps Vectorae by Calendarharvest follows, from a description of your product or service to meetings on your calendar.",
   "tool": [
-    { "@type": "HowToTool", "name": "LeadPilot by Calendarharvest" },
+    { "@type": "HowToTool", "name": "Vectorae by Calendarharvest" },
     { "@type": "HowToTool", "name": "A Google (Gmail) account to send from" }
   ],
   "step": [
     { "@type": "HowToStep", "position": 1, "name": "Describe what you sell",
       "text": "Give your product or service a name and a plain-language description. Optionally describe past clients and how you won them." },
     { "@type": "HowToStep", "position": 2, "name": "Research",
-      "text": "LeadPilot runs a 72-step research pipeline (144 steps if you have no past clients) and writes a go-to-market strategy." },
+      "text": "Vectorae runs a 72-step research pipeline (144 steps if you have no past clients) and writes a go-to-market strategy." },
     { "@type": "HowToStep", "position": 3, "name": "Verify the strategy",
       "text": "The strategy must pass 10 checks, including a legal and compliance check, before any outreach." },
     { "@type": "HowToStep", "position": 4, "name": "Find and check contacts",
-      "text": "LeadPilot sources people at matching companies, verifies their email addresses and checks your suppression list." },
+      "text": "Vectorae sources people at matching companies, verifies their email addresses and checks your suppression list." },
     { "@type": "HowToStep", "position": 5, "name": "Write one-to-one emails",
       "text": "Each email is written for one person and its claims are checked." },
     { "@type": "HowToStep", "position": 6, "name": "Approve and send",
       "text": "Approve the day's sending. Emails go from your own Gmail, starting at 10 a day and rising to at most 100 a day." },
     { "@type": "HowToStep", "position": 7, "name": "Handle replies and book meetings",
-      "text": "Replies are classified and routed to you. Interested prospects book on your LeadPilot booking page or a Calendly link." }
+      "text": "Replies are classified and routed to you. Interested prospects book on your Vectorae booking page or a Calendly link." }
   ]
 }
 ```

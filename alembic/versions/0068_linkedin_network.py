@@ -7,7 +7,7 @@ CREATES
                                 account's own products
 
 WHY NO SHARING. A connections export lists third parties who never agreed to be
-shown to another LeadPilot account. Every row carries the uploading user_id and
+shown to another Vectorae account. Every row carries the uploading user_id and
 is only ever read back for that user. Email addresses and phone numbers in the
 export are not stored at all -- there is no column for them.
 

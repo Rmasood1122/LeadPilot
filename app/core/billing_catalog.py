@@ -114,7 +114,7 @@ PAY_PER_MEETING_PLAN: dict[str, Any] = {
     # common "booked, then cancelled the next morning" case without holding
     # revenue for long.
     "grace_hours": 48,
-    "tagline": "Pay only when a prospect books a meeting through LeadPilot.",
+    "tagline": "Pay only when a prospect books a meeting through Vectorae.",
     "plan": PAY_PER_MEETING,
 }
 

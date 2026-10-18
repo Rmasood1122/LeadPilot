@@ -118,7 +118,7 @@ counting against the match.
   privacy-policy question at 0.454. 0.50 is the lowest value that refuses every
   must-refuse item.
 - **6.0** sits in the middle of the plateau between 5.0 and 7.0. Within that
-  range the score floor changes nothing. 7.5 loses "What is LeadPilot?" (score
+  range the score floor changes nothing. 7.5 loses "What is Vectorae?" (score
   7.1), and 4.0 lets one more wrong answer through.
 
 The same tables and their reasoning are written in the comment above
@@ -187,7 +187,7 @@ dense retrieval of Phase 2–3 is meant to address; none was fixed by tuning a
 synonym to one question.
 
 **Mock-mode coverage floor raised from 0.55 to 0.60.** With the new articles,
-"How much will LeadPilot cost next year?" reached coverage 0.552 against the
+"How much will Vectorae cost next year?" reached coverage 0.552 against the
 plan-price heading and would have been answered with a price paragraph. 0.60
 answers no must-refuse item and has the lowest wrong-answer rate of the tested
 floors; the grid is in `app/services/help_center.py` above

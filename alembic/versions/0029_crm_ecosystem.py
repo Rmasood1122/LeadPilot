@@ -2,7 +2,7 @@
 
 CREATES
   external_crm_connections  a user's HubSpot / Salesforce connection (non-secret)
-  external_crm_links        LeadPilot lead/deal <-> CRM record, unique both ways
+  external_crm_links        Vectorae lead/deal <-> CRM record, unique both ways
   api_keys                  hashed personal API keys (Zapier / Make)
 
 "external_" keeps these apart from M9's native CRM tables (crm_*), which

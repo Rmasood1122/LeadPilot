@@ -34,7 +34,7 @@ export default function ComparisonPage({ params }: { params: { slug: string } })
   const others = COMPARISONS.filter((o) => o.slug !== c.slug);
   return (
     <ContentPage
-      jsonLd={pageGraph({ path: comparisonPath(c.slug), breadcrumb: `LeadPilot vs ${c.competitor}` })}
+      jsonLd={pageGraph({ path: comparisonPath(c.slug), breadcrumb: `Vectorae vs ${c.competitor}` })}
       current="/compare"
       eyebrow="Compare"
       h1={c.h1}
@@ -43,9 +43,9 @@ export default function ComparisonPage({ params }: { params: { slug: string } })
       lastChecked={COMPETITORS_CHECKED}
       sections={comparisonSections(c)}
       related={[
-        ...others.map((o) => ({ href: comparisonPath(o.slug).slice(0, -1), label: `LeadPilot vs ${o.competitor}` })),
+        ...others.map((o) => ({ href: comparisonPath(o.slug).slice(0, -1), label: `Vectorae vs ${o.competitor}` })),
         { href: "/compare", label: "All comparisons" },
-        { href: "/pricing", label: "LeadPilot pricing" },
+        { href: "/pricing", label: "Vectorae pricing" },
       ]}
     />
   );

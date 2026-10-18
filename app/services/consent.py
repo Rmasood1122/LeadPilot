@@ -132,7 +132,7 @@ def requirements_for(region: str | None, channel: str) -> dict:
                      "the opt-out must work and be honoured promptly.")
     elif region == "sg":
         notes.append("PDPA: phone and SMS additionally need the national Do-Not-Call "
-                     "check, which LeadPilot does NOT perform.")
+                     "check, which Vectorae does NOT perform.")
     elif not region:
         notes.append("Region unknown, so the strictest common baseline is applied: "
                      "identification and a working opt-out.")

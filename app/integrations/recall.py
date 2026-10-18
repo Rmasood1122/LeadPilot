@@ -151,7 +151,7 @@ class RecallAdapter(BaseHttpAdapter):
         return {"headers": {"Authorization": f"Token {self.api_key}"}}
 
     def create_bot(self, meeting_url: str, *, join_at: datetime | None,
-                   metadata: dict[str, str], bot_name: str = "LeadPilot Notetaker") -> dict:
+                   metadata: dict[str, str], bot_name: str = "Vectorae Notetaker") -> dict:
         body: dict = {
             "meeting_url": meeting_url,
             "bot_name": bot_name,

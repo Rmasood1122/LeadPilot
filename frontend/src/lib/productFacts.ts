@@ -19,7 +19,7 @@ export type CapabilityId = (typeof facts.capabilities)[number]["id"];
 export const PRODUCT_FACTS = facts;
 export const PRODUCT_NAME = facts.brand.product_name;
 export const COMPANY_NAME = facts.brand.company_name;
-/** "LeadPilot by Calendarharvest": how the product is named in titles and first mentions. */
+/** "Vectorae by Calendarharvest": how the product is named in titles and first mentions. */
 export const PRODUCT_FULL_NAME = `${PRODUCT_NAME} by ${COMPANY_NAME}`;
 
 export function capability(id: CapabilityId) {

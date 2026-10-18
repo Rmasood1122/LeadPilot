@@ -1,6 +1,6 @@
-# LeadPilot — Full Product Audit (Independent Re-Evaluation)
+# Vectorae — Full Product Audit (Independent Re-Evaluation)
 
-> Independent, evidence-driven re-evaluation of the complete LeadPilot /
+> Independent, evidence-driven re-evaluation of the complete Vectorae /
 > ClientHunter Enterprise product across all branches. This report does **not**
 > inherit the conclusions of any prior evaluation; prior findings were treated
 > as claims to investigate, not ground truth.
@@ -17,7 +17,7 @@ the release gate, type-checks and build on a real toolchain.
 
 ## 1. Executive Summary
 
-LeadPilot is a **substantial, genuinely-built product**, not a façade. The core
+Vectorae is a **substantial, genuinely-built product**, not a façade. The core
 claims — a 72/144-step Anthropic research pipeline, a 10-pass verification loop,
 Apollo/Hunter lead sourcing, Gmail + WhatsApp outreach, Calendly booking, an A/B
 learning loop, a compliance layer, GDPR erasure, Fernet-at-rest, JWT auth — are
@@ -84,7 +84,7 @@ real — they are just stranded on a branch that is not `master`.
   model call could be exercised** (no credentials). Those paths are marked
   `UNVERIFIED` throughout.
 
-**Headline verdict:** LeadPilot is a real, capable, largely-working system with
+**Headline verdict:** Vectorae is a real, capable, largely-working system with
 good bones and real security discipline, but it is **not production-ready as it
 stands on any single branch**, and its highest-priority problem is not a bug —
 it is that the fixes and the quality gate live on different branches. The

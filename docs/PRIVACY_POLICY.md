@@ -1,4 +1,4 @@
-# Privacy Policy — ClientHunter Enterprise (LeadPilot)
+# Privacy Policy — ClientHunter Enterprise (Vectorae)
 
 **Last updated:** October 2026
 
@@ -10,7 +10,7 @@
 
 ## 1. Who we are
 
-ClientHunter Enterprise, also sold as LeadPilot ("we," "us," "our"), is a software service for B2B client acquisition automation. The service is operated by:
+ClientHunter Enterprise, also sold as Vectorae ("we," "us," "our"), is a software service for B2B client acquisition automation. The service is operated by:
 
 **Calendarharvest**
 [Postal address] — TODO (founders): fill in before publishing
@@ -136,12 +136,12 @@ There is no automatic deletion schedule for account, campaign or prospect data, 
 
 - **Account, campaign and prospect data:** Kept while your account exists. When you delete your account (Section 7), it is erased immediately, except for the records listed below.
 - **Support chat conversations:** Deleted automatically 30 days after their last message, by a nightly job. Support tickets are kept.
-- **Billing records** (subscription status, amounts, dates and payment-provider reference numbers; our copy holds no name or email address): kept after account deletion for 7 years for tax and accounting record-keeping. No job deletes them automatically yet. Stripe keeps its own customer record of you (name, email and payment details) under its own privacy policy; LeadPilot does not ask Stripe to delete it (founder decision pending).
+- **Billing records** (subscription status, amounts, dates and payment-provider reference numbers; our copy holds no name or email address): kept after account deletion for 7 years for tax and accounting record-keeping. No job deletes them automatically yet. Stripe keeps its own customer record of you (name, email and payment details) under its own privacy policy; Vectorae does not ask Stripe to delete it (founder decision pending).
 - **Consent ledger and do-not-contact records:** Every recorded consent event for your prospects — opt-ins (with a short note on how consent was given), opt-outs, suppressions and erasures — with the email address or phone number it concerns, its source and time, and the do-not-contact (suppression) list, are kept without a time limit, so that a person who asked not to be contacted is never contacted again — also after your account is deleted. An unsubscribe click that arrives after the prospect or your account was erased is still added to the do-not-contact list and the ledger.
 - **Security records:** The record of what happened to an account (for example "data exported", "account deleted") is kept after deletion, with IP addresses, device details, email addresses and free-form details removed — including refused sign-in attempts recorded only under your email address.
 - **Device tokens:** Deleted when you delete your account; a token Firebase invalidates is no longer used.
 - **Cached provider responses:** Answers from the contact-finding and verification providers are cached for up to 30 days (search results for 1 day) and expire on their own; they are not removed when an account is deleted.
-- **Server logs:** The hosting provider's request logs record the IP address of each request and are kept for the period the hosting provider sets (founders: state the period). LeadPilot's own application log does not record IP addresses.
+- **Server logs:** The hosting provider's request logs record the IP address of each request and are kept for the period the hosting provider sets (founders: state the period). Vectorae's own application log does not record IP addresses.
 - **Files:** Uploaded backgrounds and logos and generated voicemail audio are deleted with the account; voicemail audio is also deleted when the prospect is erased.
 
 ---
@@ -152,7 +152,7 @@ Depending on your location, you have the following rights:
 
 - **Access and portability:** Download a copy of everything your account holds as one JSON file: open **Profile** and confirm your password in **Download your data**.
 - **Rectification:** Correct inaccurate data.
-- **Erasure ("right to be forgotten"):** Delete your account yourself: open **Profile**, then **Delete account**, confirm your password and type DELETE. Any paid plan is cancelled with the payment provider first; if that cannot be confirmed, nothing is deleted and you are asked to try again. Your account and its data are then erased immediately and connected LinkedIn accounts are disconnected at Unipile, except the billing, consent, do-not-contact and security records described in Section 6. Access you gave LeadPilot inside Google, HubSpot, Salesforce or Slack is removed from LeadPilot but not revoked on the provider's side. You can also erase an individual prospect's data from the dashboard: their contact details and research, the messages written to them and the replies they sent, call transcripts and voicemail audio, booking details, meeting notes, transcripts and briefs, and notes, custom fields and deal notes about them are erased; the dates, statuses and counts reports are built from are kept; their email address, phone number and LinkedIn profile go on the do-not-contact list. Data already copied into a CRM you connected stays there.
+- **Erasure ("right to be forgotten"):** Delete your account yourself: open **Profile**, then **Delete account**, confirm your password and type DELETE. Any paid plan is cancelled with the payment provider first; if that cannot be confirmed, nothing is deleted and you are asked to try again. Your account and its data are then erased immediately and connected LinkedIn accounts are disconnected at Unipile, except the billing, consent, do-not-contact and security records described in Section 6. Access you gave Vectorae inside Google, HubSpot, Salesforce or Slack is removed from Vectorae but not revoked on the provider's side. You can also erase an individual prospect's data from the dashboard: their contact details and research, the messages written to them and the replies they sent, call transcripts and voicemail audio, booking details, meeting notes, transcripts and briefs, and notes, custom fields and deal notes about them are erased; the dates, statuses and counts reports are built from are kept; their email address, phone number and LinkedIn profile go on the do-not-contact list. Data already copied into a CRM you connected stays there.
 - **Objection:** Object to processing based on legitimate interests.
 - **Withdrawal of consent:** Disable push notifications in your device settings at any time.
 

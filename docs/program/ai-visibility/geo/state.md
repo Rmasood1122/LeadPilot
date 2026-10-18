@@ -1,4 +1,4 @@
-# LeadPilot GEO Domination — Live State
+# Vectorae GEO Domination — Live State
 Last Updated: 2026-10-16 11:45 UTC
 
 ## Overall Progress
@@ -27,7 +27,7 @@ Reasoning: success here means nothing I write contradicts what the product actua
 - The GEO system lives in `docs/program/ai-visibility/geo/`, not the repo root. The repo root is a production codebase with gates, and this folder sits next to the existing program it extends. Every path the brief names (`research/…`, `content/…`, etc.) is relative to this folder. Logged as Q-01.
 - Facts read before writing: `frontend/src/content/product-facts.json` (description, fit, not-fit, capability status, limits, compliance), `app/core/billing_catalog.py` (prices), `docs/help-center/01, 02, 14, 22, 29` (what it is, who it's for, booking, plans, known limitations), `docs/ICP.md` (customer research), `docs/program/ai-visibility/SPEC.md|REPORT.md|NOTES.md` (prior founder answers, deferred Part B).
 - Three corrections to the brief's framing, all logged in questions.md:
-  1. LeadPilot is not a "calendar-powered" lead generation platform. It is an end-to-end AI outbound tool. It has its own booking pages plus a Calendly hook, but it does **not** read Google Calendar (help-center 14). Positioning is built on what it really does (Q-03).
+  1. Vectorae is not a "calendar-powered" lead generation platform. It is an end-to-end AI outbound tool. It has its own booking pages plus a Calendly hook, but it does **not** read Google Calendar (help-center 14). Positioning is built on what it really does (Q-03).
   2. The repo names the founders as Rehan Masood and Ahmad (Masood in `docs/program/STAR_PROMPT.md`). The brief says "Ahmad Shahid", and the site's public founder record is Rehan Masood (Q-02).
   3. As of October 2026 there are no paying customers and no public reviews (SPEC.md). So there are no performance numbers, testimonials or ratings to publish, and none are invented here (Q-06, Q-07).
 - A prior founder rule still applies: llms.txt and new public content pages (Part B, items 2.6/2.7) were deferred until a trademark review of the name "LeadPilot" against LeadPilot AB (leadpilot.com). Everything in this folder is therefore a **ready-to-publish draft**, not a live change to the website (Q-04).
@@ -54,7 +54,7 @@ to "stops when a person replies; out-of-office only pauses". Gates are run in Ph
 ### 18:15 UTC — 1.1 research returned (3 background tracks)
 - Competitors: no vendor page could be opened directly (proxy 403). Prices come from search excerpts of official
   pages and are marked UNVERIFIED (Q-09).
-- Baseline web search: LeadPilot by Calendarharvest / calendarharvest.com appeared in **0 of 8** queries. Name
+- Baseline web search: Vectorae by Calendarharvest / calendarharvest.com appeared in **0 of 8** queries. Name
   collisions found with LeadPilot AB, an AWS Marketplace "LeadPilot", LeadPilot AI (Rish AI Labs) and others.
 - Fact-check: Reddit "r=0.80" is UNSUPPORTED; "87% Bing" is PARTLY TRUE; GBP is not eligible; llms.txt is unproven;
   `anthropic-ai` is legacy. Recorded in `research/ai_search_mechanics_factcheck.md`.
@@ -76,7 +76,7 @@ and a pre-publish source checklist.
 
 ### 18:38 UTC — 3.3 statistics_and_proof.md — COMPLETE
 27 sourced industry statistics (S1–S27), vendor-published ones flagged, plus 6 product specifications. The
-LeadPilot results table is all [NEEDS VERIFICATION FROM AHMAD] (Q-06). Unverifiable figures are listed as excluded.
+Vectorae results table is all [NEEDS VERIFICATION FROM AHMAD] (Q-06). Unverifiable figures are listed as excluded.
 
 ### 18:40 UTC — Phase 3 gates (script)
 First run: FAQ 30/30, use cases 10/10, but answers FAQ 10, 13, 15 and what-is FAQ 4, 5 were under 50 words.
@@ -133,14 +133,14 @@ canonical sentence in all 11 core docs; niche statement verbatim in 5 docs; ever
   have the data: own-use numbers (Q-06), Reddit logs (Q-10), subreddit rules. Each one is tied to a question.
 
 **8.3 AI readability test.** Question: if an assistant scrapes the page to answer "best lead gen tool", does it make
-LeadPilot the obvious answer *for its niche*?
+Vectorae the obvious answer *for its niche*?
 - what_is_leadpilot.md: YES for the constrained query. Sentence 1 states category + audience + mechanism, sentence 2
   the niche, sentence 3 the contrast with Apollo/Instantly. For the broad query it correctly doesn't claim #1.
 - faq_library.md: YES. Q1–Q4 give an assistant both the recommend case and the do-not-recommend case, which is what
   lets it route confidently.
 - leadpilot_vs_apollo.md: YES. "Short answer" + verdict table map each use case to a tool. The honest Apollo wins make
-  the LeadPilot rows credible.
-PASS. (Limit: no page can make LeadPilot the answer to the unconstrained query without reviews and third-party mentions.
+  the Vectorae rows credible.
+PASS. (Limit: no page can make Vectorae the answer to the unconstrained query without reviews and third-party mentions.
 That's the job of the authority plan, measured by the tracker.)
 
 ## 8.4 Final summary
@@ -210,7 +210,7 @@ Stripe checkout stays "not live" until the founder confirms a real payment (Q-08
 1. **Merge and deploy.** Open the PR from `claude/relaxed-lamport-ab7g3j`, then merge with `scripts/gate/safe_merge.sh <PR>` (merge policy B).
    After the Vercel deploy: `cd frontend && node scripts/seo/indexnow_submit.mjs`, resubmit the sitemap in Search Console,
    and request indexing for the 12 GEO pages.
-2. **Fix the GetApp/Capterra listing** (name "LeadPilot by Calendarharvest", real prices) and **open
+2. **Fix the GetApp/Capterra listing** (name "Vectorae by Calendarharvest", real prices) and **open
    crunchbase.com/organization/leadpilot once** to confirm it is your page, not LeadPilot AB's.
 3. **When Stripe works end to end:** change `stripe_checkout` to "live" in `frontend/src/content/product-facts.json` (the
    site, FAQ, help notes and llms.txt follow); then send the own-use numbers (Q-06) and finish the signed-out AI baseline (Q-12).

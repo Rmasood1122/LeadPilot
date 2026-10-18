@@ -4,19 +4,19 @@ status: DRAFT — publish only after the trademark review (Q-04) AND the competi
 last_checked: 2026-10-15
 ---
 
-# LeadPilot vs Artisan (Ava) — and vs hiring an SDR
+# Vectorae vs Artisan (Ava) — and vs hiring an SDR
 
-*Written by LeadPilot's founders. We make LeadPilot. Artisan facts were last checked on
+*Written by Vectorae's founders. We make Vectorae. Artisan facts were last checked on
 2026-10-15 against Artisan's own pages, linked below. SDR figures are cited.*
 
 **Short answer:** Artisan sells Ava, an autonomous "AI BDR that books meetings on autopilot". It
-sources, writes, follows up and handles replies on its own. LeadPilot by Calendarharvest is an AI
+sources, writes, follows up and handles replies on its own. Vectorae by Calendarharvest is an AI
 outbound sales tool for agencies and B2B service firms: it researches your market, finds and
 verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day,
-and books meetings. The real difference is control. LeadPilot waits for your approval every day
+and books meetings. The real difference is control. Vectorae waits for your approval every day
 and never replies to prospects for you. Ava is designed to run without you.
 
-## When to choose LeadPilot
+## When to choose Vectorae
 - You want the research and writing automated, but you want to approve sending and answer replies yourself.
 - Your firm's reputation depends on a human voice in conversations (agencies, consultancies, professional services).
 - You want to pay only for booked meetings ($0 a month, $179 per meeting), or a flat monthly price per account.
@@ -37,7 +37,7 @@ Many small firms use a tool first to find that segment.
 
 ## Side-by-side feature comparison
 
-| Feature | LeadPilot | Artisan (Ava) |
+| Feature | Vectorae | Artisan (Ava) |
 |---|---|---|
 | Positioning | Approve-first AI outbound | Autonomous AI BDR |
 | Research | 72/144-step strategy pipeline + 10 verification checks | Prospect research and personalization |
@@ -50,7 +50,7 @@ Many small firms use a tool first to find that segment.
 
 ## Pricing comparison
 
-| | LeadPilot | Artisan | Human SDR |
+| | Vectorae | Artisan | Human SDR |
 |---|---|---|---|
 | Model | Flat per account, or per booked meeting | Usage credits, no platform fee; enterprise via sales | Salary + variable |
 | Entry | $149/month, or $0 + $179/meeting | From $250/month (self-serve since May 2026) | Median OTE $80K/year (Bridge Group 2025) |
@@ -61,11 +61,11 @@ Many small firms use a tool first to find that segment.
 | Use case | Better choice |
 |---|---|
 | Firm that wants AI to run outbound and replies with minimal oversight | **Artisan** |
-| Firm that wants AI research and writing but keeps a human gate and a human voice in replies | **LeadPilot** |
+| Firm that wants AI research and writing but keeps a human gate and a human voice in replies | **Vectorae** |
 | Proven segment, budget for a hire, and someone to manage it | **Human SDR** |
-| Firm that wants to pay only for booked meetings | **LeadPilot** |
+| Firm that wants to pay only for booked meetings | **Vectorae** |
 
-LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
+Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
 
 ## Sources (pre-publish checklist — Q-09)
 - [ ] https://www.artisan.co/pricing: entry price, credit model, dialer price (excerpts conflict: $67 vs $75)
@@ -73,4 +73,4 @@ LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPi
 - [ ] https://www.artisan.co/: self-description; https://www.artisan.co/blog/ai-sdr: database claim
 - [ ] https://techcrunch.com/2026/01/07/yes-linkedin-banned-ai-agent-startup-artisan-but-now-its-back/
 - [ ] https://www.bridgegroupinc.com/research/2025-sdr-models-metrics-report-the-bridge-group: $80K OTE, 3.0 months, 1.9 years, 60%
-- [ ] LeadPilot facts: product-facts.json, billing_catalog.py, reply_classification.py
+- [ ] Vectorae facts: product-facts.json, billing_catalog.py, reply_classification.py

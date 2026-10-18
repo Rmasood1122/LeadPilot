@@ -147,7 +147,7 @@ function CloneCard({ state, onState, fail }: {
       }
       return last;
     },
-    onSuccess: (s) => { onState(s); toast("Recording sent to ElevenLabs — not kept by LeadPilot", "success"); },
+    onSuccess: (s) => { onState(s); toast("Recording sent to ElevenLabs — not kept by Vectorae", "success"); },
     onError: fail,
   });
   const simple = (fn: () => Promise<VoiceTwinState>, ok?: string) => ({
@@ -199,7 +199,7 @@ function CloneCard({ state, onState, fail }: {
 
         {step === "disabled" && (
           <p className="text-muted-foreground">
-            Voice cloning is not enabled on this LeadPilot. An administrator turns it on (it needs
+            Voice cloning is not enabled on this Vectorae. An administrator turns it on (it needs
             AI calling on too).
           </p>
         )}
@@ -230,7 +230,7 @@ function CloneCard({ state, onState, fail }: {
             <p>
               Add recordings of you speaking: clear audio, one speaker, no music. ElevenLabs
               recommends at least 30 minutes in total for a professional clone. Files go straight to
-              ElevenLabs; LeadPilot does not keep them.
+              ElevenLabs; Vectorae does not keep them.
             </p>
             <Input type="file" accept={state.limits.types.join(",")} multiple aria-label="Upload recordings"
                    disabled={upload.isPending}
@@ -309,7 +309,7 @@ function CloneCard({ state, onState, fail }: {
 
         {step === "revoking" && (
           <p className="text-muted-foreground">
-            Your voice is no longer used. LeadPilot keeps retrying the delete at ElevenLabs until it succeeds.
+            Your voice is no longer used. Vectorae keeps retrying the delete at ElevenLabs until it succeeds.
           </p>
         )}
 
@@ -377,7 +377,7 @@ function AccountCard({ fail }: { fail: (e: unknown) => void }) {
         <p className="text-muted-foreground">
           Only calls to your own configured AI-calling number. The assistant says it is an AI, can
           book a meeting, take a message, or put the caller through to you.
-          {!data.own_number_configured && " Your account has no number of its own yet — ask your LeadPilot administrator to assign one."}
+          {!data.own_number_configured && " Your account has no number of its own yet — ask your Vectorae administrator to assign one."}
         </p>
         <div className="space-y-1">
           <Label htmlFor="vt-transfer">Your phone number (for take-over and transfers)</Label>

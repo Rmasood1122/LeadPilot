@@ -7,7 +7,7 @@
 3. **Disclosure.** Any post, answer or review by a founder or employee says so (FTC 16 CFR 255.5; 16 CFR 465.5).
    Never write or buy reviews; never offer incentives conditioned on positive reviews (16 CFR 465.4).
 4. **Disambiguation.** Where a site already has a "LeadPilot" (LeadPilot AB on G2/Cuspera, LeadsPilot on
-   GetApp), list as **"LeadPilot by Calendarharvest"** and add the "not affiliated with LeadPilot AB" line to
+   GetApp), list as **"Vectorae by Calendarharvest"** and add the "not affiliated with LeadPilot AB" line to
    the long description. Never claim or edit another company's listing.
 5. **Trademark gate (Q-04):** Priority 1 profiles that **already exist** (G2, Crunchbase, LinkedIn, YouTube)
    can be completed now. New public listings wait for the trademark outcome, because renaming 50 listings later
@@ -17,16 +17,16 @@
 
 ## Standard copy blocks (paste exactly)
 
-**Name:** LeadPilot by Calendarharvest
+**Name:** Vectorae by Calendarharvest
 **Website:** https://www.calendarharvest.com/
 **Tagline (≤60 chars):** AI outbound sales for agencies and B2B service firms
 **Short description (≤140 chars):** AI outbound for founder-led agencies and B2B service firms: research, verified contacts, one-to-one emails you approve, booked meetings.
-**Medium description (canonical sentence, 1 line):** LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings.
+**Medium description (canonical sentence, 1 line):** Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings.
 **Long description (~150 words):**
-> LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings. LeadPilot is the approve-first AI outbound system for founder-led agencies and B2B service firms (5–50 people) who want booked sales meetings from a plain description of what they sell, without building lead lists, writing sequences or hiring an SDR. Emails go from your own Gmail, at most 100 a day per mailbox by default, with unsubscribe headers and suppression checks on every send. Replies are classified and routed to you; LeadPilot does not auto-reply. Plans start at $149/month, or pay $179 per booked meeting with no monthly fee. LinkedIn steps are not live yet. LeadPilot by Calendarharvest is not affiliated with LeadPilot AB (leadpilot.com).
+> Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings. Vectorae is the approve-first AI outbound system for founder-led agencies and B2B service firms (5–50 people) who want booked sales meetings from a plain description of what they sell, without building lead lists, writing sequences or hiring an SDR. Emails go from your own Gmail, at most 100 a day per mailbox by default, with unsubscribe headers and suppression checks on every send. Replies are classified and routed to you; Vectorae does not auto-reply. Plans start at $149/month, or pay $179 per booked meeting with no monthly fee. LinkedIn steps are not live yet. Vectorae by Calendarharvest is not affiliated with LeadPilot AB (leadpilot.com).
 
 **Categories to pick (where offered):** Sales Engagement · AI Sales Assistant / AI SDR · Lead Generation · Cold Email · Sales Prospecting
-**Anchor text for backlinks:** "LeadPilot by Calendarharvest" (preferred) or "LeadPilot" when the full name already appears nearby. Never "best lead gen tool".
+**Anchor text for backlinks:** "Vectorae by Calendarharvest" (preferred) or "Vectorae" when the full name already appears nearby. Never "best lead gen tool".
 **Founders:** Rehan Masood, Founder · Ahmad Shahid, Founder (Q-02, 2026-10-16). Claim listings with a calendarharvest.com email (e.g. ahmadshahid@calendarharvest.com, Q-11) so the domain matches the site.
 **Pricing line:** Starter $149/mo · Growth $349/mo · Scale $699/mo · Enterprise $1,499/mo (flat per account) · Pay per meeting $0/mo + $179 per booked meeting. Online checkout not live yet.
 **Screenshots:** strategy/research view, daily send-approval screen, reply inbox, booking page, Android app (real product, no mockups).
@@ -37,8 +37,8 @@
 
 | # | Platform | Create / claim URL | ✔? | What to include / note |
 |---|---|---|---|---|
-| 1 | G2 (profile exists: g2.com/products/leadpilot-2026-10-14) | https://sell.g2.com/create-free-profile (claim/manage) | ✔ | Rename display to "LeadPilot by Calendarharvest" if allowed; long description; categories; pricing; screenshots; founder as contact. Ask real users for reviews only after they've used it. |
-| 2 | Capterra | https://digital-markets.gartner.com/capterra-vendor-signup | ✔ | **Listing exists** ("LeadsPilot", capterra.com/p/10186469/LeadsPilot, NOTES.md 2026-10-14). Fix the name to "LeadPilot by Calendarharvest" and the price (it shows "from $299/month"; real: $149/month or $179 per booked meeting). Then add it to sameAs. |
+| 1 | G2 (profile exists: g2.com/products/leadpilot-2026-10-14) | https://sell.g2.com/create-free-profile (claim/manage) | ✔ | Rename display to "Vectorae by Calendarharvest" if allowed; long description; categories; pricing; screenshots; founder as contact. Ask real users for reviews only after they've used it. |
+| 2 | Capterra | https://digital-markets.gartner.com/capterra-vendor-signup | ✔ | **Listing exists** ("LeadsPilot", capterra.com/p/10186469/LeadsPilot, NOTES.md 2026-10-14). Fix the name to "Vectorae by Calendarharvest" and the price (it shows "from $299/month"; real: $149/month or $179 per booked meeting). Then add it to sameAs. |
 | 3 | GetApp | (same Gartner Digital Markets vendor portal) | ✔ | **Listing exists** (getapp.com/all-software/a/leadpilot); same name and price fix as Capterra. |
 | 4 | Software Advice | (same signup) | ✔ | Same. |
 | 5 | Product Hunt | https://www.producthunt.com/posts/new (Submit → New product) | verify | **Launch from a maker's personal account** (company accounts are not allowed). Launch only after checkout is live, so visitors can start. Tagline = tagline block. First comment: founder story + "what's not live yet". |
@@ -62,7 +62,7 @@
 | 18 | Reddit r/smallbusiness | https://www.reddit.com/r/smallbusiness/ | home | "No sales team" threads |
 | 19 | Reddit r/Entrepreneur | https://www.reddit.com/r/Entrepreneur/ | home | Founder lessons, not ads |
 | 20 | Reddit r/SaaS | https://www.reddit.com/r/SaaS/ | home | Build-in-public posts where allowed |
-| 21 | Quora | https://www.quora.com/ (profile credential "Founder of LeadPilot by Calendarharvest") | home | 2 answers/week (Perplexity playbook §D) |
+| 21 | Quora | https://www.quora.com/ (profile credential "Founder of Vectorae by Calendarharvest") | home | 2 answers/week (Perplexity playbook §D) |
 | 22 | Medium | https://medium.com/new-story | home | Syndicate statistics page and comparison guides with canonical link (syndication map) |
 | 23 | dev.to | https://dev.to/new | home | Technical posts (compliance-in-code), canonical URL set |
 | 24 | Hashnode | https://hashnode.com/ | home | Same technical posts, canonical set |
@@ -92,7 +92,7 @@
 | 43 | Internet Archive | https://web.archive.org/save/ | ✔ | Save every new URL after each wave |
 | 44 | Wikidata | https://www.wikidata.org/wiki/Special:NewItem | ✔ | **Only** once independent references exist (notability policy); otherwise it gets deleted |
 | 45 | TrustRadius | https://www.trustradius.com/vendor | ✔ | Requires **≥100 customers** and general availability; revisit then |
-| 46 | HubSpot App Marketplace | https://developers.hubspot.com/ | home | LeadPilot syncs with HubSpot; listing needs app certification; long-term |
+| 46 | HubSpot App Marketplace | https://developers.hubspot.com/ | home | Vectorae syncs with HubSpot; listing needs app certification; long-term |
 | 47 | Newsletter tool features (agency/sales/AI tools newsletters) | each newsletter's "submit a tool" form | — | 50-word fact blurb (Emerging playbook) |
 | 48 | Listicle authors (the 8 lists in competitor_analysis.md §4) | contact page of each publisher | — | Template §4 below; only lists that accept submissions; never pay for undisclosed placement |
 | 49 | Owler | https://www.owler.com/ | home | Claim company profile; same facts |
@@ -101,8 +101,8 @@
 ## §4 Template: note to a listicle author (disclosed, factual)
 > Subject: A tool for agencies without a sales team, for your "[list title]"
 >
-> Hi [name], I'm Rehan, founder of LeadPilot by Calendarharvest, so I'm biased. Your list of [category] tools
-> is one of the clearest I've read. If you ever update it: LeadPilot is an AI outbound sales tool for agencies
+> Hi [name], I'm Rehan, founder of Vectorae by Calendarharvest, so I'm biased. Your list of [category] tools
+> is one of the clearest I've read. If you ever update it: Vectorae is an AI outbound sales tool for agencies
 > and B2B service firms. It researches the market, finds and verifies contacts, writes one-to-one emails, and
 > sends from the user's Gmail only after daily approval (max 100/day). There's a $179 pay-per-booked-meeting
 > option. It isn't a fit for high-volume sending or LinkedIn automation (not live yet). Facts and pricing:

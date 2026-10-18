@@ -72,7 +72,7 @@ function faqPage(path: SitePath, faq: readonly { q: string; a: string }[]): Node
   };
 }
 
-/** Home (the header's "LeadPilot" link) → this page (its nav or footer label). */
+/** Home (the header's "Vectorae" link) → this page (its nav or footer label). */
 function breadcrumbs(path: SitePath, name: string): Node {
   return {
     "@type": "BreadcrumbList",

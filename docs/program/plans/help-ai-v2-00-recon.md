@@ -74,7 +74,7 @@ mock-mode reason codes still name the old FAQ (`mock_faq_match`,
 **Consequence for the manifest:** there is no real-user demand data, so it
 cannot drive which 20 articles exist. What can drive it:
 
-1. the golden set's must-refuse items that are really "about LeadPilot, not in
+1. the golden set's must-refuse items that are really "about Vectorae, not in
    the corpus" (for example the Learn tab, `LEGACY_FAQ_ALIASES` comment
    `help_center.py:183-184`);
 2. features that have code and a founder decision but no article (§5);

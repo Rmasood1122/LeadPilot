@@ -29,7 +29,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy for LeadPilot by Calendarharvest | Calendarharvest",
+  title: "Privacy Policy for Vectorae by Calendarharvest | Calendarharvest",
   description: `How ${PRODUCT_FULL_NAME} collects, uses, and protects your data.`,
   robots: "index, follow",
   ...canonicalMeta("/privacy/"),
@@ -54,10 +54,10 @@ export default function PrivacyPage() {
 
           <Section title="1. Who we are and what this policy covers">
             <p>
-              LeadPilot Enterprise is operated by Calendarharvest (&quot;we&quot;, &quot;us&quot;, or
+              Vectorae Enterprise is operated by Calendarharvest (&quot;we&quot;, &quot;us&quot;, or
               &quot;our&quot;). We run done-with-you outbound pipeline campaigns for businesses. This policy
               explains how we collect, use, store, and protect personal data when you visit
-              calendarharvest.com, use the LeadPilot dashboard, or engage us to run outreach on your behalf.
+              calendarharvest.com, use the Vectorae dashboard, or engage us to run outreach on your behalf.
               It also covers the data we process about the prospects we contact for our clients.
             </p>
           </Section>
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
 
           <Section title="3. How we use data">
             <p>
-              We use personal data to deliver the LeadPilot service: researching prospects, writing and
+              We use personal data to deliver the Vectorae service: researching prospects, writing and
               sending outreach, managing replies, and reporting results to you. We use campaign results to
               improve performance, for example by learning which messages and audiences produce replies for
               your account. We also use your contact details to communicate with you about your account,
@@ -215,8 +215,8 @@ export default function PrivacyPage() {
               Outside the database: provider responses used to find and verify contact details are cached for
               up to 30 days (search results for 1 day) and expire on their own; they are not removed when an
               account is deleted. Our hosting provider&apos;s request logs record the IP address of each request
-              and are kept for the period the hosting provider sets. Access LeadPilot was given inside Google,
-              HubSpot, Salesforce or Slack is removed from LeadPilot but not revoked on the provider&apos;s side;
+              and are kept for the period the hosting provider sets. Access Vectorae was given inside Google,
+              HubSpot, Salesforce or Slack is removed from Vectorae but not revoked on the provider&apos;s side;
               you can remove it there. You can also ask us to delete your account or any other data at the
               address below.
             </p>
@@ -262,7 +262,7 @@ function SiteNav() {
     <header className="border-b border-white/10 px-6 py-5">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-3">
         <Link href="/" className="text-lg font-bold text-white">
-          LeadPilot
+          Vectorae
         </Link>
         <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-300">
           <li><Link href="/how-it-works" className="hover:text-white">How it Works</Link></li>

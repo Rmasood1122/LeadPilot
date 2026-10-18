@@ -14,7 +14,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "Terms of Service for LeadPilot by Calendarharvest | Calendarharvest",
+  title: "Terms of Service for Vectorae by Calendarharvest | Calendarharvest",
   description: `The terms that govern your use of ${PRODUCT_FULL_NAME}.`,
   robots: "index, follow",
   ...canonicalMeta("/terms/"),
@@ -41,9 +41,9 @@ export default function TermsPage() {
           <Section title="1. Acceptance of terms">
             <p>
               These Terms of Service (&quot;Terms&quot;) form a binding agreement between you and
-              Calendarharvest, which operates LeadPilot Enterprise (&quot;LeadPilot&quot;, &quot;we&quot;,
+              Calendarharvest, which operates Vectorae Enterprise (&quot;Vectorae&quot;, &quot;we&quot;,
               &quot;us&quot;, or &quot;our&quot;). By signing an engagement with us, creating an account, or
-              otherwise using LeadPilot, you agree to these Terms. If you are accepting on behalf of a
+              otherwise using Vectorae, you agree to these Terms. If you are accepting on behalf of a
               business, you confirm that you have authority to bind that business, and &quot;you&quot;
               refers to it. If you do not agree, do not use the service.
             </p>
@@ -53,7 +53,7 @@ export default function TermsPage() {
             <p>
               {/* DRAFT for legal review (founders, 2026-10-14): LinkedIn sending is not live yet;
                   email (Gmail) is the main channel, with WhatsApp on plans that include it. */}
-              LeadPilot Enterprise is a done-with-you outbound pipeline system. We research prospects
+              Vectorae Enterprise is a done-with-you outbound pipeline system. We research prospects
               who match your ideal client profile, write personalised outreach, and manage email sequences
               (and WhatsApp messages, on plans that include WhatsApp) on your behalf. These sequences are
               sent automatically by our software, after you approve each day&apos;s sending, through the
@@ -66,9 +66,9 @@ export default function TermsPage() {
 
           <Section title="3. Eligibility">
             <p>
-              To use LeadPilot you must be at least 18 years old and legally able to enter into contracts.
+              To use Vectorae you must be at least 18 years old and legally able to enter into contracts.
               The service is offered only to business entities and sole traders; it is not a consumer
-              service. LeadPilot is currently available only to clients based in the United States, the
+              service. Vectorae is currently available only to clients based in the United States, the
               United Kingdom, Canada, Australia, New Zealand, Ireland, and Singapore. We may decline or end
               an engagement where these conditions are not met.
             </p>
@@ -82,7 +82,7 @@ export default function TermsPage() {
               engagement.
             </p>
             <p>
-              You must not use LeadPilot for illegal outreach, spam, or any communication you would not be
+              You must not use Vectorae for illegal outreach, spam, or any communication you would not be
               entitled to send yourself. You remain responsible for complying with the laws that apply to
               your outreach, including the CAN-SPAM Act, the GDPR and UK GDPR, Canada&apos;s Anti-Spam
               Legislation (CASL), and any other relevant local laws in the places where your prospects are
@@ -104,7 +104,7 @@ export default function TermsPage() {
 
           <Section title="6. Prohibited uses">
             <p>
-              LeadPilot may not be used to run outreach in or targeting the healthcare, legal, government,
+              Vectorae may not be used to run outreach in or targeting the healthcare, legal, government,
               non-profit, or real estate sectors, or in any other industry excluded under our ideal client
               profile policy as communicated to you. You may not ask us to send outreach that is deceptive
               or misleading, that impersonates another person or business, or that makes claims you cannot
@@ -127,7 +127,7 @@ export default function TermsPage() {
             <p>
               You own your prospect lists, your business data, and the materials you provide to us. You
               grant us a limited licence to use them solely to deliver the service to you. Calendarharvest
-              retains all rights in the LeadPilot system, its research methodology, its software, and all
+              retains all rights in the Vectorae system, its research methodology, its software, and all
               underlying technology, including improvements made while delivering your engagement. Nothing
               in these Terms transfers ownership of that technology to you.
             </p>
@@ -172,7 +172,7 @@ export default function TermsPage() {
           <Section title="12. Changes to terms">
             <p>
               We may update these Terms from time to time. We will notify active clients by email at least 30
-              days before any material change takes effect. Continuing to use LeadPilot after that date means
+              days before any material change takes effect. Continuing to use Vectorae after that date means
               you accept the updated Terms. The effective date at the top of this page shows the current
               version.
             </p>
@@ -209,7 +209,7 @@ function SiteNav() {
     <header className="border-b border-white/10 px-6 py-5">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-3">
         <Link href="/" className="text-lg font-bold text-white">
-          LeadPilot
+          Vectorae
         </Link>
         <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-300">
           <li><Link href="/how-it-works" className="hover:text-white">How it Works</Link></li>

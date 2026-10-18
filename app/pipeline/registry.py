@@ -1,4 +1,4 @@
-"""The Step Registry — LeadPilot's core IP, defined as DATA not code.
+"""The Step Registry — Vectorae's core IP, defined as DATA not code.
 
 Both pipelines (STRATEGY: project knowledge section C phases 1-8, and
 GTM: the Flow-2 second 72) are declared below as plain phase/step
@@ -23,7 +23,7 @@ from app.db.models import PipelineKind
 # --------------------------------------------------------------------------
 
 PROMPT_TEMPLATE = """You are an elite B2B go-to-market strategist working inside
-LeadPilot, an automated client-acquisition system. You are executing ONE
+Vectorae, an automated client-acquisition system. You are executing ONE
 research step of a larger pipeline. Be concrete, decision-ready and
 specific to THIS product — never generic filler.
 
@@ -44,7 +44,7 @@ Produce the output for the CURRENT STEP only, in clear markdown,
 300-600 words, ending with a 2-3 bullet "Key takeaways" list."""
 
 SYSTEM_PROMPT = (
-    "You are LeadPilot's research engine: a senior GTM strategist. "
+    "You are Vectorae's research engine: a senior GTM strategist. "
     "You produce rigorous, specific, actionable research outputs. "
     "You never invent statistics; when a figure is an estimate you label "
     "it as an assumption."

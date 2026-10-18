@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # --- App -----------------------------------------------------------
-    app_name: str = "LeadPilot"
+    app_name: str = "Vectorae"
     app_env: str = "development"  # development | production | test
     # DEDICATED flag for app/api/debug.py. Deliberately separate from app_env,
     # is_test and log_level so that no unrelated configuration change can turn
@@ -103,7 +103,7 @@ class Settings(BaseSettings):
 
     # --- Outreach compliance & sending (M3) --------------------------------
     public_base_url: str = "http://localhost:8000"  # used in unsubscribe links
-    sender_identity: str = "LeadPilot User, 123 Main St, City, Country"  # CAN-SPAM footer identity
+    sender_identity: str = "Vectorae User, 123 Main St, City, Country"  # CAN-SPAM footer identity
     gmail_daily_cap: int = 100
     gmail_warmup_start_sends: int = 10
     gmail_warmup_daily_increment: int = 10
@@ -243,7 +243,7 @@ class Settings(BaseSettings):
     # MUST be on a domain verified in the Resend dashboard, or every message is
     # accepted by the API and then dropped or spam-foldered downstream.
     email_from: str = "noreply@calendarharvest.com"
-    email_from_name: str = "LeadPilot"
+    email_from_name: str = "Vectorae"
 
     # SMTP (Mailtrap sandbox in development; any SMTP relay in production)
     smtp_host: str = ""

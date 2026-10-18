@@ -21,7 +21,7 @@
 2. **Sitemaps** → submit `https://www.calendarharvest.com/sitemap.xml`.
 3. **URL Inspection** on /, /how-it-works/, /pricing/, /about/ → **Request indexing**. Check that "User-declared
    canonical" = "Google-selected canonical" = the www URL.
-4. **Performance** → note the baseline impressions for the brand query "LeadPilot Calendarharvest"
+4. **Performance** → note the baseline impressions for the brand query "Vectorae Calendarharvest"
    (expected: 0) in the tracker.
 5. **Enhancements / Rich results**: run https://search.google.com/test/rich-results on / and /pricing/.
    Organization, SoftwareApplication and FAQPage should be detected with no errors.
@@ -35,7 +35,7 @@ in C does the job GBP would have done.
 ### C. Knowledge Panel acquisition (months 1–6)
 A Knowledge Panel is granted by Google; it can't be requested for a new entity. Make the entity
 unambiguous:
-1. **Consistent facts everywhere:** name "LeadPilot by Calendarharvest", URL, founder, one-sentence
+1. **Consistent facts everywhere:** name "Vectorae by Calendarharvest", URL, founder, one-sentence
    description (entity card §2). The same text on the LinkedIn company page, Crunchbase, G2, Product Hunt, YouTube.
 2. **`sameAs` in Organization schema** (live): LinkedIn, G2, Crunchbase, YouTube. Add Product Hunt and
    others as they're created. Only profiles you control and that are complete.
@@ -57,20 +57,20 @@ pages that visibly show the FAQ → BreadcrumbList (live) → Product/Offer once
 
 ### E. Featured snippet / AI Overview formatting (Gemini and AI Overviews quote these)
 - **Paragraph snippets:** under an H2 phrased as the question, a 40–60 word answer that starts with the
-  subject ("LeadPilot is…", "Pay per meeting costs…").
+  subject ("Vectorae is…", "Pay per meeting costs…").
 - **List snippets:** process questions as `<ol>` (how it works: 7 steps).
 - **Table snippets:** pricing and comparison as HTML tables with a header row.
 - One question per H2/H3. Don't hide answers in accordions that need JavaScript (the static export renders
   FAQ text in HTML).
-- Target questions (have a page or section answering each): "What is LeadPilot?", "How much does LeadPilot
-  cost?", "LeadPilot vs Apollo", "What is pay per meeting lead generation?", "Is cold email legal under
+- Target questions (have a page or section answering each): "What is Vectorae?", "How much does Vectorae
+  cost?", "Vectorae vs Apollo", "What is pay per meeting lead generation?", "Is cold email legal under
   CAN-SPAM?" (statistics page S23, help center 20).
 
 ### F. E-E-A-T signals (Experience, Expertise, Authoritativeness, Trust)
 | Signal | What to do | Status |
 |---|---|---|
 | Experience | Founder's own-use story with real numbers, dated (Q-06) and screenshots of the actual product | Missing: needs numbers |
-| Expertise | Founders named on /about/ (Rehan Masood and Ahmad Shahid); comparison pages say "Written by LeadPilot's founders" | Live in code 2026-10-16 |
+| Expertise | Founders named on /about/ (Rehan Masood and Ahmad Shahid); comparison pages say "Written by Vectorae's founders" | Live in code 2026-10-16 |
 | Authoritativeness | Third-party profiles and mentions (`authority/`) | In progress (G2, Crunchbase exist) |
 | Trust | "What is not live yet" section (live), Known limitations, privacy/terms (lawyer-confirmed per LEGAL-101), disclosed authorship on comparisons, "last checked" dates | Strong; keep it |
 

@@ -4,19 +4,19 @@ status: DRAFT — publish only after the trademark review (Q-04) AND the competi
 last_checked: 2026-10-15
 ---
 
-# LeadPilot vs Instantly: researched one-to-one outreach or cold email at scale?
+# Vectorae vs Instantly: researched one-to-one outreach or cold email at scale?
 
-*Written by LeadPilot's founders. We make LeadPilot. Instantly facts were last checked on
+*Written by Vectorae's founders. We make Vectorae. Instantly facts were last checked on
 2026-10-15 against Instantly's own pages, linked below.*
 
 **Short answer:** Instantly is cold-email software for scaling outreach across many email
 accounts, with built-in warmup. You bring the strategy, the list (or buy lead credits) and the
-copy. LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service
+copy. Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service
 firms: it researches your market, finds and verifies business contacts, writes one-to-one
 emails, sends on a schedule you approve each day, and books meetings. Instantly is built for
-volume; LeadPilot is built for a founder who wants fewer, better emails written for them.
+volume; Vectorae is built for a founder who wants fewer, better emails written for them.
 
-## When to choose LeadPilot
+## When to choose Vectorae
 - You don't have a defined target market, list or copy yet, and you want them researched and written for you.
 - You want to send from your own Gmail at low volume (up to 100 emails a day per mailbox by default).
 - You want to approve each day's sending, and you don't want an AI replying to prospects.
@@ -31,7 +31,7 @@ volume; LeadPilot is built for a founder who wants fewer, better emails written 
 
 ## Side-by-side feature comparison
 
-| Feature | LeadPilot | Instantly |
+| Feature | Vectorae | Instantly |
 |---|---|---|
 | Starting point | Describe what you sell | Connect mailboxes, upload or find leads |
 | Research and strategy | ✅ 72/144-step pipeline + 10 checks | ❌ |
@@ -46,7 +46,7 @@ volume; LeadPilot is built for a founder who wants fewer, better emails written 
 
 ## Pricing comparison
 
-| | LeadPilot | Instantly (outreach plans, monthly, flat) |
+| | Vectorae | Instantly (outreach plans, monthly, flat) |
 |---|---|---|
 | Entry | Starter $149/month | Growth $47/month (5,000 emails/month) |
 | Mid | Growth $349 / Scale $699 per month | Hypergrowth $97/month (125,000 emails/month) |
@@ -59,16 +59,16 @@ volume; LeadPilot is built for a founder who wants fewer, better emails written 
 | Use case | Better choice |
 |---|---|
 | Agency running high-volume campaigns for clients | **Instantly** |
-| Founder with no list, no copy and no time | **LeadPilot** |
+| Founder with no list, no copy and no time | **Vectorae** |
 | Team that has proven copy and wants cheap sending at scale | **Instantly** |
-| Firm that wants every day's sending approved and no AI replying | **LeadPilot** |
-| Firm that wants to pay only when a meeting is booked | **LeadPilot** |
+| Firm that wants every day's sending approved and no AI replying | **Vectorae** |
+| Firm that wants to pay only when a meeting is booked | **Vectorae** |
 
-LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
+Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
 
 ## Sources (pre-publish checklist — Q-09)
 - [ ] https://instantly.ai/pricing (and /pricing.md): plan names, prices, email and contact limits, monthly vs annual
 - [ ] https://instantly.ai/: self-description
 - [ ] https://instantly.ai/ai-agents/reply-agent: Reply Agent modes and Calendly sharing
 - [ ] https://instantly.ai/b2b-lead-finder: database claim
-- [ ] LeadPilot facts: product-facts.json, billing_catalog.py, help center 14, 16, 22
+- [ ] Vectorae facts: product-facts.json, billing_catalog.py, help center 14, 16, 22

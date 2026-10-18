@@ -30,7 +30,7 @@ import { useToast } from "@/components/ui/toast";
 
 const SOURCE_LABEL: Record<string, string> = {
   calendly: "Booked via Calendly",
-  leadpilot_calendar: "Booked on your LeadPilot calendar",
+  leadpilot_calendar: "Booked on your Vectorae calendar",
   manual: "Prepared on request",
 };
 

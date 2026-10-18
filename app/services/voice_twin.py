@@ -75,14 +75,14 @@ FLAG = "voice_clone_calls_enabled"
 CONSENT_VERSION = "1"
 CONSENT_TEXT = (
     "I, {name}, confirm that this is my own voice: every recording I upload or "
-    "record here is of me speaking, and I am the owner of this LeadPilot "
-    "account. I give my written consent for LeadPilot to send these recordings "
+    "record here is of me speaking, and I am the owner of this Vectorae "
+    "account. I give my written consent for Vectorae to send these recordings "
     "to ElevenLabs to create a Professional Voice Clone of my voice, and to use "
     "that clone only for AI phone calls made for this account, and only while I "
     "have \"Use my voice for AI calls\" turned on. I understand that: every call "
     "made with it opens by saying it is my AI assistant using my voice and that "
     "the call is recorded, and it will never claim to be me or a human; "
-    "LeadPilot does not keep my recordings -- ElevenLabs stores them and the "
+    "Vectorae does not keep my recordings -- ElevenLabs stores them and the "
     "voice model under its own terms; I will complete ElevenLabs' own voice "
     "verification myself; I can revoke this consent at any time in Settings, "
     "which stops all use at once and deletes the voice at ElevenLabs; deleting "
@@ -442,7 +442,7 @@ def concealment_problems(text: str | None, owner_names=()) -> list[str]:
 
 
 CONCEALMENT_REFUSAL = (
-    "This text asks the AI to hide that it is an AI ({labels}). LeadPilot's AI calls "
+    "This text asks the AI to hide that it is an AI ({labels}). Vectorae's AI calls "
     "always say they are an AI assistant and that the call is recorded, and never "
     "claim to be you or a human. Sounding natural is fine; pretending to be human is "
     "not. Remove that instruction and save again."
@@ -706,7 +706,7 @@ def record_consent(db: Session, user: User, *, signature: str, own_voice: bool,
     from app.services import security_audit  # noqa: PLC0415
 
     if not enabled(db):
-        raise VoiceTwinError("Voice cloning is not enabled on this LeadPilot.", 409)
+        raise VoiceTwinError("Voice cloning is not enabled on this Vectorae.", 409)
     if version != CONSENT_VERSION:
         raise VoiceTwinError("The consent text has changed -- reload the page and read it "
                              "again.", 409)
@@ -771,7 +771,7 @@ def _eleven(db: Session, user_id):
 
 def _provider_error(exc: Exception, what: str) -> VoiceTwinError:
     logger.warning("voice twin: %s failed: %s", what, exc)
-    return VoiceTwinError(f"ElevenLabs refused to {what}. Nothing was kept by LeadPilot; "
+    return VoiceTwinError(f"ElevenLabs refused to {what}. Nothing was kept by Vectorae; "
                           "please try again.", 502)
 
 
@@ -791,7 +791,7 @@ def _transition(db: Session, clone: VoiceClone, allowed_from, **values) -> bool:
 def assert_can_upload(db: Session, user: User) -> VoiceClone:
     """Every cheap check BEFORE the request body is read (L3)."""
     if not enabled(db):
-        raise VoiceTwinError("Voice cloning is not enabled on this LeadPilot.", 409)
+        raise VoiceTwinError("Voice cloning is not enabled on this Vectorae.", 409)
     clone = live_clone(db, user.id)
     if clone is None:
         raise VoiceTwinError("Sign the consent first: no recording is accepted before it.",
@@ -811,7 +811,7 @@ def assert_can_verify(db: Session, user: User) -> VoiceClone:
 
 
 REVOKED_MEANWHILE = ("This voice clone was revoked while the recording was uploading. "
-                     "Nothing was kept by LeadPilot, and the voice is being deleted at "
+                     "Nothing was kept by Vectorae, and the voice is being deleted at "
                      "ElevenLabs.")
 
 
@@ -833,10 +833,10 @@ def upload_sample(db: Session, user: User, *, filename: str, content_type: str,
         voice_id = clone.provider_voice_id
         if not voice_id:
             voice_id = eleven.pvc_create(
-                name=f"LeadPilot - {clean_name(clone.consent_signature) or 'owner'}",
+                name=f"Vectorae - {clean_name(clone.consent_signature) or 'owner'}",
                 language=PVC_LANGUAGE,
                 description="Professional Voice Clone of the account owner's own voice, "
-                            "created with their written consent (LeadPilot voice twin).")
+                            "created with their written consent (Vectorae voice twin).")
             # The id must survive a failed upload (so revoke can delete it) --
             # and must never land on a clone revoked in the meantime.
             if not _transition(db, clone, UPLOADABLE, provider_voice_id=voice_id):
@@ -857,7 +857,7 @@ def upload_sample(db: Session, user: User, *, filename: str, content_type: str,
 def submit(db: Session, user: User) -> VoiceClone:
     """The person finished uploading: move to verification. Commits."""
     if not enabled(db):
-        raise VoiceTwinError("Voice cloning is not enabled on this LeadPilot.", 409)
+        raise VoiceTwinError("Voice cloning is not enabled on this Vectorae.", 409)
     clone = live_clone(db, user.id)
     if clone is None or clone.status != "collecting" or clone.sample_count < 1:
         raise VoiceTwinError("Upload at least one recording first.", 409)
@@ -880,8 +880,8 @@ def verification_challenge(db: Session, user: User) -> dict:
 
 VERIFY_ON_ELEVENLABS = (
     "If no text appears here, verify on ElevenLabs instead: sign in at elevenlabs.io "
-    "with the account LeadPilot uses, open Voices > My voices, choose the voice named "
-    "\"LeadPilot - <your name>\", press Verify and read the sentence aloud yourself. "
+    "with the account Vectorae uses, open Voices > My voices, choose the voice named "
+    "\"Vectorae - <your name>\", press Verify and read the sentence aloud yourself. "
     "Then come back here and press \"Check status\"."
 )
 
@@ -1066,7 +1066,7 @@ def _delete_or_queue(db: Session, provider: str, voice_id: str, eleven) -> bool:
         db.add(row)
         db.flush()
         _operator_alert(db, row, f"A voice clone could not be deleted at {provider} "
-                                 f"({last}). LeadPilot retries hourly; delete it by hand "
+                                 f"({last}). Vectorae retries hourly; delete it by hand "
                                  "if this persists.")
     logger.error("voice twin: voice %s queued for deletion at %s: %s", voice_id, provider, last)
     return False
@@ -1553,7 +1553,7 @@ def notify_live(db: Session, call: Call) -> None:
             title=f"AI call live: {who}",
             body=("Your AI assistant is on a call now"
                   + (" in your voice" if call.voice_clone_used else "")
-                  + ". Open LeadPilot and press Take over to talk yourself."),
+                  + ". Open Vectorae and press Take over to talk yourself."),
             deep_link=_call_link(call),
             data={"call_id": str(call.id), "action": "take_over"})
 

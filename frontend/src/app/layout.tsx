@@ -29,7 +29,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
-  title: 'LeadPilot',
+  title: 'Vectorae',
   description: 'AI-powered end-to-end client acquisition',
   // manifest for PWA (also used by Capacitor as the web app manifest)
   manifest: '/manifest.json',

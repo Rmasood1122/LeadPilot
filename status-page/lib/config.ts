@@ -1,5 +1,5 @@
 /**
- * Everything the status page knows about LeadPilot's shape. The UptimeRobot
+ * Everything the status page knows about Vectorae's shape. The UptimeRobot
  * monitor names below are a contract with the founders' account: they must
  * match the friendly names in docs/program/STATUS_PAGE.md exactly (case is
  * ignored). The backend component ids are a contract with
@@ -26,7 +26,7 @@ export const COMPONENTS: readonly ComponentDef[] = [
   {
     id: "website",
     name: "Website & app",
-    description: "calendarharvest.com and the LeadPilot web app",
+    description: "calendarharvest.com and the Vectorae web app",
   },
   {
     id: "api",
@@ -62,12 +62,12 @@ export const BACKEND_COMPONENT_IDS: readonly ComponentId[] = [
 
 /** Roles of the UptimeRobot monitors and the friendly name each must have. */
 export const MONITOR_NAMES = {
-  website: "LeadPilot - Website",
-  appLogin: "LeadPilot - App login",
-  booking: "LeadPilot - Booking page",
-  apiHttp: "LeadPilot - API",
-  apiKeyword: "LeadPilot - API healthy",
-  worker: "LeadPilot - Worker",
+  website: "Vectorae - Website",
+  appLogin: "Vectorae - App login",
+  booking: "Vectorae - Booking page",
+  apiHttp: "Vectorae - API",
+  apiKeyword: "Vectorae - API healthy",
+  worker: "Vectorae - Worker",
 } as const;
 
 export type MonitorRole = keyof typeof MONITOR_NAMES;

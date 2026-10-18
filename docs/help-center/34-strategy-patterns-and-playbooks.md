@@ -36,7 +36,7 @@ sources:
 
 # Strategy patterns and playbooks
 
-LeadPilot groups strategies that aim at the same kind of buyer with the same kind of outreach, and keeps a running score of how that combination performs. This article explains what a pattern key is, how to read a playbook score, what LeadPilot does with the scores, and what it never changes on its own. For the nightly schedule, A/B variants and the promotion checks, see the learning loop article.
+Vectorae groups strategies that aim at the same kind of buyer with the same kind of outreach, and keeps a running score of how that combination performs. This article explains what a pattern key is, how to read a playbook score, what Vectorae does with the scores, and what it never changes on its own. For the nightly schedule, A/B variants and the promotion checks, see the learning loop article.
 
 ## What is a pattern key?
 
@@ -68,7 +68,7 @@ A playbook score is one row per pattern key and A/B variant (sends with no varia
 
 Both rates are weighted by age with a 90-day half-life: a send from 90 days ago counts half as much as one from today. Replies and bookings are matched to sends by lead, so if a lead received three emails and replied once, all three sends count as replied.
 
-Because pattern keys are shared, a score can include results from other accounts' strategies on the same LeadPilot deployment that have the same key.
+Because pattern keys are shared, a score can include results from other accounts' strategies on the same Vectorae deployment that have the same key.
 
 ## How do I read a playbook score?
 
@@ -77,16 +77,16 @@ Because pattern keys are shared, a score can include results from other accounts
 3. **Read the trend.** "new" means the first calculation. "rising" or "falling" means the reply rate moved more than half a percentage point (0.005) since the previous night; anything smaller is "stable".
 4. **Prefer booking rate over reply rate.** Replies include objections and refusals.
 
-Playbook scores are not shown on a customer screen yet. The **Analytics** page has a **Learning insights** card marked **Coming in M8**. On plans with playbook access, the LeadPilot API returns your scores at `GET /playbook/scores` (optionally for one `strategy_id`), and best-performing subject-line styles at `GET /playbook/subject-patterns`. Administrators see every score on the admin **Playbook Scores** page.
+Playbook scores are not shown on a customer screen yet. The **Analytics** page has a **Learning insights** card marked **Coming in M8**. On plans with playbook access, the Vectorae API returns your scores at `GET /playbook/scores` (optionally for one `strategy_id`), and best-performing subject-line styles at `GET /playbook/subject-patterns`. Administrators see every score on the admin **Playbook Scores** page.
 
-## What does LeadPilot do with the scores?
+## What does Vectorae do with the scores?
 
 Only two things read them:
 
 - **New research.** When a new strategy reaches research phases 6 (messaging and offer) and 8 (execution plan), the research is given up to 8 reliable scores from pattern keys your strategies use, best booking rate first. The research sees each pattern by its code with its rates, sample size and trend, not the ICP and tactics behind it.
 - **AI booking likelihood.** The **Past campaign results** factor uses the best reliable booking rate for the strategy's pattern key. A booking rate of 5% or more gives the full factor; with no reliable score it is 50%. It is 15% of the score.
 
-## Does LeadPilot switch to the better message on its own?
+## Does Vectorae switch to the better message on its own?
 
 No. Nothing in the learning loop changes a running campaign.
 

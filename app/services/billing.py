@@ -776,7 +776,7 @@ def _charge_one(db: Session, meeting: BillableMeeting, now: datetime) -> str:
         result = stripe.charge_meeting(
             customer_id=sub.stripe_customer_id, amount_cents=int(meeting.amount_cents),
             currency=meeting.currency,
-            description=f"LeadPilot: meeting booked {_aware(meeting.occurred_at):%Y-%m-%d}",
+            description=f"Vectorae: meeting booked {_aware(meeting.occurred_at):%Y-%m-%d}",
             meeting_id=str(meeting.id))
     except stripe.StripeError as exc:
         meeting.status, meeting.failure_reason = "failed", str(exc)[:1000]
@@ -927,7 +927,7 @@ def notice_content(sub: BillingSubscription, notice: dict) -> tuple[str, list[st
     tier = catalog.monthly_tier(sub.tier) or {"name": sub.tier}
     term = _interval_word(sub)
     annual = term == "year"
-    plan = f"LeadPilot {tier['name']} ({'annual' if annual else 'monthly'})"
+    plan = f"Vectorae {tier['name']} ({'annual' if annual else 'monthly'})"
     amount = _money(notice.get("amount_cents"))
     when = _date(notice.get("charge_at"))
     cancel_url = f"{settings.frontend_url.rstrip('/')}/profile"
@@ -949,7 +949,7 @@ def notice_content(sub: BillingSubscription, notice: dict) -> tuple[str, list[st
                  how_to_cancel,
                  "Keep this email: it is the record of your plan's renewal terms."]
     elif kind == TRIAL_END:
-        subject = f"Your LeadPilot trial ends on {when}: {amount} will be charged"
+        subject = f"Your Vectorae trial ends on {when}: {amount} will be charged"
         lines = [f"Your free trial of {plan} ends on {when}.",
                  f"Unless you cancel before then, {amount} will be charged on {when}, and "
                  f"your plan then renews automatically every {term} at {amount} until you "
@@ -961,7 +961,7 @@ def notice_content(sub: BillingSubscription, notice: dict) -> tuple[str, list[st
                  f"On that date {amount} will be charged for another {term}, and the plan "
                  f"keeps renewing every {term} until you cancel.",
                  how_to_cancel]
-    lines.append("This is a required notice about your LeadPilot subscription, sent to the "
+    lines.append("This is a required notice about your Vectorae subscription, sent to the "
                  "account owner. It is not marketing.")
     return subject, lines
 

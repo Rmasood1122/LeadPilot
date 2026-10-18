@@ -55,13 +55,13 @@
 - frontend/src/content/product-facts.json (beside site-pages.json / plan-names.json; JSON so the .mjs check reads it with no build step) + src/lib/productFacts.ts (PRODUCT_FULL_NAME built from brand.product_name + brand.company_name).
 - Capability statuses from Phase 0 Q3/Q6 and the LinkedIn status answer; off-by-default ones from system_settings.py flag defaults (same list as the home FEATURES).
 - Description unchanged from the spec: every capability it names (research, contacts, writing, sending, booking) is live per Q6.
-- Titles: literal per page (approved), all contain "LeadPilot by Calendarharvest" and end "| Calendarharvest"; /pricing got a title and description.
+- Titles: literal per page (approved), all contain "Vectorae by Calendarharvest" and end "| Calendarharvest"; /pricing got a title and description.
 - Checks added: title has full product name; JSON-LD sameAs / Person values from the facts file; JSON-LD prices from plans-snapshot.json.
 - Next: 2.4.
 
 ## 2.4 done
 - src/lib/seo/structuredData.ts + src/components/seo/JsonLd.tsx; one @graph per page.
-- Organization (Calendarharvest, footer) + WebSite on all 7; SoftwareApplication (name "LeadPilot by Calendarharvest", BusinessApplication, "Web, Android", no offers) on / and /pricing; FAQPage on / and /contact (visible FAQs); BreadcrumbList LeadPilot → nav/footer label on subpages; Person (Rehan Masood) on /about only.
+- Organization (Calendarharvest, footer) + WebSite on all 7; SoftwareApplication (name "Vectorae by Calendarharvest", BusinessApplication, "Web, Android", no offers) on / and /pricing; FAQPage on / and /contact (visible FAQs); BreadcrumbList Vectorae → nav/footer label on subpages; Person (Rehan Masood) on /about only.
 - check_static_seo.mjs: PASS (7 URLs) after 2.4.
 - Depends on 2.5: "Astoria, New York" must become visible on /about, and the facts description must be visible on / and /pricing.
 - Next: 2.5.
@@ -72,9 +72,9 @@
 - Home: "Recent LinkedIn posts and company news can shape the opening" → company news; LinkedIn posts go through the LinkedIn connection, not live yet (app/integrations/linkedin_posts.py uses Unipile/RapidAPI).
 - Home FAQ "What has not been verified yet?" (Apollo, Hunter, Gmail, WhatsApp, Calendly, Stripe simulated) → "What is not live yet?" built from product-facts.json (LinkedIn steps, Stripe checkout), per Q6.
 - Home FAQ: messaging uploaded LinkedIn connections → states LinkedIn steps are not live.
-- Home: first mention "LeadPilot by Calendarharvest" above the H1; facts description shown in "Who it's for"; AUDIENCES / NOT_A_FIT now read product-facts.json.
-- /how-it-works: "72-step research pipeline" → "once per campaign strategy: 72 … or 144"; "Personalised emails and LinkedIn messages … from the Gmail and LinkedIn accounts" → email from Gmail; WhatsApp on plans; LinkedIn not live; removed "A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call" (no code source); "Learning" step (ICP refined, compounds, Revenue & ROI dashboard: not founder-confirmed) → "Replies and meetings" (live per Q6); "Your only job is to show up … You handle the calls we book … LeadPilot handles [following up]" → "What you still do" consistent with home (daily approval, held messages, you write every answer).
-- /about: Faisalabad, Pakistan → Astoria, New York (Q1); removed "has published more than 18 public repositories on GitHub", "today it is the system that finds LeadPilot's own clients", "He uses it himself, every day, to find LeadPilot's own clients"; "72-step" → 72 or 144 per strategy; LinkedIn sending → not live; "Learning" → "Replies and meetings"; audience list (boutique agencies 3–30 staff in 7 countries, coaches, early SaaS founders, fractional consultants "resell or white-label") → product-facts fit (same as home).
+- Home: first mention "Vectorae by Calendarharvest" above the H1; facts description shown in "Who it's for"; AUDIENCES / NOT_A_FIT now read product-facts.json.
+- /how-it-works: "72-step research pipeline" → "once per campaign strategy: 72 … or 144"; "Personalised emails and LinkedIn messages … from the Gmail and LinkedIn accounts" → email from Gmail; WhatsApp on plans; LinkedIn not live; removed "A four-step conversation sequence: observe, reflect the pain, introduce your offer, earn the call" (no code source); "Learning" step (ICP refined, compounds, Revenue & ROI dashboard: not founder-confirmed) → "Replies and meetings" (live per Q6); "Your only job is to show up … You handle the calls we book … Vectorae handles [following up]" → "What you still do" consistent with home (daily approval, held messages, you write every answer).
+- /about: Faisalabad, Pakistan → Astoria, New York (Q1); removed "has published more than 18 public repositories on GitHub", "today it is the system that finds Vectorae's own clients", "He uses it himself, every day, to find Vectorae's own clients"; "72-step" → 72 or 144 per strategy; LinkedIn sending → not live; "Learning" → "Replies and meetings"; audience list (boutique agencies 3–30 staff in 7 countries, coaches, early SaaS founders, fractional consultants "resell or white-label") → product-facts fit (same as home).
 - /contact: "boutique agency with 3–30 staff in [7 countries]" → facts fit groups; removed "You are based outside our approved geographies" (no definition in code) → facts not-a-fit list; LinkedIn FAQ → included in plans but not live.
 - /pricing: intro shows the facts description and the not-live sentence.
 - /privacy, /terms: only title, description, canonical, og:url, JSON-LD changed.
@@ -105,7 +105,7 @@
 ## Phase 3 review fixes
 - New status "unconfirmed" (built and switched on, not yet confirmed working end to end in production): Lead scoring, "Not now" memory, Meeting prep, Workspaces for agencies; their mentions removed from stage/step text (/, /how-it-works, /about). Smart send time and Android app: live.
 - homeClaims.test.ts: an "unconfirmed" flagged feature must have its flag ON; otherwise unchanged (shown failing for Reply Copilot marked unconfirmed).
-- /about eyebrow → "About LeadPilot by Calendarharvest"; body text and meta descriptions use PRODUCT_FULL_NAME; breadcrumb uses PRODUCT_NAME.
+- /about eyebrow → "About Vectorae by Calendarharvest"; body text and meta descriptions use PRODUCT_FULL_NAME; breadcrumb uses PRODUCT_NAME.
 - /contact: restored the country restriction, now quoting the Terms of Service list (my 2.5 note "no definition in code" was wrong: Terms §4 defines it).
 - Home TRUST: "LinkedIn needs its own approval" → "LinkedIn steps, once live, need their own approval."
 - /pricing meta description: dropped "each with a free trial" (checkout not live). Other free-trial lines kept per founder; listed in REPORT.

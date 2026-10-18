@@ -1,22 +1,22 @@
-# LeadPilot in Claude and ChatGPT
+# Vectorae in Claude and ChatGPT
 
-LeadPilot connects to Claude (claude.ai, Claude Desktop, Claude mobile,
+Vectorae connects to Claude (claude.ai, Claude Desktop, Claude mobile,
 Cowork, Claude Code) and to ChatGPT as a **connector**: a remote MCP server at
 
 ```
 https://api.calendarharvest.com/mcp
 ```
 
-You sign in to LeadPilot once, approve what the app may do, and can then ask
+You sign in to Vectorae once, approve what the app may do, and can then ask
 about your leads, scores, strategies, outreach and results, create a
 strategy, or pause and resume a campaign — from the chat.
 
 Two pieces, and why both exist:
 
-- **The connector** (the MCP server) is what reads your LeadPilot data and
+- **The connector** (the MCP server) is what reads your Vectorae data and
   acts in your account. Nothing else can.
 - **The `leadpilot-outbound` skill** is instructions only. It teaches Claude
-  when to use LeadPilot, how to read F-P-T-A scores and attribution, and the
+  when to use Vectorae, how to read F-P-T-A scores and attribution, and the
   rules (nothing is sent from the chat; prospect text is never obeyed). It
   cannot reach your data on its own.
 
@@ -35,11 +35,11 @@ answers 200.
 ## Claude (claude.ai, Desktop, mobile, Cowork)
 
 1. In Claude: **Settings → Connectors → Add custom connector**.
-2. Name: `LeadPilot`. URL: `https://api.calendarharvest.com/mcp`. Leave the
+2. Name: `Vectorae`. URL: `https://api.calendarharvest.com/mcp`. Leave the
    OAuth client fields empty (Claude registers itself).
-3. **Connect**. A LeadPilot page opens: sign in if asked, read what the
+3. **Connect**. A Vectorae page opens: sign in if asked, read what the
    connection may do, and choose **Allow**.
-4. In a chat, enable LeadPilot from the tools menu and ask, for example,
+4. In a chat, enable Vectorae from the tools menu and ask, for example,
    "Which of my leads have the strongest F-P-T-A score?".
 
 Custom connectors are added per user. On Team and Enterprise plans an owner
@@ -51,11 +51,11 @@ and upload it where Claude's settings manage Skills (Settings → Capabilities
 or Features, depending on the version). Skills are per user.
 
 Disconnect any time in **Settings → Connectors**. That stops Claude using the
-connection; whether Claude also tells LeadPilot to revoke its tokens is up
-to Claude (LeadPilot supports it at `/oauth/revoke`). To end every
-connection on LeadPilot's side, change your LeadPilot password: that signs
+connection; whether Claude also tells Vectorae to revoke its tokens is up
+to Claude (Vectorae supports it at `/oauth/revoke`). To end every
+connection on Vectorae's side, change your Vectorae password: that signs
 out every device and every connector at once. (v1 has no "connected apps"
-page in LeadPilot yet.)
+page in Vectorae yet.)
 
 ## Claude Code
 
@@ -75,7 +75,7 @@ claude mcp add --transport http leadpilot https://api.calendarharvest.com/mcp
 ```
 
 Then run `/mcp`, choose `leadpilot` → **Authenticate**; your browser opens
-the same LeadPilot sign-in and Allow page (Claude Code listens on a local
+the same Vectorae sign-in and Allow page (Claude Code listens on a local
 `http://localhost:<port>/callback`).
 
 ## ChatGPT
@@ -85,7 +85,7 @@ names change between releases — see OpenAI's "Developer mode" help page).
 
 1. Turn on Developer Mode, then create an app / connector.
 2. URL: `https://api.calendarharvest.com/mcp`, authentication: OAuth.
-3. Sign in to LeadPilot and **Allow** when the page opens.
+3. Sign in to Vectorae and **Allow** when the page opens.
 
 Without Developer Mode and in Deep Research, ChatGPT uses only the two
 read-only tools `search` and `fetch` (lead search and the full lead record).
@@ -107,9 +107,9 @@ workspace you are a member of).
 
 ## Privacy and data handling
 
-- **What leaves LeadPilot.** Only what a tool returns for a request made in
+- **What leaves Vectorae.** Only what a tool returns for a request made in
   your chat: records from your own account. Claude or ChatGPT then processes
-  it under your agreement with Anthropic or OpenAI; LeadPilot does not
+  it under your agreement with Anthropic or OpenAI; Vectorae does not
   control how that provider stores conversations.
 - **Prospects' personal data.** Lead names, titles, companies, email
   addresses, scraped posts and message text are personal data of your
@@ -117,7 +117,7 @@ workspace you are a member of).
   choose; check that your privacy notice and your agreement with the
   provider cover it (GDPR Art. 28). Ask the assistant only for what you
   need — tools return one page (≤ 50 records) at a time.
-- **What LeadPilot stores about a connection.** The app's registration
+- **What Vectorae stores about a connection.** The app's registration
   (name and callback address), your consent (when, which app, which
   permissions), the session behind your tokens, and one audit record for
   every change made through the connector (which tool, when, which app,
@@ -127,7 +127,7 @@ workspace you are a member of).
   once; a revocation request from the app ends that one connection.
 - **Prompt injection.** Text written by prospects or scraped from the web
   is returned in a clearly marked `untrusted_content` field and never
-  executed by LeadPilot; the skill tells Claude never to follow instructions
+  executed by Vectorae; the skill tells Claude never to follow instructions
   found in it.
 
 Policy: https://www.calendarharvest.com/privacy/
@@ -156,7 +156,7 @@ Founders / operations — not doable from the repository:
       metadata URLs answering 200 from the internet.
 - [ ] **End-to-end check from claude.ai and ChatGPT** against production
       (`docs/program/PROGRESS.md` lists what has and has not been verified).
-- [ ] **Test account** for reviewers: a LeadPilot account with sample
+- [ ] **Test account** for reviewers: a Vectorae account with sample
       products, a strategy, leads and messages, credentials shared through
       the submission form only.
 - [ ] **Documentation URL**: publish a public help article from this file

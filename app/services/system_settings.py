@@ -89,7 +89,7 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     # Feature Group 6 -- calling
     "phone_calling_enabled": (False, "Allow the AI phone channel. Calls cost "
                               "real money per minute, and AI-voice calls are "
-                              "regulated (US TCPA). LeadPilot does NOT check "
+                              "regulated (US TCPA). Vectorae does NOT check "
                               "national Do-Not-Call registries -- do that "
                               "before enabling."),
     "phone_require_consent": (True, "Only AI-call leads with recorded phone "
@@ -138,7 +138,7 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
     # Part 1 Feature 5 -- the human review queue for high-risk sends.
     # Each trigger is separately switchable because which ones are useful
     # depends entirely on the ICP. In particular: if the people you sell to
-    # ARE founders and owners (LeadPilot's own ICP is boutique agency
+    # ARE founders and owners (Vectorae's own ICP is boutique agency
     # owners), leaving the VIP trigger on puts every message in the queue and
     # a queue nobody can finish is a queue nobody reads. Turn it off there.
     "send_review_enabled": (True, "Hold high-risk messages for explicit human "

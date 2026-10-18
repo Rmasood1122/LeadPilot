@@ -39,7 +39,7 @@ Response: { "access_token": "..." }
 Create a product or skill to acquire clients for.
 ```json
 Request: {
-  "name": "LeadPilot",
+  "name": "Vectorae",
   "description": "AI-powered client acquisition automation",
   "type": "product"   // "product" | "service" | "skill"
 }
@@ -161,7 +161,7 @@ Run A/B winner promotion.
 ## Meeting preparation & outcomes *(Feature Group 7)*
 
 A brief is generated automatically when a lead reaches `meeting_booked`
-(Calendly `invitee.created`, or a booking on the LeadPilot calendar). All
+(Calendly `invitee.created`, or a booking on the Vectorae calendar). All
 routes are owner-scoped: another account's lead or brief is a **404**.
 Routes that spend a model call are limited by `RATE_LIMIT_AI_ACTION`
 (default 60/hour/user).
@@ -601,7 +601,7 @@ Delivery body `{id, event, occurred_at, data}`; headers `X-LeadPilot-Event`,
 - `GET /integrations/{hubspot|salesforce}/callback` *(public, OAuth redirect)*
 - `POST /integrations/{hubspot|salesforce}/sync` → **202** `{queued}` (full push + pull; rate-limited)
 - `PUT /integrations/{hubspot|salesforce}/settings` `{sync_new_leads?, lead_status_map?,
-  deal_stage_map?, pipeline?}` — map keys are LeadPilot statuses / `open|won|lost`
+  deal_stage_map?, pipeline?}` — map keys are Vectorae statuses / `open|won|lost`
 - `DELETE /integrations/{hubspot|salesforce}` → **204** (tokens and links removed)
 
 ### POST /webhooks/hubspot *(public, signed)*
