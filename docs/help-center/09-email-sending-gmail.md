@@ -5,6 +5,8 @@ audience: customer
 last_verified: 2026-10-10
 owner: help-center
 sources:
+  - frontend/src/content/product-facts.json
+  - docs/program/ai-visibility/REPORT.md
   - app/api/integrations.py
   - app/integrations/gmail.py
   - app/integrations/google_meet.py
@@ -111,7 +113,7 @@ Besides the window and the cap, some messages are held for a person to approve. 
 
 ## Has the Gmail integration been verified against Google's live service?
 
-Not yet. It was built from Google's documentation and tested against simulated responses. Some request details are still marked in the code as needing confirmation, and it has not yet been run end to end against Google's live service.
+The founders confirmed email sending through Gmail as working end to end in production on 2026-10-13. The automated tests still run against simulated responses, and some request details are still marked in the code as needing confirmation against Google's current documentation.
 
 ## Related
 - [Sequences and follow-ups](08-sequences-and-follow-ups.md)

@@ -5,6 +5,8 @@ audience: customer
 last_verified: 2026-10-11
 owner: help-center
 sources:
+  - frontend/src/app/pricing/PricingClient.tsx
+  - frontend/src/content/product-facts.json
   - app/services/plan_holds.py
   - app/core/plans.py
   - app/core/billing_catalog.py
@@ -102,6 +104,8 @@ The Free plan has no price. Free accounts are limited by the table above.
 A meeting charge can be disputed only while it is still inside its 48-hour window. The web app has no dispute button yet; disputes go through the LeadPilot API. After the 48 hours, contact support instead. An administrator then decides whether to waive or charge a disputed meeting.
 
 ## How do I choose or change a plan?
+
+Online checkout is not open yet: Stripe checkout has so far been built and tested only against simulated services, so the **Pricing** page says "Online checkout opens soon" and offers a call instead of a checkout button. The steps below describe how choosing a plan works once checkout opens.
 
 Go to the **Pricing** page. You can also reach it from **Profile**, in the **Plan** card, with the **Upgrade plan** button. On Pricing you pick a tier (and, where offered, **Monthly** or **Annual**) and press the trial button, or press **Pay per meeting**.
 

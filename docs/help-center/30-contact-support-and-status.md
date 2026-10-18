@@ -5,6 +5,7 @@ audience: customer
 last_verified: 2026-10-11
 owner: help-center
 sources:
+  - render.yaml
   - frontend/src/components/support/ChatWidget.tsx
   - frontend/src/components/shell/Shell.tsx
   - frontend/src/lib/support/ticketSubject.ts
@@ -61,7 +62,7 @@ A question can be up to 2,000 characters long.
 
 ## How many chat messages can I send?
 
-You can send 20 chat messages per day. This is a deployment setting; 20 is the default. When you reach the limit you see "You've reached today's message limit. You can still submit a ticket." and the panel switches to the ticket form.
+You can send 30 chat messages per day on LeadPilot's hosted service. This is a deployment setting: the hosted service sets 30, and the built-in default is 20. When you reach the limit you see "You've reached today's message limit. You can still submit a ticket." and the panel switches to the ticket form.
 
 If the chat has been switched off on your deployment, you see "Support chat is temporarily unavailable. Submit a ticket instead." Tickets still work.
 

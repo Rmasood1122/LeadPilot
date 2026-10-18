@@ -2,10 +2,15 @@
 id: workspaces-and-agency-mode
 title: Workspaces, team roles and agency mode
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-18
 owner: help-center
 sources:
   - app/services/rbac.py
+  - app/api/workspaces.py
+  - app/core/plans.py
+  - app/api/strategies.py
+  - frontend/src/app/(app)/invite/page.tsx
+  - frontend/src/app/(app)/campaigns/page.tsx
   - app/services/auth.py
   - app/services/workspaces.py
   - app/api/sequences.py
@@ -93,6 +98,21 @@ A campaign that is not filed under any client is treated as the agency's own wor
 
 Creating clients, changing their prices and changing their domain lists needs a manager or the owner. Any member can read them.
 
+## Can a client sign in and see only their own campaigns?
+
+No. A client on the **Clients** page is a record in your account, not a login, and there is no role that limits someone to one client's campaigns. You have two options:
+
+- **Invite the client into your workspace as a Viewer** (**Team** › **Members** › **Invite**). They can then read everything in your workspace, including your other clients and your own work, but change nothing. Only do this if that is acceptable.
+- **Let the client have a workspace of their own.** The client creates their own LeadPilot account (their workspace is created automatically) and invites you, for example as a **Manager**. You then pick their workspace with the **Workspace** switcher. Their leads, campaigns, connected Gmail and plan are theirs, and they see only their own data. The **Clients** page features (reserved domains, retainer and invoice) belong to your own workspace and do not follow you into theirs.
+
+## Do clients get their own plan, limits and report?
+
+There are no per-client plans or limits. Every client runs on the account owner's plan, and the plan's limits (number of strategies, daily AI limit and the rest) are counted over the whole account: your own work and every client together. See [Plans, limits and billing](22-plans-limits-billing.md). The retainer and per-meeting fee on a client are what you charge that client; LeadPilot does not bill them.
+
+Each client's row on **Clients** is its report: **Sent**, **Reply rate**, **Meetings** and **Revenue** (won deals), counted over all time for that client's campaigns, with no date filter. A reply rate shows "—" until something has been sent. The invoice view counts meetings from the first day of the current month. There is no export or shareable link for a client report in the web app. For a single campaign's detail, choose it on **Analytics**.
+
+The web form sets only the name and the monthly retainer. A client's per-meeting fee, currency (USD unless changed), contact and billing details, and pausing or archiving the client are set through the LeadPilot API. Marking a client paused does not pause its campaigns; pause them with **Pause campaign**.
+
 ## What are the limits of agency mode?
 
 - Filing a strategy under a client is currently done through the LeadPilot API; the web app has no button for it yet.
@@ -107,3 +127,4 @@ Creating clients, changing their prices and changing their domain lists needs a 
 - [Learning loop and A/B tests](17-learning-loop-and-ab-tests.md)
 - [Account security](23-account-security.md)
 - [Known limitations](29-known-limitations.md)
+- [Working as an SDR in someone else's workspace](32-guide-sdr-team-member.md)

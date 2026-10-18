@@ -133,32 +133,37 @@ HELP_CENTER_DIR_ENV = "HELP_CENTER_DIR"
 # prints the full grid. correct/wrong are answerable items answered from an
 # expected / unexpected chunk; refused-answered is must-refuse items answered.
 #
+#   Re-measured 2026-10-18 on the Help AI v2 golden set (151 answerable,
+#   31 must-refuse, 44 articles). The 2026-10-11 numbers (88/23, 30
+#   articles) are in docs/program/help-center-eval.md.
+#
 #   coverage floor (score floor 6.0)   correct  wrong  must-refuse answered
-#     0.45                               43       4          1
-#     0.50                               40       4          0
-#     0.55  <- chosen                    39       3          0
-#     0.60                               35       1          0
-#     0.70                               30       1          0
+#     0.50                               72      11          1
+#     0.55  (previous floor)             64       8          1
+#     0.60  <- chosen                    57       5          0
+#     0.65                               53       5          0
+#     0.70                               46       5          0
 #
-#   score floor (coverage floor 0.55)  correct  wrong  must-refuse answered
-#     4.0                                39       4          0
-#     5.0                                39       3          0
-#     6.0   <- chosen                    39       3          0
-#     7.0                                39       3          0
-#     7.5                                38       3          0
-#     10.0                               37       2          0
+#   score floor (coverage floor 0.60)  correct  wrong  must-refuse answered
+#     4.0                                57       6          0
+#     5.0                                57       5          0
+#     6.0   <- chosen                    57       5          0
+#     7.0                                57       5          0
+#     7.5                                57       4          0
+#     10.0                               55       4          0
 #
-# 0.50 is the lowest coverage floor that answers no must-refuse item; the
-# nearest one sat at 0.454 (the privacy-policy question; 0.44 since the
-# 2026-10-11 article 21 rewrite -- the coverage is IDF-weighted). 0.55 keeps a
-# margin above it and drops a wrong answer for one correct one -- the same
-# trade the confidence floor makes: an unnecessary ticket is an annoyance, a
-# confidently wrong answer is the failure that matters.
-# The score floor is flat from 5.0 to 7.0; 7.5 loses "What is LeadPilot?"
-# (score 7.1, the weakest correct answer) and 4.0 admits a wrong one. 6.0 is
-# the middle of that plateau, so neither edge is one article edit away.
+# With 14 more articles the nearest must-refuse item is "How much will
+# LeadPilot cost next year?" at coverage 0.552 (it matches the plan-price
+# heading), so the old 0.55 floor answered it with a price paragraph. 0.60 is
+# the lowest tested floor that answers no must-refuse item, keeps a ~0.05
+# margin above it, and has the lowest wrong-answer rate (5 of 62 answers) --
+# the same trade the confidence floor makes: an unnecessary ticket is an
+# annoyance, a confidently wrong answer is the failure that matters.
+# The score floor is flat from 5.0 to 7.0; 4.0 admits a wrong answer, and the
+# weakest correct answer scores 8.2 (s01), so 6.0 stays in the middle of the
+# plateau and neither edge is one article edit away.
 MOCK_MIN_SCORE = 6.0
-MOCK_MIN_HEADING_COVERAGE = 0.55
+MOCK_MIN_HEADING_COVERAGE = 0.60
 
 # ---------------------------------------------------------------------------
 # Legacy FAQ ids -> help-center chunk ids. PERMANENT.
@@ -180,9 +185,7 @@ LEGACY_FAQ_ALIASES: dict[str, str] = {
     "how-outreach-works": "what-is-leadpilot#do-i-have-to-send-the-messages-myself",
     "learning-loop": "learning-loop-and-ab-tests#what-does-leadpilot-learn-from",
     "first-campaign": "getting-started#how-do-i-create-my-first-product-and-strategy",
-    # No article covers the Learn tab. This is the closest chunk (it lists
-    # tutorials among the assistant's topics); reported as a corpus gap.
-    "tutorial-section": "contact-support-and-status#what-can-the-support-assistant-answer",
+    "tutorial-section": "learn-tab-and-tutorials#where-do-i-find-the-training-videos",
     "contact-support": "contact-support-and-status#where-do-i-find-support-in-the-app",
     "data-storage": "privacy-data-retention-deletion#what-does-leadpilot-store-about-me",
 }

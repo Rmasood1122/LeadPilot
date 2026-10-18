@@ -2,7 +2,7 @@
 id: getting-started
 title: Getting started with LeadPilot
 audience: customer
-last_verified: 2026-10-10
+last_verified: 2026-10-18
 owner: help-center
 sources:
   - app/api/auth.py
@@ -34,6 +34,18 @@ sources:
   - frontend/src/app/(app)/strategies/new/page.tsx
   - frontend/src/app/(app)/settings/page.tsx
   - docs/VERIFICATION_REPORT.md
+  - frontend/src/components/shell/nav.ts
+  - frontend/src/components/strategy/OutreachPanel.tsx
+  - frontend/src/components/strategy/ReverifyStrategyButton.tsx
+  - frontend/src/components/settings/DeliverabilityCard.tsx
+  - frontend/src/lib/settings-tabs.ts
+  - frontend/src/app/(app)/calendar/page.tsx
+  - frontend/src/app/(app)/calendar/booking-pages/page.tsx
+  - frontend/src/app/(app)/send-approval/page.tsx
+  - frontend/src/app/(app)/campaigns/page.tsx
+  - frontend/src/app/(app)/inbox/page.tsx
+  - frontend/src/lib/conversation.ts
+  - app/services/daily_send_approval.py
 ---
 
 # Getting started with LeadPilot
@@ -114,10 +126,30 @@ A strategy may be refused at launch if:
 
 On the verified strategy's page, use **1. Find leads** to source and check contacts, then **2. Write the email and launch** to start outreach. Launching needs a verified phone number, and emails only go out once a Gmail account is connected.
 
+## What should I do in my first week?
+
+LeadPilot sets no timetable: research time depends on the AI service, and replies depend on your prospects. This is the order that takes you from sign-up to a first booked meeting, with where each step lives:
+
+1. **Verify your email** with the link from the **Check your email** screen.
+2. **Verify your phone** when asked, or press **Do this later**. You need it before launching outreach.
+3. **Choose a plan** on **Pricing**, or stay within the Free plan's limits.
+4. **Connect Gmail**: **Settings**, **Integrations** tab.
+5. **Check your sending domain**: **Settings**, **Deliverability** tab, **Email health** card. Fix SPF, DKIM and DMARC problems before sending.
+6. **Set up booking**: in **Calendar**, set your **Weekly availability**, then create a page under **Booking pages**.
+7. **Start a strategy**: **Strategies**, **New strategy**. A clear product description gives better research.
+8. **Wait for `verified`.** If the strategy ends as `needs_human_review`, use **Re-verify** or pass the failed checks manually.
+9. **Find leads** in the **1. Find leads** card on the strategy page. Start small.
+10. **Launch** from the **2. Write the email and launch** card.
+11. **Approve sending each day** on **Today's automatic sending** when asked, and clear any held messages in **Campaigns**, **Review** tab.
+12. **Answer replies** in **Inbox** (**Needs reply**) and send interested prospects your booking page link. When they book through your booking page, the lead moves to the meeting-booked stage (**Booked** on the **Pipeline** page).
+
 ## Related
 - [The research pipeline](04-research-pipeline.md)
 - [Strategy verification](05-strategy-verification.md)
 - [Lead sourcing and email verification](06-lead-sourcing-and-email-verification.md)
 - [Sending email through Gmail](09-email-sending-gmail.md)
+- [Booking meetings and your calendar](14-booking-and-calendar.md)
+- [Deliverability and mailbox health](19-deliverability-and-mailbox-health.md)
+- [Your product profile and ideal customer profile](33-product-profile-and-icp.md)
 - [Plans, limits and billing](22-plans-limits-billing.md)
 - [Account security](23-account-security.md)

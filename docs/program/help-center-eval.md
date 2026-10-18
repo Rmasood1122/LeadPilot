@@ -153,3 +153,51 @@ removes one of them.
   tested on.** New phrasings of legal or vendor questions that reuse the
   product's own headings can still get through. That is why the coverage floor
   was set one step above the minimum.
+
+## 2026-10-18 re-measurement: 44 articles (Help AI v2, Phase 1)
+
+Same command, same definitions. The corpus grew from 30 to 44 articles
+(`DECISIONS.md` HELPAI-MANIFEST) and the golden set from 111 to 182 items:
+151 answerable and 31 must-refuse. The 63 new answerable items (n01–n63) and 9
+new must-refuse items were written before the articles existed
+(`plans/help-ai-v2-01-new-questions.md`, committed first) and mapped
+afterwards.
+
+| Golden set (mock path, 151 / 31) | Old 9-entry FAQ | 44-article help center |
+|---|---|---|
+| Answerable items answered | 105 / 151 | 62 / 151 |
+| ...of which correct | 13 | **57** |
+| ...of which wrong | 92 | **5** |
+| Must-refuse items answered | 15 / 31 | **0 / 31** |
+| **Wrong-answer rate** | **89.2%** | **8.1%** |
+
+| Retrieval recall@6 (what the live model is shown) | 30 articles (2026-10-11) | 44 articles |
+|---|---|---|
+| All 151 answerable items | 0.662 (100/151) | **0.967 (146/151)** |
+| The original 88 items | 0.966 (85/88) | 0.955 (84/88) |
+| The 63 new items | — | 0.984 (62/63) |
+
+The new articles answer questions the 30 could not (63 new items, 62 found).
+The cost is precision on the old questions: one more original item misses
+(q63, "in which time the emails is going out", now outranked by the new
+email-health and tutorial sections). Remaining misses: q11 ("ten checks"),
+q63, s03 ("How does outreach work?"), q70 ("how much leads one strategy can
+have"), n38 ("answer older replies too"). All are lexical failures that the
+dense retrieval of Phase 2–3 is meant to address; none was fixed by tuning a
+synonym to one question.
+
+**Mock-mode coverage floor raised from 0.55 to 0.60.** With the new articles,
+"How much will LeadPilot cost next year?" reached coverage 0.552 against the
+plan-price heading and would have been answered with a price paragraph. 0.60
+answers no must-refuse item and has the lowest wrong-answer rate of the tested
+floors; the grid is in `app/services/help_center.py` above
+`MOCK_MIN_HEADING_COVERAGE`. The score floor stays at 6.0.
+
+Four expected-id lists were widened where a second section genuinely answers
+the question (q57, q58, n35, n40; the mock answer text was read before each
+change). Must-refuse item r23 ("What is the tutorial section?") moved to the
+answerable set as n56, because article 44 now answers it; the legacy FAQ alias
+`tutorial-section` points at that article.
+
+The live model is still not measured: `scripts/help_center/live_eval.py` needs
+the replaced production key and is a Phase 5 item.

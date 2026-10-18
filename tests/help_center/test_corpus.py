@@ -37,8 +37,11 @@ def corpus() -> help_center.Corpus:
 
 
 class TestArticles:
-    def test_thirty_articles_plus_the_index(self):
-        assert len(ARTICLES) == 30, [p.name for p in ARTICLES]
+    def test_the_manifest_articles_plus_the_index(self):
+        """44 articles: the 30 of 2026-10-10 plus the 14 of the Help AI v2
+        manifest (DECISIONS.md HELPAI-MANIFEST), numbered without gaps."""
+        assert len(ARTICLES) == 44, [p.name for p in ARTICLES]
+        assert [p.name[:2] for p in ARTICLES] == [f"{n:02d}" for n in range(1, 45)]
         assert (HELP / "00-index.md").is_file()
 
     def test_front_matter_is_complete_and_ids_are_unique(self, corpus):
