@@ -267,7 +267,21 @@
         "src/lib/content/helpCenter.ts",
         "src/lib/content/markdown.ts",
         "src/components/content/ContentPage.tsx",
-        "src/content/product-facts.json"
+        "src/content/product-facts.json",
+        "src/content/help-center/31-guide-solo-founder.md",
+        "src/content/help-center/32-guide-sdr-team-member.md",
+        "src/content/help-center/33-product-profile-and-icp.md",
+        "src/content/help-center/34-strategy-patterns-and-playbooks.md",
+        "src/content/help-center/35-google-workspace-dns-setup.md",
+        "src/content/help-center/36-crm-sync-field-mapping.md",
+        "src/content/help-center/37-webhooks-and-slack-events.md",
+        "src/content/help-center/38-reply-copilot-and-classification.md",
+        "src/content/help-center/39-daily-send-approval-and-notifications.md",
+        "src/content/help-center/40-annual-billing-and-plan-changes.md",
+        "src/content/help-center/41-benchmarks-what-good-looks-like.md",
+        "src/content/help-center/42-security-faq-for-buyers.md",
+        "src/content/help-center/43-data-processing-and-subprocessors.md",
+        "src/content/help-center/44-learn-tab-and-tutorials.md"
       ]
     },
     {
@@ -654,6 +668,188 @@
       "sources": [
         "src/app/help/[slug]/page.tsx",
         "src/content/help-center/30-contact-support-and-status.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/guide-solo-founder/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/31-guide-solo-founder.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/guide-sdr-team-member/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/32-guide-sdr-team-member.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/product-profile-and-icp/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/33-product-profile-and-icp.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/strategy-patterns-and-playbooks/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/34-strategy-patterns-and-playbooks.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/google-workspace-dns-setup/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/35-google-workspace-dns-setup.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/crm-sync-field-mapping/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/36-crm-sync-field-mapping.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/webhooks-and-slack-events/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/37-webhooks-and-slack-events.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/reply-copilot-and-classification/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/38-reply-copilot-and-classification.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/daily-send-approval-and-notifications/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/39-daily-send-approval-and-notifications.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/annual-billing-and-plan-changes/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/40-annual-billing-and-plan-changes.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/benchmarks-what-good-looks-like/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/41-benchmarks-what-good-looks-like.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/security-faq-for-buyers/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/42-security-faq-for-buyers.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/data-processing-and-subprocessors/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/43-data-processing-and-subprocessors.md",
+        "src/lib/content/helpCenter.ts",
+        "src/lib/content/markdown.ts",
+        "src/components/content/ContentPage.tsx",
+        "src/content/product-facts.json"
+      ]
+    },
+    {
+      "path": "/help/learn-tab-and-tutorials/",
+      "changefreq": "monthly",
+      "priority": 0.6,
+      "sources": [
+        "src/app/help/[slug]/page.tsx",
+        "src/content/help-center/44-learn-tab-and-tutorials.md",
         "src/lib/content/helpCenter.ts",
         "src/lib/content/markdown.ts",
         "src/components/content/ContentPage.tsx",

@@ -5,6 +5,7 @@ audience: customer
 last_verified: 2026-10-12
 owner: help-center
 sources:
+  - render.yaml
   - FEATURES.md
   - docs/program/STATUS_PAGE.md
   - docs/program/BASELINE.md
@@ -102,7 +103,7 @@ In particular:
 ## What are the support, status and mobile limitations?
 
 - **Support tickets** are stored and reviewed by the team in an admin queue. Nothing alerts the team automatically when a ticket arrives, and the app does not show you your tickets or replies to them.
-- **Support chat** is limited to 20 messages per person per day (a deployment setting). Tickets are not limited.
+- **Support chat** is limited to 30 messages per person per day on LeadPilot's hosted service (a deployment setting; the built-in default is 20). Tickets are not limited.
 - **Status page:** the status page at www.calendarharvest.com/status shows the current state and posted incidents only. It has no uptime history and no email or text alerts, and it checks from your own browser, so a problem with your connection can look like an outage.
 - **Tutorials** on the Learn page appear only after the team publishes them, so the page can be empty.
 - **Mobile:** there is an Android app but no iPhone app. Parts of the app's push-notification setup are marked as not yet verified against the current push service.

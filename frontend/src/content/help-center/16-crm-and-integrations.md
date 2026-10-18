@@ -55,7 +55,7 @@ Go to **Settings**, open the **Integrations** tab, and click **Connect** on the 
 **From LeadPilot to your CRM:**
 
 - Leads that engaged (replied, meeting booked, opportunity, closed, or disqualified) become HubSpot **contacts** or Salesforce **leads**, matched by email.
-- Tick "Also push every verified lead (by default only leads that replied or further)" to send every verified lead as well.
+- Tick "Also push every verified lead (by default only leads that replied or further)" to send verified and contacted leads as well (see [HubSpot and Salesforce sync in detail](36-crm-sync-field-mapping.md)).
 - Deals become HubSpot **deals** (linked to the contact) or Salesforce **opportunities**.
 
 Changes are pushed straight away on key events (meeting booked, reply, call, deal won, a kanban move, a deal edit) and also in a sweep every 15 minutes.

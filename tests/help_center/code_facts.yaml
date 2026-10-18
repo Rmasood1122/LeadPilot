@@ -1,0 +1,1404 @@
+# Every number a help-center article takes from code, checked against code.
+# Read by tests/help_center/test_code_facts.py (see its docstring for the three
+# checks). Maintained by hand: when you add or change a number in an article,
+# add or update its entry here, or the coverage check names the number.
+#
+#   facts:  article (file prefix), phrase (verbatim, whitespace-collapsed),
+#           expr (Python over `app`; dotted app.* paths are imported first),
+#           shows (format string over v; default "{v}").
+#   exempt: numbers that are not code-sourced (worked examples, vendor rules,
+#           calendar facts) or are inline literals with no checkable source
+#           text, each with a reason. A price can never be exempt.
+#
+# Values read from source text (TypeScript constants, inline literals) use a
+# regex over that file, so changing the literal still fails the test.
+facts:
+- article: '01'
+  phrase: 72 steps if you described past clients
+  expr: len(app.pipeline.registry.STRATEGY_STEPS)
+- article: '01'
+  phrase: or 144 steps if you did not
+  expr: len(app.pipeline.registry.STRATEGY_STEPS) + len(app.pipeline.registry.GTM_STEPS)
+- article: '01'
+  phrase: (3% by default
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '02'
+  phrase: starts at 10 emails on its first day
+  expr: app.config.Settings.model_fields['gmail_warmup_start_sends'].default
+- article: '02'
+  phrase: adds 10 per day
+  expr: app.config.Settings.model_fields['gmail_warmup_daily_increment'].default
+- article: '02'
+  phrase: ceiling of 100 emails per day
+  expr: app.config.Settings.model_fields['gmail_daily_cap'].default
+- article: '03'
+  phrase: at least 8 characters
+  expr: '[m.min_length for m in app.api.auth.Credentials.model_fields[''password''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+- article: '03'
+  phrase: limited to 10 per 15 minutes
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_AUTH'].default
+  shows: '{v} per'
+- article: '03'
+  phrase: limited to 10 per 15 minutes
+  expr: app.core.rate_limiting.AUTH_WINDOW_SECONDS // 60
+  shows: '{v} minutes'
+- article: '03'
+  phrase: The link expires after 24 hours
+  expr: app.config.Settings.model_fields['email_verification_ttl_hours'].default
+- article: '03'
+  phrase: The code expires after 10 minutes
+  expr: app.config.Settings.model_fields['phone_otp_ttl_seconds'].default // 60
+- article: '03'
+  phrase: new code after 60 seconds
+  expr: app.config.Settings.model_fields['phone_otp_resend_cooldown_seconds'].default
+- article: '03'
+  phrase: a $10 daily AI limit
+  expr: app.core.plans.PLANS['free']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f}
+- article: '03'
+  phrase: it runs 144 steps
+  expr: len(app.pipeline.registry.STRATEGY_STEPS) + len(app.pipeline.registry.GTM_STEPS)
+- article: '04'
+  phrase: 8 phases of 9 steps each
+  expr: len(app.pipeline.registry.STRATEGY_PHASES)
+  shows: '{v} phases'
+- article: '04'
+  phrase: 8 phases of 9 steps each
+  expr: len(app.pipeline.registry.STRATEGY_PHASES[0][1])
+  shows: '{v} steps'
+- article: '04'
+  phrase: news headlines from the last 30 days
+  expr: app.services.market_intel.NEWS_WINDOW_DAYS
+- article: '04'
+  phrase: some strategies have 72 steps
+  expr: len(app.pipeline.registry.STRATEGY_STEPS)
+- article: '04'
+  phrase: a time limit of 2 hours
+  expr: app.config.Settings.model_fields['pipeline_task_timeout_seconds'].default // 3600
+- article: '04'
+  phrase: up to 3 times, 30 seconds apart
+  expr: app.workers.tasks.run_pipeline.max_retries
+  shows: '{v} times'
+- article: '04'
+  phrase: The default budget is $15
+  expr: app.config.Settings.model_fields['pipeline_max_usd_default'].default
+  shows: ${v:.0f}
+- article: '04'
+  phrase: from $0.50 up to the server's ceiling
+  expr: app.api.strategies.MIN_BUDGET_USD
+  shows: ${v:.2f}
+- article: '04'
+  phrase: which is $50 by default
+  expr: app.config.Settings.model_fields['pipeline_max_usd_ceiling'].default
+  shows: ${v:.0f}
+- article: '04'
+  phrase: between 2 and 8 steps per phase
+  expr: app.pipeline.budget_plan.MIN_STEPS_PER_PHASE
+  shows: between {v}
+- article: '04'
+  phrase: between 2 and 8 steps per phase
+  expr: app.pipeline.budget_plan.SUPPORT_STEPS
+  shows: and {v} steps
+- article: '04'
+  phrase: cannot cover even 2 steps per phase
+  expr: app.pipeline.budget_plan.MIN_STEPS_PER_PHASE
+- article: '04'
+  phrase: '| Free | $10 |'
+  expr: app.core.plans.PLANS['free']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: '| Starter | $25 |'
+  expr: app.core.plans.PLANS['starter']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: '| Growth | $60 |'
+  expr: app.core.plans.PLANS['growth']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: '| Pay per meeting | $60 |'
+  expr: app.core.plans.PLANS['pay_per_meeting']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: '| Scale | $150 |'
+  expr: app.core.plans.PLANS['scale']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: '| Pro | $150 |'
+  expr: app.core.plans.PLANS['pro']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: '| Enterprise | $400 |'
+  expr: app.core.plans.PLANS['enterprise']['max_ai_spend_usd_per_day']
+  shows: ${v:.0f} |
+- article: '04'
+  phrase: daily AI limit ($10.00) is used up
+  expr: app.core.plans.PLANS['free']['max_ai_spend_usd_per_day']
+  shows: ${v:.2f}
+- article: '05'
+  phrase: each check gets up to 3 attempts
+  expr: app.config.Settings.model_fields['verification_max_retries_per_pass'].default
+- article: '05'
+  phrase: logged for 15 minutes
+  expr: int(app.services.verification_override.STALE_AFTER.total_seconds() // 60)
+- article: '05'
+  phrase: in at least 20 characters
+  expr: app.services.verification_override.MIN_REASON_CHARS
+- article: '07'
+  phrase: is more than 7 days old
+  expr: app.services.personalization_context.POSTS_TTL.days
+- article: '07'
+  phrase: News from NewsAPI from the last 30 days
+  expr: app.services.personalization_context.NEWS_WINDOW.days
+- article: '07'
+  phrase: more than 3 days old
+  expr: app.services.personalization_context.NEWS_TTL.days
+- article: '07'
+  phrase: Fit and Problem at 30% each
+  expr: app.services.fpta_scoring.WEIGHTS['fit']
+  shows: '{v:.0%}'
+- article: '07'
+  phrase: Timing and Access at 20% each
+  expr: app.services.fpta_scoring.WEIGHTS['timing']
+  shows: '{v:.0%}'
+- article: '07'
+  phrase: per batch of 10 leads
+  expr: app.services.fpta_scoring.BATCH_SIZE
+- article: 08
+  phrase: accepts up to 20 steps
+  expr: app.core.plans.SEQUENCE_STEP_CAP
+- article: 08
+  phrase: within about 15 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
+- article: 08
+  phrase: reason of at least 10 characters
+  expr: app.services.adversarial_review.MIN_OVERRIDE_REASON
+- article: 08
+  phrase: slot within the next 72 hours
+  expr: app.services.system_settings.DEFAULTS['send_time_max_delay_hours'][0]
+- article: 08
+  phrase: has sent 30 messages on a channel
+  expr: app.services.system_settings.DEFAULTS['best_time_min_sends'][0]
+- article: 08
+  phrase: for up to 72 hours by default
+  expr: app.services.system_settings.DEFAULTS['send_time_max_delay_hours'][0]
+- article: 08
+  phrase: Sequences pause for 7 days by default
+  expr: app.config.Settings.model_fields['ooo_reschedule_days'].default
+- article: 08
+  phrase: Every 30 minutes, LeadPilot looks
+  expr: app.config.Settings.model_fields['followup_sweep_interval_seconds'].default // 60
+- article: 08
+  phrase: (72 hours by default; you can set 1 to 2,160 hours)
+  expr: app.api.sequences.StepIn.model_fields['followup_delay_hours'].default
+  shows: ({v} hours
+- article: 08
+  phrase: (72 hours by default; you can set 1 to 2,160 hours)
+  expr: '[m.le for m in app.api.sequences.StepIn.model_fields[''followup_delay_hours''].metadata if getattr(m, ''le'', None) is not None][0]'
+  shows: '{v:,} hours'
+- article: 09
+  phrase: '**10 emails** on the day you'
+  expr: app.config.Settings.model_fields['gmail_warmup_start_sends'].default
+- article: 09
+  phrase: ceiling of **100 emails per day**
+  expr: app.config.Settings.model_fields['gmail_daily_cap'].default
+- article: 09
+  phrase: every 60 seconds
+  expr: app.config.Settings.model_fields['dispatch_interval_seconds'].default
+- article: 09
+  phrase: for replies every 5 minutes by default
+  expr: app.config.Settings.model_fields['reply_poll_interval_seconds'].default // 60
+- article: 09
+  phrase: Once at least 10 messages have been sent
+  expr: app.config.Settings.model_fields['bounce_min_sends'].default
+- article: 09
+  phrase: a bounce rate above **3%**
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '10'
+  phrase: at most 10 messages on the day of its first
+  expr: app.config.Settings.model_fields['whatsapp_warmup_start_sends'].default
+- article: '10'
+  phrase: up to 100 per day
+  expr: app.config.Settings.model_fields['whatsapp_daily_cap'].default
+- article: '10'
+  phrase: at most 1,024 characters by default
+  expr: app.config.Settings.model_fields['whatsapp_template_body_max_chars'].default
+  shows: '{v:,}'
+- article: '11'
+  phrase: within about 15 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
+- article: '11'
+  phrase: cut to at most 300 characters
+  expr: app.integrations.unipile_linkedin.CONNECTION_NOTE_MAX
+- article: '11'
+  phrase: a message to at most 1,500 characters
+  expr: app.services.linkedin_outreach.MESSAGE_MAX
+  shows: '{v:,}'
+- article: '11'
+  phrase: connection notes to 280 characters
+  expr: int(__import__('re').search(r'NOTE is at most (\d+) characters', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/linkedin_outreach.py').read_text()).group(1))
+- article: '11'
+  phrase: up to 5 MB and up to 20,000 rows
+  expr: app.services.linkedin_network.MAX_BYTES // 1_000_000
+  shows: '{v} MB'
+- article: '11'
+  phrase: up to 5 MB and up to 20,000 rows
+  expr: app.services.linkedin_network.MAX_ROWS
+  shows: '{v:,} rows'
+- article: '11'
+  phrase: last upload is more than 7 days old
+  expr: app.services.linkedin_network.STALE_AFTER_DAYS
+- article: '11'
+  phrase: (up to 1,500 characters), then click
+  expr: app.services.network_messages.MESSAGE_MAX
+  shows: '{v:,}'
+- article: '11'
+  phrase: about 90 seconds apart
+  expr: app.services.network_messages.BULK_SPACING_SECONDS
+- article: '11'
+  phrase: (up to 20 MB; at most 10 address
+  expr: app.services.email_network_parse.CONTACTS_MAX_BYTES // 1048576
+  shows: '{v} MB'
+- article: '11'
+  phrase: (up to 20 MB; at most 10 address
+  expr: app.services.email_network_parse.MAX_ADDRESSES_PER_CELL
+  shows: most {v} address
+- article: '11'
+  phrase: (up to 300 MB and 50,000 messages
+  expr: app.services.email_network_parse.MBOX_MAX_BYTES // 1048576
+  shows: '{v} MB'
+- article: '11'
+  phrase: (up to 300 MB and 50,000 messages
+  expr: app.services.email_network_parse.MAX_MESSAGES
+  shows: '{v:,} messages'
+- article: '11'
+  phrase: reads the last 12 months of your connected
+  expr: app.services.email_network_gmail.LOOKBACK.days * 12 // 365
+- article: '11'
+  phrase: up to 5,000 messages, in the background
+  expr: app.services.email_network_gmail.MAX_MESSAGES
+  shows: '{v:,}'
+- article: '11'
+  phrase: at most 100,000 email contacts
+  expr: app.services.email_network.MAX_CONTACTS_PER_ACCOUNT
+  shows: '{v:,}'
+- article: '12'
+  phrase: pending after more than 3 days
+  expr: int(__import__('re').search(r'> (\d+) \* 24 \* 3_600_000', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/lib/sendReview.ts').read_text()).group(1))
+- article: '12'
+  phrase: The note must be at least 5 characters
+  expr: '[m.min_length for m in app.api.send_reviews.RejectIn.model_fields[''note''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+- article: '12'
+  phrase: reason of at least 10 characters
+  expr: app.services.adversarial_review.MIN_OVERRIDE_REASON
+- article: '13'
+  phrase: every 300 seconds (5 minutes)
+  expr: app.config.Settings.model_fields['reply_poll_interval_seconds'].default
+  shows: '{v} seconds'
+- article: '13'
+  phrase: every 300 seconds (5 minutes)
+  expr: app.config.Settings.model_fields['reply_poll_interval_seconds'].default // 60
+  shows: ({v} minutes
+- article: '13'
+  phrase: picks up again after 7 days by default
+  expr: app.config.Settings.model_fields['ooo_reschedule_days'].default
+- article: '13'
+  phrase: 60 days for timing or a project
+  expr: app.services.reengagement_memory.INTERVAL_BY_KIND['timing']
+- article: '13'
+  phrase: the configured default (90 days)
+  expr: app.services.system_settings.DEFAULTS['reengagement_memory_days'][0]
+- article: '14'
+  phrase: 15, 30, 45 or 60 minutes
+  expr: int(__import__('re').search(r'\(15, 30, 45, (\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/api/calendar.py').read_text()).group(1))
+  shows: or {v} minutes
+- article: '14'
+  phrase: (0 to 120 minutes)
+  expr: '[m.le for m in app.api.calendar.BookingPageIn.model_fields[''buffer_minutes''].metadata if getattr(m, ''le'', None) is not None][0]'
+- article: '14'
+  phrase: for the next 30 days
+  expr: app.config.Settings.model_fields['calendar_slot_days_ahead'].default
+- article: '14'
+  phrase: no sooner than 60 minutes from now
+  expr: app.config.Settings.model_fields['calendar_min_notice_minutes'].default
+- article: '15'
+  phrase: once the call is within 24 hours
+  expr: int(app.workers.meeting_prep_tasks.REMINDER_24H.total_seconds() // 3600)
+- article: '15'
+  phrase: closed automatically 6 hours after
+  expr: int(__import__('re').search(r'timedelta\(hours=(\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/workers/calendar_tasks.py').read_text()).group(1))
+- article: '15'
+  phrase: waits up to 60 minutes after the meeting
+  expr: app.services.system_settings.DEFAULTS['meeting_transcript_wait_minutes'][0]
+- article: '15'
+  phrase: capped at 250,000 characters
+  expr: app.services.meeting_recording.MAX_TRANSCRIPT_CHARS
+  shows: '{v:,}'
+- article: '16'
+  phrase: in a sweep every 15 minutes
+  expr: int(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'] // 60)
+- article: '16'
+  phrase: tried 6 times in total
+  expr: app.services.webhook_delivery.MAX_ATTEMPTS
+- article: '16'
+  phrase: again after 30 seconds, 2 minutes, 10 minutes, 30 minutes and 2 hours
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[0]
+  shows: '{v} seconds'
+- article: '16'
+  phrase: again after 30 seconds, 2 minutes, 10 minutes, 30 minutes and 2 hours
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[1] // 60
+  shows: ', {v} minutes'
+- article: '16'
+  phrase: again after 30 seconds, 2 minutes, 10 minutes, 30 minutes and 2 hours
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[2] // 60
+  shows: ' {v} minutes,'
+- article: '16'
+  phrase: again after 30 seconds, 2 minutes, 10 minutes, 30 minutes and 2 hours
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[3] // 60
+  shows: ' {v} minutes and'
+- article: '16'
+  phrase: again after 30 seconds, 2 minutes, 10 minutes, 30 minutes and 2 hours
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[4] // 3600
+  shows: and {v} hours
+- article: '16'
+  phrase: up to 10 active keys
+  expr: app.services.api_keys.MAX_ACTIVE
+- article: '17'
+  phrase: A result from 90 days ago counts half
+  expr: app.core.config.Settings.model_fields['PLAYBOOK_SCORE_HALF_LIFE_DAYS'].default
+- article: '17'
+  phrase: (30 minutes after the nightly r
+  expr: min(app.workers.celery_app.celery_app.conf.beat_schedule['ab-auto-promotion']['schedule'].minute) - min(app.workers.celery_app.celery_app.conf.beat_schedule['learning-loop-aggregation']['schedule'].minute)
+- article: '17'
+  phrase: is at least 10% better
+  expr: app.core.config.Settings.model_fields['AB_MIN_LIFT'].default
+  shows: '{v:.0%}'
+- article: '17'
+  phrase: opt-outs is at most 5% of its sends
+  expr: app.core.config.Settings.model_fields['AB_HARM_CEILING'].default
+  shows: '{v:.0%}'
+- article: '17'
+  phrase: unsubscribe rate must be at most 5%
+  expr: __import__('inspect').signature(app.services.multi_variate.compare_multi_variants).parameters['harm_ceiling'].default
+  shows: '{v:.0%}'
+- article: '17'
+  phrase: has been sending for 7 days
+  expr: app.services.system_settings.DEFAULTS['strategy_mutation_idle_days'][0]
+- article: '17'
+  phrase: never more than 72 hours later
+  expr: app.services.system_settings.DEFAULTS['send_time_max_delay_hours'][0]
+- article: '18'
+  phrase: '**Reply rate** (35%)'
+  expr: app.services.pipeline_health.WEIGHTS['reply_rate']
+  shows: '{v:.0%}'
+- article: '18'
+  phrase: '**Sequence completion** (25%)'
+  expr: app.services.pipeline_health.WEIGHTS['completion']
+  shows: '{v:.0%}'
+- article: '18'
+  phrase: '**Lead freshness** (20%)'
+  expr: app.services.pipeline_health.WEIGHTS['freshness']
+  shows: '{v:.0%}'
+- article: '18'
+  phrase: up to 3 days old, zero at 30 days
+  expr: app.services.pipeline_health.FRESH_DAYS
+  shows: '{v} days old'
+- article: '18'
+  phrase: up to 3 days old, zero at 30 days
+  expr: app.services.pipeline_health.STALE_DAYS
+  shows: '{v} days'
+- article: '18'
+  phrase: '**Open conversations** (20%)'
+  expr: app.services.pipeline_health.WEIGHTS['conversations']
+  shows: '{v:.0%}'
+- article: '18'
+  phrase: Pipeline thinning. Add 10 leads this week.
+  expr: app.services.pipeline_health.BANDS[1][2]
+  shows: '{v}'
+- article: '18'
+  phrase: 0.55 within 3 days
+  expr: app.services.attribution.LAST_TOUCH_BANDS[1][0] // 24
+  shows: within {v} days
+- article: '18'
+  phrase: Attribution is updated every 15 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['attribution-sweep']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['attribution-sweep']['schedule'].minute)[0]
+- article: '18'
+  phrase: deployment** over the last 90 days
+  expr: app.services.system_settings.DEFAULTS['benchmark_window_days'][0]
+- article: '18'
+  phrase: (30 days, 90 days, 12 months or year to date)
+  expr: int(__import__('re').search(r'(\d+) days', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/app/(app)/analytics/revenue/page.tsx').read_text()).group(1))
+  shows: ({v} days
+- article: '18'
+  phrase: (default 30 days, up to 365)
+  expr: __import__('inspect').signature(app.services.share_links.create).parameters['expires_in_days'].default
+  shows: default {v} days
+- article: '18'
+  phrase: (default 30 days, up to 365)
+  expr: app.services.share_links.MAX_EXPIRY_DAYS
+  shows: up to {v}
+- article: '18'
+  phrase: 15 minutes per message plus 90
+  expr: int(app.services.roi_calculator.HOURS_PER_MESSAGE * 60)
+  shows: '{v} minutes per message'
+- article: '18'
+  phrase: plus 90 minutes per meeting
+  expr: int(app.services.roi_calculator.HOURS_PER_MEETING * 60)
+- article: '19'
+  phrase: '- no SPF record: −25'
+  expr: '100 - app.services.deliverability.health_score({''spf'': False, ''dmarc'': True, ''dkim'': True}, None, False)[0]'
+  shows: −{v}
+- article: '19'
+  phrase: '- no DMARC record: −25 (or −10 if DMARC is `p=none`)'
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': False, ''dkim'': True}, None, False)[0]'
+  shows: 'record: −{v}'
+- article: '19'
+  phrase: '- no DMARC record: −25 (or −10 if DMARC is `p=none`)'
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dmarc_policy'': ''none'', ''dkim'': True}, None, False)[0]'
+  shows: (or −{v}
+- article: '19'
+  phrase: '(`google._domainkey`): −15'
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dkim'': False}, None, False)[0]'
+  shows: −{v}
+- article: '19'
+  phrase: 'a bounce rate over 2% for your sends in the last 30 days: up to −30'
+  expr: '[r for r in range(1, 100) if app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dkim'': True}, r / 1000 + 0.0001, False)[0] < 100][0] / 1000'
+  shows: over {v:.0%}
+- article: '19'
+  phrase: 'a bounce rate over 2% for your sends in the last 30 days: up to −30'
+  expr: __import__('inspect').signature(app.services.deliverability.bounce_rate).parameters['days'].default
+  shows: last {v} days
+- article: '19'
+  phrase: 'a bounce rate over 2% for your sends in the last 30 days: up to −30'
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dkim'': True}, 0.9, False)[0]'
+  shows: up to −{v}
+- article: '19'
+  phrase: 'on a blocklist: −40'
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dkim'': True}, None, True)[0]'
+  shows: −{v}
+- article: '19'
+  phrase: Scores refresh every 4 hours
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['refresh-mailbox-health']['schedule'].hour)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['refresh-mailbox-health']['schedule'].hour)[0]
+- article: '19'
+  phrase: 'complaint rate of 0.1% or more: −35; 0.3% or more: −65'
+  expr: app.services.mailbox_health.COMPLAINT_WARN
+  shows: '{v:.1%} or more'
+- article: '19'
+  phrase: 'complaint rate of 0.1% or more: −35; 0.3% or more: −65'
+  expr: 100 - app.services.mailbox_health.score_for({}, app.services.mailbox_health.COMPLAINT_WARN, None, {})[0]
+  shows: 'more: −{v};'
+- article: '19'
+  phrase: 'complaint rate of 0.1% or more: −35; 0.3% or more: −65'
+  expr: app.services.mailbox_health.COMPLAINT_BAD
+  shows: ; {v:.1%} or more
+- article: '19'
+  phrase: 'complaint rate of 0.1% or more: −35; 0.3% or more: −65'
+  expr: 100 - app.services.mailbox_health.score_for({}, app.services.mailbox_health.COMPLAINT_BAD, None, {})[0]
+  shows: 'more: −{v}'
+- article: '19'
+  phrase: 'bounce rate of 2% or more: −35; 5% or more: −65'
+  expr: app.services.mailbox_health.BOUNCE_WARN
+  shows: of {v:.0%} or more
+- article: '19'
+  phrase: 'bounce rate of 2% or more: −35; 5% or more: −65'
+  expr: 100 - app.services.mailbox_health.score_for({}, None, app.services.mailbox_health.BOUNCE_WARN, {})[0]
+  shows: 'more: −{v};'
+- article: '19'
+  phrase: 'bounce rate of 2% or more: −35; 5% or more: −65'
+  expr: app.services.mailbox_health.BOUNCE_BAD
+  shows: ; {v:.0%} or more
+- article: '19'
+  phrase: 'bounce rate of 2% or more: −35; 5% or more: −65'
+  expr: 100 - app.services.mailbox_health.score_for({}, None, app.services.mailbox_health.BOUNCE_BAD, {})[0]
+  shows: 'more: −{v}'
+- article: '19'
+  phrase: '(3 times or more the 7-day average, with at least 20 sends today): −10'
+  expr: int(app.services.mailbox_health.SPIKE_MULTIPLE)
+  shows: ({v} times
+- article: '19'
+  phrase: '(3 times or more the 7-day average, with at least 20 sends today): −10'
+  expr: app.services.mailbox_health.VOLUME_DAYS
+  shows: the {v}-day
+- article: '19'
+  phrase: '(3 times or more the 7-day average, with at least 20 sends today): −10'
+  expr: app.services.mailbox_health.SPIKE_MIN_SENDS
+  shows: least {v} sends
+- article: '19'
+  phrase: cut to 25% of the normal warm-up allowance, never below 2 a day
+  expr: app.services.mailbox_health.THROTTLE_FRACTION
+  shows: '{v:.0%}'
+- article: '19'
+  phrase: cut to 25% of the normal warm-up allowance, never below 2 a day
+  expr: app.services.mailbox_health.MIN_THROTTLE_CAP
+  shows: below {v} a day
+- article: '19'
+  phrase: bounce rate goes over 3% once at least 10 messages have been sent
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '19'
+  phrase: bounce rate goes over 3% once at least 10 messages have been sent
+  expr: app.config.Settings.model_fields['bounce_min_sends'].default
+  shows: least {v} messages
+- article: '20'
+  phrase: an unused clone is deleted after 3 years
+  expr: app.services.voice_twin.RETENTION_YEARS
+- article: '21'
+  phrase: A conversation is deleted 30 days after its last mess
+  expr: app.config.Settings.model_fields['support_chat_retention_days'].default
+- article: '21'
+  phrase: billing records for 7 years
+  expr: app.services.account_erasure.BILLING_RETENTION_YEARS
+- article: '21'
+  phrase: billing records automatically after the 7 years
+  expr: app.services.account_erasure.BILLING_RETENTION_YEARS
+- article: '21'
+  phrase: reference numbers) for 7 years
+  expr: app.services.account_erasure.BILLING_RETENTION_YEARS
+- article: '21'
+  phrase: cached for up to 30 days (search results for 1 day)
+  expr: app.config.Settings.model_fields['cache_ttl_enrichment_seconds'].default // 86400
+  shows: '{v} days'
+- article: '21'
+  phrase: cached for up to 30 days (search results for 1 day)
+  expr: app.config.Settings.model_fields['cache_ttl_search_seconds'].default // 86400
+  shows: for {v} day
+- article: '22'
+  phrase: more than 20 steps on any plan
+  expr: app.core.plans.SEQUENCE_STEP_CAP
+- article: '22'
+  phrase: 'Starter: $149 per month'
+  expr: '[t for t in app.core.billing_catalog.MONTHLY_TIERS if t[''id''] == ''starter''][0][''price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Growth: $349 per month'
+  expr: '[t for t in app.core.billing_catalog.MONTHLY_TIERS if t[''id''] == ''growth''][0][''price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Scale: $699 per month'
+  expr: '[t for t in app.core.billing_catalog.MONTHLY_TIERS if t[''id''] == ''scale''][0][''price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Enterprise: $1,499 per month'
+  expr: '[t for t in app.core.billing_catalog.MONTHLY_TIERS if t[''id''] == ''enterprise''][0][''price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Starter: $1,490 per year'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''starter''][0][''annual_price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Growth: $3,490 per year'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''growth''][0][''annual_price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Scale: $6,990 per year'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''scale''][0][''annual_price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: 'Enterprise: $14,990 per year'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''enterprise''][0][''annual_price_cents''] // 100'
+  shows: ${v:,}
+- article: '22'
+  phrase: at the price of 10 months
+  expr: app.core.billing_catalog.ANNUAL_MONTHS_CHARGED
+- article: '22'
+  phrase: Each monthly tier starts with a 14-day free trial
+  expr: app.core.billing_catalog.TRIAL_DAYS
+  shows: '{v}-day'
+- article: '22'
+  phrase: no monthly fee ($0) and $179
+  expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['monthly_fee_cents'] // 100
+  shows: (${v})
+- article: '22'
+  phrase: no monthly fee ($0) and $179
+  expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['price_per_meeting_cents'] // 100
+  shows: and ${v}
+- article: '22'
+  phrase: It waits 48 hours first
+  expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['grace_hours']
+- article: '22'
+  phrase: no longer booked when the 48 hours are over
+  expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['grace_hours']
+- article: '22'
+  phrase: meetings whose 48 hours have passed
+  expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['grace_hours']
+- article: '22'
+  phrase: After the 48 hours, contact support
+  expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['grace_hours']
+- article: '22'
+  phrase: It runs every 30 minutes
+  expr: int(app.workers.celery_app.celery_app.conf.beat_schedule['charge-due-meetings']['schedule'] // 60)
+- article: '22'
+  phrase: within about 15 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
+- article: '22'
+  phrase: Running a 30-day pilot?
+  expr: app.services.pilot_mode.PILOT_DAYS
+  shows: '{v}-day'
+- article: '22'
+  phrase: 7 days before an annual free trial ends
+  expr: app.core.billing_catalog.TRIAL_NOTICE_DAYS
+- article: '22'
+  phrase: 30 days before each yearly
+  expr: app.core.billing_catalog.RENEWAL_NOTICE_DAYS
+- article: '22'
+  phrase: longer than 31 days also gets the 7-day
+  expr: app.core.billing_catalog.LONG_TRIAL_DAYS
+  shows: than {v} days
+- article: '22'
+  phrase: longer than 31 days also gets the 7-day
+  expr: app.core.billing_catalog.TRIAL_NOTICE_DAYS
+  shows: the {v}-day
+- article: '22'
+  phrase: 30 days on Free, 90 days on Starter, 365 days on Growth
+  expr: app.core.plans.PLANS['free']['analytics_history_days']
+  shows: '{v} days on Free'
+- article: '22'
+  phrase: 30 days on Free, 90 days on Starter, 365 days on Growth
+  expr: app.core.plans.PLANS['starter']['analytics_history_days']
+  shows: '{v} days on Starter'
+- article: '22'
+  phrase: 30 days on Free, 90 days on Starter, 365 days on Growth
+  expr: app.core.plans.PLANS['growth']['analytics_history_days']
+  shows: '{v} days on Growth'
+- article: '22'
+  phrase: (for example "last 30 days")
+  expr: app.core.plans.PLANS['free']['analytics_history_days']
+- article: '23'
+  phrase: Passwords must be at least 8 characters.
+  expr: '[m.min_length for m in app.api.auth.Credentials.model_fields[''password''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+- article: '23'
+  phrase: Sign-in attempts are limited to 10 per 15 minutes
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_AUTH'].default
+  shows: to {v} per
+- article: '23'
+  phrase: Sign-in attempts are limited to 10 per 15 minutes
+  expr: app.core.rate_limiting.AUTH_WINDOW_SECONDS // 60
+  shows: '{v} minutes'
+- article: '23'
+  phrase: you stay signed in for 30 days
+  expr: app.config.Settings.model_fields['jwt_refresh_ttl_seconds'].default // 86400
+- article: '23'
+  phrase: the 30 days start again
+  expr: app.config.Settings.model_fields['jwt_refresh_ttl_seconds'].default // 86400
+- article: '23'
+  phrase: An account left unused for 30 days
+  expr: app.config.Settings.model_fields['jwt_refresh_ttl_seconds'].default // 86400
+- article: '23'
+  phrase: or after 12 hours
+  expr: app.config.Settings.model_fields['auth_ephemeral_session_ttl_seconds'].default // 3600
+- article: '23'
+  phrase: access pass that lasts 15 minutes
+  expr: app.config.Settings.model_fields['jwt_access_ttl_seconds'].default // 60
+- article: '23'
+  phrase: Password changes are limited to 10 attempts per 15 minutes
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_AUTH'].default
+  shows: to {v} attempts
+- article: '23'
+  phrase: Password changes are limited to 10 attempts per 15 minutes
+  expr: app.core.rate_limiting.AUTH_WINDOW_SECONDS // 60
+  shows: '{v} minutes'
+- article: '23'
+  phrase: '**Repeat new password** (at least 8 characters)'
+  expr: '[m.min_length for m in app.api.auth.PasswordResetConfirmIn.model_fields[''new_password''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+- article: '23'
+  phrase: The link works once and expires after 60 minutes
+  expr: app.config.Settings.model_fields['password_reset_ttl_minutes'].default
+- article: '23'
+  phrase: Reset requests are limited to 10 per 15 minutes
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_AUTH'].default
+  shows: to {v} per
+- article: '23'
+  phrase: Reset requests are limited to 10 per 15 minutes
+  expr: app.core.rate_limiting.AUTH_WINDOW_SECONDS // 60
+  shows: '{v} minutes'
+- article: '23'
+  phrase: at most 5 in 24 hours
+  expr: app.services.password_reset.DAILY_EMAIL_LIMIT
+  shows: most {v} in
+- article: '23'
+  phrase: at most 5 in 24 hours
+  expr: int(__import__('re').search(r'timedelta\(hours=(\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/password_reset.py').read_text()).group(1))
+  shows: '{v} hours'
+- article: '23'
+  phrase: 60 minutes is the default
+  expr: app.config.Settings.model_fields['password_reset_ttl_minutes'].default
+- article: '23'
+  phrase: at most 10 active keys
+  expr: app.services.api_keys.MAX_ACTIVE
+- article: '24'
+  phrase: The link expires after 7 days
+  expr: app.services.workspaces.INVITE_TTL.days
+- article: '24'
+  phrase: up to 1 MB
+  expr: app.api.workspaces._LOGO_MAX_BYTES // 1_000_000
+  shows: '{v} MB'
+- article: '25'
+  phrase: at least 10 messages, it pauses if more than 3%
+  expr: app.config.Settings.model_fields['bounce_min_sends'].default
+  shows: least {v} messages
+- article: '25'
+  phrase: at least 10 messages, it pauses if more than 3%
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '25'
+  phrase: at least 4 unanswered messages
+  expr: app.services.system_settings.DEFAULTS['conversion_min_unanswered_sends'][0]
+- article: '25'
+  phrase: a lead below 5% is marked
+  expr: app.services.system_settings.DEFAULTS['conversion_cooling_threshold'][0]
+  shows: '{v:.0%}'
+- article: '25'
+  phrase: paused for 21 days
+  expr: app.services.system_settings.DEFAULTS['conversion_cooling_pause_days'][0]
+- article: '25'
+  phrase: below 1.5% it is archived
+  expr: app.services.system_settings.DEFAULTS['conversion_archive_threshold'][0]
+  shows: '{v:.1%}'
+- article: '27'
+  phrase: it runs 72 or 144 steps once per strategy
+  expr: len(app.pipeline.registry.STRATEGY_STEPS)
+  shows: runs {v} or
+- article: '27'
+  phrase: it runs 72 or 144 steps once per strategy
+  expr: len(app.pipeline.registry.STRATEGY_STEPS) + len(app.pipeline.registry.GTM_STEPS)
+  shows: or {v} steps
+- article: '27'
+  phrase: between $0.50 and $50.00 (the default is $15)
+  expr: app.api.strategies.MIN_BUDGET_USD
+  shows: ${v:.2f} and
+- article: '27'
+  phrase: between $0.50 and $50.00 (the default is $15)
+  expr: app.config.Settings.model_fields['pipeline_max_usd_ceiling'].default
+  shows: and ${v:.2f}
+- article: '27'
+  phrase: between $0.50 and $50.00 (the default is $15)
+  expr: app.config.Settings.model_fields['pipeline_max_usd_default'].default
+  shows: is ${v:.0f})
+- article: '27'
+  phrase: time limit of 2 hours
+  expr: app.config.Settings.model_fields['pipeline_task_timeout_seconds'].default // 3600
+- article: '27'
+  phrase: retried up to 3 times and resumes
+  expr: app.workers.tasks.run_pipeline.max_retries
+- article: '27'
+  phrase: 2 new strategies per hour
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_STRATEGIES'].default
+- article: '27'
+  phrase: 5 lead-sourcing requests per hour
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_LEADS_SOURCE'].default
+- article: '27'
+  phrase: 10 sign-in attempts per 15 minutes
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_AUTH'].default
+  shows: '{v} sign-in'
+- article: '27'
+  phrase: 10 sign-in attempts per 15 minutes
+  expr: app.core.rate_limiting.AUTH_WINDOW_SECONDS // 60
+  shows: '{v} minutes'
+- article: '27'
+  phrase: 20 support chat messages per day (LeadPilot's hosted service raises this to 30)
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_SUPPORT_CHAT'].default
+  shows: '{v} support chat'
+- article: '27'
+  phrase: 20 support chat messages per day (LeadPilot's hosted service raises this to 30)
+  expr: int([e['value'] for e in __import__('yaml').safe_load((__import__('pathlib').Path(app.__file__).parents[1] / 'render.yaml').read_text())['services'][0]['envVars'] if e.get('key') == 'RATE_LIMIT_SUPPORT_CHAT'][0])
+  shows: to {v})
+- article: '27'
+  phrase: sends at most 100 messages a day
+  expr: app.config.Settings.model_fields['gmail_daily_cap'].default
+- article: '27'
+  phrase: for more than 2 minutes
+  expr: app.services.health_checks.CELERY_HEARTBEAT_TTL_SECONDS // 60
+- article: '27'
+  phrase: at least 10 messages, it pauses automatically if more than 3%
+  expr: app.config.Settings.model_fields['bounce_min_sends'].default
+  shows: least {v} messages
+- article: '27'
+  phrase: at least 10 messages, it pauses automatically if more than 3%
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '28'
+  phrase: (144 steps in all)
+  expr: len(app.pipeline.registry.STRATEGY_STEPS) + len(app.pipeline.registry.GTM_STEPS)
+- article: '28'
+  phrase: 72 steps (8 phases of 9 steps) in Flow 1, or 144 steps
+  expr: len(app.pipeline.registry.STRATEGY_STEPS)
+  shows: '{v} steps ('
+- article: '28'
+  phrase: 72 steps (8 phases of 9 steps) in Flow 1, or 144 steps
+  expr: len(app.pipeline.registry.STRATEGY_PHASES)
+  shows: ({v} phases
+- article: '28'
+  phrase: 72 steps (8 phases of 9 steps) in Flow 1, or 144 steps
+  expr: len(app.pipeline.registry.STRATEGY_PHASES[0][1])
+  shows: of {v} steps
+- article: '28'
+  phrase: 72 steps (8 phases of 9 steps) in Flow 1, or 144 steps
+  expr: len(app.pipeline.registry.STRATEGY_STEPS) + len(app.pipeline.registry.GTM_STEPS)
+  shows: or {v} steps
+- article: '28'
+  phrase: The default is $15; it can be set between $0.50 and $50.00
+  expr: app.config.Settings.model_fields['pipeline_max_usd_default'].default
+  shows: is ${v:.0f};
+- article: '28'
+  phrase: The default is $15; it can be set between $0.50 and $50.00
+  expr: app.api.strategies.MIN_BUDGET_USD
+  shows: ${v:.2f} and
+- article: '28'
+  phrase: The default is $15; it can be set between $0.50 and $50.00
+  expr: app.config.Settings.model_fields['pipeline_max_usd_ceiling'].default
+  shows: and ${v:.2f}
+- article: '28'
+  phrase: 30% fit, 30% problem, 20% timing and 20% access
+  expr: app.services.fpta_scoring.WEIGHTS['fit']
+  shows: '{v:.0%} fit'
+- article: '28'
+  phrase: 30% fit, 30% problem, 20% timing and 20% access
+  expr: app.services.fpta_scoring.WEIGHTS['problem']
+  shows: '{v:.0%} problem'
+- article: '28'
+  phrase: 30% fit, 30% problem, 20% timing and 20% access
+  expr: app.services.fpta_scoring.WEIGHTS['timing']
+  shows: '{v:.0%} timing'
+- article: '28'
+  phrase: 30% fit, 30% problem, 20% timing and 20% access
+  expr: app.services.fpta_scoring.WEIGHTS['access']
+  shows: '{v:.0%} access'
+- article: '28'
+  phrase: more than 3% of its emails
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '28'
+  phrase: within 24 hours of the prospect
+  expr: app.services.whatsapp_window.WINDOW_HOURS
+- article: '28'
+  phrase: after 90 days by default
+  expr: app.services.system_settings.DEFAULTS['reengagement_memory_days'][0]
+- article: '28'
+  phrase: reply rate (35%), sequence completion (25%), how recently new leads were added (20%) and open conversations (20%)
+  expr: app.services.pipeline_health.WEIGHTS['reply_rate']
+  shows: rate ({v:.0%})
+- article: '28'
+  phrase: reply rate (35%), sequence completion (25%), how recently new leads were added (20%) and open conversations (20%)
+  expr: app.services.pipeline_health.WEIGHTS['completion']
+  shows: completion ({v:.0%})
+- article: '28'
+  phrase: reply rate (35%), sequence completion (25%), how recently new leads were added (20%) and open conversations (20%)
+  expr: app.services.pipeline_health.WEIGHTS['freshness']
+  shows: added ({v:.0%})
+- article: '28'
+  phrase: reply rate (35%), sequence completion (25%), how recently new leads were added (20%) and open conversations (20%)
+  expr: app.services.pipeline_health.WEIGHTS['conversations']
+  shows: conversations ({v:.0%})
+- article: '29'
+  phrase: limited to 30 messages per person per day on LeadPilot's hosted service (a deployment setting; the built-in default is 20)
+  expr: int([e['value'] for e in __import__('yaml').safe_load((__import__('pathlib').Path(app.__file__).parents[1] / 'render.yaml').read_text())['services'][0]['envVars'] if e.get('key') == 'RATE_LIMIT_SUPPORT_CHAT'][0])
+  shows: to {v} messages
+- article: '29'
+  phrase: limited to 30 messages per person per day on LeadPilot's hosted service (a deployment setting; the built-in default is 20)
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_SUPPORT_CHAT'].default
+  shows: default is {v})
+- article: '30'
+  phrase: up to 2,000 characters
+  expr: app.api.support.MAX_QUESTION_CHARS
+  shows: '{v:,}'
+- article: '30'
+  phrase: (3 to 200 characters)
+  expr: '[m.min_length for m in app.api.support.TicketIn.model_fields[''subject''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+  shows: ({v} to
+- article: '30'
+  phrase: (3 to 200 characters)
+  expr: '[m.max_length for m in app.api.support.TicketIn.model_fields[''subject''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+  shows: to {v} characters
+- article: '30'
+  phrase: (at least 10 characters)
+  expr: '[m.min_length for m in app.api.support.TicketIn.model_fields[''body''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+- article: '30'
+  phrase: responds within 24 hours
+  expr: int(__import__('re').search(r'respond within (\d+) hours', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/components/support/ChatWidget.tsx').read_text()).group(1))
+- article: '30'
+  phrase: A conversation is deleted 30 days after its last mess
+  expr: app.config.Settings.model_fields['support_chat_retention_days'].default
+- article: '30'
+  phrase: 30 days is the default
+  expr: app.config.Settings.model_fields['support_chat_retention_days'].default
+- article: '30'
+  phrase: checks again every 30 seconds
+  expr: int(__import__('re').search(r'REFRESH_INTERVAL_MS = (\d+)_000', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/lib/statusBoard.ts').read_text()).group(1))
+- article: '30'
+  phrase: within 8 seconds
+  expr: int(__import__('re').search(r'FETCH_TIMEOUT_MS = (\d+)_000', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/lib/statusBoard.ts').read_text()).group(1))
+- article: '30'
+  phrase: tries again after 2 minutes
+  expr: int(__import__('re').search(r'RATE_LIMITED_RETRY_MS = (\d+)_000', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/lib/statusBoard.ts').read_text()).group(1)) // 60
+- article: '30'
+  phrase: 'You can send 30 chat messages per day on LeadPilot''s hosted service. This is a deployment setting: the hosted service sets 30, and the built-in default is 20.'
+  expr: int([e['value'] for e in __import__('yaml').safe_load((__import__('pathlib').Path(app.__file__).parents[1] / 'render.yaml').read_text())['services'][0]['envVars'] if e.get('key') == 'RATE_LIMIT_SUPPORT_CHAT'][0])
+  shows: send {v} chat
+- article: '30'
+  phrase: 'You can send 30 chat messages per day on LeadPilot''s hosted service. This is a deployment setting: the hosted service sets 30, and the built-in default is 20.'
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_SUPPORT_CHAT'].default
+  shows: default is {v}.
+- article: '40'
+  phrase: An annual plan costs 10 times the monthly price
+  expr: app.core.billing_catalog.ANNUAL_MONTHS_CHARGED
+- article: '40'
+  phrase: so you pay for 10 months and get 12
+  expr: app.core.billing_catalog.ANNUAL_MONTHS_CHARGED
+  shows: for {v} months
+- article: '40'
+  phrase: '**Annual · 2 months free**'
+  expr: 12 - app.core.billing_catalog.ANNUAL_MONTHS_CHARGED
+- article: '40'
+  phrase: '| Starter | $298 |'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''starter''][0][''savings_cents''] // 100'
+  shows: ${v:,}
+- article: '40'
+  phrase: '| Growth | $698 |'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''growth''][0][''savings_cents''] // 100'
+  shows: ${v:,}
+- article: '40'
+  phrase: '| Scale | $1,398 |'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''scale''][0][''savings_cents''] // 100'
+  shows: ${v:,}
+- article: '40'
+  phrase: '| Enterprise | $2,998 |'
+  expr: '[t for t in app.core.billing_catalog.annual_tiers() if t[''id''] == ''enterprise''][0][''savings_cents''] // 100'
+  shows: ${v:,}
+- article: '40'
+  phrase: an email 30 days ahead
+  expr: app.core.billing_catalog.RENEWAL_NOTICE_DAYS
+- article: '40'
+  phrase: a background check runs every 15 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
+- article: '40'
+  phrase: once-per-account 14-day free trial
+  expr: app.core.billing_catalog.TRIAL_DAYS
+  shows: '{v}-day'
+- article: '40'
+  phrase: a second 14-day trial
+  expr: app.core.billing_catalog.TRIAL_DAYS
+  shows: '{v}-day'
+- article: '40'
+  phrase: enrolled before 12 October 2026
+  expr: app.services.plan_holds.PLAN_HOLD_EFFECTIVE_AT
+  shows: '{v:%d %B %Y}'
+- article: '40'
+  phrase: '`annual_billing_enabled` starts off'
+  expr: app.services.system_settings.DEFAULTS['annual_billing_enabled'][0]
+  shows: '{v!s:.0}'
+- article: '41'
+  phrase: (yours included) over the last 90 days
+  expr: app.services.system_settings.DEFAULTS['benchmark_window_days'][0]
+- article: '41'
+  phrase: at least 30 sends on that channel
+  expr: app.services.system_settings.DEFAULTS['benchmark_min_account_sends'][0]
+- article: '41'
+  phrase: (25th to 75th percentile)
+  expr: int(__import__('re').search(r'0\.(25)\b', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/benchmarks.py').read_text()).group(1))
+  shows: ({v}th
+- article: '41'
+  phrase: sent to at least 20 leads
+  expr: app.services.funnel.BEST_STEP_MIN_SENT
+- article: '41'
+  phrase: Reply rate is 35% of the score
+  expr: app.services.pipeline_health.WEIGHTS['reply_rate']
+  shows: '{v:.0%}'
+- article: '41'
+  phrase: bounce rate goes over 3%, judged only once at least 10 messages
+  expr: app.config.Settings.model_fields['bounce_rate_pause_threshold'].default
+  shows: '{v:.0%}'
+- article: '41'
+  phrase: bounce rate goes over 3%, judged only once at least 10 messages
+  expr: app.config.Settings.model_fields['bounce_min_sends'].default
+  shows: least {v} messages
+- article: '41'
+  phrase: judged on its own bounces over the last 30 days
+  expr: app.services.mailbox_health.WINDOW_DAYS
+- article: '41'
+  phrase: '- 2% or more takes 35 points off its health score. On its own that leaves 65'
+  expr: app.services.mailbox_health.BOUNCE_WARN
+  shows: '- {v:.0%} or'
+- article: '41'
+  phrase: '- 2% or more takes 35 points off its health score. On its own that leaves 65'
+  expr: 100 - app.services.mailbox_health.score_for({}, None, app.services.mailbox_health.BOUNCE_WARN, {})[0]
+  shows: takes {v} points
+- article: '41'
+  phrase: '- 2% or more takes 35 points off its health score. On its own that leaves 65'
+  expr: app.services.mailbox_health.score_for({}, None, app.services.mailbox_health.BOUNCE_WARN, {})[0]
+  shows: leaves {v}
+- article: '41'
+  phrase: '- 5% or more takes 65 points off. On its own that leaves 35'
+  expr: app.services.mailbox_health.BOUNCE_BAD
+  shows: '- {v:.0%} or'
+- article: '41'
+  phrase: '- 5% or more takes 65 points off. On its own that leaves 35'
+  expr: 100 - app.services.mailbox_health.score_for({}, None, app.services.mailbox_health.BOUNCE_BAD, {})[0]
+  shows: takes {v} points
+- article: '41'
+  phrase: '- 5% or more takes 65 points off. On its own that leaves 35'
+  expr: app.services.mailbox_health.score_for({}, None, app.services.mailbox_health.BOUNCE_BAD, {})[0]
+  shows: leaves {v}
+- article: '41'
+  phrase: of 0.1% as a warning and 0.3% as the danger line
+  expr: app.services.mailbox_health.COMPLAINT_WARN
+  shows: '{v:.1%} as a warning'
+- article: '41'
+  phrase: of 0.1% as a warning and 0.3% as the danger line
+  expr: app.services.mailbox_health.COMPLAINT_BAD
+  shows: '{v:.1%} as the danger'
+- article: '41'
+  phrase: 0–40 critical, 41–60 low, 61–80 moderate, 81–100 strong
+  expr: app.services.pipeline_health.BANDS[0][0]
+  shows: 0–{v} critical
+- article: '41'
+  phrase: 0–40 critical, 41–60 low, 61–80 moderate, 81–100 strong
+  expr: app.services.pipeline_health.BANDS[1][0]
+  shows: –{v} low
+- article: '41'
+  phrase: 0–40 critical, 41–60 low, 61–80 moderate, 81–100 strong
+  expr: app.services.pipeline_health.BANDS[2][0]
+  shows: –{v} moderate
+- article: '41'
+  phrase: 70 or more healthy, 40–69 throttled, under 40 paused
+  expr: app.services.mailbox_health.THROTTLE_BELOW
+  shows: '{v} or more'
+- article: '41'
+  phrase: 70 or more healthy, 40–69 throttled, under 40 paused
+  expr: app.services.mailbox_health.PAUSE_BELOW
+  shows: under {v} paused
+- article: '41'
+  phrase: under 70 gives a warning
+  expr: app.services.system_settings.DEFAULTS['deliverability_health_threshold'][0]
+- article: '41'
+  phrase: treats 61 and up as healthy
+  expr: app.services.pipeline_health.BANDS[1][0] + 1
+- article: '41'
+  phrase: and 81 and up as strong
+  expr: app.services.pipeline_health.BANDS[2][0] + 1
+- article: '41'
+  phrase: For a mailbox, 70 is the line
+  expr: app.services.mailbox_health.THROTTLE_BELOW
+- article: '41'
+  phrase: no bounce or complaint problems scores 45
+  expr: 'app.services.mailbox_health.score_for({''spf'': False, ''dmarc'': False, ''dkim'': False}, None, None, {})[0]'
+- article: '41'
+  phrase: For the domain, 70 is the threshold
+  expr: app.services.system_settings.DEFAULTS['deliverability_health_threshold'][0]
+- article: '41'
+  phrase: all your sends over the last 30 days is above 2%
+  expr: __import__('inspect').signature(app.services.deliverability.bounce_rate).parameters['days'].default
+  shows: last {v} days
+- article: '41'
+  phrase: all your sends over the last 30 days is above 2%
+  expr: '[r for r in range(1, 100) if app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dkim'': True}, r / 1000 + 0.0001, False)[0] < 100][0] / 1000'
+  shows: above {v:.0%}
+- article: '41'
+  phrase: (2.5% costs 25 points)
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dkim'': True}, 0.025, False)[0]'
+  shows: costs {v} points
+- article: '41'
+  phrase: the last 90 days, at least 30 sends from you
+  expr: app.services.system_settings.DEFAULTS['benchmark_window_days'][0]
+  shows: last {v} days
+- article: '41'
+  phrase: the last 90 days, at least 30 sends from you
+  expr: app.services.system_settings.DEFAULTS['benchmark_min_account_sends'][0]
+  shows: least {v} sends
+- article: '41'
+  phrase: both weeks have at least 10 human replies
+  expr: app.services.system_settings.DEFAULTS['objection_spike_min_replies'][0]
+- article: '41'
+  phrase: rose by more than 20% (relative)
+  expr: app.services.system_settings.DEFAULTS['objection_spike_threshold'][0]
+  shows: '{v:.0%}'
+- article: '41'
+  phrase: rose by at least 5 percentage points
+  expr: round(app.services.reply_sentiment.ABSOLUTE_FLOOR * 100)
+- article: '41'
+  phrase: the 5-point rise alone
+  expr: round(app.services.reply_sentiment.ABSOLUTE_FLOOR * 100)
+  shows: '{v}-point'
+- article: '41'
+  phrase: can change the 20% and the 10-reply minimum
+  expr: app.services.system_settings.DEFAULTS['objection_spike_threshold'][0]
+  shows: '{v:.0%}'
+- article: '41'
+  phrase: can change the 20% and the 10-reply minimum
+  expr: app.services.system_settings.DEFAULTS['objection_spike_min_replies'][0]
+  shows: '{v}-reply'
+- article: '42'
+  phrase: PBKDF2-HMAC-SHA256 at 600,000 iterations
+  expr: app.services.auth._PBKDF2_ITERATIONS
+  shows: '{v:,}'
+- article: '42'
+  phrase: with a random 16-
+  expr: int(__import__('re').search(r'os\.urandom\((\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/auth.py').read_text()).group(1))
+  shows: random {v}-
+- article: '42'
+  phrase: Passwords must be at least 8 characters.
+  expr: '[m.min_length for m in app.api.auth.Credentials.model_fields[''password''].metadata if getattr(m, ''min_length'', None) is not None][0]'
+- article: '42'
+  phrase: more than 300 seconds (five minutes) old
+  expr: app.services.webhook_delivery.SIGNATURE_TOLERANCE_SECONDS
+- article: '42'
+  phrase: up to 6 attempts in all
+  expr: app.services.webhook_delivery.MAX_ATTEMPTS
+- article: '42'
+  phrase: at most 3 redirects
+  expr: app.services.safe_fetch.MAX_REDIRECTS
+- article: '42'
+  phrase: an 8-second time limit
+  expr: int(app.services.safe_fetch.TIMEOUT_SECONDS)
+  shows: '{v}-second'
+- article: '31'
+  phrase: The Free plan allows 3 strategies
+  expr: app.core.plans.PLANS['free']['max_strategies']
+- article: '31'
+  phrase: pending for more than 3 days
+  expr: int(__import__('re').search(r'> (\d+) \* 24 \* 3_600_000', (__import__('pathlib').Path(app.__file__).parents[1] / 'frontend/src/lib/sendReview.ts').read_text()).group(1))
+- article: '42'
+  phrase: at most 512,000 bytes read
+  expr: app.services.safe_fetch.MAX_BYTES
+  shows: '{v:,}'
+- article: '42'
+  phrase: only port 443
+  expr: int(__import__('re').search(r'port not in \(None, (\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/safe_fetch.py').read_text()).group(1))
+- article: '36'
+  phrase: '`Name` (up to 120 characters)'
+  expr: int(__import__('re').search(r'"LeadPilot deal"\)\[:(\d+)\]', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/crm_sync.py').read_text()).group(1))
+- article: '36'
+  phrase: gets a date 30 days out
+  expr: int(__import__('re').search(r'date\.today\(\) \+ timedelta\(days=(\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/crm_sync.py').read_text()).group(1))
+- article: '36'
+  phrase: '**Every 15 minutes**'
+  expr: int(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'] // 60)
+- article: '36'
+  phrase: up to 500 leads and 500 deals per run
+  expr: app.services.crm_sync.PUSH_BATCH_LIMIT
+- article: '36'
+  phrase: up to the same 500 leads and 500 deals
+  expr: app.services.crm_sync.PUSH_BATCH_LIMIT
+- article: '36'
+  phrase: by default 60 times per hour for each CRM
+  expr: app.core.config.Settings.model_fields['RATE_LIMIT_AI_ACTION'].default
+- article: '36'
+  phrase: if more than 500 leads or deals changed
+  expr: app.services.crm_sync.PUSH_BATCH_LIMIT
+- article: '36'
+  phrase: up to 20 entries
+  expr: '[m.max_length for m in app.api.crm_integrations.CrmSettingsIn.model_fields[''lead_status_map''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+- article: '36'
+  phrase: up to 5 entries
+  expr: '[m.max_length for m in app.api.crm_integrations.CrmSettingsIn.model_fields[''deal_stage_map''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+- article: '36'
+  phrase: up to 100 characters
+  expr: '[m.max_length for m in app.api.crm_integrations.CrmSettingsIn.model_fields[''pipeline''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+- article: '37'
+  phrase: subscribe to up to 20 events
+  expr: '[m.max_length for m in app.api.webhook_targets.RegisterIn.model_fields[''events''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+- article: '37'
+  phrase: up to 25 active webhooks
+  expr: app.services.webhook_delivery.MAX_TARGETS_PER_USER
+- article: '37'
+  phrase: verified leads, up to 200)
+  expr: int(__import__('re').search(r'LeadStatus\.VERIFIED\)\s*\.limit\((\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/workers/lead_tasks.py').read_text()).group(1))
+- article: '37'
+  phrase: more than five minutes (300 seconds)
+  expr: app.services.webhook_delivery.SIGNATURE_TOLERANCE_SECONDS
+- article: '37'
+  phrase: waits up to 10 seconds
+  expr: int(app.services.webhook_delivery.TIMEOUT_SECONDS)
+- article: '37'
+  phrase: '| 2 | 30 seconds after attempt 1 |'
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[0]
+  shows: '{v} seconds'
+- article: '37'
+  phrase: '| 3 | 2 minutes after attempt 2 |'
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[1] // 60
+  shows: '{v} minutes'
+- article: '37'
+  phrase: '| 4 | 10 minutes after attempt 3 |'
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[2] // 60
+  shows: '{v} minutes'
+- article: '37'
+  phrase: '| 5 | 30 minutes after attempt 4 |'
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[3] // 60
+  shows: '{v} minutes'
+- article: '37'
+  phrase: '| 6 | 2 hours after attempt 5 |'
+  expr: app.services.webhook_delivery.RETRY_DELAYS_SECONDS[4] // 3600
+  shows: '{v} hours'
+- article: '37'
+  phrase: '| 6 | 2 hours after attempt 5 |'
+  expr: app.services.webhook_delivery.MAX_ATTEMPTS
+  shows: '| {v} |'
+- article: '38'
+  phrase: the first 4000 characters of the body
+  expr: int(__import__('re').search(r'\(body or \"\"\)\[:(\d+)\]', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/reply_classification.py').read_text()).group(1))
+- article: '38'
+  phrase: of at most 140 words
+  expr: app.services.reply_copilot.MAX_DRAFT_WORDS
+- article: '38'
+  phrase: longer than 5000 characters
+  expr: app.services.reply_copilot.MAX_FINAL_CHARS
+- article: '39'
+  phrase: tries again in 1 hour
+  expr: int(app.services.daily_send_approval.UNAVAILABLE_RETRY.total_seconds() // 3600)
+- article: '39'
+  phrase: It refreshes every 5 minutes.
+  expr: 'int(__import__(''re'').search(r''refetchInterval: (\d+) \* 60_000'', (__import__(''pathlib'').Path(app.__file__).parents[1] / ''frontend/src/components/campaigns/SendApprovalBanner.tsx'').read_text()).group(1))'
+- article: '43'
+  phrase: is deleted 30 days after a conversation
+  expr: app.config.Settings.model_fields['support_chat_retention_days'].default
+- article: '43'
+  phrase: in Redis expire after 30 days; search results after 1 day
+  expr: app.config.Settings.model_fields['cache_ttl_enrichment_seconds'].default // 86400
+  shows: '{v} days'
+- article: '43'
+  phrase: in Redis expire after 30 days; search results after 1 day
+  expr: app.config.Settings.model_fields['cache_ttl_search_seconds'].default // 86400
+  shows: after {v} day
+- article: '43'
+  phrase: are kept for 7 years
+  expr: app.services.account_erasure.BILLING_RETENTION_YEARS
+- article: '44'
+  phrase: once you have watched 90% of it
+  expr: int(app.api.tutorials.COMPLETION_THRESHOLD_PERCENT)
+  shows: '{v}%'
+- article: '06'
+  phrase: up to 1,000 leads
+  expr: '[m.le for m in app.api.schemas.SourceLeadsRequest.model_fields[''max_leads''].metadata if getattr(m, ''le'', None) is not None][0]'
+  shows: '{v:,}'
+- article: '06'
+  phrase: Search results are cached for 1 day
+  expr: app.config.Settings.model_fields['cache_ttl_search_seconds'].default // 86400
+- article: '06'
+  phrase: email-check results for 30 days
+  expr: app.config.Settings.model_fields['cache_ttl_enrichment_seconds'].default // 86400
+- article: '06'
+  phrase: retried up to 3 times, 30 seconds apart
+  expr: int(__import__('re').search(r'max_retries=(\d+)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/workers/lead_tasks.py').read_text()).group(1))
+  shows: '{v} times'
+- article: '06'
+  phrase: retried up to 3 times, 30 seconds apart
+  expr: int(__import__('re').search(r'countdown=(\d+)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/workers/lead_tasks.py').read_text()).group(1))
+  shows: '{v} seconds'
+- article: '33'
+  phrase: '**Name**: required, up to 200 characters'
+  expr: '[m.max_length for m in app.api.schemas.ProductCreate.model_fields[''name''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+- article: '33'
+  phrase: up to 50 past clients
+  expr: '[m.max_length for m in app.api.schemas.PastClientsCreate.model_fields[''clients''].metadata if getattr(m, ''max_length'', None) is not None][0]'
+- article: '33'
+  phrase: '**Role seniority** (25%)'
+  expr: app.services.lead_scoring.WEIGHTS['seniority']
+  shows: '{v:.0%}'
+- article: '33'
+  phrase: '**Industry fit** (25%)'
+  expr: app.services.lead_scoring.WEIGHTS['industry_match']
+  shows: '{v:.0%}'
+- article: '33'
+  phrase: '**Email verification** (20%)'
+  expr: app.services.lead_scoring.WEIGHTS['verification']
+  shows: '{v:.0%}'
+- article: '33'
+  phrase: '**Company signals** (15%)'
+  expr: app.services.lead_scoring.WEIGHTS['company_signals']
+  shows: '{v:.0%}'
+- article: '33'
+  phrase: '**Past campaign results** (15%)'
+  expr: app.services.lead_scoring.WEIGHTS['playbook']
+  shows: '{v:.0%}'
+- article: '33'
+  phrase: may move the score by at most 20 points
+  expr: app.services.lead_scoring.MAX_ADJUSTMENT
+- article: '33'
+  phrase: may move each dimension by at most 15 points
+  expr: app.services.fpta_scoring.MAX_ADJUSTMENT
+- article: '33'
+  phrase: (10 to 300 characters)
+  expr: app.services.quickstart.MAX_OFFER_CHARS
+  shows: to {v} characters
+- article: '33'
+  phrase: finds up to 25 verified leads by default
+  expr: app.services.system_settings.DEFAULTS['quickstart_lead_target'][0]
+- article: '34'
+  phrase: has reached 30.
+  expr: app.core.config.Settings.model_fields['PLAYBOOK_MIN_SAMPLE'].default
+- article: '34'
+  phrase: 'with a 90-day half-life: a send from 90 days ago'
+  expr: app.core.config.Settings.model_fields['PLAYBOOK_SCORE_HALF_LIFE_DAYS'].default
+  shows: '{v}-day'
+- article: '34'
+  phrase: 'with a 90-day half-life: a send from 90 days ago'
+  expr: app.core.config.Settings.model_fields['PLAYBOOK_SCORE_HALF_LIFE_DAYS'].default
+  shows: '{v} days ago'
+- article: '34'
+  phrase: half a percentage point (0.005)
+  expr: float(__import__('re').search(r'(0\.005)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/workers/learning_tasks.py').read_text()).group(1))
+- article: '34'
+  phrase: up to 8 reliable scores
+  expr: __import__('inspect').signature(app.services.playbook_service.PlaybookService.get_insights).parameters['limit'].default
+- article: '34'
+  phrase: It is 15% of the score.
+  expr: app.services.lead_scoring.WEIGHTS['playbook']
+  shows: '{v:.0%}'
+- article: '35'
+  phrase: takes longer than 5 seconds
+  expr: int(__import__('re').search(r'lifetime=(\d+)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/deliverability.py').read_text()).group(1))
+- article: '35'
+  phrase: more than 10 DNS lookups
+  expr: app.services.deliverability_autopilot.SPF_LOOKUP_LIMIT
+- article: '35'
+  phrase: the domain score still loses 10 points
+  expr: '100 - app.services.deliverability.health_score({''spf'': True, ''dmarc'': True, ''dmarc_policy'': ''none'', ''dkim'': True}, None, False)[0]'
+- article: '35'
+  phrase: '"below 70" (the default threshold)'
+  expr: app.services.system_settings.DEFAULTS['deliverability_health_threshold'][0]
+- article: '35'
+  phrase: within 120 seconds of expiring
+  expr: app.config.Settings.model_fields['gmail_token_refresh_leeway_seconds'].default
+- article: '10'
+  phrase: follow-up delay (72 hours by default) has passed
+  expr: app.api.sequences.StepIn.model_fields['followup_delay_hours'].default
+exempt:
+- article: '04'
+  phrase: up to 3 times, 30 seconds apart
+  reason: 30 s is an inline countdown=30 in app/workers/tasks.py:204 (retry spacing, no constant)
+- article: '04'
+  phrase: at most 2 attempts per verification check
+  reason: inline min(attempts, 2) in app/verification/loop.py:140
+- article: '05'
+  phrase: about 3 to 4 minutes
+  reason: an observed duration from internal notes, not a code constant
+- article: 09
+  phrase: 2.5% is above the 2% limit.
+  reason: an example notification text; the 2% is a per-strategy compliance rule in the example, not the default threshold
+- article: '11'
+  phrase: You emailed each other 14 times
+  reason: an illustrative example of a match reason
+- article: '15'
+  phrase: '**Your opening 60 seconds**'
+  reason: a heading inside the meeting-prep prompt (app/services/meeting_prep.py:453), not a limit
+- article: '18'
+  phrase: A 10% reply rate scores 1
+  reason: a worked example of the scoring arithmetic
+- article: '18'
+  phrase: (30 days, 90 days, 12 months or year to date)
+  reason: period presets listed in frontend/src/app/(app)/analytics/revenue/page.tsx:34-37; the first is checked from source
+- article: '22'
+  phrase: (up to 2 steps)
+  reason: the app's form builds a first message plus one optional follow-up (frontend/src/lib/leadOutreach.ts buildSequenceSteps); a form shape, not a limit constant
+- article: '40'
+  phrase: paying monthly for 12 months
+  reason: the months in a year, not a setting
+- article: '41'
+  phrase: so a 10% reply rate earns 10 of 100 points
+  reason: a worked example of the raw-percentage rule
+- article: '33'
+  phrase: '**Industry fit** therefore shows 50% for every lead'
+  reason: the neutral value returned inline by lead_scoring.industry_match (app/services/lead_scoring.py:87-88) when no ICP industries are read
+- article: '34'
+  phrase: A booking rate of 5% or more gives the full factor; with no reliable score it is 50%.
+  reason: inline literals in app/services/lead_scoring.py:163 (playbook factor); no named constant

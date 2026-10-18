@@ -294,7 +294,7 @@ class Settings(BaseSettings):
     # Replaces support_chat_mock_min_score, the keyword threshold of the old
     # nine-entry FAQ, which no longer decides anything.
     support_chat_mock_min_bm25: float = 6.0
-    support_chat_mock_min_heading_coverage: float = 0.55
+    support_chat_mock_min_heading_coverage: float = 0.60
     # Chat history is deleted after this many days by the nightly purge task.
     support_chat_retention_days: int = 30
     # Kill switch, matching REQUIRE_EMAIL_VERIFICATION. Turns the chat off

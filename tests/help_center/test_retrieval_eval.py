@@ -173,8 +173,9 @@ class TestMockModeMeasurement:
     def test_shipped_thresholds_reproduce_the_documented_numbers(self):
         result = self._shipped()
         assert result["wrong_refuse"] == 0
-        assert result["correct"] >= 39, result
-        assert result["wrong_answerable"] <= 3, result
+        # Re-measured 2026-10-18 on the 151/31 golden set (help_center.py).
+        assert result["correct"] >= 57, result
+        assert result["wrong_answerable"] <= 5, result
 
     def test_the_new_corpus_beats_the_old_faq(self):
         """The before/after claim in docs/program/help-center-eval.md."""
@@ -185,11 +186,12 @@ class TestMockModeMeasurement:
         assert old["wrong_refuse"] > 0 == new["wrong_refuse"]
 
     def test_lowering_the_coverage_floor_would_answer_a_must_refuse_item(self):
-        """Why the floor is where it is: lower it and the privacy-policy
-        question gets a borrowed paragraph. Its coverage is IDF-weighted, so
-        it moves with the corpus: 0.454 when the floor was chosen, 0.44 after
-        the 2026-10-11 rewrite of article 21 (GDPR erasure) -- probed at 0.40,
-        still well under the shipped 0.55."""
+        """Why the floor is where it is: lower it and a must-refuse item gets
+        a borrowed paragraph. Coverage is IDF-weighted, so it moves with the
+        corpus: the privacy-policy question sat at 0.454 when the first floor
+        was chosen; since the 2026-10-18 articles the nearest is "How much
+        will LeadPilot cost next year?" at 0.552. Probed at 0.40, well under
+        the shipped 0.60."""
         loose = measure_golden.tally(GOLDEN, lambda q: measure_golden.new_outcome(
             q, help_center.MOCK_MIN_SCORE, 0.40))
         assert loose["wrong_refuse"] >= 1

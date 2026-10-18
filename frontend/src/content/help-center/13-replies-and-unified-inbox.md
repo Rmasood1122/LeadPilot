@@ -5,6 +5,8 @@ audience: customer
 last_verified: 2026-10-11
 owner: help-center
 sources:
+  - docs/features/f04-reply-copilot.md
+  - app/services/reply_copilot.py
   - app/workers/outreach_tasks.py
   - frontend/src/lib/api/inbox.ts
   - app/services/inbox.py
@@ -29,7 +31,7 @@ sources:
 
 # Replies and the unified inbox
 
-When a prospect replies by email, WhatsApp or LinkedIn, LeadPilot stores the reply, classifies it, and changes what happens next in their sequence. LeadPilot never replies to a person automatically. The **Inbox** gathers every reply into one conversation per prospect so you can see who is waiting for an answer.
+When a prospect replies by email, WhatsApp or LinkedIn, LeadPilot stores the reply, classifies it, and changes what happens next in their sequence. By default LeadPilot does not reply to a person automatically; the optional Reply Copilot is the exception (see below). The **Inbox** gathers every reply into one conversation per prospect so you can see who is waiting for an answer.
 
 ## How does LeadPilot pick up replies?
 
@@ -54,7 +56,7 @@ A reply on one channel stops the whole sequence, including steps on other channe
 
 ## Does LeadPilot answer replies for me?
 
-No. Replies are classified and routed; a person writes the answer. LeadPilot does not send anything back to a prospect who replied.
+Not by default. Replies are classified and routed, and a person writes the answer. The exception is Reply Copilot, which is off unless your administrator turns it on: it drafts an answer that a person approves before it is sent, and only if automatic sending is also allowed can an answer go out without a person. See [Reply Copilot and reply classification](38-reply-copilot-and-classification.md).
 
 What it does do is suggest. A second AI pass reads each reply and decides what you should do next, in one of four categories:
 
