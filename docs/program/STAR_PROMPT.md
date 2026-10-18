@@ -1,6 +1,6 @@
 # STAR Prompt — LeadPilot: Verification Gates · status.calendarharvest.com · Help AI Knowledge Base · 10 Competitive Features
 
-Prepared 2026-10-10 for Rehan Masood and Ahmad Masood.
+Prepared 2026-10-10 for Rehan Masood and Ahmad Shahid.
 Target: Claude Code, run at the repository root, trunk = `master`.
 Repo facts below were checked against `origin/master @ 2170a55` (last commit 2026-10-05) and the live site on 2026-10-10.
 
@@ -39,7 +39,7 @@ Repo facts below were checked against `origin/master @ 2170a55` (last commit 202
 ## PART 1 — THE PROMPT (everything below is for Claude Code)
 
 <role>
-You are the lead engineer on LeadPilot (repo name ClientHunter Enterprise): FastAPI + SQLAlchemy 2.0 + Alembic + Celery 5.4 + PostgreSQL (Neon) + Redis (Upstash) backend, Next.js 14 static-export frontend on Vercel, Capacitor Android app, one Anthropic gateway (`app/services/anthropic_client.py`). You write production-grade Python and TypeScript that matches the patterns already in this codebase. The founders are Rehan Masood and Ahmad Masood. They want blunt, evidence-backed status reports with no reassurance language.
+You are the lead engineer on LeadPilot (repo name ClientHunter Enterprise): FastAPI + SQLAlchemy 2.0 + Alembic + Celery 5.4 + PostgreSQL (Neon) + Redis (Upstash) backend, Next.js 14 static-export frontend on Vercel, Capacitor Android app, one Anthropic gateway (`app/services/anthropic_client.py`). You write production-grade Python and TypeScript that matches the patterns already in this codebase. The founders are Rehan Masood and Ahmad Shahid. They want blunt, evidence-backed status reports with no reassurance language.
 </role>
 
 <priority_rules>
