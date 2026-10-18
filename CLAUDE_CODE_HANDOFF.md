@@ -23,7 +23,7 @@ that were "probably fine" until actually tested — assume nothing.
 ---
 
 ## What this project is
-LeadPilot / ClientHunter Enterprise — a self-learning B2B client-acquisition
+Vectorae / ClientHunter Enterprise — a self-learning B2B client-acquisition
 platform. FastAPI + PostgreSQL + Celery backend, Next.js (static export,
 for Capacitor mobile bundling) frontend. Backend at repo root
 (`app/`), frontend in `frontend/`.
@@ -1878,7 +1878,7 @@ Production would have inherited the code defaults:
   link no recipient could use — a CAN-SPAM violation and a fast route to the
   spam folder.
 * `SENDER_IDENTITY` → the literal placeholder
-  `"LeadPilot User, 123 Main St, City, Country"`, which is the **CAN-SPAM
+  `"Vectorae User, 123 Main St, City, Country"`, which is the **CAN-SPAM
   physical postal address** printed in every email footer.
 
 Both added to `.env.production.example` and both now enforced by
@@ -1940,7 +1940,7 @@ Domain: **leadpilot.com** / **api.leadpilot.com**.
 
 Source `image.png` measured before use: PNG, RGBA, **528x532**, fully opaque,
 flat `#100F14` ground. It is a LOCKUP — a blue ascending arrow (bbox
-113,123-460,346) above a "LEADPILOT" wordmark (bbox y 381-397, only 17px tall,
+113,123-460,346) above a "VECTORAE" wordmark (bbox y 381-397, only 17px tall,
 ~3% of the canvas).
 
 That measurement drove the design: **icons use the arrow mark only.** At a 192px
@@ -1971,7 +1971,7 @@ In-app usage via a new `frontend/src/components/ui/Logo.tsx` (`LogoMark` /
 `Shell.tsx`, the admin sidebar (which had no brand anchor at all), and the login
 page, where the lockup replaces the words and the title drops to "Sign in".
 The mark is `alt=""` + `aria-hidden` beside real text; the lockup carries
-`alt="LeadPilot"`.
+`alt="Vectorae"`.
 
 **No og:image was added.** The project has no `openGraph` metadata at all, and
 inventing a social-sharing setup was out of scope.
@@ -2327,7 +2327,7 @@ asserts the handler calls `enforce_rate_limit` with the right setting.
 Display strings only, per instruction. `layout.tsx` title, `manifest.json`
 `name`/`short_name`, the privacy page's title/description/body copy, the
 onboarding checklist copy, the `Exit ClientHunter?` back-button dialog (and its
-test), and `capacitor.config.ts` `appName` all now say **LeadPilot**.
+test), and `capacitor.config.ts` `appName` all now say **Vectorae**.
 `appId` (`com.clienthunter.app`) is untouched — it cannot change after a Play
 Store publish — and file-header comments were left alone. Changing `appName`
 only reaches Android after `npx cap sync`.
@@ -2373,9 +2373,9 @@ only reaches Android after `npx cap sync`.
   `statusTone("failed")` resolves to `destructive` — the red badge is reachable
   with real data for the first time.
 * **Finding 4 in a real built artifact**, not just source: production build
-  served over HTTP shows `<title>LeadPilot</title>` on every page,
-  `Privacy Policy — LeadPilot`, and a manifest with `name`/`short_name` of
-  `LeadPilot`.
+  served over HTTP shows `<title>Vectorae</title>` on every page,
+  `Privacy Policy — Vectorae`, and a manifest with `name`/`short_name` of
+  `Vectorae`.
 
 Celery's eager mode re-executes retries inline, so `apply()` can never show an
 intermediate RETRY state — "retries" and "does not retry" look identical from

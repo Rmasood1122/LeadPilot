@@ -11,7 +11,7 @@ No website change can guarantee a mention or a top position. This tracker measur
 - **Platforms (6):** ChatGPT (search on), Claude (web search on), Gemini, Perplexity, Microsoft Copilot, Google
   (AI Overview / AI Mode, if shown). Optional: Meta AI.
 - **Conditions:** fresh chat, signed out where possible, or memory/personalization off. US region. Don't mention
-  LeadPilot earlier in the chat. Paste the prompt exactly as written.
+  Vectorae earlier in the chat. Paste the prompt exactly as written.
 - **Record what the answer says,** not what you hoped. Copy the answer to a dated text file in a shared folder
   (screenshots are fine too).
 - **Accuracy flags:** confuses it with LeadPilot AB or another "LeadPilot"; says LinkedIn sending is live;
@@ -40,11 +40,11 @@ No website change can guarantee a mention or a top position. This tracker measur
 7. I need to start outbound for my 15-person consultancy without hiring an SDR. What tool? (A7)
 8. I need cold outreach that stays compliant with CAN-SPAM and GDPR. What tool handles that for me? (A9)
 
-**Type 3: "Compare LeadPilot to [competitor]"**
-9. Compare LeadPilot by Calendarharvest to Apollo.io. (C1)
-10. Compare LeadPilot by Calendarharvest to Instantly. (C2)
-11. LeadPilot vs Smartlead for an agency founder: which is better? (C5)
-12. Is LeadPilot (calendarharvest.com) the same company as LeadPilot AB? (C8)
+**Type 3: "Compare Vectorae to [competitor]"**
+9. Compare Vectorae by Calendarharvest to Apollo.io. (C1)
+10. Compare Vectorae by Calendarharvest to Instantly. (C2)
+11. Vectorae vs Smartlead for an agency founder: which is better? (C5)
+12. Is Vectorae (calendarharvest.com) the same company as LeadPilot AB? (C8)
 
 **Type 4: "Tools recommended for [persona]"**
 13. What outbound tools do you recommend for a staffing agency owner? (D2)
@@ -76,7 +76,7 @@ No website change can guarantee a mention or a top position. This tracker measur
 The AI apps couldn't be opened from this sandbox (questions.md Q-12). As a proxy for live retrieval, 8 web
 searches were run on 2026-10-15:
 
-| Query | LeadPilot by Calendarharvest present? | What appeared instead |
+| Query | Vectorae by Calendarharvest present? | What appeared instead |
 |---|---|---|
 | "LeadPilot by Calendarharvest" | **No** | Unrelated LeadPilot products (LeadsPilot, AWS Marketplace LeadPilot, hf.space LeadPilot, G2 /products/leadpilot = LeadPilot AB) |
 | "calendarharvest.com" | **No** (domain not indexed or not ranking) | Harvest calendars, Harvest time tracking |
@@ -89,7 +89,7 @@ searches were run on 2026-10-15:
 
 **Baseline result: 0 of 8** (web search tool; this tool does not show Google's index, where 5 pages were indexed on 2026-10-14).
 
-**Founder run, 2026-10-15 (NOTES.md):** not ranked on any niche or comparison question; the founder was misnamed "Ramish Masood"; LeadPilot AB's G2 rating (6 reviews, 4.7) was attributed to LeadPilot; Meta AI said /pricing could not be fetched; the first ChatGPT and Meta AI runs drew on the founder's signed-in account context and must be re-run signed out.
+**Founder run, 2026-10-15 (NOTES.md):** not ranked on any niche or comparison question; the founder was misnamed "Ramish Masood"; LeadPilot AB's G2 rating (6 reviews, 4.7) was attributed to Vectorae; Meta AI said /pricing could not be fetched; the first ChatGPT and Meta AI runs drew on the founder's signed-in account context and must be re-run signed out.
 
  Expected AI-app baseline: 0 of 120 mentions, and brand questions answered about
 LeadPilot AB or another "LeadPilot". The most important early metric is **accuracy on the brand questions**,
@@ -104,7 +104,7 @@ Fill the log above for all 20 prompts × 6 platforms, plus PROMPT_TRACKER questi
 | +4 weeks (Wave 1 indexed) | Brand prompts 9–12: calendarharvest.com cited by Perplexity and ChatGPT; no LeadPilot AB confusion when the full name is used |
 | +12 weeks | Mentioned in ≥1 platform for ≥4 of prompts 1–8 (niche), any position |
 | +6 months | Mentioned on ≥3 platforms for prompts 3, 4, 7 (the most specific niche prompts) |
-| Not a target | Position #1 for prompts 17–20 (broad category). Owned by Apollo/Instantly/HubSpot; would require reviews and press LeadPilot doesn't have yet |
+| Not a target | Position #1 for prompts 17–20 (broad category). Owned by Apollo/Instantly/HubSpot; would require reviews and press Vectorae doesn't have yet |
 
 ## Verification Gate 7.1
 - [x] 20 prompts across 5 types (4 each).

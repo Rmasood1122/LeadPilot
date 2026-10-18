@@ -1,4 +1,4 @@
-"""Per-user tutorial progress for the Learn LeadPilot section.
+"""Per-user tutorial progress for the Learn Vectorae section.
 
 Feature 2. ONE new table and nothing else -- no column is added to any existing
 table, so this migration cannot affect a single existing query.

@@ -9,7 +9,7 @@ multi-tenant in practice and the HIGH ratings of F-DB-01 and RF-5 return.
 
 | Setting | Default | Effect |
 |---|---|---|
-| `SIGNUP_ENABLED` | `true` | `false`: every `POST /auth/signup` → 403 "Sign-up is closed on this LeadPilot deployment. Ask your administrator for an account." |
+| `SIGNUP_ENABLED` | `true` | `false`: every `POST /auth/signup` → 403 "Sign-up is closed on this Vectorae deployment. Ask your administrator for an account." |
 | `SIGNUP_ALLOWED_EMAIL_DOMAINS` | empty (any) | comma list of exact domains (`acme.com, acme.co.uk`); any other domain → 403 "limited to approved email domains". The list is never echoed back. |
 
 - Checked after the per-IP rate limiter and before the VPN-provider lookup and

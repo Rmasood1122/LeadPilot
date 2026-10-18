@@ -1,4 +1,4 @@
-# LeadPilot — Verification Report (adversarial re-check of the prior audit)
+# Vectorae — Verification Report (adversarial re-check of the prior audit)
 
 **Purpose:** convert the prior audit's findings from *read* evidence into *executed*
 evidence, correct whatever does not hold, and state plainly what could not be run.

@@ -27,7 +27,7 @@ function describe(text: string): string {
 export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
   const a = helpArticle(params.slug);
   return {
-    title: `${a.title} | LeadPilot by Calendarharvest help | Calendarharvest`,
+    title: `${a.title} | Vectorae by Calendarharvest help | Calendarharvest`,
     description: describe(a.lead[0] ?? a.title),
     ...canonicalMeta(pathOf(a.id)),
   };
@@ -45,7 +45,7 @@ export default function HelpArticlePage({ params }: { params: { slug: string } }
       disclosure={helpStatusNote()}
       lastChecked={a.lastVerified || undefined}
       sections={a.sections}
-      related={[{ href: "/help", label: "All help articles" }, { href: "/faq", label: "LeadPilot FAQ" }]}
+      related={[{ href: "/help", label: "All help articles" }, { href: "/faq", label: "Vectorae FAQ" }]}
     />
   );
 }

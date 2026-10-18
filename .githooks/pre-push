@@ -1,5 +1,5 @@
 #!/bin/sh
-# LeadPilot pre-push hook. Install once per clone: scripts/gate/install_hooks.sh
+# Vectorae pre-push hook. Install once per clone: scripts/gate/install_hooks.sh
 #
 # 1. Refuses any push whose destination is master or main (MERGE-B: master
 #    changes only through scripts/gate/safe_merge.sh).

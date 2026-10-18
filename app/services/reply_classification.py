@@ -9,7 +9,7 @@ Classes and their routing (implemented in app/services/sequence_engine.py
     out_of_office        -> sequence pauses and reschedules (does not stop)
     bounce               -> bounce outcome + campaign bounce-rate check
 
-LeadPilot does NOT auto-reply to humans in M3.
+Vectorae does NOT auto-reply to humans in M3.
 """
 
 import logging
@@ -32,7 +32,7 @@ REPLY_CLASSES = [
 ]
 
 _SYSTEM = (
-    "You are LeadPilot's inbound reply classifier. Classify one inbound "
+    "You are Vectorae's inbound reply classifier. Classify one inbound "
     "email into exactly one class. Respond with ONLY a JSON object: "
     '{"classification": "<class>"} where <class> is one of: '
     + ", ".join(REPLY_CLASSES) + ". "

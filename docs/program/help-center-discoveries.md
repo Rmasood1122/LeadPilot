@@ -72,7 +72,7 @@ two-factor sign-in and a billing management UI remain open.
 
 - No article covers the Learn tab / tutorials, yet article 30 and the support
   assistant's refusal message list "tutorials" as a topic it can answer.
-- The widget's starter question "What does LeadPilot replace?" has no answer in
+- The widget's starter question "What does Vectorae replace?" has no answer in
   the corpus; "How does outreach work?" is too vague for lexical retrieval.
 
 ---

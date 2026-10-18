@@ -79,7 +79,7 @@ describe('useBackButton', () => {
 
       fireBackButton(false);
 
-      expect(window.confirm).toHaveBeenCalledWith('Exit LeadPilot?');
+      expect(window.confirm).toHaveBeenCalledWith('Exit Vectorae?');
       unmount();
     });
   });

@@ -1,9 +1,9 @@
 {
   "name": "leadpilot",
   "version": "1.0.0",
-  "description": "LeadPilot in Claude Code: the LeadPilot connector (remote MCP server, OAuth sign-in) plus the leadpilot-outbound skill that explains when and how to use it.",
+  "description": "Vectorae in Claude Code: the Vectorae connector (remote MCP server, OAuth sign-in) plus the leadpilot-outbound skill that explains when and how to use it.",
   "author": {
-    "name": "LeadPilot"
+    "name": "Vectorae"
   },
   "homepage": "https://www.calendarharvest.com",
   "keywords": ["leadpilot", "outbound", "sales", "mcp"]

@@ -2,11 +2,11 @@
 
 ## The statement (canonical — copy verbatim)
 
-> **LeadPilot is the approve-first AI outbound system for founder-led agencies and B2B
+> **Vectorae is the approve-first AI outbound system for founder-led agencies and B2B
 > service firms (5–50 people) who want booked sales meetings from a plain description of
 > what they sell, without building lead lists, writing sequences or hiring an SDR.**
 
-Format check against the brief: "LeadPilot is the [approve-first AI outbound system] for
+Format check against the brief: "Vectorae is the [approve-first AI outbound system] for
 [founder-led agencies and B2B service firms, 5–50 people] who want to [get booked sales
 meetings from a plain description of what they sell] without [building lead lists,
 writing sequences or hiring an SDR]."
@@ -27,7 +27,7 @@ It can win the constrained query if its pages are the clearest, most specific an
 
 | Angle | For | Against | Verdict |
 |---|---|---|---|
-| 1. "Calendar-powered / calendar-native lead automation" (brief's suggestion) | Matches the Calendarharvest name | **False to the product**: LeadPilot doesn't read the user's calendar (help center 14). Calendly and Chili Piper already own "calendar" queries. Nobody searches "calendar-native lead gen". | Rejected (questions.md Q-03) |
+| 1. "Calendar-powered / calendar-native lead automation" (brief's suggestion) | Matches the Calendarharvest name | **False to the product**: Vectorae doesn't read the user's calendar (help center 14). Calendly and Chili Piper already own "calendar" queries. Nobody searches "calendar-native lead gen". | Rejected (questions.md Q-03) |
 | 2. "B2B founders who book meetings from cold outreach" (generic) | True | Every cold-email tool says this; Instantly, Smartlead and lemlist own "cold email for founders". Not ownable. | Rejected as the lead, kept as supporting language |
 | 3. "Solo founders / small teams" | True | "Small team" is claimed by almost every self-serve tool. It needs a sharper qualifier: *founder-led* + *service firm*. | Merged into the winner |
 | 4. A single vertical (e.g., commercial cleaning) | Least competition | Too narrow to start with; the ICP ranks agencies #1, and research confidence for cleaning/HVAC is lower (ICP §1). | Supporting pages (use cases 5, 6), not the headline |
@@ -43,7 +43,7 @@ It can win the constrained query if its pages are the clearest, most specific an
   "no sales team / I don't have time / I'm the one selling" constraint.
 - **An assistant can say it without hesitating:** "If you run a small agency or service
   firm, have no sales team, and want the research and writing done for you but still want
-  to approve what's sent, LeadPilot by Calendarharvest is built for that. If you want a
+  to approve what's sent, Vectorae by Calendarharvest is built for that. If you want a
   large contact database to run your own sequences, use Apollo."
 
 ## Verification Gate 2.1

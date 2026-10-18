@@ -46,7 +46,7 @@ Help-center articles and specs may cite this file as a source.
 
 ## P0-D — self-hosted, single-tenant (decided 2026-10-04)
 
-Meaning, as applied in `BASELINE.md`: each deployment of LeadPilot (database,
+Meaning, as applied in `BASELINE.md`: each deployment of Vectorae (database,
 Redis, API, worker) serves **one customer organisation**. Several user accounts
 may exist in one deployment, but they all belong to that customer.
 

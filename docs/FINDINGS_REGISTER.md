@@ -1,4 +1,4 @@
-# LeadPilot — Findings Register
+# Vectorae — Findings Register
 
 Supporting detail for `docs/FULL_PRODUCT_AUDIT.md`. Audit date 2026-10-01.
 Severity (impact) and confidence (evidence strength) are rated **independently**.

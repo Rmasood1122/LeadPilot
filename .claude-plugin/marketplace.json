@@ -1,13 +1,13 @@
 {
   "name": "leadpilot",
   "owner": {
-    "name": "LeadPilot"
+    "name": "Vectorae"
   },
   "plugins": [
     {
       "name": "leadpilot",
       "source": "./plugins/leadpilot",
-      "description": "The LeadPilot connector (remote MCP) and the leadpilot-outbound skill."
+      "description": "The Vectorae connector (remote MCP) and the leadpilot-outbound skill."
     }
   ]
 }

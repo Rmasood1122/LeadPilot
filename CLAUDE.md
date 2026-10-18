@@ -1,4 +1,4 @@
-# CLAUDE.md — LeadPilot (ClientHunter Enterprise)
+# CLAUDE.md — Vectorae (ClientHunter Enterprise)
 
 Rules for any Claude Code session working in this repository. The governing
 project records (gap register, requirements, evidence index) live in the

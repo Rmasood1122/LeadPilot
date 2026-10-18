@@ -1,6 +1,6 @@
-# LeadPilot GEO / AEO system
+# Vectorae GEO / AEO system
 
-The plan and the ready-to-publish drafts that make **LeadPilot by Calendarharvest** findable, accurately
+The plan and the ready-to-publish drafts that make **Vectorae by Calendarharvest** findable, accurately
 described and recommendable by ChatGPT, Claude, Gemini, Perplexity, Copilot and other AI assistants, for
 the queries it honestly fits. Built 2026-10-15 on top of the existing program in `docs/program/ai-visibility/`
 (SPEC, REPORT, PROMPT_TRACKER). Live progress log: `state.md`. Open decisions: `questions.md`.
@@ -10,9 +10,9 @@ the queries it honestly fits. Built 2026-10-15 on top of the existing program in
   cite for constrained queries ("…for a 10-person agency with no sales team"), and build the third-party
   corroboration assistants rely on.
 - **Cannot:** guarantee position #1. Assistants and third-party sites decide that. Broad queries ("best lead
-  generation tool") belong to Apollo, ZoomInfo and HubSpot, which have thousands of reviews; LeadPilot has
+  generation tool") belong to Apollo, ZoomInfo and HubSpot, which have thousands of reviews; Vectorae has
   none yet. The realistic goal is to be the named answer for its niche, then to grow from there.
-- **Starting point (measured 2026-10-15):** LeadPilot by Calendarharvest and calendarharvest.com appeared in
+- **Starting point (measured 2026-10-15):** Vectorae by Calendarharvest and calendarharvest.com appeared in
   **0 of 8** web searches (a search tool that does not reflect Google's index: Search Console showed 5 pages indexed on 2026-10-14), including its own name. "LeadPilot" alone returns other companies (LeadPilot AB first).
 
 ## Index

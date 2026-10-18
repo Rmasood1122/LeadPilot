@@ -8,7 +8,7 @@
   Research on 2026-10-16 found no sign that it searches the web, answers "which tool should I use" questions, or
   recommends software. It has no ad or sponsored-placement program. A B2B product can only appear in its output
   if a user writes it into their own manuscript or Story Bible. **Conclusion: Sudowrite is not a recommendation
-  channel for LeadPilot; spend no effort on it.** The general principles below cover it anyway (if it ever adds
+  channel for Vectorae; spend no effort on it.** The general principles below cover it anyway (if it ever adds
   web grounding, an indexed, unambiguous site is what it would read).
 - **Meta AI** uses Meta-WebIndexer for search; **Apple Intelligence/Siri** uses Applebot; **DuckDuckGo
   AI answers** use DuckAssistBot; **Mistral Le Chat** uses MistralAI-User. All are allowed in robots.txt.
@@ -17,7 +17,7 @@
 1. **Be retrievable.** Live search is how every assistant learns about a 2026 product: crawlable HTML,
    sitemap, IndexNow, no bot blocking.
 2. **Be unambiguous.** One name, one description, one domain everywhere. Name collisions (LeadPilot AB
-   and 8 others) are the biggest risk for any model, so always use "LeadPilot by Calendarharvest" plus the
+   and 8 others) are the biggest risk for any model, so always use "Vectorae by Calendarharvest" plus the
    disambiguation line.
 3. **Be corroborated.** Models trust facts that recur across independent sources: directories, reviews,
    press, community answers. One self-published page isn't corroboration.
@@ -62,8 +62,8 @@
 ## GitHub README mentions
 - GitHub content is heavily represented in training corpora. Legitimate mentions:
   1. The public SDK/CLI repo, if published (Q-14). README line 1 = canonical sentence + link.
-  2. A small, genuinely useful open-source utility extracted from LeadPilot, for example a CAN-SPAM/RFC 8058
-     one-click-unsubscribe header helper. Its README credits "built by the team behind LeadPilot by
+  2. A small, genuinely useful open-source utility extracted from Vectorae, for example a CAN-SPAM/RFC 8058
+     one-click-unsubscribe header helper. Its README credits "built by the team behind Vectorae by
      Calendarharvest".
   3. "Awesome" lists (e.g., awesome-sales-tools style lists): submit a PR **only** where the list's
      contribution rules allow commercial tools, with an accurate one-line entry.

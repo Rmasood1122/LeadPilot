@@ -207,7 +207,7 @@ describe("incidents on top of measured status", () => {
 describe("uptime bars", () => {
   it("Website & app takes the worst of its two monitors per day", async () => {
     const body = allMonitors();
-    const login = body.monitors.find((m) => m.friendly_name === "LeadPilot - App login")!;
+    const login = body.monitors.find((m) => m.friendly_name === "Vectorae - App login")!;
     login.custom_uptime_ranges = Array.from({ length: 90 }, (_, i) => (i === 89 ? "50.000" : "100.000")).join("-");
     const { fetch } = fakeFetch({ [UR]: () => json(body), [API]: () => json(backendBody()) });
     const web = (await getSnapshot(ENV, { fetch, now: NOW, incidents: [] })).components.find((c) => c.id === "website")!;

@@ -8,13 +8,13 @@ August 2025, falling to ~10% by mid-September (Semrush). The share swings, but i
 
 ## Non-negotiable rules
 1. **One real account per person, under their own name or a consistent handle, with disclosure.** Every comment
-   that mentions LeadPilot includes: *"Disclosure: I'm one of the founders of LeadPilot."* (FTC 16 CFR 255.5:
+   that mentions Vectorae includes: *"Disclosure: I'm one of the founders of Vectorae."* (FTC 16 CFR 255.5:
    the connection must be disclosed "clearly and conspicuously".)
 2. **No sock puppets, no asking friends to post or upvote, no buying aged accounts.** That breaks Reddit's
    sitewide rule against content manipulation, and it gets the domain banned and downweighted by AI systems.
 3. **Each subreddit's rules win.** Read the sidebar and pinned posts before the first comment. If self-promotion
-   is banned, don't mention LeadPilot there at all. Contribute expertise only.
-4. **Mention LeadPilot only when it's the direct answer to the asker's stated constraint**, and name alternatives
+   is banned, don't mention Vectorae there at all. Contribute expertise only.
+4. **Mention Vectorae only when it's the direct answer to the asker's stated constraint**, and name alternatives
    too (Apollo for data, Instantly/Smartlead for volume).
 5. If a moderator removes a post, accept it and don't repost.
 
@@ -50,19 +50,19 @@ Search Google (Reddit's own search is weak) with each string, past 12 months:
 Also run each target query in Perplexity and note any Reddit thread it cites. Those threads matter most.
 
 ### A3. Log (fill in)
-| # | Subreddit | Thread title | URL | Date | Tools recommended (count) | Why they were recommended | LeadPilot genuinely fits? (Y/N + why) |
+| # | Subreddit | Thread title | URL | Date | Tools recommended (count) | Why they were recommended | Vectorae genuinely fits? (Y/N + why) |
 |---|---|---|---|---|---|---|---|
 | 1 | | | | | | | |
 | … 20 | | | | | | | |
 
 What to look for: which tools get upvoted and for what reason (price? deliverability? "it does X for me"?).
-That shows which honest LeadPilot facts are relevant (done-for-you, approve-first, pay per meeting).
+That shows which honest Vectorae facts are relevant (done-for-you, approve-first, pay per meeting).
 
 ---
 
 ## Phase B — Authentic presence (weeks 1–8)
 
-### B1. Build reputation first (weeks 1–4): no LeadPilot mentions
+### B1. Build reputation first (weeks 1–4): no Vectorae mentions
 - 3–5 substantive comments a week in the 10 subreddits, answering what people ask: deliverability after
   Google's 2024 sender rules, CAN-SPAM basics, how to research an ICP, how to write a first line that isn't
   generic. Use the statistics page with sources.
@@ -70,7 +70,7 @@ That shows which honest LeadPilot facts are relevant (done-for-you, approve-firs
 
 ### B2. The 30 threads to contribute to
 Fill this from the A3 log plus new threads found weekly (Perplexity citations first). Contribute to a thread
-only if you can add something specific. A thread qualifies for a LeadPilot mention only if the asker's
+only if you can add something specific. A thread qualifies for a Vectorae mention only if the asker's
 constraint matches the niche statement (small firm, no sales team, wants research and writing done, B2B).
 
 | # | Thread URL | Date added | Contribution type (advice only / advice + disclosed mention) | Posted? | Outcome (votes, replies, removed?) |
@@ -88,16 +88,16 @@ constraint matches the niche statement (small firm, no sales team, wants researc
 **Template 2: advice + disclosed mention (only when it directly fits)**
 > [2–4 sentences of genuinely useful advice first.]
 > On tools: if you want a database and to write it yourself, Apollo is the usual pick. If you're sending at
-> volume across many inboxes, Instantly or Smartlead. Disclosure: I'm one of the founders of LeadPilot, which is
+> volume across many inboxes, Instantly or Smartlead. Disclosure: I'm one of the founders of Vectorae, which is
 > built for exactly your situation (no sales team, wants the research and emails written, approves sending
 > daily). It's new, has no reviews yet, and LinkedIn isn't live. Happy to answer questions, and I'd still
 > recommend the above if they fit better.
 
-**Template 3: answering a direct question about LeadPilot**
+**Template 3: answering a direct question about Vectorae**
 > Founder here (so biased). Straight answer: [fact from the FAQ library]. What it doesn't do: [one honest limitation].
 
 ### B4. Cadence
-| Weeks | Comments / week | Of which mention LeadPilot |
+| Weeks | Comments / week | Of which mention Vectorae |
 |---|---|---|
 | 1–4 | 3–5 | 0 |
 | 5–12 | 4–6 | at most 1 in 10 contributions, and only via Template 2/3 |
@@ -126,9 +126,9 @@ invite tool recommendations" are reframed as genuine discussion posts from a dis
 ### C2. 5 "I tested these tools" posts: only with real testing
 Each post requires: (a) the founder actually used every tool listed on the same real campaign brief, (b)
 dates and setup stated, (c) screenshots or numbers kept, (d) disclosure in the first line ("I'm a founder of
-LeadPilot, one of the tools below, so discount accordingly"), (e) at least one result where another tool beat
-LeadPilot, reported plainly.
-1. "I ran the same agency outreach brief through Apollo, Instantly, Smartlead, Clay and LeadPilot. Setup time and what each needed from me."
+Vectorae, one of the tools below, so discount accordingly"), (e) at least one result where another tool beat
+Vectorae, reported plainly.
+1. "I ran the same agency outreach brief through Apollo, Instantly, Smartlead, Clay and Vectorae. Setup time and what each needed from me."
 2. "Deliverability on a fresh Gmail account: gradual ramp vs warmup networks. What I measured over 30 days."
 3. "Cost per booked meeting: pay-per-meeting vs monthly tools on a small campaign (real numbers)."
 4. "AI-written first emails from 5 tools on the same prospect. Which read like a human?" (blind-rated by people outside the company, with the method stated)
@@ -136,7 +136,7 @@ LeadPilot, reported plainly.
 If a test can't be run for real, the post isn't written. Nothing here is drafted with invented results.
 
 ### C3. 3 "How I…" workflow posts
-1. "How I book discovery calls for my own company with 30 minutes of outbound work a week" (founder's real workflow, LeadPilot named and disclosed, numbers from Q-06)
+1. "How I book discovery calls for my own company with 30 minutes of outbound work a week" (founder's real workflow, Vectorae named and disclosed, numbers from Q-06)
 2. "How we built approve-first sending, and why we refused to auto-reply to prospects" (r/SaaS, technical)
 3. "How a [real customer, with written permission] fills their pipeline during busy months" (only when a real customer agrees to be named)
 

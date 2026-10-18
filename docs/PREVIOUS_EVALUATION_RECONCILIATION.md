@@ -1,4 +1,4 @@
-# LeadPilot — Previous Evaluation Reconciliation
+# Vectorae — Previous Evaluation Reconciliation
 
 Supporting detail for `docs/FULL_PRODUCT_AUDIT.md`. Audit date 2026-10-01.
 

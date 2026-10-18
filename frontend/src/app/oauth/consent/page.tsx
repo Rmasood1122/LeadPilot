@@ -1,6 +1,6 @@
 "use client";
 
-/** Connector consent: "Claude wants to connect to your LeadPilot account".
+/** Connector consent: "Claude wants to connect to your Vectorae account".
  *  Reached from GET /oauth/authorize (app/api/oauth.py). Shows who is asking,
  *  where the browser will be sent back to and what access is granted; the
  *  person approves or declines. docs/features/mcp-connector.md. */
@@ -58,7 +58,7 @@ export default function OAuthConsentPage() {
     try {
       const { redirect_to } = await decideConsent(request.request_id, approve);
       if (!isSafeClientRedirect(redirect_to)) {
-        setError("The app asked to return to an address LeadPilot does not allow.");
+        setError("The app asked to return to an address Vectorae does not allow.");
         setBusy(false);
         return;
       }
@@ -77,7 +77,7 @@ export default function OAuthConsentPage() {
         <CardHeader className="items-center text-center">
           <LogoLockup width={132} className="mb-2" />
           <CardTitle className="text-xl">
-            {request ? `${appName} wants to connect to LeadPilot` : "Connect an app"}
+            {request ? `${appName} wants to connect to Vectorae` : "Connect an app"}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -138,7 +138,7 @@ def create_subscription_checkout(*, customer_id: str, user_id: str, tier: dict,
         line_item = {"quantity": 1, "price_data": {
             "currency": "usd", "unit_amount": amount,
             "recurring": {"interval": interval},
-            "product_data": {"name": f"LeadPilot {tier['name']}{suffix}"},
+            "product_data": {"name": f"Vectorae {tier['name']}{suffix}"},
         }}
     metadata = {"user_id": user_id, "billing_model": billing_model, "tier": tier["id"]}
     subscription_data: dict[str, Any] = {"metadata": metadata}

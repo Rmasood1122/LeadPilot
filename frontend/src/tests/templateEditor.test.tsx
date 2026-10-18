@@ -24,7 +24,7 @@ import {
   variableDescriptions,
 } from "@/lib/whatsappTemplate";
 
-const EXAMPLE = "Hi {{1}}, Sam from LeadPilot. Reply STOP to opt out.";
+const EXAMPLE = "Hi {{1}}, Sam from Vectorae. Reply STOP to opt out.";
 
 describe("template rules", () => {
   it("finds each placeholder once, in order", () => {
@@ -78,7 +78,7 @@ describe("TemplateEditor", () => {
   it("will not save a body without the STOP opt-out", async () => {
     render(<TemplateEditor onSave={vi.fn()} onClose={() => undefined} />);
     await userEvent.type(screen.getByLabelText(/name/i), "intro");
-    await userEvent.type(screen.getByLabelText(/^body/i), "NON-STOP deals from LeadPilot.");
+    await userEvent.type(screen.getByLabelText(/^body/i), "NON-STOP deals from Vectorae.");
     expect(screen.getByRole("button", { name: /save draft/i })).toBeDisabled();
     expect(screen.getByText(/must tell the recipient how to opt out/i)).toBeInTheDocument();
   });

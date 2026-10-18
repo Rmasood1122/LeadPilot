@@ -1,7 +1,7 @@
 # ChatGPT + Microsoft Copilot (Bing) playbook
 
-## The mechanism (what actually decides whether LeadPilot is named)
-- LeadPilot's site went live around September 2026, after current models' training cut-offs. **ChatGPT can
+## The mechanism (what actually decides whether Vectorae is named)
+- Vectorae's site went live around September 2026, after current models' training cut-offs. **ChatGPT can
   only name it through live search.** That runs on OpenAI's own crawler, **OAI-SearchBot**, plus
   user-triggered fetches by **ChatGPT-User**, together with third-party search data.
 - A Seer Interactive study (Feb 2025, ~500 SearchGPT citations) found 87% of cited URLs also appeared in
@@ -36,11 +36,11 @@
 3. If you use Vercel or Cloudflare bot protection, add an allow rule for OAI-SearchBot, ChatGPT-User and Bingbot.
 
 ### C. The top 10 Bing factors that drive ChatGPT/Copilot citations (and what to do for each)
-| # | Factor (from Bing Webmaster Guidelines themes) | LeadPilot action |
+| # | Factor (from Bing Webmaster Guidelines themes) | Vectorae action |
 |---|---|---|
 | 1 | Crawlable, indexable HTML with the content in the page | Done (static export); keep `check_static_seo.mjs` in the build |
 | 2 | Freshness and fast discovery | IndexNow on every deploy; git-based `lastmod` (done) |
-| 3 | Exact, descriptive `<title>` and H1 matching the query | Comparison titles: "LeadPilot vs Apollo: which fits a small agency? \| Calendarharvest" |
+| 3 | Exact, descriptive `<title>` and H1 matching the query | Comparison titles: "Vectorae vs Apollo: which fits a small agency? \| Calendarharvest" |
 | 4 | Clear answer near the top | Every draft opens with a "Short answer" paragraph |
 | 5 | Relevance to the query's constraint | /for/ pages name the buyer, size and pain in the H1 and first 100 words |
 | 6 | Structured data that matches visible content | Organization, SoftwareApplication, FAQPage already live; add HowTo/Breadcrumb |
@@ -52,10 +52,10 @@
 ### D. Content formatting Bing and ChatGPT reward
 - An H1 phrased as the question; a 40–80 word direct answer in the first paragraph.
 - Markdown-style tables with a header row (comparison, pricing). These are extracted cleanly.
-- Numbered steps for process questions ("How does LeadPilot work").
+- Numbered steps for process questions ("How does Vectorae work").
 - Statistics with a linked source, and quotations from named people (the GEO paper's top methods).
 - A visible "Last checked" date on comparison and pricing content.
-- One entity name throughout: "LeadPilot by Calendarharvest" on first mention.
+- One entity name throughout: "Vectorae by Calendarharvest" on first mention.
 
 ### E. Bing Places for Business — **do not create** (questions.md Q-11)
 Bing Places is for businesses with a physical location customers visit. Calendarharvest is online-only.
@@ -66,10 +66,10 @@ schema and the LinkedIn company page for entity data instead.
 - Bing weights social and directory signals more visibly than Google does. Priority: LinkedIn company page
   (complete, weekly posts), Crunchbase, G2, Product Hunt.
 - Exact-match anchor text from relevant sites carries more weight in Bing. When a directory allows a link
-  title, use "LeadPilot by Calendarharvest", not "click here".
+  title, use "Vectorae by Calendarharvest", not "click here".
 - Microsoft properties: a complete **LinkedIn** company page is the one Microsoft-owned surface that matters.
 
-### G. Target queries where LeadPilot must reach Bing's top 10
+### G. Target queries where Vectorae must reach Bing's top 10
 Pick constrained queries a new site can realistically rank for. (IDs refer to `research/query_library.md`.)
 1. "AI outbound tool for small marketing agency" (B1)
 2. "Apollo alternative for small agencies" (C3)
@@ -79,7 +79,7 @@ Pick constrained queries a new site can realistically rank for. (IDs refer to `r
 6. "outbound tool where I approve emails before sending" (B7)
 7. "outbound sales tool for commercial cleaning company" (D3)
 8. "AI outreach for HVAC commercial clients" (D4)
-9. "LeadPilot vs Apollo" (C1)
-10. "LeadPilot by Calendarharvest" (brand). Must be #1; today it returns nothing (baseline 2026-10-15).
+9. "Vectorae vs Apollo" (C1)
+10. "Vectorae by Calendarharvest" (brand). Must be #1; today it returns nothing (baseline 2026-10-15).
 
 Check weekly in Bing (signed out, US region) and log the result in `monitoring/ai_mention_tracker.md`.

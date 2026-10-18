@@ -41,7 +41,7 @@ cal=r('monitoring/content_update_calendar.md')+tr
 mon=re.findall(r'(?:First Monday|first Monday)',cal)
 for d in re.findall(r'20\d\d-\d\d-\d\d',r('monitoring/content_update_calendar.md').split('## Quarterly')[0].split('Dates:')[1]): chk(datetime.date.fromisoformat(d).weekday()==0,'monthly date is Monday '+d)
 # placeholders / consistency across all md
-canon="LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings."
+canon="Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service firms: it researches your market, finds and verifies business contacts, writes one-to-one emails, sends on a schedule you approve each day, and books meetings."
 niche="approve-first AI outbound system for founder-led agencies and B2B service firms (5–50\npeople)"
 allmd=glob.glob('**/*.md',recursive=True)
 for f in allmd:
@@ -50,11 +50,11 @@ for f in allmd:
     chk('CalendarHarvest' not in t or f in('questions.md','entity_card.md','state.md'),f'{f} brand spelling')
 flat=lambda t:re.sub(r'\s+',' ',t)
 for f in ['entity_card.md','content/definitions/what_is_leadpilot.md','content/faq_library.md','technical/schema_markup.md','technical/crawler_access_strategy.md','authority/citation_acquisition_plan.md']+glob.glob('content/comparisons/*.md'):
-    t=flat(r(f).replace("> ","").replace("**","")); chk(canon in t or canon.replace('LeadPilot by Calendarharvest is','LeadPilot by Calendarharvest is') in t or flat(canon.split(': ',1)[1]) in t,'canonical sentence in '+f)
+    t=flat(r(f).replace("> ","").replace("**","")); chk(canon in t or canon.replace('Vectorae by Calendarharvest is','Vectorae by Calendarharvest is') in t or flat(canon.split(': ',1)[1]) in t,'canonical sentence in '+f)
 nf=flat("approve-first AI outbound system for founder-led agencies and B2B service firms (5–50 people) who want booked sales meetings from a plain description of what they sell, without building lead lists, writing sequences or hiring an SDR")
 for f in ['positioning/niche_statement.md','content/definitions/what_is_leadpilot.md','content/definitions/leadpilot_use_cases.md','technical/crawler_access_strategy.md','authority/citation_acquisition_plan.md']:
     chk(nf in flat(r(f).replace("> ","").replace("**","")),'niche statement verbatim in '+f)
 w=flat(r('content/definitions/what_is_leadpilot.md').split('---',2)[2]); first200=' '.join(w.split()[:200])
-chk(first200.startswith('# What is LeadPilot by Calendarharvest? LeadPilot by Calendarharvest is an AI outbound'),'what_is answers in first sentence')
-for f in glob.glob('content/comparisons/*.md'): t=r(f); chk('Written by LeadPilot' in t and '## When to choose' in t.split('## When to choose LeadPilot')[1],'balanced+disclosed '+f)
+chk(first200.startswith('# What is Vectorae by Calendarharvest? Vectorae by Calendarharvest is an AI outbound'),'what_is answers in first sentence')
+for f in glob.glob('content/comparisons/*.md'): t=r(f); chk('Written by Vectorae' in t and '## When to choose' in t.split('## When to choose Vectorae')[1],'balanced+disclosed '+f)
 print("\nFAILS:",len(fails)); [print(" -",x) for x in fails]; sys.exit(1 if fails else 0)

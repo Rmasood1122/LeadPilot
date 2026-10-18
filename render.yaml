@@ -1,4 +1,4 @@
-# Render Blueprint — FREE-tier deployment of the LeadPilot backend.
+# Render Blueprint — FREE-tier deployment of the Vectorae backend.
 #
 # This is ADDITIVE. railway/*.json and DEPLOY_RAILWAY.md remain the documented
 # paid-tier path and are untouched; nothing here replaces them.
@@ -115,7 +115,7 @@ services:
       - key: EMAIL_FROM
         value: noreply@calendarharvest.com
       - key: EMAIL_FROM_NAME
-        value: LeadPilot
+        value: Vectorae
       # Secret — paste in the Render dashboard. The sending DOMAIN must be
       # verified in Resend (SPF + DKIM) or mail is dropped downstream.
       - key: RESEND_API_KEY
@@ -215,7 +215,7 @@ services:
       - key: EMAIL_FROM
         value: noreply@calendarharvest.com
       - key: EMAIL_FROM_NAME
-        value: LeadPilot
+        value: Vectorae
       # Secret — paste in the Render dashboard. The sending DOMAIN must be
       # verified in Resend (SPF + DKIM) or mail is dropped downstream.
       - key: RESEND_API_KEY

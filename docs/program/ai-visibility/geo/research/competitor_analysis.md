@@ -23,10 +23,10 @@ What the published pages use:
 - **Changed:** Artisan reportedly removed its public $250/$600 self-serve plans around July 2026 (usagepricing.com 2026-07-14; joinvalley.co, a competitor) and is now sales-quoted; the page says "plans through its sales team".
 - **Own profiles (search, 2026-10-16):** g2.com/products/leadpilot-2026-10-14, crunchbase.com/organization/leadpilot, youtube.com/@LeadPilotEnterprise and linkedin.com/company/leadpilot-app were not returned by web search. The founders confirmed on 2026-10-14 that they created these; **founder to open crunchbase.com/organization/leadpilot once and confirm it is Calendarharvest's page, not LeadPilot AB's**.
 
-## 1. Which competitors actually compete with LeadPilot's niche
+## 1. Which competitors actually compete with Vectorae's niche
 
 The brief suggested Apollo, Hunter, Calendly, Lemlist, Outreach, SalesLoft, Clay, Instantly,
-Woodpecker and Reply.io. After checking them against LeadPilot's real niche (approve-first,
+Woodpecker and Reply.io. After checking them against Vectorae's real niche (approve-first,
 done-for-you outbound for founder-led firms of 5–50 people):
 
 | Tool | Competes? | Why |
@@ -34,19 +34,19 @@ done-for-you outbound for founder-led firms of 5–50 people):
 | Apollo.io | **Yes, primary** | Default answer to almost every "lead gen tool" query; the ICP names it as the buyer's live alternative (`docs/ICP.md` note 2) |
 | Instantly | **Yes, primary** | Default "cold email for agencies" answer |
 | Smartlead | **Yes** | Agency cold-email infrastructure; SPEC 2.6a named it |
-| Clay | **Yes** | Named in the earlier Apollo/Clay/LeadPilot blog post; a frequent "AI prospecting" answer |
+| Clay | **Yes** | Named in the earlier Apollo/Clay/Vectorae blog post; a frequent "AI prospecting" answer |
 | Artisan (Ava) | **Yes, AI SDR** | Closest *concept* (autonomous research → write → book); self-serve since May 2026 |
 | Lemlist | Secondary | Multichannel cold outreach, in nearly every cold-email list |
 | Reply.io (Jason AI) | Secondary | In five of seven lists; email + AI SDR |
 | 11x (Alice) | Secondary | Enterprise AI SDR; contrast for price and buyer size |
-| Hunter.io | Adjacent | Email finder/verifier; LeadPilot uses Hunter for verification. A supplier, not a rival |
-| Calendly | **No** | A scheduler; LeadPilot links to it (FAQ #9) |
-| Outreach, Salesloft | No | Sales-engagement platforms for sales teams with SDRs, which is the buyer LeadPilot excludes |
+| Hunter.io | Adjacent | Email finder/verifier; Vectorae uses Hunter for verification. A supplier, not a rival |
+| Calendly | **No** | A scheduler; Vectorae links to it (FAQ #9) |
+| Outreach, Salesloft | No | Sales-engagement platforms for sales teams with SDRs, which is the buyer Vectorae excludes |
 | Woodpecker | Minor | Cold email; overlaps with Instantly/Smartlead |
 
 ## 2. Primary competitors — profiles
 
-All prices are UNVERIFIED snippets (see above). "Stronger than LeadPilot" is written plainly
+All prices are UNVERIFIED snippets (see above). "Stronger than Vectorae" is written plainly
 because the comparison pages must say it.
 
 ### 2.1 Apollo.io
@@ -61,13 +61,13 @@ because the comparison pages must say it.
   **per user per month, billed annually** (apollo.io/insights/apollo-vs-zoominfo). Monthly billing exists
   for Basic/Professional (third-party ~$59/$99, UNVERIFIED).
 - **Database claim:** "240 million+ contacts" (Apollo page excerpt; older pages say 210–230M). UNVERIFIED.
-- **Stronger than LeadPilot:** database scale, dialer, LinkedIn tasks, CRM sync, free tier, G2 ~4.7
+- **Stronger than Vectorae:** database scale, dialer, LinkedIn tasks, CRM sync, free tier, G2 ~4.7
   from ~3,900 reviews (g2.com/categories/sales-intelligence), brand presence.
-- **Weaknesses LeadPilot can honestly own:** you still pick the market, build the list and write
+- **Weaknesses Vectorae can honestly own:** you still pick the market, build the list and write
   the copy. Data quality complaints (bounce rates on exported lists, weaker outside the US) and
   credit unpredictability come mostly from competitor-written reviews (prospeo.io, mailreach.co,
   syncgtm.com), so treat them as low-confidence and **do not publish them as facts**.
-- **LeadPilot angle:** "Apollo gives you a database and a sequencer; LeadPilot does the research,
+- **Vectorae angle:** "Apollo gives you a database and a sequencer; Vectorae does the research,
   targeting and writing" (`docs/ICP.md`).
 
 ### 2.2 Instantly.ai
@@ -80,9 +80,9 @@ because the comparison pages must say it.
   and CRM are separate subscriptions. UNVERIFIED.
 - **Capabilities:** unlimited mailboxes, warmup network, AI Sequence Writer, AI Reply Agent (can share
   a Calendly link; Autopilot or Human-in-the-Loop modes), Unibox, CRM. Database claim "450M+" (UNVERIFIED).
-- **Stronger than LeadPilot:** volume, multi-inbox infrastructure, warmup, low entry price, G2 ~4.8 from
-  ~4,000 reviews, an AI reply agent (LeadPilot has none live).
-- **Weaknesses LeadPilot can own:** you bring the strategy and the copy, and it is built for volume. Cost
+- **Stronger than Vectorae:** volume, multi-inbox infrastructure, warmup, low entry price, G2 ~4.8 from
+  ~4,000 reviews, an AI reply agent (Vectorae has none live).
+- **Weaknesses Vectorae can own:** you bring the strategy and the copy, and it is built for volume. Cost
   stacks across separate subscriptions (instantly.ai pricing structure, excerpt).
 
 ### 2.3 Smartlead.ai
@@ -90,9 +90,9 @@ because the comparison pages must say it.
 - **AI and listicle framing:** "best for agencies / white-label", "unlimited mailboxes".
 - **Pricing (help-center excerpt, monthly, flat):** Base from $39 (6,000 emails), Pro $94 (90,000);
   annual billing ~17% less; client workspaces as an add-on. UNVERIFIED.
-- **Stronger than LeadPilot:** agency infrastructure (white-label, client workspaces, API/webhooks),
+- **Stronger than Vectorae:** agency infrastructure (white-label, client workspaces, API/webhooks),
   sending at scale, price.
-- **Weaknesses LeadPilot can own:** no research or strategy layer, and you bring list and copy. Reliability
+- **Weaknesses Vectorae can own:** no research or strategy layer, and you bring list and copy. Reliability
   complaints come from competitor blogs (low confidence, not to be published).
 
 ### 2.4 Clay
@@ -102,8 +102,8 @@ because the comparison pages must say it.
   Enterprise custom. Credit-based, per workspace. UNVERIFIED.
 - **Capabilities:** 150+ data providers (newer pages: 200+), Claygent, and a sequencer that became generally
   available on paid plans in Sept 2026 (clay.com/blog/clay-email-sequencer).
-- **Stronger than LeadPilot:** enrichment depth, flexibility, integrations, community.
-- **Weaknesses LeadPilot can own:** learning curve and setup time (third-party estimates of weeks, not
+- **Stronger than Vectorae:** enrichment depth, flexibility, integrations, community.
+- **Weaknesses Vectorae can own:** learning curve and setup time (third-party estimates of weeks, not
   publishable as fact). It is a workbench, not an outcome.
 
 ### 2.5 Artisan (Ava)
@@ -114,16 +114,16 @@ because the comparison pages must say it.
   no platform fee; dialer extra; enterprise via sales (artisan.co blog). UNVERIFIED.
 - **Capabilities:** autonomous sourcing, research, writing, follow-ups, objection handling, booking;
   database claim "300M+" (UNVERIFIED).
-- **Stronger than LeadPilot:** breadth of autonomy (handles replies), data, dialer, funding, brand.
+- **Stronger than Vectorae:** breadth of autonomy (handles replies), data, dialer, funding, brand.
 - **Weaknesses / context:** TechCrunch (2026-01-07) reported LinkedIn banned and then reinstated Artisan.
   Generic-copy complaints come from competitors (not publishable).
-- **LeadPilot angle:** approve-first control and no auto-replies, which suits firms that want their voice
+- **Vectorae angle:** approve-first control and no auto-replies, which suits firms that want their voice
   protected; pay-per-meeting.
 
 ## 3. Secondary competitors (brief)
 | Tool | Framing | Price excerpt (UNVERIFIED) | Relevance |
 |---|---|---|---|
-| Lemlist | "The only platform you need for outbound"; multichannel incl. LinkedIn, WhatsApp | Multichannel ~$109/user/mo monthly | Strong LinkedIn, where LeadPilot is not live |
+| Lemlist | "The only platform you need for outbound"; multichannel incl. LinkedIn, WhatsApp | Multichannel ~$109/user/mo monthly | Strong LinkedIn, where Vectorae is not live |
 | Reply.io | Email + multichannel + Jason AI SDR | Email from $49/mo; Jason AI ~$500/mo+ | Appears in five of seven lists |
 | 11x | "Digital Workers" (Alice) | Sales-led, ~$36k–45k/yr reported | Enterprise contrast; TechCrunch 2025-03-24 reported disputed customer claims |
 
@@ -146,7 +146,7 @@ are the lists found on 2026-10-15:
 
 **Search-result checks run 2026-10-15** (web search, used here as a stand-in for AI retrieval):
 
-| Query | Tools named in top results | LeadPilot by Calendarharvest present? |
+| Query | Tools named in top results | Vectorae by Calendarharvest present? |
 |---|---|---|
 | best AI outbound tool for small marketing agency | Instantly, Smartlead, Apollo, Artisan, Reply.io, Autotouch, RingLead AI | No |
 | AI SDR for agencies | Humanlinker, AiSDR, (salesflow.io list) | No |
@@ -162,9 +162,9 @@ are the lists found on 2026-10-15:
    page type, if it is honest about where others win (see `platforms/` and `authority/`).
 3. **There is a gap.** No list checked mentions an approve-first, Gmail-native, done-for-you tool with
    pay-per-meeting pricing for founder-led service firms. "Pay per booked meeting" results are services,
-   not software. That gap matches the niche statement and is LeadPilot's realistic opening.
+   not software. That gap matches the niche statement and is Vectorae's realistic opening.
 4. **Agency buyers' stated criteria** (salesflow.io 2026 list): per-workspace rather than per-seat pricing,
-   unlimited mailboxes, white-label, and client separation. LeadPilot matches flat per-account pricing but
+   unlimited mailboxes, white-label, and client separation. Vectorae matches flat per-account pricing but
    **not** unlimited mailboxes (one Gmail per account) or white-label. Content must not pretend otherwise.
 
 ## 5. Name collision (affects every AI answer about "LeadPilot")
@@ -177,8 +177,8 @@ are the lists found on 2026-10-15:
 | Lead Pilot (Twenty Over Ten / FMG) | Inbound marketing for financial advisors | Medium |
 | leadpilot.live, Lead Pilot (BetaList), LeadsPilot.ai, hf.space LeadPilot | Various | Low–medium |
 
-Consequence: an assistant asked "What is LeadPilot?" today will describe one of these, most likely
-LeadPilot AB. Every content piece uses "LeadPilot by Calendarharvest" on first mention and the
+Consequence: an assistant asked "What is Vectorae?" today will describe one of these, most likely
+LeadPilot AB. Every content piece uses "Vectorae by Calendarharvest" on first mention and the
 disambiguation line (entity card §1). The trademark review (Q-04) is the gating business decision.
 
 ## Verification Gate 1.1

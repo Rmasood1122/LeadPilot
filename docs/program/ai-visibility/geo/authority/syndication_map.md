@@ -8,7 +8,7 @@
    of the full text). LinkedIn Articles have no canonical, so post an adapted version (≥40% different) with a link.
 3. **No full-copy syndication of comparison pages.** Competitor prices change; a stale copy on Medium keeps
    saying the wrong thing. Syndicate summaries that link back to the dated page.
-4. Every copy keeps the entity language and the disclosure ("written by LeadPilot's founders").
+4. Every copy keeps the entity language and the disclosure ("written by Vectorae's founders").
 5. Archive every live URL at `https://web.archive.org/save/<url>` on the day it ships.
 
 ## Map: each Phase 3 document
@@ -19,7 +19,7 @@
 | Use cases → /for/agencies/ | /for/agencies/ (W1) | Medium: "How agency founders keep prospecting during busy months" (adapted, canonical) | LinkedIn founder post (problem → workflow, 200 words); Reddit r/agency discussion post C1-1 (no link unless asked) | ✅ |
 | Use cases → /for/b2b-service-firms/ | /for/b2b-service-firms/ (W1) | Medium (adapted, canonical) | LinkedIn post per sub-segment (staffing, consultants, accounting) over 3 weeks | ✅ |
 | Use cases → /for/local-businesses/ | /for/local-businesses/ (W1) | — | LinkedIn post "How a commercial cleaning company can reach property managers"; Quora answers on cleaning/HVAC client questions | ✅ |
-| leadpilot_vs_apollo.md | /compare/leadpilot-vs-apollo/ (W1) | ❌ no full copies (rule 3) | LinkedIn post: summary table image + link; X thread "When to choose Apollo vs LeadPilot (we make one of them)"; Quora answers to "Apollo alternatives" (disclosed) | ✅ |
+| leadpilot_vs_apollo.md | /compare/leadpilot-vs-apollo/ (W1) | ❌ no full copies (rule 3) | LinkedIn post: summary table image + link; X thread "When to choose Apollo vs Vectorae (we make one of them)"; Quora answers to "Apollo alternatives" (disclosed) | ✅ |
 | leadpilot_vs_instantly.md | /compare/leadpilot-vs-instantly/ (W1) | ❌ | Same pattern; r/coldemail only as a disclosed reply where asked | ✅ |
 | leadpilot_vs_smartlead.md | /compare/leadpilot-vs-smartlead/ (W1) | ❌ | Same pattern | ✅ |
 | leadpilot_vs_clay.md | /compare/leadpilot-vs-clay/ (W2) | ❌ | LinkedIn post for ops/growth audience | ✅ |

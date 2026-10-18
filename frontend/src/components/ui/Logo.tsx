@@ -2,7 +2,7 @@
  * Logo — the one place brand imagery is sized.
  *
  * Two variants, because the source artwork is a square lockup (arrow above a
- * "LEADPILOT" wordmark) and the wordmark is only ~3% of the artwork's height:
+ * "VECTORAE" wordmark) and the wordmark is only ~3% of the artwork's height:
  *
  *   LogoMark    the arrow on the brand ground, as a small rounded tile. Used
  *               anywhere the logo sits inline at 20-32px, where the lockup's
@@ -36,7 +36,7 @@ export function LogoMark({
       width={size}
       height={size}
       /* Decorative: every use sits beside the product name in real text, so
-         announcing it again would just repeat "LeadPilot" to a screen reader. */
+         announcing it again would just repeat "Vectorae" to a screen reader. */
       alt=""
       aria-hidden="true"
       className={cn("shrink-0 rounded-[22%]", className)}
@@ -58,7 +58,7 @@ export function LogoLockup({
       height={Math.round(width * LOCKUP_ASPECT)}
       /* Not decorative here: this replaces the product name rather than
          accompanying it. */
-      alt="LeadPilot"
+      alt="Vectorae"
       className={cn("rounded-xl", className)}
     />
   );

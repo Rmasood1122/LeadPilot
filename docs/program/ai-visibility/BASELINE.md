@@ -44,23 +44,23 @@ Each row reads `frontend/out/<path>/index.html`, which is exactly the file Verce
 
 | Path | Title | Meta description | Canonical | H1 | Words in raw HTML main | JSON-LD types |
 |---|---|---|---|---|---|---|
-| / | LeadPilot: from what you sell to meetings on your calendar \| Calendarharvest | Describe what you sell. LeadPilot researches your market, finds and checks business contac | — | From what you sell to meetings on your calendar. | 1642 | — |
-| /how-it-works/ | How LeadPilot Works \| Calendarharvest | LeadPilot builds and runs your outbound pipeline. Here is exactly how it works. | — | Your pipeline. Running without you. | 270 | — |
+| / | Vectorae: from what you sell to meetings on your calendar \| Calendarharvest | Describe what you sell. Vectorae researches your market, finds and checks business contac | — | From what you sell to meetings on your calendar. | 1642 | — |
+| /how-it-works/ | How Vectorae Works \| Calendarharvest | Vectorae builds and runs your outbound pipeline. Here is exactly how it works. | — | Your pipeline. Running without you. | 270 | — |
 | /blog/agency-founder-prospecting-delivery-problem/ | MISSING FROM EXPORT | | | | | |
 | /blog/apollo-clay-leadpilot-comparison/ | MISSING FROM EXPORT | | | | | |
 | /blog/cold-email-not-working-agency/ | MISSING FROM EXPORT | | | | | |
 | /blog/client-pipeline-works-during-delivery/ | MISSING FROM EXPORT | | | | | |
-| /pricing/ | LeadPilot | AI-powered end-to-end client acquisition | — | Pricing that fits how you sell | 28 | — |
-| /about/ | About LeadPilot Enterprise \| Calendarharvest | LeadPilot Enterprise was built by a founder who used it to find his own clients. Here is t | — | Built by a founder who used it to find his own clients. | 464 | — |
-| /contact/ | Book a Call \| LeadPilot Enterprise | Talk to Rehan directly. If LeadPilot is a fit, we will tell you honestly. If it is not, we | — | Talk to Rehan directly. | 315 | — |
-| /privacy/ | Privacy Policy \| Calendarharvest | How LeadPilot Enterprise collects, uses, and protects your data. | — | Privacy Policy | 1611 | — |
-| /terms/ | Terms of Service \| Calendarharvest | The terms that govern your use of LeadPilot Enterprise. | — | Terms of Service | 1003 | — |
+| /pricing/ | Vectorae | AI-powered end-to-end client acquisition | — | Pricing that fits how you sell | 28 | — |
+| /about/ | About Vectorae Enterprise \| Calendarharvest | Vectorae Enterprise was built by a founder who used it to find his own clients. Here is t | — | Built by a founder who used it to find his own clients. | 464 | — |
+| /contact/ | Book a Call \| Vectorae Enterprise | Talk to Rehan directly. If Vectorae is a fit, we will tell you honestly. If it is not, we | — | Talk to Rehan directly. | 315 | — |
+| /privacy/ | Privacy Policy \| Calendarharvest | How Vectorae Enterprise collects, uses, and protects your data. | — | Privacy Policy | 1611 | — |
+| /terms/ | Terms of Service \| Calendarharvest | The terms that govern your use of Vectorae Enterprise. | — | Terms of Service | 1003 | — |
 
 
 Notes:
 - **None** of the 11 pages has a canonical tag, an `og:url`, or any JSON-LD.
-- `/pricing/` is a client component: its title and description fall back to the root layout ("LeadPilot" / "AI-powered end-to-end client acquisition"), and its 28 words in raw HTML contain no plan name and no price; the plan list is fetched in the browser from `GET /billing/catalog` (`frontend/src/app/pricing/page.tsx:63-67`, `frontend/src/lib/api/billing.ts:61`).
-- The **4 `/blog/…` URLs have no page anywhere in the repository** (no `blog` route in `frontend/src/app`, none in git history). They were added to `frontend/public/sitemap.xml` in commit `1c2a82b`. A deploy of this repo serves 404 for them. Finding 8 (four blog posts, one an Apollo/Clay/LeadPilot comparison) therefore cannot be checked against the repo, and there is no Apollo/Clay post to read or correct.
+- `/pricing/` is a client component: its title and description fall back to the root layout ("Vectorae" / "AI-powered end-to-end client acquisition"), and its 28 words in raw HTML contain no plan name and no price; the plan list is fetched in the browser from `GET /billing/catalog` (`frontend/src/app/pricing/page.tsx:63-67`, `frontend/src/lib/api/billing.ts:61`).
+- The **4 `/blog/…` URLs have no page anywhere in the repository** (no `blog` route in `frontend/src/app`, none in git history). They were added to `frontend/public/sitemap.xml` in commit `1c2a82b`. A deploy of this repo serves 404 for them. Finding 8 (four blog posts, one an Apollo/Clay/Vectorae comparison) therefore cannot be checked against the repo, and there is no Apollo/Clay post to read or correct.
 - `robots.txt`: `User-agent: *`, `Allow: /`, `Sitemap: https://calendarharvest.com/sitemap.xml` (apex host; finding 1 confirmed in the repo). No group blocks any of the eight crawlers.
 - Sitemap `lastmod` values are hard-coded (2026-09-12 / 2026-09-13). `/status/` is not in the sitemap.
 
@@ -118,12 +118,12 @@ Finding 4 is **partly stale**: `master` no longer says "human senders" or "Linke
 
 Between pages:
 1. Research steps: home and /how-it-works say 72 steps, or 144 with no past clients; /about says "A 72-step research pipeline" and omits 144.
-2. Who it is for: home lists agencies, B2B service firms and local businesses with business clients; /about lists boutique agencies (3–30 staff in seven named countries), consultants and coaches, early B2B SaaS founders, and fractional sales consultants who "resell or white-label LeadPilot".
-3. Product name: "LeadPilot" (home, /how-it-works, header) vs "LeadPilot Enterprise" (/about, /contact, /privacy, /terms) vs "Calendarharvest" (footer, titles).
-4. Titles: /contact ends "| LeadPilot Enterprise"; /pricing has the generic root title "LeadPilot".
+2. Who it is for: home lists agencies, B2B service firms and local businesses with business clients; /about lists boutique agencies (3–30 staff in seven named countries), consultants and coaches, early B2B SaaS founders, and fractional sales consultants who "resell or white-label Vectorae".
+3. Product name: "Vectorae" (home, /how-it-works, header) vs "Vectorae Enterprise" (/about, /contact, /privacy, /terms) vs "Calendarharvest" (footer, titles).
+4. Titles: /contact ends "| Vectorae Enterprise"; /pricing has the generic root title "Vectorae".
 
 Against the founders' Phase 0 answers (NOTES.md):
 5. LinkedIn sending is **not live** (Q3). /how-it-works ("Sequences send automatically from the Gmail and LinkedIn accounts you connect"), /about ("Personalised sequences across email and LinkedIn send automatically"), home ("LinkedIn and WhatsApp steps … available", "LinkedIn from Growth") and /contact's FAQ ("LinkedIn outreach is optional … included in the Growth, Scale, Enterprise and Pay per meeting plans") describe it as working.
 6. The home FAQ says Apollo, Hunter, Gmail, WhatsApp, Calendly and Stripe "were built and tested against simulated responses and have not yet been verified end to end". Founders now say contact finding and verification, Gmail sending, WhatsApp, reply routing and booking work end to end (Q6a/Q6b); Stripe checkout does not.
 7. /about: Rehan "based in Faisalabad, Pakistan"; founders chose Astoria, New York (Q1).
-8. Claims no source in the repo or founder answer supports: /about "has published more than 18 public repositories on GitHub", "He uses it himself, every day, to find LeadPilot's own clients" / "today it is the system that finds LeadPilot's own clients"; /about fractional consultants "resell or white-label LeadPilot"; /how-it-works "You handle the calls we book" (implies a done-for-you service) and "ICP refined" / "The system compounds over time" (no code reference found yet).
+8. Claims no source in the repo or founder answer supports: /about "has published more than 18 public repositories on GitHub", "He uses it himself, every day, to find Vectorae's own clients" / "today it is the system that finds Vectorae's own clients"; /about fractional consultants "resell or white-label Vectorae"; /how-it-works "You handle the calls we book" (implies a done-for-you service) and "ICP refined" / "The system compounds over time" (no code reference found yet).

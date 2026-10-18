@@ -219,13 +219,13 @@ base (exception text in the body).
 every page) said "Your campaigns are still running" when the API is
 unreachable — the one thing an outage makes unknowable.
 
-**Fix.** Offline (device): "Scheduled sends run on LeadPilot's servers, not
+**Fix.** Offline (device): "Scheduled sends run on Vectorae's servers, not
 on this device, so losing your connection does not stop them." — true by
-construction. Server unreachable: "We can't reach LeadPilot's server right
+construction. Server unreachable: "We can't reach Vectorae's server right
 now, so we can't confirm whether scheduled sends are going out. We'll
 reconnect automatically." plus a "Check service status" link when the status
 page link is live (`SHOW_STATUS_LINK`), consistent with the status page, which
-shows components as unknown when LeadPilot's own checks cannot be reached
+shows components as unknown when Vectorae's own checks cannot be reached
 (`status-page/lib/snapshot.ts:201`). Help center 26 updated.
 `NetworkContext.tsx` comment updated. The status page app itself has no
 "still running" copy (grep), so nothing changed there.

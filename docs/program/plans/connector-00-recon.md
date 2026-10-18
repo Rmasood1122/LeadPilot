@@ -1,7 +1,7 @@
 # Connector Phase 0: recon (read-only)
 
 Date: 2026-10-17. Branch `claude/awesome-lovelace-okii9j`, read at `master @ 2813fbc`.
-Scope: Phase 0 of the LeadPilot ↔ Claude/ChatGPT integration. That integration has three parts: a remote MCP server in the FastAPI app, an OAuth 2.1 authorization server, and a Skill plus a Claude Code plugin.
+Scope: Phase 0 of the Vectorae ↔ Claude/ChatGPT integration. That integration has three parts: a remote MCP server in the FastAPI app, an OAuth 2.1 authorization server, and a Skill plus a Claude Code plugin.
 No code changed in this phase. Every citation below was read in this session. Where a sub-agent found a citation, it was spot-checked against the file.
 
 **Status: ANSWERED 2026-10-17.** The founder approved every recommendation in §9 and set the host to `https://api.calendarharvest.com/mcp`. Recorded in `DECISIONS.md` as CONN-AS, CONN-WRITES, CONN-HOST, CONN-SERVICES, CONN-DEPS, CONN-WORKSPACE and CONN-AUDIT.
@@ -102,7 +102,7 @@ It is synchronous and reads headers by hand (no `HTTPBearer`). In order:
    - Claude refreshes proactively 5 min before expiry and reactively on 401, so a racing double refresh is plausible.
    - Proposal: an OAuth-specific rotate path that reuses the claim and family logic but returns `invalid_grant` instead of access-only.
    - The web session path keeps its grace window unchanged.
-3. **Token confusion.** A LeadPilot web access token (`typ="access"`, no audience) must not be accepted at `/mcp`, and an MCP token must not be accepted by the REST API.
+3. **Token confusion.** A Vectorae web access token (`typ="access"`, no audience) must not be accepted at `/mcp`, and an MCP token must not be accepted by the REST API.
    - Proposal: MCP access tokens carry `typ="mcp_access"`, `aud=<MCP resource URL>`, `scope`, `client_id` and `sid` (session row).
    - The `TokenVerifier` accepts only that `typ` plus a matching `aud`, and sets `AccessToken.resource`.
    - `decode_token_payload(…, "access")` already rejects any other `typ` (`auth.py:121-137`), so the REST API refuses MCP tokens with no change.

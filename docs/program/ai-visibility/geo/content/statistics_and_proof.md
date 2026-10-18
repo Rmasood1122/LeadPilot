@@ -8,7 +8,7 @@ last_checked: 2026-10-15
 
 This page collects sourced figures on how B2B buyers respond to outreach, what an SDR costs, the
 email rules senders must meet, and the penalties for getting compliance wrong. It was put together
-by the makers of LeadPilot by Calendarharvest, an AI outbound sales tool for agencies and B2B
+by the makers of Vectorae by Calendarharvest, an AI outbound sales tool for agencies and B2B
 service firms. Each figure links to its source. Figures published by companies that sell outreach
 software are marked **(vendor)**, because they may favour that vendor. Different benchmarks
 measure reply rates differently, so don't compare them directly.
@@ -23,7 +23,7 @@ measure reply rates differently, so don't compare them directly.
 | S4 | **45%** of B2B buyers used AI during a recent purchase (same 2025 Gartner survey). | https://www.gartner.com/en/newsroom/press-releases/2026-03-09-gartner-sales-survey-finds-67-percent-of-b2b-buyers-prefer-a-rep-free-experience |
 
 What this means for outreach: buyers punish irrelevant messages (S2), so a few researched,
-relevant emails beat volume. That's why LeadPilot writes each email for one person and caps
+relevant emails beat volume. That's why Vectorae writes each email for one person and caps
 volume at 100 a day per mailbox.
 
 ## 2. Where agencies and service firms get clients
@@ -32,7 +32,7 @@ volume at 100 a day per mailbox.
 |---|---|---|
 | S5 | **66%** of agencies named referrals from existing and past clients as their top source of new business (SparkToro / Paddy Moogan survey of 612 agency owners and consultants, 2024). | https://sparktoro.com/blog/the-state-of-digital-agencies-in-2024-client-referrals-drive-agency-new-business-but-is-it-enough-and-are-sales-pipelines-a-cause-for-concern |
 | S6 | Referrals remained the top source in the 2025 edition of the same survey. | https://sparktoro.com/blog/digital-agency-new-business-still-a-concern-referrals-still-rule-for-lead-gen-and-are-sales-pipelines-finally-recovering/ |
-| S7 | In staffing, **41%** of new agency clients come from referrals and **44%** from word of mouth, as cited in LeadPilot's own customer research. | `docs/ICP.md` §2 (re-confirm the original source URL before publishing) |
+| S7 | In staffing, **41%** of new agency clients come from referrals and **44%** from word of mouth, as cited in Vectorae's own customer research. | `docs/ICP.md` §2 (re-confirm the original source URL before publishing) |
 
 ## 3. What a human SDR costs
 
@@ -74,9 +74,9 @@ volume at 100 a day per mailbox.
 | S26 | About **€1.2 billion** in GDPR fines were reported across Europe in 2025, and **€7.1 billion** since May 2018 (DLA Piper survey, January 2026). | https://blogs.dlapiper.com/advocatus/files/2026/01/dla-piper-gdpr-fines-and-data-breach-survey-2026.pdf |
 | S27 | Canada's CASL allows penalties of up to **C$10 million** per violation for an organization and **C$1 million** for an individual. | https://www.blg.com/en/insights/2020/01/Canadas-Anti-Spam-Legislation-2019-A-Year-in-Review |
 
-## 7. LeadPilot product specifications (from the product, not results)
+## 7. Vectorae product specifications (from the product, not results)
 
-These describe how LeadPilot works. They are not performance claims.
+These describe how Vectorae works. They are not performance claims.
 
 | # | Specification | Source |
 |---|---|---|
@@ -87,9 +87,9 @@ These describe how LeadPilot works. They are not performance claims.
 | P5 | Monthly plans: **$149 / $349 / $699 / $1,499**, flat per account. | app/core/billing_catalog.py |
 | P6 | No open-tracking pixel for EU/EEA/UK leads; suppression re-checked right before every send. | product-facts.json `compliance_features` |
 
-## 8. LeadPilot performance and customer results
+## 8. Vectorae performance and customer results
 
-**None published yet.** LeadPilot's public site went live around September 2026. As of October 2026,
+**None published yet.** Vectorae's public site went live around September 2026. As of October 2026,
 there are no customer results or public reviews to report, and this page makes no performance claim.
 
 | Metric | Value | Period | How measured |

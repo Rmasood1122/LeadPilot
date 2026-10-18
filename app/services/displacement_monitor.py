@@ -71,10 +71,10 @@ MAX_SENTENCES = 4
 MAX_QUESTIONS = 1
 # The product must not name itself in a first touch. A Day 0 DM that pitches
 # is a Day 0 DM that gets ignored.
-FORBIDDEN_MENTIONS = ("leadpilot", "lead pilot")
+FORBIDDEN_MENTIONS = ("vectorae", "leadpilot", "lead pilot")
 
 _DM_SYSTEM = (
-    "You are LeadPilot's displacement DM writer. A prospect has just posted "
+    "You are Vectorae's displacement DM writer. A prospect has just posted "
     "publicly about a problem you can solve. You write the FIRST message to "
     "them -- a Day 0 cold DM. Respond with ONLY a JSON object, no prose and "
     'no markdown fences: {"dm": "the message"}\n'

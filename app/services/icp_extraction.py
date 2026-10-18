@@ -44,7 +44,7 @@ TACTIC_MOTIONS = ["cold_outbound", "warm_intro", "inbound_led", "product_led", "
 TACTIC_CADENCES = ["light", "standard", "aggressive"]
 
 _TACTIC_SYSTEM = (
-    "You are LeadPilot's go-to-market classifier. You read an execution plan "
+    "You are Vectorae's go-to-market classifier. You read an execution plan "
     "and label it with a small fixed vocabulary. Respond with ONLY a single "
     "JSON object — no prose, no markdown fences."
 )
@@ -65,7 +65,7 @@ EXECUTION PLAN AND CHANNEL RESEARCH:
 """
 
 _SYSTEM = (
-    "You are LeadPilot's ICP extraction engine. From strategy research you "
+    "You are Vectorae's ICP extraction engine. From strategy research you "
     "produce structured lead-search criteria. Respond with ONLY a single "
     "JSON object — no prose, no markdown fences."
 )

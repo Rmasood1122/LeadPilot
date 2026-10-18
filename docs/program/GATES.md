@@ -1,4 +1,4 @@
-# LeadPilot gates — what is enforced, where, and what is not
+# Vectorae gates — what is enforced, where, and what is not
 
 Phase 1 exit-gate record. Last updated 2026-10-10. Repo: private, GitHub Free
 (no branch protection or rulesets: `DECISIONS.md` GH-PRO). Merge policy:

@@ -1,4 +1,4 @@
-# STATUS 2026-09-29 — LeadPilot gated (consumer-3, THE LAST ONE). Rollout complete.
+# STATUS 2026-09-29 — Vectorae gated (consumer-3, THE LAST ONE). Rollout complete.
 
 *(Committed 2026-09-30 per LP-T-001/GAP-003: this record previously existed only
 session-side while being referenced at this path. Content preserved verbatim
@@ -8,7 +8,7 @@ LeadPilot Production Readiness Claude Project, 02 §B.)*
 **Commit f73c930 on Rmasood1122/LeadPilot master. eval-gate GREEN, every step verified: https://github.com/Rmasood1122/LeadPilot/actions/runs/36657790603**
 
 ## The headline finding
-**LeadPilot had NO test CI at all.** 1,985 offline tests (SQLite in-memory, FakeClaude, stubbed broker — zero network, 3.5 min) existed and never ran on push; the only workflows were android/pypi release. For the revenue product with a zero-tolerance legal posture, the compliance tests ("the tests that must never go red" — send-time suppression re-check, unsubscribe endpoint, per-region CAN-SPAM/GDPR/CASL/PDPA rules) were enforced by nothing. The gate is also the repo's first per-push test run.
+**Vectorae had NO test CI at all.** 1,985 offline tests (SQLite in-memory, FakeClaude, stubbed broker — zero network, 3.5 min) existed and never ran on push; the only workflows were android/pypi release. For the revenue product with a zero-tolerance legal posture, the compliance tests ("the tests that must never go red" — send-time suppression re-check, unsubscribe endpoint, per-region CAN-SPAM/GDPR/CASL/PDPA rules) were enforced by nothing. The gate is also the repo's first per-push test run.
 
 ## Registry (all measured; full suite is the instrument, junit-scored)
 | metric | blocking | threshold | measured |
@@ -37,6 +37,6 @@ Outbound-generation *content* quality — fabricated prospect facts, personaliza
 | 1 | agent-rep-engine-core | a10132d | 4 | GREEN, seen-it-fire + live-fire |
 | 2 | aivis | f9a6035 | 5 | GREEN, seen-it-fire + live-fire |
 | — | titan-gate (library) | 15d1a98 | 1 (23 sealed verdicts) | GREEN, seen-it-fire + live-fire |
-| 3 | **LeadPilot** | **f73c930** | **3** | **GREEN, seen-it-fire + live-fire** |
+| 3 | **Vectorae** | **f73c930** | **3** | **GREEN, seen-it-fire + live-fire** |
 
 Per Build Order 3: **no more consumers.** Small repos get no gate. Remaining non-gate items unchanged: titan-receipts `/receipt-init` on Rehan's machine (local keys), attack-corpus growth in are-core, and the eval-conductor v1.1 column (scaffolder ships verify_block_fixtures.py; sealed-expectations and sealed-testset recipes) — locked until both plugins are live.

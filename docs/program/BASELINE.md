@@ -1,4 +1,4 @@
-# LeadPilot — Phase 0 Baseline
+# Vectorae — Phase 0 Baseline
 
 Built 2026-10-10 from `origin/master @ 2170a55` (last commit 2026-10-05), in a
 clean worktree with no `.env`. Every status below was checked against the code

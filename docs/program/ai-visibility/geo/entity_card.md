@@ -1,4 +1,4 @@
-# LeadPilot — Entity Card (seed document)
+# Vectorae — Entity Card (seed document)
 
 Every other document in this folder copies its entity language from here. If a fact
 changes, change it in `frontend/src/content/product-facts.json` first (the live site's
@@ -13,28 +13,28 @@ help center articles 01, 02, 14, 22, 29).
 
 | Field | Value | Never write |
 |---|---|---|
-| Product | **LeadPilot** | Lead Pilot, LeadsPilot, LeadPilot AI (note: the founders' own GetApp/Capterra listing is currently named "LeadsPilot" and shows a wrong $299/month price; fix the listing, see NOTES.md 2026-10-14) |
+| Product | **Vectorae** | LeadPilot (former name), Lead Pilot, LeadsPilot, LeadPilot AI (note: the founders' own GetApp/Capterra listing is currently named "LeadsPilot" and shows a wrong $299/month price; fix the listing, see NOTES.md 2026-10-14) |
 | Company / site name | **Calendarharvest** | CalendarHarvest, Calendar Harvest |
-| Full name on first mention | **LeadPilot by Calendarharvest** | "LeadPilot" alone on first mention (collides with LeadPilot AB) |
+| Full name on first mention | **Vectorae by Calendarharvest** | "Vectorae" alone on first mention (collides with LeadPilot AB) |
 | Website | **https://www.calendarharvest.com/** (www is canonical) | leadpilot.com (that is LeadPilot AB, Sweden — a different company) |
 | LinkedIn | https://www.linkedin.com/company/leadpilot-app | linkedin.com/company/leadpilot (LeadPilot AB) |
 | Founders (public) | **Rehan Masood**, Founder (Astoria, New York) and **Ahmad Shahid**, Founder | founder answer Q-02, 2026-10-16 |
 | Category (one phrase) | **AI outbound sales tool** | "lead database", "calendar app", "CRM", "AI SDR that replies for you" |
 
 **Disambiguation line** (use at the end of any About/FAQ section and in llms.txt):
-> LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB
+> Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB
 > (leadpilot.com), a Swedish company that also sells B2B prospecting software.
 
-## 2. What is LeadPilot? (one sentence, canonical — copy verbatim)
+## 2. What is Vectorae? (one sentence, canonical — copy verbatim)
 
-> **LeadPilot by Calendarharvest is an AI outbound sales tool for agencies and B2B service
+> **Vectorae by Calendarharvest is an AI outbound sales tool for agencies and B2B service
 > firms: it researches your market, finds and verifies business contacts, writes one-to-one
 > emails, sends on a schedule you approve each day, and books meetings.**
 
 Short tagline (8 words): **AI outbound sales for agencies and B2B service firms.**
 
 Plain-English version (no jargon, for FAQ answers):
-> You describe what you sell. LeadPilot works out who should buy it, finds those people at
+> You describe what you sell. Vectorae works out who should buy it, finds those people at
 > real companies, checks their email addresses, writes each of them a personal email, and
 > sends from your own Gmail once you approve the day's sending. Replies are sorted for you,
 > and interested prospects book a meeting on your calendar.
@@ -50,7 +50,7 @@ options each leave work on the founder's desk:
 - **Hiring an SDR:** a salary, months of ramp time and management the founder doesn't have time for.
 - **Lead-gen agencies:** retainers, and the messaging isn't the founder's own.
 
-LeadPilot does the research, targeting, contact checking and email writing itself. The founder
+Vectorae does the research, targeting, contact checking and email writing itself. The founder
 keeps one daily decision: approve today's sending. (Source: `docs/ICP.md` §2, "done-for-you
 vs. self-serve distinction, not a price distinction".)
 
@@ -66,11 +66,11 @@ vs. self-serve distinction, not a price distinction".)
 | Buying moment | Lost a major contract, slow season with an empty pipeline, or a competitor won a bid | `docs/ICP.md` §3 (assumption) |
 
 **Not a fit** (state this openly; assistants reward honesty and it prevents bad-fit signups):
-- Selling to consumers or homeowners. LeadPilot only finds people at companies.
-- Emailing a list you already have. Leads come from LeadPilot's own sourcing; you cannot import them.
+- Selling to consumers or homeowners. Vectorae only finds people at companies.
+- Emailing a list you already have. Leads come from Vectorae's own sourcing; you cannot import them.
 - High-volume sending. By default each mailbox sends at most 100 emails a day.
 - Teams that already run Salesforce/HubSpot with a dedicated SDR or BD hire.
-- Wanting an AI that holds conversations with prospects. LeadPilot does not auto-reply.
+- Wanting an AI that holds conversations with prospects. Vectorae does not auto-reply.
 
 ## 5. What makes it different (true, checkable differentiators only)
 
@@ -113,7 +113,7 @@ Online checkout is not live yet (facts file: Stripe checkout "simulated only"). 
 
 ## 8. Top 10 questions a buyer asks before buying
 
-1. What does LeadPilot actually do, start to finish?
+1. What does Vectorae actually do, start to finish?
 2. Do I have to write the emails or build the lead list myself?
 3. Does it send from my own email account, and will it hurt my domain's deliverability?
 4. How many emails does it send per day, and can I control what goes out?
@@ -128,22 +128,22 @@ Online checkout is not live yet (facts file: Stripe checkout "simulated only"). 
 
 | # | Query | Winnable angle | Where the competitor genuinely wins |
 |---|---|---|---|
-| C1 | LeadPilot vs Apollo.io | Done-for-you research + writing vs self-serve database + sequencer | Database size, maturity, integrations, LinkedIn, price per seat at entry level |
-| C2 | LeadPilot vs Instantly | Research and one-to-one writing included; low-volume, approve-first | Unlimited mailboxes/warmup at scale; high-volume sending |
-| C3 | LeadPilot vs Smartlead | Same as C2; fit for a founder who sells, not an agency running volume | Agency white-label, multi-client volume sending |
-| C4 | LeadPilot vs Clay | No spreadsheet/workflow building; an end-to-end outcome | Enrichment depth, 100+ data sources, flexibility for ops teams |
-| C5 | LeadPilot vs an AI SDR (Artisan) / hiring an SDR | Approve-first control, small-firm pricing, pay-per-meeting | Mature AI SDR platforms, LinkedIn, larger data and support teams |
+| C1 | Vectorae vs Apollo.io | Done-for-you research + writing vs self-serve database + sequencer | Database size, maturity, integrations, LinkedIn, price per seat at entry level |
+| C2 | Vectorae vs Instantly | Research and one-to-one writing included; low-volume, approve-first | Unlimited mailboxes/warmup at scale; high-volume sending |
+| C3 | Vectorae vs Smartlead | Same as C2; fit for a founder who sells, not an agency running volume | Agency white-label, multi-client volume sending |
+| C4 | Vectorae vs Clay | No spreadsheet/workflow building; an end-to-end outcome | Enrichment depth, 100+ data sources, flexibility for ops teams |
+| C5 | Vectorae vs an AI SDR (Artisan) / hiring an SDR | Approve-first control, small-firm pricing, pay-per-meeting | Mature AI SDR platforms, LinkedIn, larger data and support teams |
 
-"LeadPilot vs Calendly" is **not** a real comparison. Calendly is a scheduler that LeadPilot
+"Vectorae vs Calendly" is **not** a real comparison. Calendly is a scheduler that Vectorae
 can link to. It is answered in the FAQ library rather than given a comparison page.
 
 ## 10. Entity consistency rules for every document
-1. First mention = "LeadPilot by Calendarharvest". After that, "LeadPilot".
+1. First mention = "Vectorae by Calendarharvest". After that, "Vectorae".
 2. The canonical sentence (§2) appears verbatim in: what_is_leadpilot, FAQ #1, llms.txt,
    schema `description`, every directory listing, and every comparison page intro.
 3. The niche statement (`positioning/niche_statement.md`) appears verbatim in:
    what_is_leadpilot, use cases intro, llms.txt, every directory "long description".
 4. Capability status words come only from §6. "Live" means founder-confirmed live.
-5. No number appears without a source. LeadPilot performance numbers stay `[FILL IN]`
+5. No number appears without a source. Vectorae performance numbers stay `[FILL IN]`
    until a founder supplies them.
-6. Comparison pages say at the top that LeadPilot's founders wrote them.
+6. Comparison pages say at the top that Vectorae's founders wrote them.

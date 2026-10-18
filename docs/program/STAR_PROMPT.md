@@ -1,4 +1,4 @@
-# STAR Prompt — LeadPilot: Verification Gates · status.calendarharvest.com · Help AI Knowledge Base · 10 Competitive Features
+# STAR Prompt — Vectorae: Verification Gates · status.calendarharvest.com · Help AI Knowledge Base · 10 Competitive Features
 
 Prepared 2026-10-10 for Rehan Masood and Ahmad Shahid.
 Target: Claude Code, run at the repository root, trunk = `master`.
@@ -39,7 +39,7 @@ Repo facts below were checked against `origin/master @ 2170a55` (last commit 202
 ## PART 1 — THE PROMPT (everything below is for Claude Code)
 
 <role>
-You are the lead engineer on LeadPilot (repo name ClientHunter Enterprise): FastAPI + SQLAlchemy 2.0 + Alembic + Celery 5.4 + PostgreSQL (Neon) + Redis (Upstash) backend, Next.js 14 static-export frontend on Vercel, Capacitor Android app, one Anthropic gateway (`app/services/anthropic_client.py`). You write production-grade Python and TypeScript that matches the patterns already in this codebase. The founders are Rehan Masood and Ahmad Shahid. They want blunt, evidence-backed status reports with no reassurance language.
+You are the lead engineer on Vectorae (repo name ClientHunter Enterprise): FastAPI + SQLAlchemy 2.0 + Alembic + Celery 5.4 + PostgreSQL (Neon) + Redis (Upstash) backend, Next.js 14 static-export frontend on Vercel, Capacitor Android app, one Anthropic gateway (`app/services/anthropic_client.py`). You write production-grade Python and TypeScript that matches the patterns already in this codebase. The founders are Rehan Masood and Ahmad Shahid. They want blunt, evidence-backed status reports with no reassurance language.
 </role>
 
 <priority_rules>
@@ -84,7 +84,7 @@ Why buyers choose competitors:
 - **Buyer criteria in 2026 guides:** signal freshness with verifiable sources; personalization that cites real facts; brand guardrails and account exclusions; human review; deliverability (SPF/DKIM/DMARC, ramp, reputation); reporting in **meetings per dollar** and pipeline rather than emails sent; transparent pricing; a 30-day pilot before any annual contract.
 - **Mailbox-provider rules:** Google and Yahoo require SPF + DKIM + DMARC alignment, RFC 8058 one-click unsubscribe, and a spam rate kept below 0.10% and never reaching 0.30%; Microsoft began enforcing similar rules for consumer Outlook domains in May 2025 (Red Sift).
 
-LeadPilot's real, code-backed advantages to build on (from `codebase_map` and the audits): claim-verification engine that strips unsupported claims, 10-pass strategy verification, outreach gate with 15+ checks and no bypass flag, hash-chained audit trail, attribution ledger with confidence levels, statistically sound learning loop, per-mailbox health throttling, human send-review queue.
+Vectorae's real, code-backed advantages to build on (from `codebase_map` and the audits): claim-verification engine that strips unsupported claims, 10-pass strategy verification, outreach gate with 15+ checks and no bypass flag, hash-chained audit trail, attribution ledger with confidence levels, statistically sound learning loop, per-mailbox health throttling, human send-review queue.
 </market_research>
 
 ---
@@ -197,7 +197,7 @@ Jobs:
 | `08-sequences-and-follow-ups.md` | steps, delays, stop-on-reply, completion |
 | `09-email-sending-gmail.md` | connecting/reconnecting Google, daily caps, send windows, bounce auto-pause |
 | `10-whatsapp-outreach.md` | templates, opt-in, 24-hour window, STOP handling, sender model |
-| `11-linkedin.md` | exactly what LeadPilot does and does not do on LinkedIn; network feature and plan gate |
+| `11-linkedin.md` | exactly what Vectorae does and does not do on LinkedIn; network feature and plan gate |
 | `12-send-review-queue.md` | approvals, holds, kill switch interplay |
 | `13-replies-and-unified-inbox.md` | reply routing, classification, what changes when a lead replies |
 | `14-booking-and-calendar.md` | own calendar vs Calendly, booking pages, double-booking protection, time zones |
@@ -288,7 +288,7 @@ Rules for every feature:
 
 ## R — RESULT
 
-### R.1 What "LeadPilot is fully working" means for the merge gate
+### R.1 What "Vectorae is fully working" means for the merge gate
 
 `scripts/gate/e2e_journeys.py` must pass on Postgres + Redis + a real non-eager Celery worker, with a fake model provider and mocked vendors. Each journey asserts database state, not only HTTP codes:
 
@@ -315,7 +315,7 @@ Rules for every feature:
 
 Report this table at the end of every Phase 4 feature, measured — never estimated. A target counts as met only with a measurement from staging or a real pilot.
 
-| # | Competitor weakness (documented) | LeadPilot target |
+| # | Competitor weakness (documented) | Vectorae target |
 |---|---|---|
 | 1 | 15–35% bounces reported on "verified" data | < 2% hard bounces on verified sends |
 | 2 | Signals without verifiable sources | 100% of cited signals linked to a stored source |

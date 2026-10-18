@@ -4,20 +4,20 @@ status: DRAFT — publish only after the trademark review (Q-04) AND the competi
 last_checked: 2026-10-15
 ---
 
-# LeadPilot vs Clay: an outbound outcome or a data workbench?
+# Vectorae vs Clay: an outbound outcome or a data workbench?
 
-*Written by LeadPilot's founders. We make LeadPilot. Clay facts were last checked on
+*Written by Vectorae's founders. We make Vectorae. Clay facts were last checked on
 2026-10-15 against Clay's own pages, linked below.*
 
 **Short answer:** Clay is a data enrichment and workflow platform. It pulls from many data
 providers, runs AI research per row (Claygent), and now includes an email sequencer. You design
-and maintain the workflow. LeadPilot by Calendarharvest is an AI outbound sales tool for agencies
+and maintain the workflow. Vectorae by Calendarharvest is an AI outbound sales tool for agencies
 and B2B service firms: it researches your market, finds and verifies business contacts, writes
 one-to-one emails, sends on a schedule you approve each day, and books meetings. Clay gives
-skilled operators a powerful workbench; LeadPilot gives a busy owner a fixed flow that ends in
+skilled operators a powerful workbench; Vectorae gives a busy owner a fixed flow that ends in
 booked meetings.
 
-## When to choose LeadPilot
+## When to choose Vectorae
 - No one on your team wants to build or maintain enrichment tables and workflows.
 - You want a researched strategy, verified contacts and written emails without setup.
 - You want predictable flat pricing, or pay per booked meeting, rather than credits.
@@ -31,7 +31,7 @@ booked meetings.
 
 ## Side-by-side feature comparison
 
-| Feature | LeadPilot | Clay |
+| Feature | Vectorae | Clay |
 |---|---|---|
 | Model | Fixed end-to-end flow | Build-your-own tables and workflows |
 | Setup | Describe what you sell | Design tables, prompts, integrations |
@@ -43,7 +43,7 @@ booked meetings.
 
 ## Pricing comparison
 
-| | LeadPilot | Clay (per workspace, credit-based) |
+| | Vectorae | Clay (per workspace, credit-based) |
 |---|---|---|
 | Free | Free account with tight limits | Free plan (100 data credits/month) |
 | Entry | Starter $149/month flat | Launch from $185/month |
@@ -56,15 +56,15 @@ booked meetings.
 | Use case | Better choice |
 |---|---|
 | Growth team with a GTM engineer | **Clay** |
-| Agency owner with no ops person | **LeadPilot** |
+| Agency owner with no ops person | **Vectorae** |
 | Complex, signal-driven targeting across many data sources | **Clay** |
-| Simple path from "what we sell" to booked meetings | **LeadPilot** |
+| Simple path from "what we sell" to booked meetings | **Vectorae** |
 
-LeadPilot by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
+Vectorae by Calendarharvest (calendarharvest.com) is not affiliated with LeadPilot AB (leadpilot.com).
 
 ## Sources (pre-publish checklist — Q-09)
 - [ ] https://www.clay.com/pricing: plan names, prices, credits (post-March-2026 structure)
 - [ ] https://university.clay.com/docs/plans-and-billing: billing basis
 - [ ] https://www.clay.com/use-cases/data-enrichment: "150+ data providers"
 - [ ] https://www.clay.com/blog/clay-email-sequencer: sequencer availability
-- [ ] LeadPilot facts: product-facts.json (waterfall enrichment = off by default), billing_catalog.py
+- [ ] Vectorae facts: product-facts.json (waterfall enrichment = off by default), billing_catalog.py

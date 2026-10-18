@@ -16,7 +16,7 @@ existing AI-visibility program it extends. Paths in the brief are relative to th
 **ANSWERED 2026-10-16:** "Good and it is ok store state.md and questions.md in docs/program/ai-visibility/geo/" → confirmed.
 
 ### Q-02 — 2026-10-15 17:39 UTC — Founder name and public founder
-The brief says LeadPilot was "built by Ahmad Shahid". The repo says the founders are
+The brief says Vectorae was "built by Ahmad Shahid". The repo says the founders are
 Rehan Masood and Ahmad (`docs/program/STAR_PROMPT.md` says "Ahmad Masood"). The live
 `/about` page and the Person JSON-LD name **Rehan Masood** (Astoria, New York) as founder.
 **Assumption:** public content names Rehan Masood as founder (as the live site does) and
@@ -26,8 +26,8 @@ the site and third-party profiles confuses assistants.
 **ANSWERED 2026-10-16:** "Display Ahmad Shahid and Rehan Masood both as Founder" → both added as Founder in product-facts.json, /about and the JSON-LD.
 
 ### Q-03 — 2026-10-15 17:39 UTC — "Calendar-powered" positioning
-The brief's examples describe LeadPilot as "calendar-powered lead generation" that matches
-"prospect availability with the user's calendar". The code does not do that: LeadPilot has
+The brief's examples describe Vectorae as "calendar-powered lead generation" that matches
+"prospect availability with the user's calendar". The code does not do that: Vectorae has
 its own booking pages and a Calendly hook, and it does **not** read Google Calendar
 (`docs/help-center/14-booking-and-calendar.md`). Publishing the calendar claim would be
 false, and assistants that later read the help center would flag the contradiction.
@@ -40,7 +40,7 @@ sell to meetings on your calendar", the live homepage H1), not the mechanism.
 `docs/program/ai-visibility/REPORT.md` records "Trademark: Not reviewed; keep name" and
 defers new public pages and llms.txt until counsel reviews "LeadPilot" against
 LeadPilot AB (leadpilot.com, Sweden, since 2019) and Twenty Over Ten's "Lead Pilot" (US).
-Every page here assumes the brand stays "LeadPilot by Calendarharvest".
+Every page here assumes the brand stays "Vectorae by Calendarharvest".
 **Assumption:** all content in this folder is a draft, ready to paste once the trademark
 outcome is "reviewed, keep the name". Nothing here changes the live site.
 **Question:** has a trademark attorney reviewed the name yet, and with what outcome?
@@ -55,7 +55,7 @@ The brief writes "CalendarHarvest". The facts file, titles and JSON-LD use "Cale
 The 2026-10-13 founder answer was "Own-use numbers — I'll give them", but no numbers were
 supplied. Statistics pages, use cases and schema need them: meetings booked, reply rate,
 emails sent, time spent per week, period measured, and how measured.
-**Assumption:** no LeadPilot performance number is published anywhere. Every slot that
+**Assumption:** no Vectorae performance number is published anywhere. Every slot that
 needs one is marked `[FILL IN — own-use number + date + how measured]`.
 **ANSWERED 2026-10-16:** "I will give it later" → slots stay [FILL IN]; nothing published.
 
@@ -98,11 +98,11 @@ with customers"). Creating either would need an address customers visit, which C
 
 ### Q-12 — 2026-10-15 18:20 UTC — Baseline in the AI apps themselves
 This sandbox cannot sign in to ChatGPT, Claude.ai, Gemini, Perplexity or Copilot, so the "before"
-measurement in those apps could not be run. What was run: 8 web searches (none returned LeadPilot by
+measurement in those apps could not be run. What was run: 8 web searches (none returned Vectorae by
 Calendarharvest or calendarharvest.com).
 **Assumption:** `monitoring/ai_mention_tracker.md` holds the protocol and a pre-filled baseline sheet.
 The expected result is "not mentioned" everywhere, and a founder spends about 90 minutes to fill it.
-**ANSWERED 2026-10-16:** "ok i will complete" → note: a partial run already exists (NOTES.md 2026-10-15: not ranked on niche/comparison questions; founder misnamed "Ramish Masood"; LeadPilot AB's G2 reviews attributed to LeadPilot).
+**ANSWERED 2026-10-16:** "ok i will complete" → note: a partial run already exists (NOTES.md 2026-10-15: not ranked on niche/comparison questions; founder misnamed "Ramish Masood"; LeadPilot AB's G2 reviews attributed to Vectorae).
 
 ### Q-13 — 2026-10-15 18:50 UTC — The 6-new-page cap
 The founder-approved SPEC 2.6 allows at most 6 new public pages (3 comparisons + 3 buyer-group pages).

@@ -41,44 +41,44 @@ Source-path check (step 1): every path in the `sources:` front matter of 01–10
 ### 01-what-is-leadpilot.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot is an outbound sales system. You describe a product … then sends personalized outreach by email (and, where set up, WhatsApp) automatically, within compliance limits you can see. | supported | FEATURES.md:6; app/workers/outreach_tasks.py:1-7; app/services/sequence_engine.py:1-15 (D1 caveat above) |
+| 1 | Vectorae is an outbound sales system. You describe a product … then sends personalized outreach by email (and, where set up, WhatsApp) automatically, within compliance limits you can see. | supported | FEATURES.md:6; app/workers/outreach_tasks.py:1-7; app/services/sequence_engine.py:1-15 (D1 caveat above) |
 | 2 | The work happens in a fixed order. | supported | FEATURES.md:44-67; app/workers/tasks.py:143-145; app/api/leads.py:83-90 |
-| 3 | **Intake.** You give LeadPilot a name and a plain-language description … Optionally, you describe past clients and how you won them. | supported | frontend/src/app/(app)/strategies/new/page.tsx:57-140 |
+| 3 | **Intake.** You give Vectorae a name and a plain-language description … Optionally, you describe past clients and how you won them. | supported | frontend/src/app/(app)/strategies/new/page.tsx:57-140 |
 | 4 | **Research.** … 72 steps if you described past clients, or 144 steps if you did not. | supported | app/pipeline/engine.py:10-11,37-40 |
 | 5 | It runs once per strategy, not once per prospect. | supported | app/workers/tasks.py:95-146; app/api/strategies.py:132-209 |
 | 6 | **Verification.** The finished strategy is checked against 10 criteria, including a legal and compliance check. | supported | app/verification/passes.py:103-161 |
 | 7 | Leads cannot be sourced and outreach cannot start until the strategy is verified. | supported | app/api/leads.py:83-90; app/api/sequences.py:247-251 |
-| 8 | **Lead sourcing.** LeadPilot searches for people …, adds details …, finds and checks their email address, and removes anyone on the suppression list. | supported | app/workers/lead_tasks.py:3-13,221-223,283-285,340-348 |
+| 8 | **Lead sourcing.** Vectorae searches for people …, adds details …, finds and checks their email address, and removes anyone on the suppression list. | supported | app/workers/lead_tasks.py:3-13,221-223,283-285,340-348 |
 | 9 | **Writing and sending.** Each email is written for one specific person at the moment it is sent (a WhatsApp template's wording is fixed; only its variables are filled per person). | supported | app/workers/outreach_tasks.py:554-589,646-653; app/services/message_personalization.py:1-4 |
 | 10 | Messages are then sent automatically from your connected Gmail account (or the deployment's WhatsApp Business number), inside send windows and daily limits. | supported | app/workers/outreach_tasks.py:268-352,396-398 |
 | 11 | **Follow-up.** Later steps go out after the delay you set. | supported | app/services/sequence_engine.py:325,352-386 |
 | 12 | When someone replies, their sequence stops. | supported | app/workers/outreach_tasks.py:1104-1108 (an out-of-office reply pauses instead, 1095-1102) |
-| 13 | **Booking and meetings.** LeadPilot has its own booking pages and a meeting room for notes and an AI summary. | supported | app/api/calendar.py:327-433; app/api/meetings.py:134-156,432 |
+| 13 | **Booking and meetings.** Vectorae has its own booking pages and a meeting room for notes and an AI summary. | supported | app/api/calendar.py:327-433; app/api/meetings.py:134-156,432 |
 | 14 | **Learning.** Results are rolled up every night and fed into the starting point for new strategies. | supported | app/workers/celery_app.py:234-238 (nightly 02:05 UTC); app/pipeline/engine.py:128-139 (playbook injected into phases 6 and 8) |
-| 15 | No. Once you launch a sequence, LeadPilot sends the messages automatically. | supported | app/workers/celery_app.py:226-229; app/workers/outreach_tasks.py:99-123 (D1 caveat) |
+| 15 | No. Once you launch a sequence, Vectorae sends the messages automatically. | supported | app/workers/celery_app.py:226-229; app/workers/outreach_tasks.py:99-123 (D1 caveat) |
 | 16 | Before every single send it re-checks the suppression list, the campaign and contact state, the send window, and the daily allowance. | supported | app/workers/outreach_tasks.py:1-7,171-196,268-352 |
 | 17 | Some messages can be held for a person to approve first … | supported | app/workers/outreach_tasks.py:416-432; app/services/send_review.py:1-40 |
-| 18 | LeadPilot does not reply to people on your behalf: when a prospect replies, the reply is classified and routed to you, and you write the answer. | supported | app/workers/outreach_tasks.py:996-998,1115-1117; app/services/reply_classification.py:12 |
+| 18 | Vectorae does not reply to people on your behalf: when a prospect replies, the reply is classified and routed to you, and you write the answer. | supported | app/workers/outreach_tasks.py:996-998,1115-1117; app/services/reply_classification.py:12 |
 | 19 | No. The research pipeline runs once for each strategy you create. | supported | app/workers/tasks.py:95-146 |
-| 20 | Messages to individual prospects are written separately, at send time, from that strategy's messaging research plus what LeadPilot has stored about the person. | supported | app/services/message_personalization.py:47-59,97-174 |
+| 20 | Messages to individual prospects are written separately, at send time, from that strategy's messaging research plus what Vectorae has stored about the person. | supported | app/services/message_personalization.py:47-59,97-174 |
 | 21 | The research instructions tell the model never to invent statistics and to label estimates as assumptions. | supported | app/pipeline/registry.py:46-51 |
 | 22 | Verification check #1 then tests for this. | supported | app/verification/passes.py:104-107 |
 | 23 | Every AI-written message is checked before it is sent. | supported | app/workers/outreach_tasks.py:576-584; app/services/system_settings.py:142 (on by default; an administrator can turn the whole check off with `claim_verification_enabled`, app/services/claim_verification.py:442-461) |
-| 24 | Any claim about the prospect or their company … must be backed by data LeadPilot actually stored for that lead. | supported | app/services/claim_verification.py:1-20 |
+| 24 | Any claim about the prospect or their company … must be backed by data Vectorae actually stored for that lead. | supported | app/services/claim_verification.py:1-20 |
 | 25 | Unsupported claims are removed or replaced with a neutral line. | supported | app/services/claim_verification.py:7-9,363-372 |
 | 26 | The legal and compliance verification check can never be passed manually by a person. It has to pass on its own. | supported | app/services/verification_override.py:24-28,161-166 |
 | 27 | Every outreach email carries a footer with the sender identity and an unsubscribe link, plus one-click unsubscribe headers. | supported | app/services/sequence_engine.py:439-463 |
 | 28 | An unsubscribe, or a reply asking to stop, suppresses the person and stops all of their sequences immediately. | supported | app/services/sequence_engine.py:484-508; app/api/unsubscribe.py:50; app/workers/outreach_tasks.py:1084-1088 |
 | 29 | WhatsApp messages only go to contacts with a recorded opt-in, and a first WhatsApp touch must use a Meta-approved template. | supported | app/workers/outreach_tasks.py:222-255; app/api/sequences.py:181-199 |
 | 30 | If a campaign's bounce rate goes above the threshold (3% by default, after at least 10 sends), the whole campaign pauses until a person resumes it. | supported | app/config.py:113-114; app/services/sequence_engine.py:527-557 |
-| 31 | LeadPilot gives no legal advice; you remain responsible for having a lawful basis to contact each person. | supported | app/services/compliance_rules.py:36; frontend/src/components/strategy/OutreachPanel.tsx:198-205 |
+| 31 | Vectorae gives no legal advice; you remain responsible for having a lawful basis to contact each person. | supported | app/services/compliance_rules.py:36; frontend/src/components/strategy/OutreachPanel.tsx:198-205 |
 | 32 | Each plan sets how many strategies …, how many leads one strategy can hold, how many steps …, which channels …, and a daily AI spending limit. | supported | app/core/plans.py:52-177 |
 | 33 | When the daily AI limit is used up, new strategies and resumes are refused until it resets at 00:00 UTC. | supported | app/api/strategies.py:102-126,167,322 (figures are placeholders, DECISIONS.md:20) |
-| 34 | LeadPilot runs on a server, so sequences keep sending and follow-ups keep firing when your computer is off. | supported | app/workers/celery_app.py:207-262 |
+| 34 | Vectorae runs on a server, so sequences keep sending and follow-ups keep firing when your computer is off. | supported | app/workers/celery_app.py:207-262 |
 | 35 | (RE-CHECK, rewritten) Each deployment (database, workers and app) is intended to serve one customer organization. | supported | docs/program/DECISIONS.md:22-26 |
 | 35a | (RE-CHECK, new) Public sign-up is open to any email address by default, so a deployment stays limited to one organization only if its administrator closes sign-up or limits it to the organization's email domains. | supported | app/config.py:434-448; app/api/auth.py:214-228; DECISIONS.md:36-46 |
 | 36 | You use it through the web app; there is also an Android app. | supported | frontend/android (Capacitor project) |
-| 37 | LeadPilot connects to outside services such as Apollo, Hunter, Gmail, Meta's WhatsApp Cloud API, Calendly, Stripe and Recall.ai. | supported | docs/VERIFICATION_REPORT.md:579 |
+| 37 | Vectorae connects to outside services such as Apollo, Hunter, Gmail, Meta's WhatsApp Cloud API, Calendly, Stripe and Recall.ai. | supported | docs/VERIFICATION_REPORT.md:579 |
 | 38 | These integrations were built and tested against simulated responses. | supported | docs/VERIFICATION_REPORT.md:84 (F-QA-02 "integrations mock-only"), :579 |
 | 39 | They have not yet been verified end to end against the live services. | supported | docs/VERIFICATION_REPORT.md:579 |
 | 40 | ~~Where an article describes one of these integrations, it says so.~~ | removed | RE-CHECK: the writer deleted this sentence (and 03 and 08 now carry the Stripe and Calendly caveats anyway). |
@@ -90,7 +90,7 @@ Summary (after re-check): 40 supported, 0 unsupported, 0 contradicted.
 ### 02-who-its-for-and-not-for.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | The first part comes from LeadPilot's own customer research (its ideal customer profile). | supported | docs/ICP.md:1 |
+| 1 | The first part comes from Vectorae's own customer research (its ideal customer profile). | supported | docs/ICP.md:1 |
 | 2 | … target customer as a business-to-business company in the United States with roughly 5 to 50 employees, and a sweet spot of about 8 to 25. | supported | docs/ICP.md:1,6,51 |
 | 3 | At that size there is usually one named person who decides … owner, founder, general manager or head of sales, but no dedicated sales team or sales infrastructure yet. | supported | docs/ICP.md:91-96,199-203 |
 | 4 | 1. Small marketing, web development and design agencies. | supported | docs/ICP.md:76 |
@@ -98,35 +98,35 @@ Summary (after re-check): 40 supported, 0 unsupported, 0 contradicted.
 | 6 | 3. Small accounting, immigration and law consultancies (the research marks this one as an assumption …). | supported | docs/ICP.md:78 |
 | 7 | 4. Business-to-business staffing and recruiting agencies. | supported | docs/ICP.md:79 |
 | 8 | 5. Commercial HVAC and facilities maintenance companies (the lowest-confidence rank). | supported | docs/ICP.md:80 |
-| 9 | These are targets, not requirements. You can run LeadPilot for any product or service you sell to other businesses. | supported | app/api/strategies.py:132-209 (no product-type restriction) |
+| 9 | These are targets, not requirements. You can run Vectorae for any product or service you sell to other businesses. | supported | app/api/strategies.py:132-209 (no product-type restriction) |
 | 10 | Companies that already run Salesforce or HubSpot and have a dedicated sales or business development hire. | supported | docs/ICP.md:201-203 |
-| 11 | The problem LeadPilot addresses is the absence of that setup. | supported | docs/ICP.md:202-203 |
+| 11 | The problem Vectorae addresses is the absence of that setup. | supported | docs/ICP.md:202-203 |
 | 12 | Owner-operators with fewer than 5 employees and no budget for software. | supported | docs/ICP.md:204-206 |
 | 13 | Businesses that sell only to consumers or homeowners. | supported | docs/ICP.md:207-209 |
-| 14 | LeadPilot finds and contacts people at companies. It has no consumer prospecting. | supported | app/integrations/apollo.py:90-92; app/workers/lead_tasks.py:227-240 |
+| 14 | Vectorae finds and contacts people at companies. It has no consumer prospecting. | supported | app/integrations/apollo.py:90-92; app/workers/lead_tasks.py:227-240 |
 | 15 | The new-strategy form asks for a name and a description, and optionally details of past clients and how you won them. | supported | frontend/src/app/(app)/strategies/new/page.tsx:57-133 |
 | 16 | Email outreach is sent through the Gmail account you connect in Settings. | supported | app/workers/outreach_tasks.py:70-85 |
-| 17 | LeadPilot stores one Gmail connection per user account. | supported | app/db/models.py:1659-1661 (user_id unique) |
-| 18 | Before you launch, LeadPilot asks you to confirm that you may lawfully email each person on the list. | supported | frontend/src/components/strategy/OutreachPanel.tsx:198-205; frontend/src/lib/leadOutreach.ts:56-67 |
+| 17 | Vectorae stores one Gmail connection per user account. | supported | app/db/models.py:1659-1661 (user_id unique) |
+| 18 | Before you launch, Vectorae asks you to confirm that you may lawfully email each person on the list. | supported | frontend/src/components/strategy/OutreachPanel.tsx:198-205; frontend/src/lib/leadOutreach.ts:56-67 |
 | 19 | It applies compliance checks at send time, but it does not give legal advice. | supported | app/workers/outreach_tasks.py:1-7; app/services/compliance_rules.py:36 |
-| 20 | **For WhatsApp:** a plan that includes WhatsApp, a WhatsApp Business number configured on your LeadPilot deployment, Meta-approved message templates, and a recorded opt-in for each contact. | supported | app/core/plans.py:58,75; app/config.py:135-158; app/workers/outreach_tasks.py:222-255 |
-| 21 | (RE-CHECK, rewritten) Not as leads. Leads for email and WhatsApp sequences come only from LeadPilot's own sourcing step … | supported | app/workers/lead_tasks.py:227 (the only place a Lead is created) |
+| 20 | **For WhatsApp:** a plan that includes WhatsApp, a WhatsApp Business number configured on your Vectorae deployment, Meta-approved message templates, and a recorded opt-in for each contact. | supported | app/core/plans.py:58,75; app/config.py:135-158; app/workers/outreach_tasks.py:222-255 |
+| 21 | (RE-CHECK, rewritten) Not as leads. Leads for email and WhatsApp sequences come only from Vectorae's own sourcing step … | supported | app/workers/lead_tasks.py:227 (the only place a Lead is created) |
 | 22 | (RE-CHECK, rewritten) There is no way to import your own contact list as leads. | supported | app/workers/lead_tasks.py:227; no lead-import route in app/api |
-| 23 | (RE-CHECK, rewritten) If your business depends on emailing or messaging a list you already have, LeadPilot does not currently support that. | supported | Same as #22; the LinkedIn exception is stated next (#23a). |
+| 23 | (RE-CHECK, rewritten) If your business depends on emailing or messaging a list you already have, Vectorae does not currently support that. | supported | Same as #22; the LinkedIn exception is stated next (#23a). |
 | 23a | (RE-CHECK, new) The one exception is LinkedIn. On the Growth, Scale, Pro and Enterprise plans, the **Network** page lets you upload your LinkedIn `Connections.csv` export and send saved messages to people who are still your 1st-degree connections. | supported | app/core/plans.py:180-186; app/services/linkedin_network.py:343-345; app/api/linkedin_network.py:68-87,215-230; app/services/network_messages.py:1-9; frontend/src/components/shell/nav.ts:50 |
 | 23b | (RE-CHECK, new) Those connections do not become leads. | supported | app/api/linkedin_network.py:19-22 (stored as LinkedInConnection; no Lead created) |
 | 24 | By default, a newly connected Gmail account starts at 10 emails on its first day, adds 10 per day, and stops at a ceiling of 100 emails per day. | supported | app/config.py:106-108; app/services/sequence_engine.py:115-123 |
 | 25 | These numbers are set per deployment, and compliance rules can only lower the cap, never raise it. | supported | app/services/compliance_rules.py:13-15; app/services/sequence_engine.py:122 |
 | 26 | Messages over the day's allowance wait for the next day; they are not dropped. | supported | app/workers/outreach_tasks.py:339-352 |
 | 27 | The deployment's WhatsApp number follows the same pattern by default. | supported | app/config.py:155-158; app/services/sequence_engine.py:161-179 |
-| 28 | No. LeadPilot does not auto-reply to people. | supported | app/workers/outreach_tasks.py:996-998; app/services/reply_classification.py:12 |
-| 29 | When someone replies, LeadPilot classifies the reply, stops their sequence (or pauses it for an out-of-office), and tells you. | supported | app/workers/outreach_tasks.py:1037,1095-1117 |
+| 28 | No. Vectorae does not auto-reply to people. | supported | app/workers/outreach_tasks.py:996-998; app/services/reply_classification.py:12 |
+| 29 | When someone replies, Vectorae classifies the reply, stops their sequence (or pauses it for an out-of-office), and tells you. | supported | app/workers/outreach_tasks.py:1037,1095-1117 |
 | 30 | You write the answer. | supported | app/workers/outreach_tasks.py:996-998 |
-| 31 | (RE-CHECK, rewritten) Partly. A LeadPilot deployment is intended to serve one customer organization (this holds only if the administrator closes public sign-up or limits it to the organization's email domains; by default sign-up is open). | supported | DECISIONS.md:22-26,36-46; app/config.py:434-448 |
+| 31 | (RE-CHECK, rewritten) Partly. A Vectorae deployment is intended to serve one customer organization (this holds only if the administrator closes public sign-up or limits it to the organization's email domains; by default sign-up is open). | supported | DECISIONS.md:22-26,36-46; app/config.py:434-448 |
 | 32 | For email, client workspaces can restrict each client's outreach to that client's own sending domains. | supported | app/workers/outreach_tasks.py:319-332 |
 | 33 | For WhatsApp, there is one sending number per deployment, so every client's prospects see the same WhatsApp number. | supported | app/config.py:137; app/services/sequence_engine.py:162-164; docs/program/BASELINE.md:164 |
-| 34 | If you need a separate WhatsApp number per client, LeadPilot does not support that yet. | supported | docs/program/BASELINE.md:92 |
-| 35 | LeadPilot works out which region a lead is in from their country or time zone and applies region-specific rules. | supported | app/services/compliance_region.py:9-17,124-131 |
+| 34 | If you need a separate WhatsApp number per client, Vectorae does not support that yet. | supported | docs/program/BASELINE.md:92 |
+| 35 | Vectorae works out which region a lead is in from their country or time zone and applies region-specific rules. | supported | app/services/compliance_region.py:9-17,124-131 |
 | 36 | … it never adds an open-tracking pixel to email sent to leads in the EU, EEA or UK … | supported | app/services/compliance_region.py:134-137; app/services/open_tracking.py:76-80 |
 | 37 | … and it adds a regional notice to the email footer where that region's rules ask for one. | supported | app/services/compliance_audit.py:49-64; app/services/sequence_engine.py:456-463 |
 | 38 | Leads with neither a country nor a time zone are treated as "unknown". | supported | app/services/compliance_region.py:15-17; app/services/compliance_audit.py:70-73 (for open tracking, unknown counts as allowed) |
@@ -140,13 +140,13 @@ Summary (after re-check): 40 supported, 0 unsupported, 0 contradicted. New sourc
 |---|---|---|---|
 | 1 | (RE-CHECK, rewritten) Email verification is required before you can use anything; the phone step and the plan choice can be put off, with the limits described below. | supported | app/config.py:276-281; frontend/src/lib/post-login.ts:4-7,25-32; onboarding/verify/page.tsx:274 |
 | 2 | … enter your email address and a password of at least 8 characters, and press **Create account**. | supported | app/api/auth.py:78; frontend/src/app/(auth)/signup/page.tsx:55-64 |
-| 3 | Each LeadPilot deployment can turn public sign-up off, or allow only certain email domains. By default it is open to any address. | supported | app/config.py:434-448 |
-| 4 | If it is closed you will see "Sign-up is closed on this LeadPilot deployment. Ask your administrator for an account." | supported | app/api/auth.py:207-208,222-223 |
+| 3 | Each Vectorae deployment can turn public sign-up off, or allow only certain email domains. By default it is open to any address. | supported | app/config.py:434-448 |
+| 4 | If it is closed you will see "Sign-up is closed on this Vectorae deployment. Ask your administrator for an account." | supported | app/api/auth.py:207-208,222-223 |
 | 5 | If your domain is not allowed, you will see a similar message about approved email domains. | supported | app/api/auth.py:209-211,224-228 |
-| 6 | On production deployments, LeadPilot refuses sign-up and sign-in from these networks and asks you to try again from your normal network. | supported | app/config.py:411-416,502-506; app/services/network_guard.py:36-38; app/api/auth.py:250 |
+| 6 | On production deployments, Vectorae refuses sign-up and sign-in from these networks and asks you to try again from your normal network. | supported | app/config.py:411-416,502-506; app/services/network_guard.py:36-38; app/api/auth.py:250 |
 | 7 | Sign-up and other account requests are limited to 10 per 15 minutes from one network address. | supported | app/core/config.py:320; app/api/auth.py:242-243,344-348 |
 | 8 | **The address already has an account.** Sign in instead. | supported | app/api/auth.py:254-255 |
-| 9 | Right after sign-up, LeadPilot emails you a verification link and shows a **Check your email** screen. | supported | app/api/auth.py:282-289; frontend/src/lib/post-login.ts:25-27; frontend/src/app/(auth)/check-email/page.tsx:74 |
+| 9 | Right after sign-up, Vectorae emails you a verification link and shows a **Check your email** screen. | supported | app/api/auth.py:282-289; frontend/src/lib/post-login.ts:25-27; frontend/src/app/(auth)/check-email/page.tsx:74 |
 | 10 | Click the link in the email to activate your account. | supported | app/api/auth.py:292-326 |
 | 11 | The link expires after 24 hours. | supported | app/config.py:236-238 |
 | 12 | Until you click it, your account exists but cannot use any features. | supported | app/config.py:276-281; app/api/auth.py:277-281 |
@@ -154,14 +154,14 @@ Summary (after re-check): 40 supported, 0 unsupported, 0 contradicted. New sourc
 | 14 | On the **Check your email** screen, press **Resend verification email**. A new link replaces the old one. | supported | frontend/src/app/(auth)/check-email/page.tsx:121; app/services/email_verification.py:100-112 |
 | 15 | If the screen says the email could not be sent, your account was still created. | supported | app/api/auth.py:183-204; frontend/src/app/(auth)/check-email/page.tsx:78-82 |
 | 16 | … the resend screen always answers the same way ("If that address has an unverified account, a new link is on its way") … | supported | frontend/src/app/(auth)/check-email/page.tsx:110-116; app/api/auth.py:329-357 |
-| 17 | LeadPilot's system emails come from noreply@calendarharvest.com by default. | supported | app/config.py:226 |
+| 17 | Vectorae's system emails come from noreply@calendarharvest.com by default. | supported | app/config.py:226 |
 | 18 | New accounts go through a short, two-step verification screen after the email link. | supported | app/api/auth.py:270-273; frontend/src/app/(app)/onboarding/verify/page.tsx:5-7,59 |
 | 19 | You choose the country you are personally in, and whether you are signing up as an individual or a company. | supported | frontend/src/app/(app)/onboarding/verify/page.tsx:121-142 |
 | 20 | A company also gives the country it is registered or operating in, and optionally its name. | supported | frontend/src/app/(app)/onboarding/verify/page.tsx:156-168 |
-| 21 | LeadPilot compares your stated country with where your connection appears to come from. | supported | app/services/identity.py:3-6 |
+| 21 | Vectorae compares your stated country with where your connection appears to come from. | supported | app/services/identity.py:3-6 |
 | 22 | A mismatch never blocks you; it only flags your account for an administrator to review. | supported | app/services/identity.py:8-14 |
 | 23 | Enter your mobile number with its country code (for example +44 20 7946 0958) and press **Send code**. | supported | frontend/src/app/(app)/onboarding/verify/page.tsx:240-245 |
-| 24 | LeadPilot texts you a 6-digit code. | supported | app/services/phone_verification.py:3,140 |
+| 24 | Vectorae texts you a 6-digit code. | supported | app/services/phone_verification.py:3,140 |
 | 25 | The code expires after 10 minutes. | supported | app/config.py:462 |
 | 26 | After 5 wrong attempts the code is locked. | supported | app/config.py:463; app/services/phone_verification.py:176-185 |
 | 27 | You can request a new code after 60 seconds, and up to 5 codes per hour. | supported | app/config.py:464; app/core/config.py:294-301 |
@@ -170,7 +170,7 @@ Summary (after re-check): 40 supported, 0 unsupported, 0 contradicted. New sourc
 | 30 | The text-message service behind this step (Twilio) has not yet been verified against the live service. | supported | BUILD_BLOCKERS.md:10-22 |
 | 31 | If your deployment has not finished setting it up, codes may not arrive. | supported | app/config.py:451-456 (default `sms_provider="console"` delivers nothing) |
 | 32 | (RE-CHECK, rewritten) Not to start. An account without a paid plan uses the Free plan's limits (for example 3 strategies, a $10 daily AI limit, and email only). | supported | app/db/models.py:405 (default plan FREE); app/core/plans.py:53-69; no server route requires a paid plan (app/api/auth.py:166 only reports it) |
-| 33 | (RE-CHECK, rewritten) Right after you sign in, if your account has no paid plan, LeadPilot shows you the **Pricing** page ("Choose a plan to start using LeadPilot"); it does not send you back there later. | supported | frontend/src/lib/post-login.ts:4-7,31; frontend/src/app/pricing/page.tsx:112 |
+| 33 | (RE-CHECK, rewritten) Right after you sign in, if your account has no paid plan, Vectorae shows you the **Pricing** page ("Choose a plan to start using Vectorae"); it does not send you back there later. | supported | frontend/src/lib/post-login.ts:4-7,31; frontend/src/app/pricing/page.tsx:112 |
 | 34 | Each monthly tier starts with a 14-day free trial. | supported | app/core/billing_catalog.py:29; frontend/src/app/pricing/page.tsx:133 |
 | 35 | Choosing a plan requires a verified phone number. | supported | app/api/billing.py:17,77 |
 | 35a | (RE-CHECK, new) The payment integration (Stripe) has not yet been verified against the live service; if checkout is not available on your deployment, contact support. | supported | docs/VERIFICATION_REPORT.md:579; app/api/billing.py:79-84 (503 in production when no Stripe key) |
@@ -183,10 +183,10 @@ Summary (after re-check): 40 supported, 0 unsupported, 0 contradicted. New sourc
 | 42 | **Do you have any past clients for this?** Choose **Yes — build on proven patterns** or **No — research the market from scratch**. | supported | frontend/src/app/(app)/strategies/new/page.tsx:86-101 |
 | 43 | **Past clients** (only if you said yes). For each client, describe who they were and how you won them. You can add more than one. | supported | frontend/src/app/(app)/strategies/new/page.tsx:107-140 |
 | 44 | **Ready to launch.** Review the flow and press **Launch pipeline**. | supported | frontend/src/app/(app)/strategies/new/page.tsx:144-171 |
-| 45 | If you added past clients, LeadPilot runs a 72-step research pipeline anchored on them. If not, it runs 144 steps (72 strategy plus 72 go-to-market). | supported | frontend/src/app/(app)/strategies/new/page.tsx:151-153; app/pipeline/engine.py:10-11 |
-| 46 | Each time you complete this form, LeadPilot creates a new product and a new strategy for it. | supported | frontend/src/app/(app)/strategies/new/page.tsx:29-38 |
+| 45 | If you added past clients, Vectorae runs a 72-step research pipeline anchored on them. If not, it runs 144 steps (72 strategy plus 72 go-to-market). | supported | frontend/src/app/(app)/strategies/new/page.tsx:151-153; app/pipeline/engine.py:10-11 |
+| 46 | Each time you complete this form, Vectorae creates a new product and a new strategy for it. | supported | frontend/src/app/(app)/strategies/new/page.tsx:29-38 |
 | 47 | You land on the strategy's page. | supported | frontend/src/app/(app)/strategies/new/page.tsx:38 |
-| 48 | (RE-CHECK, rewritten) The research runs on LeadPilot's servers, so you can close the tab; the strategy page shows research progress as steps done out of the total for each pipeline. | supported | app/api/strategies.py:221-251; detail/page.tsx:38-60,167-171 |
+| 48 | (RE-CHECK, rewritten) The research runs on Vectorae's servers, so you can close the tab; the strategy page shows research progress as steps done out of the total for each pipeline. | supported | app/api/strategies.py:221-251; detail/page.tsx:38-60,167-171 |
 | 49 | When research finishes, the 10 verification checks run. | supported | app/workers/tasks.py:143-145 |
 | 50 | … you have reached your plan's number of strategies (for example, 3 on the Free plan); | supported | app/api/strategies.py:158-166; app/core/plans.py:54 |
 | 51 | … your plan's daily AI limit is used up (it resets at 00:00 UTC); | supported | app/api/strategies.py:102-126,167 |
@@ -205,7 +205,7 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 | 2 | The pipeline is organized into 8 phases of 9 steps each. The ninth step of every phase is a summary step … | supported | app/pipeline/registry.py:9-12; app/pipeline/budget_plan.py:7-11 |
 | 3 | The strategy document is built from those 8 phase summaries. | supported | app/pipeline/engine.py:232-245 |
 | 4 | The 8 strategy phases are: Product decomposition, ICP definition, … and Execution plan. | supported | frontend/src/app/(app)/strategies/detail/page.tsx:21-26 (short labels); app/pipeline/registry.py:57-146 |
-| 5 | Before the first phase, LeadPilot fetches recent market signals once …: news headlines from the last 30 days (from Google News) and, where available, company funding and headcount signals from Apollo. | supported | app/services/market_intel.py:1-17,53-57; app/workers/tasks.py:113-120 |
+| 5 | Before the first phase, Vectorae fetches recent market signals once …: news headlines from the last 30 days (from Google News) and, where available, company funding and headcount signals from Apollo. | supported | app/services/market_intel.py:1-17,53-57; app/workers/tasks.py:113-120 |
 | 6 | They are labelled as headlines to check, not facts to quote. | supported | app/services/market_intel.py:26-27 |
 | 7 | If this fetch fails, the pipeline continues without them. | supported | app/services/market_intel.py:29-32 |
 | 8 | The pipeline runs **once per strategy**. It does not run again for each prospect. | supported | app/workers/tasks.py:95-146 |
@@ -215,12 +215,12 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 | 12 | The GTM pipeline's 8 phases are: Positioning, Pricing, … and Funnel metrics. | supported | frontend/src/app/(app)/strategies/detail/page.tsx:27-30; app/pipeline/registry.py:152-241 |
 | 13 | When both run, the strategy pipeline runs first and the GTM pipeline second. | supported | app/pipeline/engine.py:37-40 (FEATURES.md:153 says GTM runs first; that doc is stale) |
 | 14 | There is no fixed duration; it depends on the AI service's response times. | supported | app/core/config.py:190-193 |
-| 15 | The research runs on LeadPilot's servers, so you can close the browser tab. | supported | app/workers/tasks.py:95 |
+| 15 | The research runs on Vectorae's servers, so you can close the browser tab. | supported | app/workers/tasks.py:95 |
 | 16 | (RE-CHECK, rewritten) The strategy page shows progress for each pipeline (the strategy pipeline, and the GTM pipeline when it runs) as steps done out of the total. | supported | app/api/strategies.py:221-251; detail/page.tsx:38-60,167-171 |
 | 16a | (RE-CHECK, new) In the current release these progress cards are labelled "Phase pending" rather than with phase names, and they do not break progress down by phase. | supported | detail/page.tsx:38-41 (entries have no `phase`, so `numbered` is false); app/api/schemas.py:127-131 |
-| 17 | When verification finishes, LeadPilot sends a push notification ("Your strategy is ready" or "Strategy needs review") to devices registered for notifications. | supported | app/verification/loop.py:360-368; app/services/notifications.py:355-382 |
+| 17 | When verification finishes, Vectorae sends a push notification ("Your strategy is ready" or "Strategy needs review") to devices registered for notifications. | supported | app/verification/loop.py:360-368; app/services/notifications.py:355-382 |
 | 18 | Each pipeline run has a time limit of 2 hours. | supported | app/config.py:346-350; app/workers/tasks.py:95-97 |
-| 19 | … LeadPilot retries it automatically up to 3 times, 30 seconds apart, and each retry continues from the last finished step. | supported | app/workers/tasks.py:95,160-181; app/pipeline/engine.py:58-69 |
+| 19 | … Vectorae retries it automatically up to 3 times, 30 seconds apart, and each retry continues from the last finished step. | supported | app/workers/tasks.py:95,160-181; app/pipeline/engine.py:58-69 |
 | 20 | If the error cannot succeed on retry, or the retries run out, the strategy is marked `failed` and the reason is shown on the strategy page. | supported | app/workers/tasks.py:43-69,160-172; detail/page.tsx:161-165 |
 | 21 | `pending` — Created; research has not started yet. | supported | app/api/strategies.py:202-208,323-325 |
 | 22 | `researching` — The research steps are running. | supported | app/workers/tasks.py:109 |
@@ -232,11 +232,11 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 | 28 | `budget_exhausted` — … the next AI call could have gone over the strategy's budget or your daily AI limit. Everything already done is saved. | supported | app/workers/tasks.py:72-86; app/services/usage_meter.py:63-82 |
 | 29 | Every strategy has a dollar budget for the AI spending of its research and verification. | supported | app/services/usage_meter.py:42-45; app/config.py:50-60 |
 | 30 | Writing outreach messages later does not count against it. | supported | app/services/usage_meter.py:42-45,166-184 (see out-of-scope note 4) |
-| 31 | Before each AI call, LeadPilot checks whether the call could take the run past its budget, assuming the worst case. If it could, the call is not made … Nothing is spent on the refused call. | supported | app/services/usage_meter.py:258-287; app/workers/tasks.py:147-148 |
+| 31 | Before each AI call, Vectorae checks whether the call could take the run past its budget, assuming the worst case. If it could, the call is not made … Nothing is spent on the refused call. | supported | app/services/usage_meter.py:258-287; app/workers/tasks.py:147-148 |
 | 32 | The default budget is $15. Through the API you can choose any amount from $0.50 up to the server's ceiling, which is $50 by default. The New strategy form uses the default. | supported | app/config.py:59-60; app/api/strategies.py:57-69,186-189; frontend/src/lib/api/strategies.ts:49-55 |
 | 33 | (RE-CHECK, rewritten) … runs fewer of the supporting research steps (between 2 and 8 steps per phase, instead of the full 9). | supported | app/pipeline/budget_plan.py:64-73 |
 | 34 | A shorter run also gets at most 2 attempts per verification check. | supported | app/verification/loop.py:133-141 |
-| 35 | If the budget cannot cover even 2 steps per phase, LeadPilot refuses to create the strategy and tells you the minimum needed. | supported | app/api/strategies.py:192-201; app/pipeline/budget_plan.py:60-69 |
+| 35 | If the budget cannot cover even 2 steps per phase, Vectorae refuses to create the strategy and tells you the minimum needed. | supported | app/api/strategies.py:192-201; app/pipeline/budget_plan.py:60-69 |
 | 36 | … every plan has a limit on how much AI spending your whole account can run up per day. The day resets at 00:00 UTC. | supported | app/core/plans.py:45-51; app/services/usage_meter.py:187-195 |
 | 37 | Daily AI limit table (Free $10, Starter $25, Growth $60, Pay per meeting $60, Scale $150, Pro $150, Enterprise $400) | supported | app/core/plans.py:55,72,91,107,126,142,164 (placeholders: DECISIONS.md:20) |
 | 38 | All AI use on your account counts toward the day's total. | supported | app/services/usage_meter.py:47-49,198-215 |
@@ -263,15 +263,15 @@ Summary (after re-check): 54 supported, 0 unsupported, 0 contradicted.
 ### 05-strategy-verification.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | … LeadPilot checks the strategy document against 10 separate criteria before anything can reach a real person. | supported | app/verification/passes.py:159-161; app/api/leads.py:83; app/api/sequences.py:249 |
+| 1 | … Vectorae checks the strategy document against 10 separate criteria before anything can reach a real person. | supported | app/verification/passes.py:159-161; app/api/leads.py:83; app/api/sequences.py:249 |
 | 2 | Each check is judged on its own, one criterion at a time. | supported | app/verification/passes.py:15-23 |
 | 3 | An AI reviewer answers PASS, or FAIL with a concrete instruction for what to change. | supported | app/verification/passes.py:15-23 |
-| 4 | On a FAIL, LeadPilot rewrites the strategy document to resolve that one finding and runs the same check again. | supported | app/verification/loop.py:3-7,287-349 |
+| 4 | On a FAIL, Vectorae rewrites the strategy document to resolve that one finding and runs the same check again. | supported | app/verification/loop.py:3-7,287-349 |
 | 5 | By default each check gets up to 3 attempts. A strategy that was shortened to fit a small budget gets at most 2. | supported | app/config.py:353; app/verification/loop.py:133-141 |
-| 6 | LeadPilot runs all 10 checks even if an earlier one fails. | supported | app/verification/loop.py:258-353 |
+| 6 | Vectorae runs all 10 checks even if an earlier one fails. | supported | app/verification/loop.py:258-353 |
 | 7 | If every check ends in PASS, the strategy becomes `verified`. | supported | app/verification/loop.py:355-357 |
 | 8 | If any check still fails after its attempts, the strategy becomes `needs_human_review`. | supported | app/verification/loop.py:351-357 |
-| 9 | Until a strategy is `verified`, LeadPilot will not source leads for it or launch a sequence from it. | supported | app/api/leads.py:83-90; app/api/sequences.py:247-251 |
+| 9 | Until a strategy is `verified`, Vectorae will not source leads for it or launch a sequence from it. | supported | app/api/leads.py:83-90; app/api/sequences.py:247-251 |
 | 10 | 1 Factual accuracy — … estimates are labelled as assumptions. No invented statistics. | supported | app/verification/passes.py:104-107 |
 | 11 | 2 ICP fit — … no drift toward excluded audiences. | supported | app/verification/passes.py:108-111 |
 | 12 | 3 Channel–message fit — … | supported | app/verification/passes.py:112-115 |
@@ -287,8 +287,8 @@ Summary (after re-check): 54 supported, 0 unsupported, 0 contradicted.
 | 22 | (RE-CHECK, rewritten) A check that took three attempts therefore appears three times (for example FAIL, FAIL, PASS), and a re-verified strategy also keeps the rows from earlier runs. | supported | loop.py:129 (append-only); app/api/strategies.py:372-378 (re-verify does not clear the log) |
 | 23 | (RE-CHECK, rewritten) The card does not show the reviewer's reasons; the reason a check failed is shown in the **Review and pass manually** form ("Why it failed"). | supported | detail/page.tsx:197-201 (`pass.fix` is never sent); OverridePassesPanel.tsx:72-76. Note: that form appears only when 1–3 checks failed and Legal & compliance is not among them (verificationReview.ts:27-47). |
 | 24 | A check can also stop early, before using all its attempts, for two reasons: | supported | app/verification/loop.py:119-128 |
-| 25 | **Conflicting sources.** The proposed fix would put the document back the way it was …. LeadPilot stops that check and leaves it for a person. | supported | app/verification/loop.py:319-342 |
-| 26 | **Rewrite too long.** … cut off even after one retry with a larger limit. LeadPilot leaves the document exactly as it was … and fails that check. | supported | app/verification/loop.py:179-199,293-317 |
+| 25 | **Conflicting sources.** The proposed fix would put the document back the way it was …. Vectorae stops that check and leaves it for a person. | supported | app/verification/loop.py:319-342 |
+| 26 | **Rewrite too long.** … cut off even after one retry with a larger limit. Vectorae leaves the document exactly as it was … and fails that check. | supported | app/verification/loop.py:179-199,293-317 |
 | 27 | At least one check still failed. The strategy page shows a **Needs your review** notice. | supported | detail/page.tsx:140-155 |
 | 28 | Three options: **Re-verify** …; **Pass the failed checks manually**, if no more than 3 failed, the Legal & compliance check is not one of them …; **Start a new strategy** … | supported | app/api/strategies.py:333-379; app/services/verification_override.py:24-28 |
 | 29 | Resume is not available from this status, because the research is already complete. | supported | app/api/strategies.py:295-300 |
@@ -299,7 +299,7 @@ Summary (after re-check): 54 supported, 0 unsupported, 0 contradicted.
 | 34 | The finished research is reused, not repeated, but the checks cost AI spending again and count toward your daily AI limit. | supported | app/api/strategies.py:341-352,377-378; app/services/usage_meter.py:55 |
 | 35 | Every check is judged from scratch, and the strategy becomes `verified` only if all 10 pass. Otherwise it returns to `needs_human_review`. | supported | app/api/strategies.py:346-348; app/verification/loop.py:355-357 |
 | 36 | Press **Review and pass manually**. It is offered when the strategy is `needs_human_review` or `budget_exhausted`, and also while it shows `verifying`. | supported | detail/page.tsx:140-159; OverridePassesPanel.tsx:37-55; frontend/src/lib/verificationReview.ts:65 |
-| 37 | For a `verifying` strategy, LeadPilot refuses the sign-off until nothing has been logged for 15 minutes … | supported | app/services/verification_override.py:31-34,110-128 |
+| 37 | For a `verifying` strategy, Vectorae refuses the sign-off until nothing has been logged for 15 minutes … | supported | app/services/verification_override.py:31-34,110-128 |
 | 38 | If the Legal & compliance check is among the failures, the button is replaced by a note saying it cannot be passed manually. | supported | frontend/src/lib/verificationReview.ts:30-36; OverridePassesPanel.tsx:41-47 |
 | 39 | The form lists each failed check and why it failed. | supported | OverridePassesPanel.tsx:68-79 |
 | 40 | Write why the failure is acceptable, in at least 20 characters. This reason is kept on record. | supported | app/services/verification_override.py:25,140-144,189; OverridePassesPanel.tsx:80-81 |
@@ -314,7 +314,7 @@ Summary (after re-check): 54 supported, 0 unsupported, 0 contradicted.
 | 49 | Each manually passed check shows **PASS (manual)** with "passed manually by" your email address and your reason … | supported | detail/page.tsx:192-205; verification_override.py:184-189 |
 | 50 | … and the decision is also written to the security audit trail. | supported | app/api/strategies.py:422-426 |
 | 51 | It varies with how many checks fail and need a rewrite. | supported | app/verification/loop.py:268-349 |
-| 52 | LeadPilot's own notes estimate one check-and-fix cycle at about 3 to 4 minutes. | supported | app/services/verification_override.py:32 |
+| 52 | Vectorae's own notes estimate one check-and-fix cycle at about 3 to 4 minutes. | supported | app/services/verification_override.py:32 |
 | 53 | Each verification run has the same 2-hour time limit and automatic retries as the research pipeline. | supported | app/workers/tasks.py:186-188,209-225 |
 
 Summary (after re-check): 53 supported, 0 unsupported, 0 contradicted.
@@ -324,11 +324,11 @@ Summary (after re-check): 53 supported, 0 unsupported, 0 contradicted.
 ### 06-lead-sourcing-and-email-verification.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | Once a strategy is verified, LeadPilot can find people who match it, look up their email addresses and check that those addresses accept mail. | supported | app/workers/lead_tasks.py:3-4 |
+| 1 | Once a strategy is verified, Vectorae can find people who match it, look up their email addresses and check that those addresses accept mail. | supported | app/workers/lead_tasks.py:3-4 |
 | 2 | In the **1. Find leads** card, enter **How many leads** (1 to 25 per click; the form starts at 5) and press **Find leads**. | supported | OutreachPanel.tsx:103-123; frontend/src/lib/leadOutreach.ts:10-11,21-25 |
-| 3 | LeadPilot shows "Finding leads. This takes a few minutes." and the list fills in as leads move through the stages. | supported | OutreachPanel.tsx:35-50 |
+| 3 | Vectorae shows "Finding leads. This takes a few minutes." and the list fills in as leads move through the stages. | supported | OutreachPanel.tsx:35-50 |
 | 4 | Lead sourcing only works for a strategy whose status is `verified`. For any other status the request is refused. | supported | app/api/leads.py:83-90 |
-| 5 | LeadPilot builds the search from the strategy's research: job titles, industries, locations, company size ranges and keywords from the ideal customer profile. | supported | app/api/schemas.py:155-158; app/api/leads.py:105 |
+| 5 | Vectorae builds the search from the strategy's research: job titles, industries, locations, company size ranges and keywords from the ideal customer profile. | supported | app/api/schemas.py:155-158; app/api/leads.py:105 |
 | 6 | Through the API a request can ask for up to 1,000 leads, but one sourcing run is capped at 200 by default. | supported | app/api/schemas.py:153; app/config.py:87; app/api/leads.py:114-116 |
 | 7 | By default you can start 5 sourcing requests per hour. | supported | app/core/config.py:200; app/api/leads.py:80 |
 | 8 | Each lead uses paid Apollo and Hunter credits, so the screen suggests starting small. | supported | OutreachPanel.tsx:106-109 |
@@ -368,12 +368,12 @@ Summary (after re-check): 53 supported, 0 unsupported, 0 contradicted.
 | 42 | when a lead is enrolled in a sequence; | supported | app/services/sequence_engine.py:227-228 |
 | 43 | immediately before every single message is sent. | supported | app/workers/outreach_tasks.py:187-196 |
 | 44 | A suppressed lead is skipped or dropped, never contacted. | supported | lead_tasks.py:221-223,283-285; outreach_tasks.py:187-196 |
-| 45 | The list applies across your whole LeadPilot deployment. | supported | app/workers/lead_tasks.py:124-142 (no owner filter); frontend/src/lib/settings-tabs.ts:4-7 |
+| 45 | The list applies across your whole Vectorae deployment. | supported | app/workers/lead_tasks.py:124-142 (no owner filter); frontend/src/lib/settings-tabs.ts:4-7 |
 | 46 | Administrators can view it in **Settings** under the **Suppression** tab; other users do not see that tab. | supported | frontend/src/lib/settings-tabs.ts:21-35 |
 | 47 | Your plan limits the number of leads per strategy. Dropped leads do not count. | supported | app/workers/lead_tasks.py:179-201 |
 | 48 | Plan table (Free 100, Starter 500, Growth 2,500, Pay per meeting 1,000, Scale 10,000, Pro/Enterprise no limit) | supported | app/core/plans.py:56,73,92,108,127,143,165 |
 | 49 | When a strategy is full, a new sourcing request is refused with an upgrade message. | supported | app/api/leads.py:95-103 |
-| 50 | When it is nearly full, LeadPilot asks for no more leads than the room left, and checks again for each lead it adds. | supported | app/api/leads.py:114-116; app/workers/lead_tasks.py:211-220 |
+| 50 | When it is nearly full, Vectorae asks for no more leads than the room left, and checks again for each lead it adds. | supported | app/api/leads.py:114-116; app/workers/lead_tasks.py:211-220 |
 | 51 | (RE-CHECK, rewritten) **Remove** … marks the lead `dropped`, so it is not included when you launch. | supported | app/api/ui_support.py:133-148; leadOutreach.ts:39-41 |
 | 51a | (RE-CHECK, new) It does not stop a sequence the lead is already in; that sequence keeps sending to them. | supported | app/api/ui_support.py:133-148 (no enrollment change); outreach_tasks.py:160-196 (no lead-status check) |
 | 51b | (RE-CHECK, new) To stop contacting someone who is already enrolled, use **Delete (GDPR erasure)** below. | supported | app/api/leads.py:313-340 (address erased and suppressed); outreach_tasks.py:185-196 (the next due message is cancelled and the enrollment stopped) |
@@ -393,7 +393,7 @@ Summary (after re-check): 60 supported, 0 unsupported, 1 contradicted (#33). New
 ### 07-personalization-and-claim-verification.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot writes each outreach message for one person, using what it actually knows about them. | supported | app/services/message_personalization.py:97-174 |
+| 1 | Vectorae writes each outreach message for one person, using what it actually knows about them. | supported | app/services/message_personalization.py:97-174 |
 | 2 | Before a message is sent, every factual claim it makes about that person or their company is checked against stored data, and anything unsupported is taken out. | supported | app/services/claim_verification.py:1-20 (default on; admin switch `claim_verification_enabled`, system_settings.py:142) |
 | 3 | Messages are written at the moment they are sent, not when the sequence is created. | supported | app/services/sequence_engine.py:323-324; app/workers/outreach_tasks.py:554-589 |
 | 4 | the step's **brief** … | supported | message_personalization.py:31-32 |
@@ -403,30 +403,30 @@ Summary (after re-check): 60 supported, 0 unsupported, 1 contradicted (#33). New
 | 8 | your **voice profile**, if you set one up; | supported | message_personalization.py:137-148 |
 | 9 | the sequence's booking link, if it has one. | supported | message_personalization.py:128-131; outreach_tasks.py:571 |
 | 10 | The AI is asked for a plain-text email under 140 words, with no placeholders such as [Name]. | supported | message_personalization.py:18-27 |
-| 11 | It does not write the unsubscribe footer; LeadPilot adds the compliant footer itself. | supported | message_personalization.py:24-26; outreach_tasks.py:585 |
+| 11 | It does not write the unsubscribe footer; Vectorae adds the compliant footer itself. | supported | message_personalization.py:24-26; outreach_tasks.py:585 |
 | 12 | The exact subject and body are saved on the message before it is sent … | supported | outreach_tasks.py:414,586-588 |
 | 13 | **Enrichment** gathered during lead sourcing (from Apollo). | supported | app/workers/lead_tasks.py:256-298 |
-| 14 | Right before writing an email, LeadPilot fetches the lead's three most recent posts if its stored copy is more than 7 days old. | supported | personalization_context.py:1-6,37,75-92; app/integrations/linkedin_posts.py:28 |
+| 14 | Right before writing an email, Vectorae fetches the lead's three most recent posts if its stored copy is more than 7 days old. | supported | personalization_context.py:1-6,37,75-92; app/integrations/linkedin_posts.py:28 |
 | 15 | It reads them through Unipile, which needs a connected LinkedIn account, or through a RapidAPI scraper as a fallback. | supported | linkedin_posts.py:6-9,153-164 (Unipile can also use a deployment "reader" account) |
 | 16 | When posts are available, the email's first line is asked to reference one specific detail from them. | supported | personalization_context.py:19-21 |
 | 17 | **Company news.** News from NewsAPI from the last 30 days, refreshed if the stored copy is more than 3 days old. | supported | personalization_context.py:5-6,38-39,107-112 |
 | 18 | An article is kept only if the company name appears in its title or description, and the AI is told to use it only if it plausibly concerns this company. | supported | app/integrations/newsapi.py:37-80; personalization_context.py:20-22,170-171 |
-| 19 | In **Settings**, on the **Voice** tab, you can paste up to 5 writing samples. LeadPilot extracts a style profile from them … | supported | app/services/style_profile.py:1-6,27,59-60; frontend/src/components/settings/VoiceSettings.tsx:3 |
+| 19 | In **Settings**, on the **Voice** tab, you can paste up to 5 writing samples. Vectorae extracts a style profile from them … | supported | app/services/style_profile.py:1-6,27,59-60; frontend/src/components/settings/VoiceSettings.tsx:3 |
 | 20 | Only the profile is used when writing; your samples are stored for editing but never go into an outreach prompt. | supported | style_profile.py:13-15; VoiceSettings.tsx:6,38 |
-| 21 | If a provider is not set up or fails, LeadPilot writes the email without that input. It never holds back a send because of it. | supported | personalization_context.py:13-17,126-130 |
+| 21 | If a provider is not set up or fails, Vectorae writes the email without that input. It never holds back a send because of it. | supported | personalization_context.py:13-17,126-130 |
 | 22 | The LinkedIn post and news integrations have not yet been verified against the live services. | supported | docs/VERIFICATION_REPORT.md:579 |
 | 23 | Several request details for the LinkedIn post providers are still marked in the code as needing confirmation. | supported | app/integrations/linkedin_posts.py:14,89,115 |
-| 24 | You can see what LeadPilot has stored on a lead's detail page, on the **Personalization** tab (**Company news** and **Recent LinkedIn posts**). | supported | leads/detail/page.tsx:53,134-136; components/leads/PersonalizationPanel.tsx:51,106 |
+| 24 | You can see what Vectorae has stored on a lead's detail page, on the **Personalization** tab (**Company news** and **Recent LinkedIn posts**). | supported | leads/detail/page.tsx:53,134-136; components/leads/PersonalizationPanel.tsx:51,106 |
 | 25 | Every AI-written message goes through a claim check after it is written and before it is sent. | supported | outreach_tasks.py:576-584 (default on; see #2) |
 | 26 | The check looks for claims … in these categories: funding, headcount, hiring, a job change, news, metrics, expansion, and references to their own content … | supported | claim_verification.py:61-90 |
 | 27 | stored data of the right kind mentions the topic (for example, a funding claim needs funding evidence); | supported | claim_verification.py:31-33,94-110 |
 | 28 | every specific detail in the sentence, such as a number, an amount, a "Series B", a quoted phrase or a proper name, appears in that stored data. | supported | claim_verification.py:34-38 |
-| 29 | The only evidence that counts is what LeadPilot has stored on the lead … Nothing new is looked up during the check. | supported | claim_verification.py:12-20,182-200 |
+| 29 | The only evidence that counts is what Vectorae has stored on the lead … Nothing new is looked up during the check. | supported | claim_verification.py:12-20,182-200 |
 | 30 | the sentence is **removed**; | supported | claim_verification.py:370-372 |
 | 31 | … where removing it would break the message (the opening line, the subject line, or a WhatsApp template variable), it is **rewritten** to a neutral line that asserts nothing. | supported | claim_verification.py:7-9,297-300,364-369,448-489 |
 | 32 | A replaced subject line becomes "Quick question". | supported | claim_verification.py:58,476 |
 | 33 | If the check itself fails with an error, every claim it detected by its rules is removed rather than sent unchecked. | supported | claim_verification.py:40-41,466-469 |
-| 34 | … LeadPilot also asks the AI to find claims the rules missed. This is on by default; an administrator can turn it off, and it costs one extra AI call per message. | supported | app/services/system_settings.py:146; claim_verification.py:396-410 |
+| 34 | … Vectorae also asks the AI to find claims the rules missed. This is on by default; an administrator can turn it off, and it costs one extra AI call per message. | supported | app/services/system_settings.py:146; claim_verification.py:396-410 |
 | 35 | The check runs on email, on WhatsApp free-form replies and template variables (the approved template text itself is fixed …), and on LinkedIn messages. | supported | outreach_tasks.py:581-584,621-653,784-786 (phone call scripts are also checked, 867-888) |
 | 36 | No. The check only looks at sentences about the prospect: second person ("you", "your"), their name, or their company. | supported | claim_verification.py:22-26,303-307 |
 | 37 | A sentence such as "We helped 40 agencies grow" is a claim about you, and it is your responsibility … | supported | claim_verification.py:24-26 |
@@ -453,9 +453,9 @@ Summary: 52 supported, 0 unsupported, 0 contradicted. (RE-CHECK: file unchanged 
 ### 08-sequences-and-follow-ups.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | A sequence is the series of messages LeadPilot sends to each lead in a strategy. | supported | app/api/sequences.py:116-121 |
+| 1 | A sequence is the series of messages Vectorae sends to each lead in a strategy. | supported | app/api/sequences.py:116-121 |
 | 2 | A sequence belongs to one strategy and has numbered steps. | supported | app/api/sequences.py:146-167 |
-| 3 | a **brief** … It is not the final text; LeadPilot writes the final message for each lead at send time. | supported | app/api/sequences.py:84; app/services/sequence_engine.py:323-324 |
+| 3 | a **brief** … It is not the final text; Vectorae writes the final message for each lead at send time. | supported | app/api/sequences.py:84; app/services/sequence_engine.py:323-324 |
 | 4 | a **delay**: how many days to wait after the previous step is sent (0 to 60). | supported | app/api/sequences.py:86; sequence_engine.py:325 |
 | 5 | a **channel**: email by default. Steps can also use WhatsApp, LinkedIn or phone, if your plan includes them. A step without its own channel uses the sequence's channel. | supported | app/api/sequences.py:88-90,118,224-225; sequence_engine.py:336-338 |
 | 6 | optionally a **variant** label, for testing different versions of a step. | supported | app/api/sequences.py:85 |
@@ -466,7 +466,7 @@ Summary: 52 supported, 0 unsupported, 0 contradicted. (RE-CHECK: file unchanged 
 | 11 | Tick the box confirming you may lawfully email each person on the list. | supported | OutreachPanel.tsx:198-206 |
 | 12 | Press **Launch to N lead(s)**. | supported | OutreachPanel.tsx:207-210 |
 | 13 | In the app today, this creates an email-only sequence with one or two steps. | supported | frontend/src/lib/leadOutreach.ts:43-54; OutreachPanel.tsx:68-71 |
-| 14 | Longer sequences, and steps on other channels, are created through the LeadPilot API, which accepts up to 20 steps numbered 1, 2, 3 … with no gaps. | supported | app/api/sequences.py:83,120,164-167 |
+| 14 | Longer sequences, and steps on other channels, are created through the Vectorae API, which accepts up to 20 steps numbered 1, 2, 3 … with no gaps. | supported | app/api/sequences.py:83,120,164-167 |
 | 15 | Plan table (Free 5 / Gmail; Starter 10 / Gmail, WhatsApp; Pay per meeting 10 / +LinkedIn; Growth 15 / +LinkedIn; Scale, Pro, Enterprise no limit / +phone) | supported | app/core/plans.py:57-58,74-75,93-94,109-110,128-129,144-149,166-167 |
 | 16 | These are checked when the sequence is created and again at every launch, so a sequence built on a higher plan cannot be launched after a downgrade. | supported | app/api/sequences.py:57-79,224-225,300,401 |
 | 17 | A sequence over the limit is refused with an upgrade message. | supported | app/core/plans.py:279-300; app/api/sequences.py:71-72 |
@@ -477,7 +477,7 @@ Summary: 52 supported, 0 unsupported, 0 contradicted. (RE-CHECK: file unchanged 
 | 22 | Changing the content after an override brings the review back. | supported | app/services/adversarial_review.py:22-24,310-318 |
 | 23 | You can see the review under **Campaigns**, on the **Sequences** tab. | supported | campaigns/page.tsx:405-407,554-555 |
 | 24 | If you are an SDR in a workspace that requires approval, your first launch is sent to a manager instead: "Sent to a manager for approval. Nothing is sent until they approve." | supported | app/api/sequences.py:330-362; OutreachPanel.tsx:78-80 |
-| 25 | On launch, LeadPilot enrolls the strategy's `verified` leads that have an email address (or … LinkedIn profile). It skips anyone suppressed or already enrolled, and schedules step 1. | supported | app/services/sequence_engine.py:193-240 |
+| 25 | On launch, Vectorae enrolls the strategy's `verified` leads that have an email address (or … LinkedIn profile). It skips anyone suppressed or already enrolled, and schedules step 1. | supported | app/services/sequence_engine.py:193-240 |
 | 26 | If your sending domain has deliverability problems, the launch still goes ahead but shows a warning. | supported | app/api/sequences.py:307-313 |
 | 27 | **Step 1** is scheduled for the next moment inside the send window. | supported | sequence_engine.py:325-326 (smart send time may hold it, #30) |
 | 28 | **Each later step** is scheduled when the previous step is actually sent: its delay in days is added, then the time is moved into the next send window. | supported | sequence_engine.py:325,352-386 |
@@ -489,7 +489,7 @@ Summary: 52 supported, 0 unsupported, 0 contradicted. (RE-CHECK: file unchanged 
 | 34 | The lead unsubscribes or asks to stop → Suppressed everywhere; all sequences stop immediately. | supported | sequence_engine.py:484-508 |
 | 35 | An email bounces → The lead is dropped and their sequences stop. | supported | sequence_engine.py:511-524 |
 | 36 | An out-of-office reply → Sequences pause for 7 days by default, then continue. | supported | app/config.py:117; outreach_tasks.py:1095-1102; sequence_engine.py:300-312 |
-| 37 | A meeting is booked on LeadPilot's own calendar → Sequences pause. If the meeting is cancelled they resume; otherwise they resume a day after the meeting ends … | supported | sequence_engine.py:611-685; app/workers/calendar_tasks.py:199-204,287 |
+| 37 | A meeting is booked on Vectorae's own calendar → Sequences pause. If the meeting is cancelled they resume; otherwise they resume a day after the meeting ends … | supported | sequence_engine.py:611-685; app/workers/calendar_tasks.py:199-204,287 |
 | 38 | A meeting is booked through Calendly → Sequences stop. | supported | app/api/webhooks.py:3,154-165 |
 | 38a | (RE-CHECK, new) (The Calendly integration has not yet been verified against the live service.) | supported | docs/VERIFICATION_REPORT.md:579 |
 | 39 | The lead is suppressed by the time a message is due → That message is cancelled and the sequence stops. | supported | outreach_tasks.py:187-196 |
@@ -497,15 +497,15 @@ Summary: 52 supported, 0 unsupported, 0 contradicted. (RE-CHECK: file unchanged 
 | 41 | … After a lead has had 4 unanswered sends (the default), a lead judged to have gone cold may have its sequence paused ("cooling") or stopped ("archived"). | supported | app/services/conversion_probability.py:27-35,248-258; system_settings.py:158-170 |
 | 42 | A stopped sequence can never send to that lead again. | supported | sequence_engine.py:252-279; outreach_tasks.py:173-177 |
 | 43 | Automatic follow-ups are separate from step delays. They catch a lead whose sequence is still active but has nothing queued, for example because a send failed permanently, a WhatsApp step needed a template, or a step was deleted. | supported | outreach_tasks.py:1286-1307,1440-1444 |
-| 44 | Every 30 minutes, LeadPilot looks for active sequences where the last message has had no reply for longer than that step's follow-up delay (72 hours by default; you can set 1 to 2,160 hours). | supported | app/config.py:326; celery_app.py:256-262; app/api/sequences.py:103-108,495-505; outreach_tasks.py:1450-1458 |
+| 44 | Every 30 minutes, Vectorae looks for active sequences where the last message has had no reply for longer than that step's follow-up delay (72 hours by default; you can set 1 to 2,160 hours). | supported | app/config.py:326; celery_app.py:256-262; app/api/sequences.py:103-108,495-505; outreach_tasks.py:1450-1458 |
 | 45 | If the sequence has a next step, that step is sent. | supported | outreach_tasks.py:1515-1522 |
-| 46 | If it does not, LeadPilot writes a follow-up from the lead's own message history and your product description, on the same channel as the last message, and sends it through the normal checks. | supported | outreach_tasks.py:1523-1567; message_personalization.py:355-421 |
+| 46 | If it does not, Vectorae writes a follow-up from the lead's own message history and your product description, on the same channel as the last message, and sends it through the normal checks. | supported | outreach_tasks.py:1523-1567; message_personalization.py:355-421 |
 | 47 | It does not write automatic follow-ups for WhatsApp, because a WhatsApp first contact needs an approved template. | supported | outreach_tasks.py:1529-1537 (an existing WhatsApp next step is still sent) |
 | 48 | No follow-up goes to a lead who has replied, or from a paused campaign. | supported | outreach_tasks.py:1458-1467,1506-1513 |
 | 49 | … go to **Campaigns**, choose the strategy, open the **Sequences** tab, and use **Auto follow-up** and **after N hours of silence** under each step. | supported | campaigns/page.tsx:340-359,395 |
-| 50 | When every step has been sent to a lead, their sequence is marked completed. LeadPilot does not keep following up after that. | supported | sequence_engine.py:378-383; outreach_tasks.py:1309-1315 |
+| 50 | When every step has been sent to a lead, their sequence is marked completed. Vectorae does not keep following up after that. | supported | sequence_engine.py:378-383; outreach_tasks.py:1309-1315 |
 | 51 | A separate re-engagement feature can send one more email to leads who finished without replying, but it is off for every campaign until an owner or manager turns it on. | supported | app/services/reengagement.py:1-26,73 |
-| 52 | LeadPilot also reports a completion rate, and lists each reason a sequence ended early. | supported | app/services/sequence_completion.py:1-27; app/api/sequences.py:549-562 |
+| 52 | Vectorae also reports a completion rate, and lists each reason a sequence ended early. | supported | app/services/sequence_completion.py:1-27; app/api/sequences.py:549-562 |
 | 53 | A sequence where every step was skipped … is flagged for your attention. | supported | sequence_engine.py:405-420 |
 | 54 | Skipped steps do not count as sent. | supported | sequence_engine.py:352-371,389-402 |
 
@@ -516,18 +516,18 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 ### 09-email-sending-gmail.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot sends outreach email from the Gmail account you connect, automatically, inside a send window and a daily limit that grows slowly while the account warms up. | supported | outreach_tasks.py:70-85,268-352; sequence_engine.py:115-123 (D1 caveat) |
+| 1 | Vectorae sends outreach email from the Gmail account you connect, automatically, inside a send window and a daily limit that grows slowly while the account warms up. | supported | outreach_tasks.py:70-85,268-352; sequence_engine.py:115-123 (D1 caveat) |
 | 2 | Go to **Settings** and open the **Integrations** tab. | supported | settings/page.tsx:266-298; settings-tabs.ts:21-23 |
 | 3 | On the **Gmail** card, press **Connect**. | supported | settings/page.tsx:322-328 |
-| 4 | LeadPilot requests permission to send email, read email (to detect replies and bounces), create calendar events (…Google Meet links), and create drafts (…). | supported | app/integrations/gmail.py:39-59 |
-| 5 | After you approve, Google sends you to LeadPilot's server, which records the connection. … the Gmail card should say "Connected:" followed by your address. | supported | app/api/integrations.py:41-82; settings/page.tsx:304-306 |
-| 6 | LeadPilot keeps one Gmail connection per user account. Connecting again updates that same connection. | supported | app/db/models.py:1659-1661; gmail.py:170-177 |
+| 4 | Vectorae requests permission to send email, read email (to detect replies and bounces), create calendar events (…Google Meet links), and create drafts (…). | supported | app/integrations/gmail.py:39-59 |
+| 5 | After you approve, Google sends you to Vectorae's server, which records the connection. … the Gmail card should say "Connected:" followed by your address. | supported | app/api/integrations.py:41-82; settings/page.tsx:304-306 |
+| 6 | Vectorae keeps one Gmail connection per user account. Connecting again updates that same connection. | supported | app/db/models.py:1659-1661; gmail.py:170-177 |
 | 7 | Your Google access tokens are stored encrypted and refreshed automatically. | supported | gmail.py:170-224 |
-| 8 | If you see "Gmail is not configured on the server", your LeadPilot deployment has not been set up with Google sign-in credentials yet. | supported | app/api/integrations.py:27-36 |
-| 9 | Press **Reconnect** on the Gmail card when: you removed LeadPilot's access in your Google account; | supported | settings/page.tsx:322-327 |
+| 8 | If you see "Gmail is not configured on the server", your Vectorae deployment has not been set up with Google sign-in credentials yet. | supported | app/api/integrations.py:27-36 |
+| 9 | Press **Reconnect** on the Gmail card when: you removed Vectorae's access in your Google account; | supported | settings/page.tsx:322-327 |
 | 10 | the card says "Calendar access missing — reconnect to create Google Meet links. Your Gmail access is kept." The button then reads **Reconnect for Calendar**. | supported | settings/page.tsx:308-327; app/integrations/google_meet.py:79-86 |
 | 11 | Accounts connected before calendar access was added need this once; | supported | gmail.py:48-52 |
-| 12 | LeadPilot asks you to "Reconnect Gmail in Settings to allow saving drafts" after a meeting. | supported | frontend/src/lib/meeting-prep.ts:43 |
+| 12 | Vectorae asks you to "Reconnect Gmail in Settings to allow saving drafts" after a meeting. | supported | frontend/src/lib/meeting-prep.ts:43 |
 | 13 | Use **Test** on the Gmail card to check whether the connection is healthy. | supported | settings/page.tsx:271-282,316-321 |
 | 14 | If no Gmail account is connected, email steps are not sent. | supported | outreach_tasks.py:70-80 |
 | 15 | Each connected Gmail account follows a warm-up ramp, counted per UTC day: 10 emails on the day you connect it; 10 more each day after that; up to a ceiling of 100 emails per day. | supported | app/config.py:106-108; sequence_engine.py:115-134 |
@@ -541,7 +541,7 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 | 23 | weekends skipped by default; | supported | app/config.py:112 |
 | 24 | leads with no known time zone use the deployment's fallback zone, UTC by default. | supported | app/config.py:111; sequence_engine.py:64-72 |
 | 25 | An administrator can change the window for a workspace, a recipient region or a channel, but only within 07:00 to 20:00 local time. | supported | compliance_rules.py:1-20,59-63 |
-| 26 | LeadPilot checks for due messages every 60 seconds and re-checks every rule at the moment of sending. | supported | app/config.py:116; celery_app.py:226-229; outreach_tasks.py:1-7 |
+| 26 | Vectorae checks for due messages every 60 seconds and re-checks every rule at the moment of sending. | supported | app/config.py:116; celery_app.py:226-229; outreach_tasks.py:1-7 |
 | 27 | **A footer** with your sender identity (name and postal address) and the line "Don't want these emails? Unsubscribe instantly:" followed by a personal unsubscribe link. | supported | sequence_engine.py:428-444 |
 | 28 | The sender identity is a deployment setting; a production deployment refuses to start while it is missing or still the placeholder address. | supported | app/config.py:105; app/core/production_guard.py:220-245,331 |
 | 29 | **One-click unsubscribe headers** (`List-Unsubscribe` and `List-Unsubscribe-Post`) … | supported | sequence_engine.py:452-455 |
@@ -549,9 +549,9 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 | 31 | **An open-tracking pixel**, in an HTML copy of the email, unless open tracking is turned off or the lead is in the EU, EEA or UK. | supported | outreach_tasks.py:590-601; open_tracking.py:76-80; compliance_region.py:134-137 |
 | 32 | **Click tracking** is off by default. | supported | app/services/system_settings.py:191 |
 | 33 | Clicking the unsubscribe link, or replying with a request to stop, suppresses that person immediately and stops all of their sequences. | supported | app/api/unsubscribe.py:50; sequence_engine.py:484-508; outreach_tasks.py:1084-1088 |
-| 34 | LeadPilot checks each connected inbox for replies every 5 minutes by default. | supported | app/config.py:115; celery_app.py:230-233 |
+| 34 | Vectorae checks each connected inbox for replies every 5 minutes by default. | supported | app/config.py:115; celery_app.py:230-233 |
 | 35 | A delivery-failure notice that it can match to a sent message is treated as a bounce: the lead is dropped and all of their sequences stop. | supported | outreach_tasks.py:1015-1035,1090-1093; reply_classification.py:41-42; sequence_engine.py:511-524 |
-| 36 | After each bounce, LeadPilot checks the campaign's bounce rate (bounces divided by messages sent across the strategy). | supported | sequence_engine.py:523-543 |
+| 36 | After each bounce, Vectorae checks the campaign's bounce rate (bounces divided by messages sent across the strategy). | supported | sequence_engine.py:523-543 |
 | 37 | Once at least 10 messages have been sent, a bounce rate above **3%** pauses the whole campaign automatically. | supported | app/config.py:113-114; sequence_engine.py:536-550 |
 | 38 | Your workspace's compliance rules may set a lower threshold, never a higher one. | supported | sequence_engine.py:544-548; compliance_rules.py:13-15 |
 | 39 | You get a notification, and nothing more is sent until a person resumes the campaign. | supported | sequence_engine.py:559-581; outreach_tasks.py:119-120,171-172 |
@@ -561,7 +561,7 @@ Summary (after re-check): 55 supported, 0 unsupported, 0 contradicted. New sourc
 | 43 | Other errors are retried later. | supported | outreach_tasks.py:482-485,499-502 |
 | 44 | If a send was interrupted at the moment of sending, the message is flagged and never resent automatically … | supported | outreach_tasks.py:150-156 |
 | 45 | If you use client workspaces, an email is blocked when your Gmail address's domain is not in that client's sending-domain list. | supported | outreach_tasks.py:319-332 |
-| 46 | (RE-CHECK, rewritten) By default LeadPilot holds a message when … the lead's job title contains founder or co-founder, owner, a C-level title (CEO, COO, CFO, CTO, CMO, CRO or "Chief …"), president, managing director, partner, VP or vice president, "head of", board member or chair, or when the written copy trips the tone and spam rules. | supported | app/services/send_review.py:86-89,145-148,166-183; system_settings.py:114-125 |
+| 46 | (RE-CHECK, rewritten) By default Vectorae holds a message when … the lead's job title contains founder or co-founder, owner, a C-level title (CEO, COO, CFO, CTO, CMO, CRO or "Chief …"), president, managing director, partner, VP or vice president, "head of", board member or chair, or when the written copy trips the tone and spam rules. | supported | app/services/send_review.py:86-89,145-148,166-183; system_settings.py:114-125 |
 | 46a | (RE-CHECK, new) If most of your prospects are owners or founders, expect many of their messages to wait for approval … | supported | app/services/send_review.py:86-89 (matches "owner" and "founder") |
 | 46b | (RE-CHECK, new) … an administrator can turn the job-title rule off. | supported | app/services/system_settings.py:120 (`send_review_vip_titles`); send_review.py:188-193 |
 | 47 | Approved messages send as approved. | supported | send_review.py:26-35; outreach_tasks.py:438-445 |
@@ -575,22 +575,22 @@ Summary (after re-check): 51 supported, 0 unsupported, 0 contradicted.
 ### 10-whatsapp-outreach.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot can send outreach on WhatsApp through Meta's WhatsApp Business Cloud API. | supported | app/config.py:135-158; app/integrations/whatsapp.py |
-| 2 | … LeadPilot enforces them at the moment of sending: a contact needs a recorded opt-in, a first message must use a Meta-approved template, and free-form messages can only go out inside the 24-hour window the contact opens by messaging you. | supported | outreach_tasks.py:218-255; app/api/sequences.py:181-199 |
+| 1 | Vectorae can send outreach on WhatsApp through Meta's WhatsApp Business Cloud API. | supported | app/config.py:135-158; app/integrations/whatsapp.py |
+| 2 | … Vectorae enforces them at the moment of sending: a contact needs a recorded opt-in, a first message must use a Meta-approved template, and free-form messages can only go out inside the 24-hour window the contact opens by messaging you. | supported | outreach_tasks.py:218-255; app/api/sequences.py:181-199 |
 | 3 | The Free plan is email only. Starter, Growth, Pay per meeting, Scale, Pro and Enterprise include WhatsApp. | supported | app/core/plans.py:58,75,94,110,129,149,167 |
 | 4 | This is set up by your administrator in the server settings, not in the app. | supported | app/config.py:135-158; settings/page.tsx:341 |
 | 5 | … the **WhatsApp Business** card shows the phone number ID when it is set up, or "Not configured — set WHATSAPP_* env vars on the server" when it is not. | supported | settings/page.tsx:337-341 |
 | 6 | Use **Test** on that card to check the connection. | supported | settings/page.tsx:345-348 |
-| 7 | There is **one WhatsApp Business number per LeadPilot deployment**, and every user in the deployment sends from it. | supported | app/config.py:137; outreach_tasks.py:396-398; sequence_engine.py:162-164 |
+| 7 | There is **one WhatsApp Business number per Vectorae deployment**, and every user in the deployment sends from it. | supported | app/config.py:137; outreach_tasks.py:396-398; sequence_engine.py:162-164 |
 | 8 | (RE-CHECK, rewritten) A deployment is intended to serve one customer organization, but public sign-up is open to any email address by default; unless your administrator closes sign-up or limits it to your organization's email domains, other people's accounts on the same deployment would share this number too. | supported | DECISIONS.md:22-26,36-46; app/config.py:434-448; sequence_engine.py:162-164 |
-| 9 | **Agencies:** … every client's prospects see the same WhatsApp number. Unlike email, LeadPilot has no per-client WhatsApp number. | supported | docs/program/BASELINE.md:92,164 |
+| 9 | **Agencies:** … every client's prospects see the same WhatsApp number. Unlike email, Vectorae has no per-client WhatsApp number. | supported | docs/program/BASELINE.md:92,164 |
 | 10 | **Templates are shared.** … Anyone signed in to the deployment can see, create, edit and submit them. | supported | app/api/whatsapp_templates.py:98-106; docs/program/BASELINE.md:106 |
 | 11 | **The daily cap is shared.** By default the number sends at most 10 messages on the day of its first WhatsApp send, 10 more each day after that, up to 100 per day, counted across all users. | supported | sequence_engine.py:149-179; app/config.py:156-158 |
 | 12 | Messages over the cap wait for the next day's send window; they are not dropped. | supported | outreach_tasks.py:300-308 |
 | 13 | Go to **Campaigns**, choose a strategy, and open the **Templates** tab. | supported | campaigns/page.tsx:424,557-558 |
 | 14 | **+ New draft** opens an editor. Give the template a name (lowercase letters, digits and underscores, for example `intro_offer`) and a body. | supported | campaigns/page.tsx:103,118-122,189; app/services/whatsapp_templates.py:51-52,91-98 |
-| 15 | (RE-CHECK, rewritten) In the current release, a template written in this editor must not contain placeholders such as `{{1}}`: LeadPilot requires a description for every placeholder, and this editor cannot add one, so saving fails with "missing variable descriptions" (even though the editor's example text shows `{{1}}`). | supported | campaigns/page.tsx:102-106,129; app/services/whatsapp_templates.py:101-118,151-152 |
-| 15a | (RE-CHECK, new) Templates with placeholders come from **Generate with AI** or from the LeadPilot API. | supported | app/services/whatsapp_templates.py:383-424; app/api/whatsapp_templates.py:55-63 |
+| 15 | (RE-CHECK, rewritten) In the current release, a template written in this editor must not contain placeholders such as `{{1}}`: Vectorae requires a description for every placeholder, and this editor cannot add one, so saving fails with "missing variable descriptions" (even though the editor's example text shows `{{1}}`). | supported | campaigns/page.tsx:102-106,129; app/services/whatsapp_templates.py:101-118,151-152 |
+| 15a | (RE-CHECK, new) Templates with placeholders come from **Generate with AI** or from the Vectorae API. | supported | app/services/whatsapp_templates.py:383-424; app/api/whatsapp_templates.py:55-63 |
 | 16 | Templates created here use the language `en_US` and the category "marketing". | supported | campaigns/page.tsx:104 |
 | 17 | **Generate with AI** drafts 2 or 3 candidate templates from the strategy's research. | supported | app/services/whatsapp_templates.py:17,343,399; app/api/whatsapp_templates.py:11-14 (note: every candidate is saved as a draft at once, not only the one you pick) |
 | 17a | (RE-CHECK, new) Each draft comes with a description of every placeholder. | supported | app/services/whatsapp_templates.py:407-418 (a candidate whose descriptions do not match is dropped). Note on #17: because invalid candidates are dropped, a run can yield 1 draft. |
@@ -601,27 +601,27 @@ Summary (after re-check): 51 supported, 0 unsupported, 0 contradicted.
 | 21 | **Sync status** fetches the latest decision from Meta. | supported | campaigns/page.tsx:176-184,242-245; app/api/whatsapp_templates.py:189-200 |
 | 22 | A rejected template shows Meta's reason, and you can edit and resubmit it. | supported | campaigns/page.tsx:227-240 |
 | 23 | … the body cannot be empty, must be at most 1,024 characters by default, and its placeholders must run `{{1}}`, `{{2}}`, … in order with no gaps or repeats. | supported | app/services/whatsapp_templates.py:60-88; app/config.py:154 (the code checks the set of numbers, not their order in the text) |
-| 24 | The editor reminds you to include "Reply STOP to opt out."; LeadPilot does not add this line for you. | supported | campaigns/page.tsx:129-131 (no code appends it) |
+| 24 | The editor reminds you to include "Reply STOP to opt out."; Vectorae does not add this line for you. | supported | campaigns/page.tsx:129-131 (no code appends it) |
 | 25 | Editing an approved template creates a new draft version rather than changing the approved one. | supported | app/services/whatsapp_templates.py:169-200 (only via the API: the app shows **Edit** only for draft/rejected, campaigns/page.tsx:234) |
 | 26 | Only **approved** templates are sent. Approval is checked again at the moment of sending; if … no longer approved …, that message stops with the status "needs template" … | supported | outreach_tasks.py:242-255 |
-| 27 | The launch form on the strategy page creates email sequences only. WhatsApp steps are added through the LeadPilot API. | supported | frontend/src/lib/leadOutreach.ts:43-54; app/api/sequences.py:82-120 |
+| 27 | The launch form on the strategy page creates email sequences only. WhatsApp steps are added through the Vectorae API. | supported | frontend/src/lib/leadOutreach.ts:43-54; app/api/sequences.py:82-120 |
 | 28 | (RE-CHECK, rewritten) **Template step:** names any template that has not been rejected (a draft, a submitted one or an approved one) and says how each variable is filled. | supported | app/api/sequences.py:191-220 |
 | 28a | (RE-CHECK, new) It only sends once the template is approved. | supported | outreach_tasks.py:242-255 |
 | 29 | A variable can be filled from the lead's record (…) or from a short brief that the AI fills …, without inventing facts. If a variable cannot be filled, the message is not sent with an empty slot. | supported | app/services/message_personalization.py:208-276 |
 | 30 | **Free-form text step:** only sends inside an open 24-hour window, and can never be the first step of a sequence. | supported | app/api/sequences.py:181-190; outreach_tasks.py:228-241 |
-| 31 | LeadPilot will not send a WhatsApp message to a contact without a recorded opt-in. | supported | outreach_tasks.py:222-226 |
+| 31 | Vectorae will not send a WhatsApp message to a contact without a recorded opt-in. | supported | outreach_tasks.py:222-226 |
 | 32 | A WhatsApp step for a contact without one is **skipped**, and the sequence carries on …. If every step of a sequence was skipped, the sequence is flagged for your attention. | supported | sequence_engine.py:389-420 |
 | 33 | **The contact messages your WhatsApp number first.** If their status was unknown, that message is recorded as an opt-in, with the message ID as evidence. | supported | webhooks_whatsapp.py:471-476; app/services/whatsapp_optin.py:241-260 |
 | 34 | (RE-CHECK, rewritten) **Through the API, one contact at a time.** Evidence of where, when and how they agreed is recommended, and is required when the opt-in is recorded as a manual import. | supported | app/api/whatsapp_optin.py:56-66,102-128; app/services/whatsapp_optin.py:129-136 |
 | 35 | **Through the API, as a CSV import.** Every row must include evidence; rows without it are rejected with a reason. | supported | app/api/whatsapp_optin.py:257-351 |
-| 36 | LeadPilot also contains a hosted opt-in page, but the app does not currently give you a way to get a contact's link to it. | supported | app/api/whatsapp_optin.py:211-249 (`optin_url` is defined but never called) |
+| 36 | Vectorae also contains a hosted opt-in page, but the app does not currently give you a way to get a contact's link to it. | supported | app/api/whatsapp_optin.py:211-249 (`optin_url` is defined but never called) |
 | 37 | Every opt-in and opt-out is kept as a history that is only ever added to. | supported | app/services/whatsapp_optin.py:1-17 |
 | 38 | You can see a contact's current status as **WhatsApp opt-in** when you open a lead on the **Pipeline** page. | supported | pipeline/page.tsx:96-108 |
-| 39 | A number on the suppression list cannot be opted in again through LeadPilot. | supported | app/services/whatsapp_optin.py:140-147 |
+| 39 | A number on the suppression list cannot be opted in again through Vectorae. | supported | app/services/whatsapp_optin.py:140-147 |
 | 40 | When a contact sends you a WhatsApp message, a 24-hour window opens, and each new message from them restarts it. | supported | app/services/whatsapp_window.py:3-10,41-52 |
 | 41 | Template messages you send do not open it. | supported | whatsapp_window.py:9-10 |
 | 42 | Inside the window, free-form text steps can send; outside it, only templates can. | supported | outreach_tasks.py:228-241 |
-| 43 | LeadPilot works the window out at the moment of sending, so a free-form message queued while the window was open, but due after it closed, is not sent. It is marked "needs template". | supported | outreach_tasks.py:228-241; whatsapp_window.py:12-14 |
+| 43 | Vectorae works the window out at the moment of sending, so a free-form message queued while the window was open, but due after it closed, is not sent. It is marked "needs template". | supported | outreach_tasks.py:228-241; whatsapp_window.py:12-14 |
 | 44 | On **Campaigns**, the **Overview** tab's **WhatsApp** card shows how many windows are open and how many messages need a template. | supported | campaigns/page.tsx:68-77,513; app/api/strategies.py:594-619 (the "need template" badge appears only when the count is above 0) |
 | 45 | The 24-hour length follows Meta's policy as understood when the feature was built and has not been re-checked against Meta's current policy. | supported | whatsapp_window.py:3,25 |
 | 46 | … treats these messages as an opt-out …: "stop", "unsubscribe", "opt out", "optout", "cancel", "remove me", "stop messaging me", "no more messages", and any message that starts with "stop" or "unsubscribe" (capital letters do not matter). | supported | webhooks_whatsapp.py:57-70 |
@@ -629,12 +629,12 @@ Summary (after re-check): 51 supported, 0 unsupported, 0 contradicted.
 | 48 | suppresses their phone number, email address and LinkedIn profile; | supported | whatsapp_optin.py:209-219; consent.py:219-264 |
 | 49 | stops all of their sequences on every channel. | supported | webhooks_whatsapp.py:468-469; sequence_engine.py:505-507 |
 | 50 | If the AI later reads another reply as a request to stop, it has the same effect. | supported | outreach_tasks.py:1145-1153 |
-| 51 | A STOP from a number LeadPilot cannot match to one lead still suppresses that number. | supported | webhooks_whatsapp.py:396-406,361-378 |
+| 51 | A STOP from a number Vectorae cannot match to one lead still suppresses that number. | supported | webhooks_whatsapp.py:396-406,361-378 |
 | 52 | If an opted-out contact messages you again, they are not opted back in automatically. | supported | whatsapp_optin.py:241-250; webhooks_whatsapp.py:472-476 |
 | 53 | WhatsApp replies are classified the same way as email replies. | supported | outreach_tasks.py:1122-1132 |
 | 54 | A real reply stops all of the contact's sequences, including pending email steps. | supported | outreach_tasks.py:1170-1173 |
 | 55 | An out-of-office reply pauses them. | supported | outreach_tasks.py:1161-1168 |
-| 56 | LeadPilot never replies to people automatically. | supported | outreach_tasks.py:1131 |
+| 56 | Vectorae never replies to people automatically. | supported | outreach_tasks.py:1131 |
 | 57 | A reply is matched to a lead by phone number. If any lead … has been sent a WhatsApp message, it goes to the one messaged most recently; otherwise, if exactly one lead has the number …; … several leads … none was messaged, the reply is not attached to any lead. | supported | webhooks_whatsapp.py:321-358 |
 | 58 | If Meta reports that a message failed to deliver, it is handled like an email bounce. | supported | webhooks_whatsapp.py:276-299 |
 | 59 | Not yet. (WhatsApp verified against Meta's live service?) | supported | docs/VERIFICATION_REPORT.md:579 |
@@ -699,7 +699,7 @@ Verdicts: S = supported, U = unsupported, C = contradicted.
 ### 11-linkedin.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot has two separate LinkedIn features. | S | app/api/sequences.py:110-113 (LinkedIn steps); frontend/src/components/shell/nav.ts:49-50 (Network) |
+| 1 | Vectorae has two separate LinkedIn features. | S | app/api/sequences.py:110-113 (LinkedIn steps); frontend/src/components/shell/nav.ts:49-50 (Network) |
 | 2 | LinkedIn steps in a sequence send connection requests, messages and InMail … through a LinkedIn account you connect. | S | app/services/linkedin_outreach.py:13-21; frontend/src/components/settings/LinkedInAccountsCard.tsx:59 |
 | 3 | The Network page lets you upload your own LinkedIn connections, see which of them may fit your products, and write messages to them. | S | frontend/src/app/(app)/network/page.tsx:3,212-217,268-299; app/services/network_messages.py:1-10 |
 | 4 | There are two different plan checks | S | app/api/sequences.py:57-72 (channels); app/core/plans.py:180-186 (linkedin_network) |
@@ -711,14 +711,14 @@ Verdicts: S = supported, U = unsupported, C = contradicted.
 | 10 | It is not included with Pay per meeting, even though that plan includes the LinkedIn channel. | S | app/core/plans.py:129,180-184 |
 | 11 | On other plans the Network page still opens and shows "Upgrade in Settings". | S | frontend/src/app/(app)/network/page.tsx:198-208; app/api/linkedin_network.py:47-49 (status readable on every plan) |
 | 12 | (Has LinkedIn sending been verified against the live service?) No. | S | app/integrations/unipile_linkedin.py:16 and the `# TODO: verify` markers below |
-| 13 | LeadPilot talks to LinkedIn through a third-party service called Unipile. | S | app/integrations/unipile_linkedin.py:1-31; app/integrations/linkedin_channel.py |
+| 13 | Vectorae talks to LinkedIn through a third-party service called Unipile. | S | app/integrations/unipile_linkedin.py:1-31; app/integrations/linkedin_channel.py |
 | 14 | The code that calls Unipile is marked … not yet checked … profiles, connection requests, starting chats, sending messages, the account-connection page, reading InMail credits, and the incoming webhook … | S | app/integrations/unipile_linkedin.py:71,84,93,103,115,126,137; app/api/linkedin.py:288 |
 | 15 | Until that check is done, treat LinkedIn sending as not yet verified against the live service. | S | same as #14 |
-| 16 | Your LeadPilot administrator must also set up Unipile (Admin > Integrations > Unipile) before any LinkedIn sending can work. | S | app/workers/outreach_tasks.py:733-737 |
+| 16 | Your Vectorae administrator must also set up Unipile (Admin > Integrations > Unipile) before any LinkedIn sending can work. | S | app/workers/outreach_tasks.py:733-737 |
 | 17 | If it is not set up, LinkedIn steps fail with the reason "LinkedIn is not configured". | S | app/workers/outreach_tasks.py:736-737 (full text: "LinkedIn is not configured (Admin > Integrations > Unipile)") |
 | 18 | Go to Settings, open the Integrations tab, and find the LinkedIn card. Click Connect an account. | S | frontend/src/lib/settings-tabs.ts:16; frontend/src/app/(app)/settings/page.tsx:390,531; LinkedInAccountsCard.tsx:57,64 |
 | 19 | You are sent to Unipile's hosted sign-in page and sign in to LinkedIn there. | S | LinkedInAccountsCard.tsx:6-8,40-43; app/integrations/unipile_linkedin.py:111-122 |
-| 20 | LeadPilot does not see your LinkedIn password; it stores only an account id. | S | LinkedInAccountsCard.tsx:6-8; app/api/linkedin.py:120-134 |
+| 20 | Vectorae does not see your LinkedIn password; it stores only an account id. | S | LinkedInAccountsCard.tsx:6-8; app/api/linkedin.py:120-134 |
 | 21 | There is also an option to "Link an existing Unipile account id instead" … | S | LinkedInAccountsCard.tsx:74-84 |
 | 22 | You can connect more than one LinkedIn account. | S | app/services/linkedin_limits.py:6-8 |
 | 23 | Each connected account shows a Premium badge …, a Paused badge if it is inactive, and two usage bars for today: Connection requests and Messages + InMail. | S | LinkedInAccountsCard.tsx:121-122,136-137 |
@@ -732,7 +732,7 @@ Verdicts: S = supported, U = unsupported, C = contradicted.
 | 31 | You can also set a step to connect, message or inmail explicitly. | S | app/api/sequences.py:110 (note: API only — the in-app sequence form creates email-only sequences, frontend/src/lib/api/outreach.ts:30-33) |
 | 32 | A "connect" step to someone already connected becomes a message. | S | app/services/linkedin_outreach.py:121-123 |
 | 33 | A "message" step to someone who is not connected is skipped. | S | app/services/linkedin_outreach.py:119-120; outreach_tasks.py:749-751 |
-| 34 | Before each send, LeadPilot re-reads the prospect's profile (connected, pending, Premium) from LinkedIn through Unipile. | S | app/workers/outreach_tasks.py:747; app/services/linkedin_outreach.py:91-111 |
+| 34 | Before each send, Vectorae re-reads the prospect's profile (connected, pending, Premium) from LinkedIn through Unipile. | S | app/workers/outreach_tasks.py:747; app/services/linkedin_outreach.py:91-111 |
 | 35 | When someone accepts your connection request, the incoming webhook marks them as connected. | S | app/api/linkedin.py:287,315-319 |
 | 36 | The text is written by AI from the step brief and your messaging playbook | S | app/services/linkedin_outreach.py:143-160 |
 | 37 | … and it passes through the same claim check as other channels. | S | app/workers/outreach_tasks.py:780-786 |
@@ -741,7 +741,7 @@ Verdicts: S = supported, U = unsupported, C = contradicted.
 | 40 | Each connected LinkedIn account has two daily ceilings, counted per UTC day | S | app/services/linkedin_limits.py:10-14,49-50 |
 | 41 | Connection requests: default 20 per account per day. | S | app/services/system_settings.py:85-86 |
 | 42 | Messages (including InMail): default 50 per account per day. An InMail counts against the message ceiling. | S | app/services/system_settings.py:87-88; linkedin_limits.py:13-14,90 |
-| 43 | Both numbers are set by your LeadPilot administrator in System Settings … | S | app/services/system_settings.py:1-9,85-88 |
+| 43 | Both numbers are set by your Vectorae administrator in System Settings … | S | app/services/system_settings.py:1-9,85-88 |
 | 44 | If a send fails, the slot it reserved is given back. | S | app/workers/outreach_tasks.py:456-461,487-491; linkedin_limits.py:104-109 |
 | 45 | … a prospect's first touch goes from the active account with the fewest sends of that kind today. | S | app/services/linkedin_limits.py:117-138 |
 | 46 | Every later touch to that prospect comes from the same account … | S | app/services/linkedin_limits.py:22-27; outreach_tasks.py:753-755 |
@@ -751,15 +751,15 @@ Verdicts: S = supported, U = unsupported, C = contradicted.
 | 50 | … a reply on LinkedIn goes through the same reply classifier and stop rules as email and WhatsApp. | S | app/workers/outreach_tasks.py:1192-1232 |
 | 51 | A reply classified as an unsubscribe request suppresses that person's LinkedIn profile, email address and phone number. | S | app/workers/outreach_tasks.py:1209-1211; app/services/consent.py:219-296 |
 | 52 | An unsubscribe on any channel also suppresses the LinkedIn profile. | S | app/services/sequence_engine.py:484-501; consent.py:262-276 (when the lead has a LinkedIn URL) |
-| 53 | LeadPilot checks the suppression list when a prospect is enrolled, when a message is sent, and once more immediately before the LinkedIn send call. | S | app/services/sequence_engine.py:227-229; app/workers/outreach_tasks.py:187-196; app/integrations/linkedin_channel.py:48-56 |
+| 53 | Vectorae checks the suppression list when a prospect is enrolled, when a message is sent, and once more immediately before the LinkedIn send call. | S | app/services/sequence_engine.py:227-229; app/workers/outreach_tasks.py:187-196; app/integrations/linkedin_channel.py:48-56 |
 | 54 | A suppressed prospect is never sent a LinkedIn message. | S | same as #53 |
 | 55 | Network in the main menu opens "Your LinkedIn network". | S | nav.ts:50; network/page.tsx:191 |
-| 56 | LinkedIn offers no way for LeadPilot to read your connections, so you upload them yourself | S | app/services/linkedin_network.py:13-15 |
+| 56 | LinkedIn offers no way for Vectorae to read your connections, so you upload them yourself | S | app/services/linkedin_network.py:13-15 |
 | 57 | Steps 1–3 (Settings & Privacy → Data privacy → Get a copy of your data; choose Connections; upload Connections.csv) | S | network/page.tsx:214-218 |
 | 58 | The file can be up to 5 MB and up to 20,000 rows. | S | app/services/linkedin_network.py:43-44; app/api/linkedin_network.py:72-74 |
 | 59 | Only name, job title, company, profile link and connection date are stored. | S | app/services/linkedin_network.py:54-61,137-140 |
 | 60 | Email addresses and phone numbers in the file are discarded when it is read. | S | app/services/linkedin_network.py:8-9,136 |
-| 61 | LeadPilot then scores each connection against each of your products with fixed rules. | S | app/services/linkedin_network.py:239-295 |
+| 61 | Vectorae then scores each connection against each of your products with fixed rules. | S | app/services/linkedin_network.py:239-295 |
 | 62 | This scoring does not use AI and does not send your connections to any outside service. | S | app/services/linkedin_network.py:10-11 |
 | 63 | Connections scoring 30 or more out of 100 appear as matches, grouped into segments, with the reasons for each match. | S | app/services/linkedin_network.py:45,285-292; app/api/linkedin_network.py:118-128 |
 | 64 | Stored connections are re-scored weekly. | S | app/workers/celery_app.py:221-225; linkedin_network.py:358-369 (eligible plans only) |
@@ -772,12 +772,12 @@ Verdicts: S = supported, U = unsupported, C = contradicted.
 | 71 | Copy and open LinkedIn copies the text and opens their profile; you send it yourself, then click I sent it to record it. | S | network/page.tsx:93-105; network_messages.py:122-128 |
 | 72 | Send now via LinkedIn sends it through your connected LinkedIn account after you confirm. | S | network/page.tsx:107-113; app/api/linkedin_network.py:212-217 |
 | 73 | Bulk send sends up to 25 saved messages per batch, one at a time, about 90 seconds apart. | S | network_messages.py:26-27,179-189; app/api/linkedin_network.py:220-233 |
-| 74 | Every LeadPilot send to a connection checks again … plan, … do-not-contact list, … daily LinkedIn message limit, … still a 1st-degree connection. | S | app/services/network_messages.py:139-162 |
+| 74 | Every Vectorae send to a connection checks again … plan, … do-not-contact list, … daily LinkedIn message limit, … still a 1st-degree connection. | S | app/services/network_messages.py:139-162 |
 | 75 | If they are no longer connected, nothing is sent and the message is marked failed. | S | network_messages.py:159-161,173-176 |
 | 76 | On the Network page, click Delete my uploaded connections and confirm. | S | network/page.tsx:236-241 (shown only when eligible and connections > 0 — see #78) |
 | 77 | This deletes everything you uploaded. | S | app/services/linkedin_network.py:325-335 |
 | 78 | (re-check) The button only appears while your plan includes the Network page; after a downgrade the page shows only the upgrade notice and no delete button. | S | network/page.tsx:198-208,210,236-241 (also hidden when 0 connections are stored) |
-| 79 | (re-check, new) The delete itself is not tied to your plan, so it can still be done through the LeadPilot API (`DELETE /linkedin-network`). | S | app/api/linkedin_network.py:28,134-144 (router prefix `/linkedin-network`, `@router.delete("")`, no plan check) |
+| 79 | (re-check, new) The delete itself is not tied to your plan, so it can still be done through the Vectorae API (`DELETE /linkedin-network`). | S | app/api/linkedin_network.py:28,134-144 (router prefix `/linkedin-network`, `@router.delete("")`, no plan check) |
 
 Summary (final, after re-check): 79 supported, 0 unsupported, 0 contradicted. (First pass: 77 S / 0 U / 1 C; the old #78 "It works on every plan…" was rewritten as #78–#79.)
 
@@ -786,7 +786,7 @@ Summary (final, after re-check): 79 supported, 0 unsupported, 0 contradicted. (F
 ### 12-send-review-queue.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot sends outreach automatically. | S | app/workers/outreach_tasks.py:99-123,1240-1267 (D1) |
+| 1 | Vectorae sends outreach automatically. | S | app/workers/outreach_tasks.py:99-123,1240-1267 (D1) |
 | 2 | … certain messages are held, just before they would go out, until a person approves or rejects them. | S | app/services/send_review.py:21-24; outreach_tasks.py:416-432 |
 | 3 | A message is checked after its text has been written and right before it would be sent. | S | app/workers/outreach_tasks.py:402-427 |
 | 4 | It is held if any of these four rules applies | S | app/services/send_review.py:69-81,214-242 |
@@ -796,10 +796,10 @@ Summary (final, after re-check): 79 supported, 0 unsupported, 0 contradicted. (F
 | 8 | Tone or spam check flagged the copy – … (the same rules used in the pre-launch review). | S | send_review.py:166-183 |
 | 9 | The queue covers email, WhatsApp and LinkedIn messages. | S | outreach_tasks.py:423-426 |
 | 10 | AI phone calls are not held, because a live call cannot be read and approved in advance. | S | outreach_tasks.py:419-423 |
-| 11 | Yes, but not by individual users. The queue as a whole and each of the four rules are switched … by your LeadPilot administrator in System Settings. | S | app/services/system_settings.py:108-125; send_review.py:189-211 |
+| 11 | Yes, but not by individual users. The queue as a whole and each of the four rules are switched … by your Vectorae administrator in System Settings. | S | app/services/system_settings.py:108-125; send_review.py:189-211 |
 | 12 | All five settings are on by default. | S | system_settings.py:114-125 |
 | 13 | If your prospects are mostly founders … the VIP rule would hold nearly every message. The administrator setting … says to turn it off … | S | system_settings.py:108-113,120-122 |
-| 14 | If LeadPilot cannot read these settings, it treats the queue as on. | S | send_review.py:197-211 |
+| 14 | If Vectorae cannot read these settings, it treats the queue as on. | S | send_review.py:197-211 |
 | 15 | If the review check itself fails with an error, the message is sent rather than held … | S | send_review.py:272-316 |
 | 16 | The queue sits on top of the normal compliance checks; it does not replace them. | S | send_review.py:272-274; outreach_tasks.py:170-352 |
 | 17 | Go to Campaigns and open the Review tab. | S | frontend/src/app/(app)/campaigns/page.tsx:424,474-483,562 |
@@ -814,7 +814,7 @@ Summary (final, after re-check): 79 supported, 0 unsupported, 0 contradicted. (F
 | 25 | Then click Approve & send (or Approve edit & send if you changed anything). | S | ReviewQueuePanel.tsx:179-182 |
 | 26 | A note is optional. | S | ReviewQueuePanel.tsx:170-172; send_reviews.py:31-32 |
 | 27 | What you approve is exactly what is sent. | S | send_review.py:26-39,281-288; outreach_tasks.py:438-445 |
-| 28 | LeadPilot saves the text at the moment the message is held and, after approval, sends that saved text (or your edit). | S | send_review.py:301-305,319-322,286-288 |
+| 28 | Vectorae saves the text at the moment the message is held and, after approval, sends that saved text (or your edit). | S | send_review.py:301-305,319-322,286-288 |
 | 29 | It does not rewrite the message after you approve it. | S | send_review.py:281-288 |
 | 30 | Approval puts the message back in the normal send queue, and it goes out on the next send run ("Approved — it will send on the next tick"). | S | send_review.py:371-378; ReviewQueuePanel.tsx:99 |
 | 31 | Click Reject, type a note, then click Confirm reject. | S | ReviewQueuePanel.tsx:183-190 |
@@ -822,7 +822,7 @@ Summary (final, after re-check): 79 supported, 0 unsupported, 0 contradicted. (F
 | 33 | A rejected message is never sent. | S | send_review.py:290-292,382-403 |
 | 34 | Only that one message is cancelled. | S | send_review.py:398-402 |
 | 35 | (re-check) The prospect stays enrolled, but rejecting does not schedule the next step. | S | send_review.py:382-403 (enrollment left ACTIVE, no scheduling); sequence_engine.py:352-402 |
-| 35a | (re-check, new) If automatic follow-up is on for the previous step (it is by default), LeadPilot later tries that same step again as a new message, by default 72 hours after the previous step was sent, and the new message is checked by the review queue again. | S | app/api/sequences.py:103-108 (followup_enabled default True, followup_delay_hours default 72); outreach_tasks.py:1440-1470 (next step = last sent + 1 = the rejected step), 1515-1564 (new Message row sent through send_message_impl); send_review.py:278-308 (a new message id has no review, so the rules are evaluated afresh). Applies only when the rejected step had a previously sent step before it. |
+| 35a | (re-check, new) If automatic follow-up is on for the previous step (it is by default), Vectorae later tries that same step again as a new message, by default 72 hours after the previous step was sent, and the new message is checked by the review queue again. | S | app/api/sequences.py:103-108 (followup_enabled default True, followup_delay_hours default 72); outreach_tasks.py:1440-1470 (next step = last sent + 1 = the rejected step), 1515-1564 (new Message row sent through send_message_impl); send_review.py:278-308 (a new message id has no review, so the rules are evaluated afresh). Applies only when the rejected step had a previously sent step before it. |
 | 36 | (re-check) To stop contacting the person, stop or pause them separately. | S | send_reviews.py:104-107 (enrollment keeps running) |
 | 37 | A review can be decided only once. Trying to approve or reject an item that was already decided returns an error … | S | app/api/send_reviews.py:92-94,110-112 |
 | 38 | An approved message goes back through the full send process. | S | outreach_tasks.py:131-352 |
@@ -838,7 +838,7 @@ Summary (final, after re-check): 79 supported, 0 unsupported, 0 contradicted. (F
 | 48 | When you resume the campaign, approved messages are sent through the normal checks. | S | send_review.py:371-377 (SCHEDULED); outreach_tasks.py:108-123 |
 | 49 | Held messages stay in the queue while a campaign is paused. | S | send_review.py:294-295 (a pending review stays pending; pausing does not touch reviews) |
 | 50 | Approving one while the campaign is paused does not send it until the campaign is active again. | S | outreach_tasks.py:118-120,171-172 |
-| 51 | LeadPilot has three separate checks with similar names | S | app/api/send_reviews.py:9-11; app/api/sequences.py:258-268,330-337 |
+| 51 | Vectorae has three separate checks with similar names | S | app/api/send_reviews.py:9-11; app/api/sequences.py:258-268,330-337 |
 | 52 | Send-review queue: checks one message, at send time, for the four rules above. | S | send_review.py:3-6 |
 | 53 | Pre-send review on a sequence: checks the sequence's content before it can be launched. | S | app/api/sequences.py:258-268,301-303; app/services/adversarial_review.py:1-20 |
 | 54 | It looks for spam and tone problems, compliance problems (…unsubscribe footer or a misleading "Re:" subject), and claims about prospects. | S | adversarial_review.py:127-174 |
@@ -853,8 +853,8 @@ Summary (final, after re-check): 59 supported, 0 unsupported, 0 contradicted. (F
 ### 13-replies-and-unified-inbox.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | When a prospect replies by email, WhatsApp or LinkedIn, LeadPilot stores the reply, classifies it, and changes what happens next in their sequence. | S | app/workers/outreach_tasks.py:996-1232 |
-| 2 | LeadPilot never replies to a person automatically. | S | outreach_tasks.py:997-998,1131,1197; reply_classification.py:12 |
+| 1 | When a prospect replies by email, WhatsApp or LinkedIn, Vectorae stores the reply, classifies it, and changes what happens next in their sequence. | S | app/workers/outreach_tasks.py:996-1232 |
+| 2 | Vectorae never replies to a person automatically. | S | outreach_tasks.py:997-998,1131,1197; reply_classification.py:12 |
 | 3 | The Inbox gathers every reply into one conversation per prospect … | S | app/services/inbox.py:3-13 |
 | 4 | Email: … checks your connected Gmail accounts … on a schedule. The default is every 300 seconds (5 minutes); your deployment can change this. | S | app/config.py:115; app/workers/celery_app.py:230-233 |
 | 5 | WhatsApp and LinkedIn: replies arrive through the providers' webhooks. | S | app/api/webhooks_whatsapp.py:447; app/api/linkedin.py:11,285-347 |
@@ -871,14 +871,14 @@ Summary (final, after re-check): 59 supported, 0 unsupported, 0 contradicted. (F
 | 16 | That stops the sequence and leaves it for you to look at … | S | reply_classification.py:62-63; outreach_tasks.py:1104-1108 |
 | 17 | A reply on one channel stops the whole sequence, including steps on other channels … | S | outreach_tasks.py:1122-1128; sequence_engine.py:252-279 |
 | 18 | No. Replies are classified and routed; a person writes the answer. | S | outreach_tasks.py:997-998 |
-| 19 | LeadPilot does not send anything back to a prospect who replied. | S | outreach_tasks.py:1104-1107 (stop); follow-up sweep skips repliers :1458 |
+| 19 | Vectorae does not send anything back to a prospect who replied. | S | outreach_tasks.py:1104-1107 (stop); follow-up sweep skips repliers :1458 |
 | 20 | A second AI pass reads each reply and decides what you should do next, in one of four categories | S | app/services/reply_intelligence.py:7-14,50; enqueued on every channel: outreach_tasks.py:1069, webhooks_whatsapp.py:447, linkedin.py:347 |
 | 21 | Buying signal – interest, a question about how it works, or a request for a call or pricing. | S | reply_intelligence.py:109-110 |
 | 22 | Objection – a specific concern such as price or an existing supplier. | S | reply_intelligence.py:110-111 |
 | 23 | Not now – a timing issue, not a rejection. | S | reply_intelligence.py:111-112 |
 | 24 | Wrong person – they are not the buyer or name someone else. | S | reply_intelligence.py:13-14,112 |
 | 25 | It writes a suggested draft of under 150 words onto the reply. | S | reply_intelligence.py:56,204,355 (capped at 150 words) |
-| 26 | The draft is never sent by LeadPilot … | S | reply_intelligence.py:18-21 |
+| 26 | The draft is never sent by Vectorae … | S | reply_intelligence.py:18-21 |
 | 27 | For a buying signal, the sequence is lined up so that the next step would be step 3, but its status is not changed … | S | reply_intelligence.py:18-21,64-67,246-271 |
 | 28 | Every reply also gets a label …: interested, objection, not now, unsubscribe or neutral, with a confidence score and a one-line reason. | S | app/services/reply_intent.py:17-24,53-59,78 |
 | 29 | Unsubscribe requests and machine mail … are labelled by fixed rules. | S | reply_intent.py:26-31,129-138 |
@@ -888,7 +888,7 @@ Summary (final, after re-check): 59 supported, 0 unsupported, 0 contradicted. (F
 | 33 | A reply labelled not now creates a re-engagement plan that records their reason in their own words and a return date. | S | app/services/reengagement_memory.py:287-343 |
 | 34 | If they named a date, that date is used. | S | reengagement_memory.py:259-267 |
 | 35 | Otherwise … 60 days for timing or a project, 90 for budget or headcount, 120 for priority, 180 for a contract, and the configured default (90 days) when no reason is given. | S | reengagement_memory.py:86-94,268-273; system_settings.py:129-131 |
-| 36 | When the date arrives, LeadPilot first re-checks …; dropped, disqualified, closed won or lost, meeting, opportunity or proposal, or suppression list → the plan is cancelled with the reason recorded. | S | reengagement_memory.py:377-399,524-528 (the suppression check here looks at the email address only) |
+| 36 | When the date arrives, Vectorae first re-checks …; dropped, disqualified, closed won or lost, meeting, opportunity or proposal, or suppression list → the plan is cancelled with the reason recorded. | S | reengagement_memory.py:377-399,524-528 (the suppression check here looks at the email address only) |
 | 37 | Otherwise you are notified. | S | reengagement_memory.py:529-538,549-568 |
 | 38 | Sending a message automatically at that point is off by default. | S | app/services/system_settings.py:132-137 (the module docstring at reengagement_memory.py:20 says "the default" is on; that docstring is stale) |
 | 39 | (re-check) If your administrator turns it on, a return message is scheduled on the prospect's earlier sequence. | S | reengagement_memory.py:467-509,532-537 (message on the sequence of the last sent message) |
@@ -919,15 +919,15 @@ Summary (final, after re-check): 58 supported, 0 unsupported, 0 contradicted. (F
 ### 14-booking-and-calendar.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | Prospects can book a meeting with you in two ways: … a booking page on LeadPilot's own calendar, or … a Calendly link. | S | app/api/calendar.py:452-528; app/api/webhooks.py:1-5,75 |
-| 2 | LeadPilot's own calendar: you set your weekly availability and create booking pages inside LeadPilot. | S | frontend/src/app/(app)/calendar/page.tsx:157; calendar/booking-pages/page.tsx:110 |
-| 3 | Each booking is tied to your page, so LeadPilot always knows whose booking it is. | S | app/db/models.py:2459-2461 |
+| 1 | Prospects can book a meeting with you in two ways: … a booking page on Vectorae's own calendar, or … a Calendly link. | S | app/api/calendar.py:452-528; app/api/webhooks.py:1-5,75 |
+| 2 | Vectorae's own calendar: you set your weekly availability and create booking pages inside Vectorae. | S | frontend/src/app/(app)/calendar/page.tsx:157; calendar/booking-pages/page.tsx:110 |
+| 3 | Each booking is tied to your page, so Vectorae always knows whose booking it is. | S | app/db/models.py:2459-2461 |
 | 4 | When a booking is cancelled, the prospect goes back into their sequence. | S | app/workers/calendar_tasks.py:262-287; sequence_engine.py:652-685 |
-| 5 | Calendly: a scheduling link can be attached to a sequence, and LeadPilot asks the writer to include it in the call to action …, tagged with your account. | S | app/api/sequences.py:119; app/services/message_personalization.py:129; outreach_tasks.py:556-571; app/integrations/calendly.py:177-196 |
-| 6 | Calendly reports bookings back to LeadPilot through a webhook. | S | app/api/webhooks.py:75-99 |
+| 5 | Calendly: a scheduling link can be attached to a sequence, and Vectorae asks the writer to include it in the call to action …, tagged with your account. | S | app/api/sequences.py:119; app/services/message_personalization.py:129; outreach_tasks.py:556-571; app/integrations/calendly.py:177-196 |
+| 6 | Calendly reports bookings back to Vectorae through a webhook. | S | app/api/webhooks.py:75-99 |
 | 7 | A Calendly booking stops the prospect's sequences for good. | S | webhooks.py:153-165; sequence_engine.py:252-262 |
-| 8 | In the current app, the sequence form does not have a field for this link; it can be set when a sequence is created through the LeadPilot API. | S | frontend/src/components/strategy/OutreachPanel.tsx:68-71 (no bookingUrl passed); frontend/src/lib/api/outreach.ts:28,35 |
-| 9 | The Calendly connection uses one API token for the whole deployment, set by whoever runs your LeadPilot. | S | app/config.py:119-120 |
+| 8 | In the current app, the sequence form does not have a field for this link; it can be set when a sequence is created through the Vectorae API. | S | frontend/src/components/strategy/OutreachPanel.tsx:68-71 (no bookingUrl passed); frontend/src/lib/api/outreach.ts:28,35 |
+| 9 | The Calendly connection uses one API token for the whole deployment, set by whoever runs your Vectorae. | S | app/config.py:119-120 |
 | 10 | In Settings, on the Integrations tab, the Calendly card shows either "API token configured" or "Not configured". | S | settings/page.tsx:396-403 (full text: "Not configured — set CALENDLY_API_TOKEN env var") |
 | 11 | Several parts of the Calendly code are marked as not yet checked … (the sign-in method, the webhook signature header and the booking data it reads), so treat … as not yet verified … | S | app/integrations/calendly.py:4,8,21-22,44,53; webhooks.py:55,116 |
 | 12 | Open Calendar in the main menu and set your Weekly availability. | S | nav.ts:45; calendar/page.tsx:157 |
@@ -944,7 +944,7 @@ Summary (final, after re-check): 58 supported, 0 unsupported, 0 contradicted. (F
 | 22 | Questions – up to 10 custom questions, each optional or required. | S | app/api/calendar.py:128; booking-pages/page.tsx:298-335 |
 | 23 | You can pause and resume a page, and copy its link to share it. | S | booking-pages/page.tsx:156-175 |
 | 24 | Booking pages also support a gap between meetings (0 to 120 minutes) and a maximum number of bookings per day (1 to 50). | S | app/api/calendar.py:126-127 |
-| 25 | These two settings are not in the booking-page form; they can be set through the LeadPilot API. | S | booking-pages/page.tsx:206-335 (form has no buffer or daily-max fields) |
+| 25 | These two settings are not in the booking-page form; they can be set through the Vectorae API. | S | booking-pages/page.tsx:206-335 (form has no buffer or daily-max fields) |
 | 26 | The public page shows the page title, description, length and your questions. | S | app/api/calendar.py:420-430; book/page.tsx:235-239,406-425 |
 | 27 | The prospect picks a time zone (their browser's zone is pre-selected), picks a date and time, and enters Your name, Email and optionally Phone, then clicks Confirm booking. | S | book/page.tsx:112,249-252,377-435 |
 | 28 | Times are offered from your availability for the next 30 days, and no sooner than 60 minutes from now. | S | app/config.py:288,292; calendar_service.py:243-245 |
@@ -955,7 +955,7 @@ Summary (final, after re-check): 58 supported, 0 unsupported, 0 contradicted. (F
 | 33 | Times in the past, inside the minimum notice period, or on a day that has reached the page's daily cap are also hidden. | S | calendar_service.py:288-298 |
 | 34 | (re-check) If two people try to book the same time on the same booking page at the same moment, the database allows only one of them; the second gets an error. | S | models.py:2453-2454; app/api/calendar.py:510-518 |
 | 35 | A cancelled booking frees its time so it can be booked again. | S | app/api/calendar.py:630-640,674-676; models.py:2444-2448 |
-| 36 | LeadPilot's calendar does not read your Google Calendar or any other external calendar. | S | calendar_service.py:174-205 (only LeadPilot bookings and meetings) |
+| 36 | Vectorae's calendar does not read your Google Calendar or any other external calendar. | S | calendar_service.py:174-205 (only Vectorae bookings and meetings) |
 | 37 | Your availability is stored as your local clock time plus its time zone, not converted to UTC … "9am" stays 9am … through daylight-saving changes. | S | models.py:2359-2363 |
 | 38 | Each day is converted on its own date. | S | calendar_service.py:28-33,266-283 |
 | 39 | The prospect sees and books times in the zone they choose. | S | book/page.tsx:112,131-132,209 |
@@ -967,8 +967,8 @@ Summary (final, after re-check): 58 supported, 0 unsupported, 0 contradicted. (F
 | 45 | Confirmation emails are sent to the invitee and to you. | S | calendar_tasks.py:104-134,222 |
 | 46 | If sending the emails fails, the booking still exists and stays on your calendar. | S | calendar_tasks.py:80-101,163-170; calendar.py:549-556 |
 | 47 | When a booking comes in through Calendly, the matching lead is marked Meeting booked, a "booked" outcome is recorded, and all the lead's sequences are stopped. | S | webhooks.py:153-165 |
-| 48 | If the Calendly link did not carry your account's tag …, LeadPilot does not guess … and matches no lead. | S | webhooks.py:122-140; calendly.py:201-206 |
-| 49 | On LeadPilot's calendar you can cancel a booking from the calendar ("Cancel booking"). | S | frontend/src/components/calendar/BookingDrawer.tsx:193 |
+| 48 | If the Calendly link did not carry your account's tag …, Vectorae does not guess … and matches no lead. | S | webhooks.py:122-140; calendly.py:201-206 |
+| 49 | On Vectorae's calendar you can cancel a booking from the calendar ("Cancel booking"). | S | frontend/src/components/calendar/BookingDrawer.tsx:193 |
 | 50 | The time is freed, a cancellation email goes to the invitee and to you, any meeting prep reminders … are cancelled, a lead marked Meeting booked goes back to Replied, and the sequence pause made by the booking is lifted. | S | app/api/calendar.py:674-677; calendar_tasks.py:279-317 |
 | 51 | Cancelling a meeting never lifts a different pause, such as an out-of-office hold. | S | sequence_engine.py:652-667 |
 | 52 | When a Calendly booking is cancelled, the lead goes back to Replied. Its sequences were already stopped and are not restarted. | S | webhooks.py:210-221 |
@@ -980,7 +980,7 @@ Summary (final, after re-check): 53 supported, 0 unsupported, 0 contradicted. (F
 ### 15-meetings-prep-room-transcripts.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | When a meeting is booked (through Calendly or a LeadPilot booking page), LeadPilot writes a prep brief for that lead. | S | calendar_tasks.py:208-218; webhooks.py:194-206 (only when the booking matches a lead) |
+| 1 | When a meeting is booked (through Calendly or a Vectorae booking page), Vectorae writes a prep brief for that lead. | S | calendar_tasks.py:208-218; webhooks.py:194-206 (only when the booking matches a lead) |
 | 2 | You can also start one yourself from the lead's Meeting Prep tab with Generate prep brief. | S | frontend/src/components/leads/MeetingPrepPanel.tsx:3,79 |
 | 3 | Writing one takes about a minute. | S | MeetingPrepPanel.tsx:53,172 |
 | 4 | When it is ready, the owner gets a notification, and a Slack message if Slack is connected. | S | app/services/meeting_prep.py:609-640; docs/features/meeting-prep.md:20-22 |
@@ -991,8 +991,8 @@ Summary (final, after re-check): 53 supported, 0 unsupported, 0 contradicted. (F
 | 9 | Likely pain points – labelled as hypotheses to confirm on the call. | S | MeetingPrepPanel.tsx:277-281 |
 | 10 | Likely objections, Talking points, Discovery questions, Competitive landscape, Recommended next steps and Deal structure. | S | MeetingPrepPanel.tsx:284-303 |
 | 11 | You can copy the brief as Markdown. | S | MeetingPrepPanel.tsx:95-97,159-160 |
-| 12 | Your LeadPilot administrator can turn automatic briefs off in System Settings; they are on by default. | S | app/services/system_settings.py:29-30 |
-| 13 | Yes, by default. LeadPilot sends a day-before reminder once the call is within 24 hours, and a 1-hour reminder whose text is your opening script. | S | system_settings.py:31-34; meeting-prep.md:24-26 |
+| 12 | Your Vectorae administrator can turn automatic briefs off in System Settings; they are on by default. | S | app/services/system_settings.py:29-30 |
+| 13 | Yes, by default. Vectorae sends a day-before reminder once the call is within 24 hours, and a 1-hour reminder whose text is your opening script. | S | system_settings.py:31-34; meeting-prep.md:24-26 |
 | 14 | Each is sent at most once. | S | meeting-prep.md:26-27; celery_app.py:285-291 |
 | 15 | Cancelling the booking stops both, and a reschedule sets them up again. | S | meeting_prep.py:463-520 |
 | 16 | Your administrator can switch either reminder off. | S | system_settings.py:31-34 |
@@ -1015,12 +1015,12 @@ Summary (final, after re-check): 53 supported, 0 unsupported, 0 contradicted. (F
 | 32 | (re-check) Type Live notes, which save as you go. | S | MeetingRoom.tsx:32,73-88,143-170 |
 | 32a | (re-check, new) After you end the meeting, you can review and add action items under the AI summary. | S | frontend/src/app/(app)/meetings/detail/page.tsx:142-156; AISummaryPanel.tsx:123-131; ActionItemsList.tsx:150 |
 | 33 | A meeting can be on Google Meet, Zoom, Microsoft Teams, or any other link you paste. | S | PlatformLauncher.tsx:24-29 |
-| 34 | LeadPilot can create Google Meet and Zoom links for you, but these two integrations have never been tested against the live Google and Zoom services. | S | app/integrations/google_meet.py:27-37; app/integrations/zoom.py:26,56,162-170; docs/features/engagement-hub.md:5,308 |
+| 34 | Vectorae can create Google Meet and Zoom links for you, but these two integrations have never been tested against the live Google and Zoom services. | S | app/integrations/google_meet.py:27-37; app/integrations/zoom.py:26,56,162-170; docs/features/engagement-hub.md:5,308 |
 | 35 | If creating the link fails, the meeting is still created and you can paste a link yourself. | S | app/api/meetings.py:22-27,266-283,315-349 |
 | 36 | Teams has no integration; you paste the link. | S | app/api/meetings.py:343-344 |
 | 37 | Pasting your own link is the only verified path today. | S | follows from #34-#36 |
 | 38 | A meeting nobody ended is closed automatically 6 hours after its scheduled end, without a summary. | S | calendar_tasks.py:420-468; celery_app.py:270-278 (a meeting that was never started is closed as cancelled / no-show) |
-| 39 | When you click End meeting, LeadPilot writes a summary from what exists, usually your notes: a summary, key points, next steps, action items and sentiment. | S | app/api/meetings.py:454-491; calendar_tasks.py:326-361; app/services/meeting_recording.py:9-15 |
+| 39 | When you click End meeting, Vectorae writes a summary from what exists, usually your notes: a summary, key points, next steps, action items and sentiment. | S | app/api/meetings.py:454-491; calendar_tasks.py:326-361; app/services/meeting_recording.py:9-15 |
 | 40 | Your own notes are never changed by the AI. | S | MeetingRoom.tsx:167-170; calendar_tasks.py:349-357 (separate fields) |
 | 41 | If you regenerate the summary, action items you already ticked stay ticked. | S | calendar_tasks.py:353-356,381-402 |
 | 42 | When the meeting is completed, the summary is filed as a note on the lead in the CRM. | S | calendar_tasks.py:363-367; app/services/crm_events.py:370-376 |
@@ -1030,17 +1030,17 @@ Summary (final, after re-check): 53 supported, 0 unsupported, 0 contradicted. (F
 | 46 | Your administrator must set it up under Admin › Integrations › Recall.ai. Until it is, sending a bot fails, and the transcript webhook is closed. | S | recall.py:200-207; app/api/recording.py:6-8,60-66,87-93 |
 | 47 | The meeting needs a join link. Without one the button is disabled ("Add a join link to send a recording bot."). | S | RecordingControl.tsx:57-62 |
 | 48 | When a transcript arrives, it replaces the notes-only summary with one built from the transcript and your notes. | S | meeting_recording.py:9-15,188-220 |
-| 49 | LeadPilot waits up to 60 minutes after the meeting for it by default (an administrator setting); a late transcript is still accepted. | S | system_settings.py:211-217; meeting_recording.py:68-69,127-131,227-232 |
+| 49 | Vectorae waits up to 60 minutes after the meeting for it by default (an administrator setting); a late transcript is still accepted. | S | system_settings.py:211-217; meeting_recording.py:68-69,127-131,227-232 |
 | 50 | Transcripts are capped at 250,000 characters. | S | app/api/meetings.py:75; meeting_recording.py:55 |
 | 51 | You can search a transcript and export it as PDF or TXT. | S | frontend/src/components/meetings/TranscriptViewer.tsx:3,75-121 |
-| 52 | LeadPilot does not collect recording consent. The bot records everyone on the call. | S | RecordingControl.tsx:57-62; app/api/recording.py (no consent capture) |
+| 52 | Vectorae does not collect recording consent. The bot records everyone on the call. | S | RecordingControl.tsx:57-62; app/api/recording.py (no consent capture) |
 | 53 | The app reminds you: "Tell everyone on the call that it is being recorded." | S | RecordingControl.tsx:61 |
-| 54 | … LeadPilot does not enforce it. | S | app/api/recording.py:1-66 |
+| 54 | … Vectorae does not enforce it. | S | app/api/recording.py:1-66 |
 | 55 | On the lead's page, use Log meeting outcome. | S | frontend/src/components/leads/LogOutcomeDialog.tsx:73 |
 | 56 | Pick an outcome, add notes, and for a closed-won outcome optionally a deal value. | S | LogOutcomeDialog.tsx:43-50,127-131 |
-| 57 | LeadPilot records the outcome first: … lead's status, … CRM activity and note, … result for reporting, … won deal for closed-won, and stops every live sequence … | S | app/services/meeting_followup.py:1-17,140,163-217 (the CRM note is written only when notes were entered) |
+| 57 | Vectorae records the outcome first: … lead's status, … CRM activity and note, … result for reporting, … won deal for closed-won, and stops every live sequence … | S | app/services/meeting_followup.py:1-17,140,163-217 (the CRM note is written only when notes were entered) |
 | 58 | It then writes a follow-up email and saves it as a Gmail draft. | S | meeting_followup.py:17-19 |
-| 59 | It is never sent automatically. You edit it and send it yourself, from LeadPilot or from Gmail. | S | meeting-prep.md:33-36; meeting_followup.py:17-19 |
+| 59 | It is never sent automatically. You edit it and send it yourself, from Vectorae or from Gmail. | S | meeting-prep.md:33-36; meeting_followup.py:17-19 |
 | 60 | The suppression list is checked both when drafting and when sending. | S | meeting_followup.py:26-27 |
 | 61 | Saving drafts needs Gmail's compose permission; if you connected Gmail before this feature existed, reconnect it. Until then the draft text is kept so you can copy it. | S | meeting-prep.md:48-51; meeting_followup.py:21-22 |
 
@@ -1051,7 +1051,7 @@ Summary (final, after re-check): 63 supported, 0 unsupported, 0 contradicted. (F
 ### 16-crm-and-integrations.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot has its own CRM, and it can also connect to HubSpot, Salesforce, Slack, and tools like Zapier or Make. | S | app/api/crm.py:1-2; app/integrations/hubspot.py, salesforce.py, slack.py; app/services/webhook_delivery.py |
+| 1 | Vectorae has its own CRM, and it can also connect to HubSpot, Salesforce, Slack, and tools like Zapier or Make. | S | app/api/crm.py:1-2; app/integrations/hubspot.py, salesforce.py, slack.py; app/services/webhook_delivery.py |
 | 2 | … none of the HubSpot, Salesforce or Slack connections has a recorded test against the live vendor yet. | S | docs/FULL_PRODUCT_AUDIT.md:119 ("Any live third-party API — no credentials; all integrations are mock-tested") |
 | 3 | CRM in the main menu opens a CRM over the same leads your campaigns use, with dashboards and a spreadsheet-style table you edit directly. | S | nav.ts:34-38; frontend/src/app/(app)/crm/page.tsx:18 |
 | 4 | You can edit cells inline, bulk-edit up to 500 rows, add notes, tags, saved views and custom fields, and see each lead's activity and meetings. | S | app/api/crm.py:1-2,103-104,369-376; frontend/src/components/crm/grid/LeadNotesPanel.tsx:3,50-51 |
@@ -1061,24 +1061,24 @@ Summary (final, after re-check): 63 supported, 0 unsupported, 0 contradicted. (F
 | 8 | HubSpot: several parts of the code (the sign-in token exchange, the contact search, and linking deals to contacts) are marked as not yet checked … | S | app/integrations/hubspot.py:74,131,157 |
 | 9 | Salesforce: there is no record of a test against a live Salesforce account. | S | docs/FULL_PRODUCT_AUDIT.md:119 |
 | 10 | Slack: there is no record of a test against a live Slack workspace. | S | docs/FULL_PRODUCT_AUDIT.md:119 |
-| 11 | Outbound webhooks and API keys are LeadPilot's own features and do not depend on a vendor. | S | app/services/webhook_delivery.py; app/services/api_keys.py |
-| 12 | All three vendor connections also need your LeadPilot administrator to register the app first …; the card shows "An admin must add the … app under Admin › Integrations first." and Connect is disabled. | S | frontend/src/components/settings/CrmCards.tsx:104-109; SlackCard.tsx:76-81 |
+| 11 | Outbound webhooks and API keys are Vectorae's own features and do not depend on a vendor. | S | app/services/webhook_delivery.py; app/services/api_keys.py |
+| 12 | All three vendor connections also need your Vectorae administrator to register the app first …; the card shows "An admin must add the … app under Admin › Integrations first." and Connect is disabled. | S | frontend/src/components/settings/CrmCards.tsx:104-109; SlackCard.tsx:76-81 |
 | 13 | Go to Settings, open the Integrations tab, and click Connect on the HubSpot or Salesforce card. You sign in on the vendor's site. | S | CrmCards.tsx:104; settings/page.tsx:392-394; docs/features/crm-ecosystem.md:21-24 |
 | 14 | Once connected, the card shows the account, how many leads and deals are linked, when data was last pushed and pulled, Sync now and Disconnect buttons, and the last error … ("reconnect to restore the sync"). | S | CrmCards.tsx:87-115 (the "reconnect…" phrase shows only when the connection status is "error") |
 | 15 | Leads that engaged (replied, meeting booked, opportunity, closed, or disqualified) become HubSpot contacts or Salesforce leads, matched by email. | S | app/services/crm_sync.py:4-5,67-68; crm-ecosystem.md:26-28 |
 | 16 | Tick "Also push every verified lead (by default only leads that replied or further)" to send every verified lead as well. | S | CrmCards.tsx:126; crm_sync.py:69,535 |
 | 17 | Deals become HubSpot deals (linked to the contact) or Salesforce opportunities. | S | crm_sync.py:65; crm-ecosystem.md:28-30 |
 | 18 | Changes are pushed straight away on key events … and also in a sweep every 15 minutes. | S | crm-ecosystem.md:30-31; celery_app.py:316-321; event_bus.py:104-106 |
-| 19 | From your CRM to LeadPilot, only for records LeadPilot linked, and only forward | S | crm-ecosystem.md:33; crm_sync.py:571 |
+| 19 | From your CRM to Vectorae, only for records Vectorae linked, and only forward | S | crm-ecosystem.md:33; crm_sync.py:571 |
 | 20 | HubSpot lead status "Unqualified" makes the lead disqualified; an open deal or the "opportunity" lifecycle stage makes it an opportunity; the "customer" lifecycle stage makes it closed won. | S | crm_sync.py:93-94 ("open deal" is the hs_lead_status OPEN_DEAL value) |
 | 21 | A deal or opportunity closed won or lost marks the deal and the lead won or lost. Deal amount and close date are copied. | S | crm-ecosystem.md:40-41 |
 | 22 | A converted Salesforce lead becomes an opportunity; "Closed - Not Converted" becomes disqualified. | S | crm_sync.py:96-97,664-665 |
-| 23 | A HubSpot deal created on a linked contact is imported as a LeadPilot deal. | S | crm-ecosystem.md:44 |
+| 23 | A HubSpot deal created on a linked contact is imported as a Vectorae deal. | S | crm-ecosystem.md:44 |
 | 24 | A CRM change never moves a lead backwards and never reopens a closed lead. | S | crm_sync.py:70-72,571; crm-ecosystem.md:46-47 |
 | 25 | Closing a lead in this way stops its sequences. | S | crm-ecosystem.md:47-48 |
 | 26 | The 15-minute sweep reads linked records back without any setup in your CRM; your CRM admin can also add webhooks … | S | crm-ecosystem.md:50-62 |
 | 27 | On the Slack card …, click Connect, approve the app in Slack, then choose a Channel. You can send a test message. | S | SlackCard.tsx:37-41,66-102 |
-| 28 | LeadPilot posts meeting bookings, interested replies, campaigns paused automatically for a high bounce rate (manual pauses are not posted), and strategy changes on idle campaigns. | S | crm-ecosystem.md:7-12; sequence_engine.py:573-581; app/api/analytics.py:145-146 (manual pause sends `slack=False`) |
+| 28 | Vectorae posts meeting bookings, interested replies, campaigns paused automatically for a high bounce rate (manual pauses are not posted), and strategy changes on idle campaigns. | S | crm-ecosystem.md:7-12; sequence_engine.py:573-581; app/api/analytics.py:145-146 (manual pause sends `slack=False`) |
 | 29 | It also posts meeting prep briefs, meeting reminders, objection spikes and deals won. | S | crm-ecosystem.md:13; event_bus.py:42-60 |
 | 30 | Public channels work straight away. For a private channel, invite the bot to it before choosing it. | S | SlackCard.tsx:102; crm-ecosystem.md:15-16 |
 | 31 | If Slack is unavailable, the notification is skipped; it never undoes the booking or event that caused it. | S | event_bus.py:83; notification_tasks.py:46-59 |
@@ -1092,7 +1092,7 @@ Summary (final, after re-check): 63 supported, 0 unsupported, 0 contradicted. (F
 | 39 | The URL must be public HTTPS. Private or internal addresses are refused, and redirects are not followed. | S | webhook_delivery.py:30-33,150-167,310,329-334 |
 | 40 | The card's Recent deliveries list shows each event, its status, attempts, last response and time. | S | WebhooksCard.tsx:118-136 |
 | 41 | On the API keys card, enter a Name and click Create key. | S | WebhooksCard.tsx:238-252 |
-| 42 | The key starts with lpk_ and is shown only once; LeadPilot stores only a scrambled (hashed) form. | S | app/services/api_keys.py:3-4,21,30-41 |
+| 42 | The key starts with lpk_ and is shown only once; Vectorae stores only a scrambled (hashed) form. | S | app/services/api_keys.py:3-4,21,30-41 |
 | 43 | Tools like Zapier and Make use it as Authorization: Bearer lpk_…. | S | WebhooksCard.tsx:240; crm-ecosystem.md:78-79 |
 | 44 | You can have up to 10 active keys; revoke one to make another. | S | api_keys.py:22,35-38 |
 | 45 | Revoke stops a key from working. | S | api_keys.py:51-52,64-69 |
@@ -1105,19 +1105,19 @@ Summary (final, after re-check): 46 supported, 0 unsupported, 0 contradicted. (F
 ### 17-learning-loop-and-ab-tests.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot records what happens to every message it sends (sent, replied, booked and so on) … | S | app/db/models.py:1579-1611; outreach_tasks.py:525-528,1109-1113 |
+| 1 | Vectorae records what happens to every message it sends (sent, replied, booked and so on) … | S | app/db/models.py:1579-1611; outreach_tasks.py:525-528,1109-1113 |
 | 2 | Nothing in the learning loop rewrites a live campaign on its own. | S | app/services/strategy_mutation.py:17-22; learning_tasks.py:259-265 (writes default_variant only, which nothing reads) |
 | 3 | Every send, reply, booking and similar event is stored as an outcome record. | S | models.py:1579-1611 |
-| 4 | (re-check) Every night (by default at 02:05 UTC, configurable by your deployment), LeadPilot rolls these records up into scores for each strategy pattern: reply rate and booking rate, per variant. | S | app/workers/celery_app.py:211-217,235-238; app/core/config.py:151; score_decay.py:142-168 (see finding F1 for the data it actually sees) |
+| 4 | (re-check) Every night (by default at 02:05 UTC, configurable by your deployment), Vectorae rolls these records up into scores for each strategy pattern: reply rate and booking rate, per variant. | S | app/workers/celery_app.py:211-217,235-238; app/core/config.py:151; score_decay.py:142-168 (see finding F1 for the data it actually sees) |
 | 5 | Older results count for less. A result from 90 days ago counts half as much as one from today (the default half-life, configurable). | S | score_decay.py:5-16,35-37; app/core/config.py:156-161 |
-| 6 | LeadPilot also counts how much recent evidence there is, so a pattern with many old results can still count as "not enough data". | S | score_decay.py:15-16,184,222 |
+| 6 | Vectorae also counts how much recent evidence there is, so a pattern with many old results can still count as "not enough data". | S | score_decay.py:15-16,184,222 |
 | 7 | … the messaging step and the execution-plan step are given up to 8 of your account's best-scoring patterns that have enough data to be considered reliable. | S | app/pipeline/engine.py:128-139; app/services/playbook_service.py:33,55-64 |
 | 8 | Only patterns from your own account's strategies are used. | S | playbook_service.py:42-53 (pattern keys are limited to the account's strategies). Note: the score behind a pattern key aggregates every account's outcomes with that key (score_decay.py:142-168 has no account filter). |
 | 9 | On a new account there is no data yet. In that case the pipeline is told plainly that no learned data exists and works from research alone. | S | playbook_service.py:23-28,66-67,84-86 |
 | 10 | Each sequence step carries a variant label (the default is "A"). | S | app/api/sequences.py:85 |
 | 11 | Within one sequence each step number appears only once, so a step has exactly one variant. | S | app/api/sequences.py:164-167 |
 | 12 | To compare variants you run sequences whose steps carry different labels within the same strategy. | S | learning_tasks.py:214-227 (grouped by strategy, then variant) |
-| 13 | The sequence form in the app does not set variant labels, so steps created there are all variant "A"; labels can be set … through the LeadPilot API. | S | frontend/src/lib/api/outreach.ts:6-10,26-36; app/api/sequences.py:85 |
+| 13 | The sequence form in the app does not set variant labels, so steps created there are all variant "A"; labels can be set … through the Vectorae API. | S | frontend/src/lib/api/outreach.ts:6-10,26-36; app/api/sequences.py:85 |
 | 14 | The A/B variants table on the CRM campaigns dashboard shows each variant's sends, reply rate and booking rate, counted from messages actually sent. | S | frontend/src/app/(app)/crm/dashboard/campaigns/page.tsx:67,218-250 |
 | 15 | A variant with under 30 sends is flagged as below the sample size the promotion check needs … | S | crm/dashboard/campaigns/page.tsx:257-260 |
 | 16 | (re-check) A nightly sweep (30 minutes after the nightly roll-up, at 02:35 UTC by default) checks strategies … | S | celery_app.py:235-243 |
@@ -1134,13 +1134,13 @@ Summary (final, after re-check): 46 supported, 0 unsupported, 0 contradicted. (F
 | 27 | Each strategy is promoted at most once. | S | learning_tasks.py:234-241,268-277 |
 | 28 | Messages that have already been sent are never changed. | S | learning_tasks.py:259-279 (only the strategies row and an outcomes row are written) |
 | 29 | … promotion records the winning variant on the strategy. In the current version, nothing reads that record when writing or scheduling future messages … | S | learning_tasks.py:260-265; `default_variant` is never read anywhere else (models.py:928) |
-| 30 | If a campaign has been sending for 7 days (the default, set by your administrator) with zero replies, counted from its first sent message, LeadPilot reviews it. | S | app/services/strategy_mutation.py:3-8,132-143; system_settings.py:45-48 |
+| 30 | If a campaign has been sending for 7 days (the default, set by your administrator) with zero replies, counted from its first sent message, Vectorae reviews it. | S | app/services/strategy_mutation.py:3-8,132-143; system_settings.py:45-48 |
 | 31 | AI looks at the strategy, the target customer, the step briefs and the numbers, and proposes a diagnosis and three changes: … messaging angle, … channel recommendation, and target refinements, plus rewritten messaging. | S | strategy_mutation.py:10-15,56-66 |
 | 32 | This is saved as a proposed new version of the strategy and you are notified. | S | strategy_mutation.py:18-19,264-299,326-335 |
 | 33 | It is never applied automatically; applying it is your decision. | S | strategy_mutation.py:17-22 |
 | 34 | At most one automatic proposal is made per idle period. | S | strategy_mutation.py:7-8 |
 | 35 | Smart send time is a per-campaign switch. | S | frontend/src/components/campaigns/SendTimePanel.tsx; app/services/send_windows.py:1-28 |
-| 36 | LeadPilot scores each day-and-hour slot in the lead's own time zone by opens plus three times replies. | S | send_windows.py:5,9,76-104 |
+| 36 | Vectorae scores each day-and-hour slot in the lead's own time zone by opens plus three times replies. | S | send_windows.py:5,9,76-104 |
 | 37 | Once a campaign has 50 opens (the default), it works out its top windows, using only hours inside your allowed send window. | S | send_windows.py:14-18,120-128; system_settings.py:58-59 |
 | 38 | … moved to the next of the top 3 windows at or after its normal time, never earlier and never more than 72 hours later (the default). | S | send_windows.py:24-25,56; system_settings.py:72-73 |
 | 39 | If no window fits, it sends at its normal time. | S | send_windows.py:162-167 |
@@ -1156,7 +1156,7 @@ Summary (final, after re-check): 43 supported, 0 unsupported, 0 contradicted. (F
 ### 18-analytics-health-score-roi.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot reports … in several places: the Analytics page, the Revenue & ROI page, a shareable ROI dashboard, and a Pipeline Health Score. | S | frontend/src/app/(app)/analytics/page.tsx; analytics/revenue/page.tsx:85; ShareLinksCard.tsx; app/api/analytics.py:8-10 |
+| 1 | Vectorae reports … in several places: the Analytics page, the Revenue & ROI page, a shareable ROI dashboard, and a Pipeline Health Score. | S | frontend/src/app/(app)/analytics/page.tsx; analytics/revenue/page.tsx:85; ShareLinksCard.tsx; app/api/analytics.py:8-10 |
 | 2 | A single number from 0 to 100 for one campaign, made from four parts. Each part is scored 0 to 100, then weighted | S | app/services/pipeline_health.py:7-14,53-61 |
 | 3 | Reply rate (35%): replies divided by sends, as a percentage. A 10% reply rate scores 10 on this part. | S | pipeline_health.py:101-109,157-165,195 |
 | 4 | Sequence completion (25%): finished enrollments divided by all enrollments. | S | pipeline_health.py:167-178,196 |
@@ -1167,12 +1167,12 @@ Summary (final, after re-check): 43 supported, 0 unsupported, 0 contradicted. (F
 | 9 | If the calculation fails, the score shows 0 and "critical" with an error flag … | S | pipeline_health.py:140-150,218-229 |
 | 10 | The score is refreshed every six hours for verified and running campaigns, and recalculated live when requested. | S | celery_app.py:352-358; app/workers/health_tasks.py:35,54; app/api/analytics.py:199-220 |
 | 11 | It is available on every plan. | S | app/api/analytics.py:8-10,215 |
-| 12 | The web app does not currently display it; it is available through the LeadPilot API. | S | no frontend call to /strategies/{id}/health (grep). The marketing page still advertises it (frontend/src/app/how-it-works/page.tsx:31); see finding F9. |
+| 12 | The web app does not currently display it; it is available through the Vectorae API. | S | no frontend call to /strategies/{id}/health (grep). The marketing page still advertises it (frontend/src/app/how-it-works/page.tsx:31); see finding F9. |
 | 13 | Choose a campaign on Analytics to see …: reply quality (the raw reply rate next to the positive reply rate), sequence completion, attribution ("What earned the outcomes"), and benchmarks ("How you compare"). | S | components/analytics/ReplyQualityPanel.tsx:41-53; CompletionPanel.tsx:54; AttributionPanel.tsx:70; BenchmarkPanel.tsx:44 |
 | 14 | The page also links to Revenue & ROI. | S | analytics/page.tsx:78 |
 | 15 | The positive reply rate counts only replies labelled interested. | S | app/services/reply_intent.py:61-65,294 |
 | 16 | Replies that could not be classified are counted as unclassified, never guessed. | S | reply_intent.py:288-292,324 |
-| 17 | Every booked meeting, won deal and interested reply is credited to a message, and LeadPilot always records how it decided and how sure it is | S | app/services/attribution.py:59-69,137-181,257-258 |
+| 17 | Every booked meeting, won deal and interested reply is credited to a message, and Vectorae always records how it decided and how sure it is | S | app/services/attribution.py:59-69,137-181,257-258 |
 | 18 | Direct reply: … Confidence 1.0. | S | attribution.py:13-15,153 |
 | 19 | Thread match: … Confidence 0.85. | S | attribution.py:16-17,155-164 |
 | 20 | Last touch: … 0.7 within a day, 0.55 within 3 days, 0.4 within a week, 0.25 within a month, 0.1 after that. | S | attribution.py:18-22,82-83,96-104 |
@@ -1181,7 +1181,7 @@ Summary (final, after re-check): 43 supported, 0 unsupported, 0 contradicted. (F
 | 23 | When fewer than half are confirmed, a caveat appears above the totals. | S | frontend/src/lib/attribution.ts:97-98; AttributionPanel.tsx:89-92 |
 | 24 | Attribution is updated every 15 minutes, and Recompute runs it now. | S | celery_app.py:332-338; AttributionPanel.tsx:82 |
 | 25 | A message sent after the outcome is never credited. | S | attribution.py:111-118 |
-| 26 | How you compare shows your reply rate, meeting-booked rate and bounce rate per channel next to the spread across other accounts on this LeadPilot deployment over the last 90 days. | S | app/services/benchmarks.py:4-5,67-70,248-286; system_settings.py:224-225 |
+| 26 | How you compare shows your reply rate, meeting-booked rate and bounce rate per channel next to the spread across other accounts on this Vectorae deployment over the last 90 days. | S | app/services/benchmarks.py:4-5,67-70,248-286; system_settings.py:224-225 |
 | 27 | It is not an industry statistic. | S | benchmarks.py:4-6 |
 | 28 | An account counts only with at least 30 sends in that group. | S | benchmarks.py:201-203; system_settings.py:222-223 |
 | 29 | A group is shown only if at least 10 accounts are in it. This can never be set below 5. Smaller groups are not stored at all. | S | benchmarks.py:74,82-87,205-209,221-223; system_settings.py:220-221 |
@@ -1216,10 +1216,10 @@ Summary (final, after re-check): 52 supported, 0 unsupported, 0 contradicted. (F
 ### 19-deliverability-and-mailbox-health.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot checks two things: the health of each sending domain … and the health of each mailbox you send from. | S | app/services/deliverability.py:1-26; app/services/mailbox_health.py:1-9 |
+| 1 | Vectorae checks two things: the health of each sending domain … and the health of each mailbox you send from. | S | app/services/deliverability.py:1-26; app/services/mailbox_health.py:1-9 |
 | 2 | A mailbox in trouble is slowed down or paused automatically, and paused messages wait rather than being dropped. | S | mailbox_health.py:29-37; outreach_tasks.py:310-352 |
 | 3 | You find both under Settings, on the Deliverability tab. | S | settings/page.tsx:533-543; settings-tabs.ts:17 |
-| 4 | You or whoever manages your domain adds them at your DNS provider. LeadPilot only reads them; it cannot change them. | S | deliverability.py:68-86,108-120 (DNS lookups only) |
+| 4 | You or whoever manages your domain adds them at your DNS provider. Vectorae only reads them; it cannot change them. | S | deliverability.py:68-86,108-120 (DNS lookups only) |
 | 5 | The Email health card checks the domain of each connected Gmail address. | S | deliverability.py:96-105; components/settings/DeliverabilityCard.tsx:110 |
 | 6 | Shared consumer domains such as gmail.com are skipped … | S | deliverability.py:4,54,103 |
 | 7 | no SPF record: −25 | S | deliverability.py:168-170 |
@@ -1232,12 +1232,12 @@ Summary (final, after re-check): 52 supported, 0 unsupported, 0 contradicted. (F
 | 14 | Below 70 (the default threshold), you get a one-time warning, and launching a campaign returns a warning too. | S | deliverability.py:263-269,320-328; system_settings.py:100-101; app/api/sequences.py:307-313 (the warning fires again each time the score drops back below the threshold) |
 | 15 | Click Run check now to check immediately. | S | DeliverabilityCard.tsx:118 |
 | 16 | Domains are checked against blocklists daily at 06:10 UTC and on demand. | S | celery_app.py:339-342; DeliverabilityCard.tsx:118 |
-| 17 | Without an MXToolbox key, LeadPilot queries Spamhaus DBL, SURBL and URIBL directly. | S | deliverability.py:13-14,53,123-147 |
+| 17 | Without an MXToolbox key, Vectorae queries Spamhaus DBL, SURBL and URIBL directly. | S | deliverability.py:13-14,53,123-147 |
 | 18 | Spamhaus refuses queries from public DNS servers; when that happens the list is shown as "could not be queried", never as listed. | S | deliverability.py:15-16,140-146; DeliverabilityCard.tsx:75 |
 | 19 | When a domain is newly listed, every active campaign on your account is paused … | S | deliverability.py:197-207,252-254 |
 | 20 | (re-check) … and an urgent alert goes out by push notification and Slack. | S | deliverability.py:255-262; app/services/event_bus.py:80-81,98-101 |
 | 21 | Being removed from the list does not restart anything; you resume campaigns yourself. | S | deliverability.py:25-26 |
-| 22 | Two mailboxes on the same domain can have very different reputations, so LeadPilot also scores each mailbox and acts only on the one in trouble. | S | mailbox_health.py:3-9 |
+| 22 | Two mailboxes on the same domain can have very different reputations, so Vectorae also scores each mailbox and acts only on the one in trouble. | S | mailbox_health.py:3-9 |
 | 23 | The Mailbox health card shows each mailbox's score out of 100, its state, the reasons, its complaint and bounce rates, and how much it sent today. | S | mailbox_health.py:468-493; components/settings/MailboxHealthCard.tsx:125-142 |
 | 24 | Scores refresh every 4 hours; Check now refreshes them immediately. | S | celery_app.py:343-351; MailboxHealthCard.tsx:76 |
 | 25 | A mailbox that has not been checked yet is shown as unchecked. | S | mailbox_health.py:458-460,496-518 |
@@ -1247,7 +1247,7 @@ Summary (final, after re-check): 52 supported, 0 unsupported, 0 contradicted. (F
 | 29 | a volume spike (3 times or more the 7-day average, with at least 20 sends today): −10 | S | mailbox_health.py:94-96,203-213,262-265 |
 | 30 | A brand-new mailbox with no history is not penalised for missing rates. | S | mailbox_health.py:154-160,179-182 (rates are None, so no deduction) |
 | 31 | A mailbox missing all three DNS records lands at 45: slowed down, not stopped. | S | mailbox_health.py:71-76 |
-| 32 | LeadPilot has no connection to Gmail's spam-report data (a feedback loop or Google Postmaster Tools) … | S | mailbox_health.py:21-27 |
+| 32 | Vectorae has no connection to Gmail's spam-report data (a feedback loop or Google Postmaster Tools) … | S | mailbox_health.py:21-27 |
 | 33 | … the complaint rate counts unsubscribes plus replies asking you to stop, divided by sends. | S | mailbox_health.py:170-200 (opt-outs are counted too) |
 | 34 | The card labels it "(proxy)". | S | MailboxHealthCard.tsx:142 |
 | 35 | 70 or more healthy / 40 to 69 throttled (25% of the normal warm-up allowance, never below 2 a day) / under 40 paused (sends nothing) | S | mailbox_health.py:29-37,77-82,270-281 |
@@ -1267,7 +1267,7 @@ Summary (final, after re-check): 43 supported, 0 unsupported, 0 contradicted. (F
 ### 20-compliance.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot builds several compliance safeguards into how it sends: an unsubscribe route in every email, a suppression list checked right before every send, rules that depend on where the recipient is, and a record of what was checked. | S | app/services/sequence_engine.py:8-15; app/services/compliance_audit.py:1-7 |
+| 1 | Vectorae builds several compliance safeguards into how it sends: an unsubscribe route in every email, a suppression list checked right before every send, rules that depend on where the recipient is, and a record of what was checked. | S | app/services/sequence_engine.py:8-15; app/services/compliance_audit.py:1-7 |
 | 2 | … a footer with the sender identity (your business name and postal address, set by whoever runs your deployment) and an unsubscribe link: "Don't want these emails? Unsubscribe instantly" | S | sequence_engine.py:439-444; app/config.py:105 |
 | 3 | List-Unsubscribe headers that support one-click unsubscribe in mail apps that offer it. | S | sequence_engine.py:447-455 |
 | 4 | A production deployment refuses to start if the sender identity is missing or still the placeholder address, or if the public address used to build unsubscribe links is not set. | S | app/core/production_guard.py:18-22,148-175,220-245,317-336 |
@@ -1291,12 +1291,12 @@ Summary (final, after re-check): 43 supported, 0 unsupported, 0 contradicted. (F
 | 22 | It uses the country on the lead's enrichment record. If there is none, it uses the lead's time zone. | S | app/services/compliance_region.py:9-15,124-131 |
 | 23 | If neither is known, the region is "unknown" and a baseline of sender identification and a working unsubscribe applies. | S | compliance_audit.py:25-26,70-73 |
 | 24 | US – CAN-SPAM – opt-out regime | S | compliance_region.py:54; compliance_audit.py:40 |
-| 25 | Canada – CASL – implied consent assumed – LeadPilot cannot verify it | S | compliance_region.py:55; compliance_audit.py:12-16,41 |
+| 25 | Canada – CASL – implied consent assumed – Vectorae cannot verify it | S | compliance_region.py:55; compliance_audit.py:12-16,41 |
 | 26 | EU/EEA – GDPR – legitimate interest (B2B); right to object stated | S | compliance_region.py:56; compliance_audit.py:42 |
 | 27 | UK – UK GDPR / PECR – legitimate interest (B2B); corporate subscriber | S | compliance_region.py:57; compliance_audit.py:43 |
 | 28 | Singapore – PDPA – business contact information; Do-Not-Call registry not checked | S | compliance_region.py:58; compliance_audit.py:44 |
 | 29 | Australia / New Zealand – Spam Act 2003 / UEMA 2007 – inferred consent | S | compliance_region.py:59-60; compliance_audit.py:45-46 |
-| 30 | LeadPilot does not check any national Do-Not-Call registry and cannot verify implied consent. The records say so. | S | compliance_audit.py:41,44,81-83; system_settings.py:91-94 |
+| 30 | Vectorae does not check any national Do-Not-Call registry and cannot verify implied consent. The records say so. | S | compliance_audit.py:41,44,81-83; system_settings.py:91-94 |
 | 31 | Outreach emails can carry a tracking pixel to count opens, but never for EU, EEA or UK leads, because a tracking pixel needs consent under ePrivacy and PECR rules. | S | app/services/open_tracking.py:76-80; compliance_region.py:134-137 |
 | 32 | Your administrator can turn open tracking off entirely. | S | system_settings.py:66-68 |
 | 33 | Opens are approximate; replies are the reliable signal. | S | system_settings.py:69-71 (prefetch filter) |
@@ -1311,15 +1311,15 @@ Summary (final, after re-check): 43 supported, 0 unsupported, 0 contradicted. (F
 | 42 | (re-check) … a different send window anywhere between 07:00 and 20:00, weekend sending on or off, lower daily caps, a lower bounce-pause threshold, or requiring recorded consent. | S | compliance_rules.py:61-68,118-138,219-230 |
 | 43 | (re-check) Daily caps and the bounce-pause threshold can only be lowered, never raised past the deployment defaults. | S | compliance_rules.py:14-15,125-135,226-230 |
 | 43a | (re-check, new) The send window can be set anywhere between 07:00 and 20:00, which can be wider than the default 09:00–17:00. | S | compliance_rules.py:64-68,118-124,219-225; app/config.py:109-110 |
-| 44 | (re-check) If a matching rule is invalid, LeadPilot uses the strictest combination of the defaults and the valid rules. | S | compliance_rules.py:23-30,197-217 |
+| 44 | (re-check) If a matching rule is invalid, Vectorae uses the strictest combination of the defaults and the valid rules. | S | compliance_rules.py:23-30,197-217 |
 | 44a | (re-check, new) If the rules cannot be read at all, it falls back to the deployment defaults. | S | compliance_rules.py:21-22,184-189 |
-| 45 | Because LeadPilot records no consent for email or LinkedIn, a "consent required" rule on those channels stops those sends. | S | compliance_rules.py:32-36,262-263; outreach_tasks.py:261-266 (the step is skipped and the sequence continues) |
+| 45 | Because Vectorae records no consent for email or LinkedIn, a "consent required" rule on those channels stops those sends. | S | compliance_rules.py:32-36,262-263; outreach_tasks.py:261-266 (the step is skipped and the sequence continues) |
 | 46 | The compliance audit log has one entry per send, and per send refused on compliance grounds: region, regime, decision, legal basis and the checks made. | S | compliance_audit.py:1-7,89-100; outreach_tasks.py:191-192,224,533 (refusals audited today: suppressed, no address, no WhatsApp consent) |
 | 47 | You can see it under Settings, Deliverability, in the Compliance audit log table. | S | DeliverabilityCard.tsx:138,148; settings/page.tsx:533-539 |
 | 48 | The consent ledger is an append-only record of consent granted …, withdrawn, suppressed and erased, with the source and who acted. | S | consent.py:58-62,178-182; models.py:4414-4458 |
 | 49 | It answers "when did they tell us to stop, and what did we do?". | S | models.py:4416-4420 |
 | 50 | Entries survive even if the lead is later deleted. | S | models.py:4422-4426,4437-4439 |
-| 51 | Delete the lead. LeadPilot erases the lead's personal data, puts their email, phone and LinkedIn profile on the suppression list …, and records the erasure in the consent ledger first. | S | app/api/leads.py:281-323; consent.py:318-323 |
+| 51 | Delete the lead. Vectorae erases the lead's personal data, puts their email, phone and LinkedIn profile on the suppression list …, and records the erasure in the consent ledger first. | S | app/api/leads.py:281-323; consent.py:318-323 |
 
 Summary (final, after re-check): 53 supported, 0 unsupported, 0 contradicted. (First pass: 47 S / 0 U / 4 C.)
 
@@ -1355,7 +1355,7 @@ Front-matter sources: all paths exist in all ten articles. Sources added since t
 1. **11 #78** "It works on every plan, so you can remove your data even after a downgrade." Replace with: "The delete button appears only while your plan includes the Network page. After a downgrade the page shows only the upgrade notice, so contact support (or use the API: `DELETE /linkedin-network`, which works on every plan) to remove your data." Alternatively, fix the UI so the button shows on every plan (finding F5).
 2. **12 #19** Replace with: "You can filter by Pending, Approved or Rejected."
 3. **12 #22** Replace with: "Each item shows who it is for, their title and company, the step number and channel, how long it has been waiting, and a badge for each rule that applied. The most serious rule is also named in the item's headline."
-4. **12 #35** Replace with: "The prospect stays enrolled, but rejecting does not schedule the next step. If automatic follow-up is on for the previous step (it is by default), LeadPilot later tries that same step again as a new message. By default this happens 72 hours after the previous step was sent, and the new message is checked by the review queue again. To stop contacting the person, stop or pause them." (See finding F3.)
+4. **12 #35** Replace with: "The prospect stays enrolled, but rejecting does not schedule the next step. If automatic follow-up is on for the previous step (it is by default), Vectorae later tries that same step again as a new message. By default this happens 72 hours after the previous step was sent, and the new message is checked by the review queue again. To stop contacting the person, stop or pause them." (See finding F3.)
 5. **13 #39** Replace with: "If your administrator turns it on, a return message is scheduled. In the current version it is cancelled when it is due to send, because the prospect's 'not now' reply already stopped that sequence. Treat the reminder as your cue to write to them yourself." (See finding F4.)
 6. **13 #44** Replace with: "Needs reply – threads with at least one reply from a person that has not been marked handled. These are listed oldest first …"
 7. **13 #50** Replace with: "The Inbox menu item does not show a count. The Needs reply list shows each waiting person once, however many messages they sent."
@@ -1371,7 +1371,7 @@ Front-matter sources: all paths exist in all ten articles. Sources added since t
 17. **20 #15** Replace with: "You can do the same yourself on a lead's page: in the **Can we contact them?** panel, choose **They asked us to stop**, then **Confirm — suppress everywhere**."
 18. **20 #42** Replace with: "… a different send window anywhere between 07:00 and 20:00, weekend sending on or off, lower daily caps, a lower bounce-pause threshold, or requiring recorded consent."
 19. **20 #43** Replace with: "Daily caps and the bounce-pause threshold can only be lowered, never raised past the deployment defaults. The send window can be set anywhere between 07:00 and 20:00, which can be wider than the default 09:00–17:00."
-20. **20 #44** Replace with: "If a matching rule is invalid, LeadPilot uses the strictest combination of the defaults and the valid rules. If the rules cannot be read at all, it falls back to the deployment defaults."
+20. **20 #44** Replace with: "If a matching rule is invalid, Vectorae uses the strictest combination of the defaults and the valid rules. If the rules cannot be read at all, it falls back to the deployment defaults."
 
 ## Out-of-scope discoveries (reported, not fixed)
 
@@ -1407,12 +1407,12 @@ Verdicts: supported / unsupported / contradicted. Pure navigation and general ad
 | 4 | "the IP address you signed up from and the country that address appears to be in, which is used as a risk signal" | supported | app/api/auth.py:274 (signup_ip); app/db/models.py:467-471; app/services/identity.py:8-14. Nuance: the country is looked up from the IP of the identity-submission request (identity.py:145), not strictly the signup request. |
 | 5 | "your theme and writing-voice settings" | supported | app/db/models.py:409 (theme_json), :443-444 (style_profile_json / style_samples_json) |
 | 6 | "connections to Gmail, LinkedIn and other services. Their access tokens are stored encrypted." | supported | app/db/models.py:1651-1664 (Gmail Fernet ciphertext), :1906-1933 (IntegrationToken encrypted_value), :3350 (CRM tokens in TokenStore). Nuance: LinkedIn stores only a Unipile account id, no token (models.py:3109). |
-| 7 | "LeadPilot also keeps security and activity records … sign-ins, refused attempts, data exports and deleted strategies." | supported | app/services/security_audit.py:26-36 (strategy.deleted, account.data_exported, …_denied); auth_sessions table (account_export.py:51); app/services/network_guard.py:18 (refusals) |
+| 7 | "Vectorae also keeps security and activity records … sign-ins, refused attempts, data exports and deleted strategies." | supported | app/services/security_audit.py:26-36 (strategy.deleted, account.data_exported, …_denied); auth_sessions table (account_export.py:51); app/services/network_guard.py:18 (refusals) |
 | 8 | "For each prospect … name, job title, company, email address, phone number, LinkedIn profile, and research notes such as recent posts or company news." | supported | app/api/leads.py:325-336 lists these Lead columns (full_name, title, company, email, phone, linkedin_url, linkedin_posts_json, company_news_json, enrichment_json) |
 | 9 | "It also stores the outreach itself: the subject and body of every message, when it was sent, and the replies … including the reply text." | supported | app/services/account_export.py:114,121 (messages, inbound_replies tables owned per lead) |
 | 10 | "Bookings, meetings, meeting notes and transcripts are stored too." | supported | app/db/models.py:2555 (transcript); account_export.py:53,55,80,128 (billable_meetings, calendar_booking_pages, meetings, calendar_bookings) |
-| 11 | "LeadPilot keeps a consent ledger (opt-ins, opt-outs and erasures) and a do-not-contact (suppression) list of email addresses, phone numbers and LinkedIn profiles." | supported | app/db/models.py:4413-4425 (ConsentEvent), :1672-1687 (suppression_list email/phone), :3134-3144 (LinkedInSuppression) |
-| 12 | "Apart from support chat history, LeadPilot does not delete your data automatically after a set time." | supported | app/workers/celery_app.py:223-392 beat list: the only retention purge is support-chat-retention-purge (:252-254); app/config.py:269-270 |
+| 11 | "Vectorae keeps a consent ledger (opt-ins, opt-outs and erasures) and a do-not-contact (suppression) list of email addresses, phone numbers and LinkedIn profiles." | supported | app/db/models.py:4413-4425 (ConsentEvent), :1672-1687 (suppression_list email/phone), :3134-3144 (LinkedInSuppression) |
+| 12 | "Apart from support chat history, Vectorae does not delete your data automatically after a set time." | supported | app/workers/celery_app.py:223-392 beat list: the only retention purge is support-chat-retention-purge (:252-254); app/config.py:269-270 |
 | 13 | "A conversation is deleted 30 days after its last message, by a job that runs every night at 03:20 UTC." | supported | app/workers/support_tasks.py:8-13,55-63 (keyed on last_message_at, falls back to created_at); app/workers/celery_app.py:250-254,188-189 |
 | 14 | "The number of days is a deployment setting; 30 is the default." | supported | app/config.py:270 (support_chat_retention_days: int = 30) |
 | 15 | "Support tickets are not deleted by this job, even if the conversation they came from is." | supported | app/workers/support_tasks.py:15-19 (chat_session_id ON DELETE SET NULL) |
@@ -1463,7 +1463,7 @@ Summary: 45 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 5 | Table row pay_per_meeting: 10 / 1000 / 10 / gmail, whatsapp, linkedin / 60.0 | supported | app/core/plans.py:124-129 |
 | 6 | Table row pro: Unlimited / Unlimited / Unlimited / all four / 150.0 (re-checked) | supported | app/core/plans.py:140-149; qualified by #7a |
 | 7 | Table row enterprise: Unlimited / Unlimited / Unlimited / all four / 400.0 (re-checked) | supported | app/core/plans.py:162-167; qualified by #7a |
-| 7a | "Any single sequence is limited to 20 steps by the sequence form and API, so "Unlimited" sequence steps means up to 20 steps per sequence." (new) | **contradicted** (partly) | The API cap is real: `steps: list[StepIn] = Field(min_length=1, max_length=20)` and `step_no … le=20` (app/api/sequences.py:84,120). "the sequence form": the web app's only create-sequence form (frontend/src/components/strategy/OutreachPanel.tsx:68-70) builds one or two steps, an opening message and an optional follow-up (frontend/src/lib/leadOutreach.ts:43-54); it has no 20-step limit and cannot build more than 2. Correct to: "The LeadPilot API accepts at most 20 steps per sequence, so "Unlimited" sequence steps means up to 20. The sequence form in the web app creates an opening message and an optional follow-up (up to 2 steps)." |
+| 7a | "Any single sequence is limited to 20 steps by the sequence form and API, so "Unlimited" sequence steps means up to 20 steps per sequence." (new) | **contradicted** (partly) | The API cap is real: `steps: list[StepIn] = Field(min_length=1, max_length=20)` and `step_no … le=20` (app/api/sequences.py:84,120). "the sequence form": the web app's only create-sequence form (frontend/src/components/strategy/OutreachPanel.tsx:68-70) builds one or two steps, an opening message and an optional follow-up (frontend/src/lib/leadOutreach.ts:43-54); it has no 20-step limit and cannot build more than 2. Correct to: "The Vectorae API accepts at most 20 steps per sequence, so "Unlimited" sequence steps means up to 20. The sequence form in the web app creates an opening message and an optional follow-up (up to 2 steps)." |
 | 8 | "In the app these plans are shown as Free, Starter, Growth, Scale, Pay per meeting, Pro and Enterprise." | supported | app/core/plans.py:67,83,102,118,137,157,175 (display_name) |
 | 9 | ""gmail" means email sent through your connected Gmail account." | supported | frontend/src/lib/pricing.ts:69-71 (gmail → "Email") |
 | 10 | "The Pricing page calls strategies "campaigns"." | supported | frontend/src/lib/pricing.ts:80-81 |
@@ -1474,15 +1474,15 @@ Summary: 45 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 15 | "Starter: $149 … Growth: $349 … Scale: $699 … Enterprise: $1,499 per month" | supported | app/core/billing_catalog.py:40,47,54,61 |
 | 16 | "Each monthly tier starts with a 14-day free trial." | supported | app/core/billing_catalog.py:29; app/services/billing.py:142-144,165 |
 | 17 | "An account gets the trial only once: if you have had a trial before, a later monthly checkout starts without one." | supported | app/services/billing.py:132,142,165 (had_trial → trial_days=0) |
-| 18 | "Pay per meeting: no monthly fee ($0) and $179 for each prospect who books a meeting through LeadPilot." | supported | app/core/billing_catalog.py:67-77 |
+| 18 | "Pay per meeting: no monthly fee ($0) and $179 for each prospect who books a meeting through Vectorae." | supported | app/core/billing_catalog.py:67-77 |
 | 19 | "The Free plan has no price. Free accounts are limited by the table above." | supported | app/core/billing_catalog.py:36-65 (no free tier); plans.py:53-69 |
-| 20 | "When a prospect books a meeting, LeadPilot records a charge for it, but does not take payment straight away. It waits 48 hours first." | supported | app/services/billing.py:11-18,350-363; billing_catalog.py:72-75 (grace_hours 48) |
+| 20 | "When a prospect books a meeting, Vectorae records a charge for it, but does not take payment straight away. It waits 48 hours first." | supported | app/services/billing.py:11-18,350-363; billing_catalog.py:72-75 (grace_hours 48) |
 | 21 | "If the meeting is no longer booked when the 48 hours are over (for example, it was cancelled), the charge is waived." | supported | app/services/billing.py:59-65,394-399 |
 | 22 | "You are charged once per prospect. If the same prospect books again, there is no second charge." | supported | app/services/usage_meter.py:386-388,421-423 |
 | 23 | "A background job charges meetings whose 48 hours have passed. It runs every 30 minutes." | supported | app/workers/billing_tasks.py:3; app/workers/celery_app.py:377-378 (1800.0 s) |
 | 24 | "If the account has no saved payment method, or the card is declined, the charge is marked as failed." | supported | app/services/billing.py:407-412,418-421,325-327 |
 | 25 | "A meeting charge can be disputed only while it is still inside its 48-hour window." | supported | app/services/billing.py:443-449 |
-| 26 | "The web app has no dispute button yet; disputes go through the LeadPilot API." | supported | frontend/src/lib/api/billing.ts:59-60 defines the call but nothing in frontend/src imports it (grep); app/api/billing.py:114 |
+| 26 | "The web app has no dispute button yet; disputes go through the Vectorae API." | supported | frontend/src/lib/api/billing.ts:59-60 defines the call but nothing in frontend/src imports it (grep); app/api/billing.py:114 |
 | 27 | "After the 48 hours, contact support instead." | supported | app/services/billing.py:446-447 ("For a charged meeting, contact support.") |
 | 28 | "An administrator then decides whether to waive or charge a disputed meeting." | supported | app/api/billing.py:124-134; app/services/billing.py:455-469 |
 | 29 | "Go to the Pricing page. You can also reach it from Profile, in the Plan card, with the Upgrade plan button." | supported | frontend/src/app/(app)/profile/page.tsx:109 |
@@ -1492,12 +1492,12 @@ Summary: 45 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 33 | "You finish on a checkout page run by Stripe … For pay per meeting, this step saves your card for later charges. When checkout finishes you return to Settings." | supported | app/services/billing.py:155-170 (setup checkout for PPM; success_url /settings?billing=success) |
 | 34 | "Choosing a different plan replaces your current one. The subscription being replaced is cancelled so you are not billed twice." | supported | app/services/billing.py:254-261 |
 | 35 | "Leaving checkout without finishing does not change or downgrade your current plan." | supported | app/services/billing.py:176-180 |
-| 36 | "If you sign in and your account has no paid plan, LeadPilot takes you to the Pricing page once, right after sign-in. You can still go back to the app; the Free limits then apply." | supported | frontend/src/lib/post-login.ts:1-8,40 (after every explicit sign-in, not on session restore); pricing/page.tsx:99-101 ("Back to app") |
+| 36 | "If you sign in and your account has no paid plan, Vectorae takes you to the Pricing page once, right after sign-in. You can still go back to the app; the Free limits then apply." | supported | frontend/src/lib/post-login.ts:1-8,40 (after every explicit sign-in, not on session restore); pricing/page.tsx:99-101 ("Back to app") |
 | 37 | "…you work under the workspace owner's plan and are not asked to buy your own, as long as the workspace owner has a paid plan." (re-checked) | supported | app/services/billing.py:529-561 (owner plan not free, or owner subscription trialing/active/past_due) |
 | 38 | "Only the account owner can buy or cancel a plan for their account." | supported | app/api/billing.py:14-16; app/services/rbac.py:28-32 (/billing is personal) |
 | 39 | "The action is refused and you see a message that names the limit, for example "Free plan allows 3 strategies. You have 3."" | supported | app/core/plans.py:225-235 |
 | 40 | "Strategies: when you create a new strategy. All strategies across all your products count. Deleting a strategy frees a place." | supported | app/api/strategies.py:154-165 |
-| 41 | "Leads per strategy: when you source leads. If the strategy is full, sourcing is refused. If there is some room, LeadPilot only asks for as many leads as fit, and checks again lead by lead." | supported | app/api/leads.py:92-104,113-116; app/workers/lead_tasks.py:211 |
+| 41 | "Leads per strategy: when you source leads. If the strategy is full, sourcing is refused. If there is some room, Vectorae only asks for as many leads as fit, and checks again lead by lead." | supported | app/api/leads.py:92-104,113-116; app/workers/lead_tasks.py:211 |
 | 42 | "Sequence steps and channels: when you create a sequence and again every time you launch it. A sequence built … higher plan cannot be launched after a downgrade…" | supported | app/api/sequences.py:57-62 |
 | 43 | "Channels for AI calls: when you start a call." | supported | app/api/calls.py:162-165 |
 | 44 | "the learning playbook and A/B test results are not included in Free" | supported | app/core/plans.py:59-60; app/api/playbook.py:46,80,121; app/api/strategies_advanced.py:42 |
@@ -1525,8 +1525,8 @@ Summary: 59 supported, 0 unsupported, 1 contradicted. (final, after re-check)
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
 | 1 | "You sign in with your email address and password. Passwords must be at least 8 characters." | supported | app/api/auth.py:78 (min_length=8), :488 |
-| 2 | "LeadPilot stores only a one-way hash of your password (PBKDF2-SHA256), never the password itself." | supported | app/services/auth.py:4,56-58 |
-| 3 | "If the email or the password is wrong, the message is always "invalid email or password". LeadPilot does not say which one was wrong…" | supported | app/api/auth.py:399-402 |
+| 2 | "Vectorae stores only a one-way hash of your password (PBKDF2-SHA256), never the password itself." | supported | app/services/auth.py:4,56-58 |
+| 3 | "If the email or the password is wrong, the message is always "invalid email or password". Vectorae does not say which one was wrong…" | supported | app/api/auth.py:399-402 |
 | 4 | "New accounts must confirm their email address before they can use the app." | supported | app/config.py:281 (require_email_verification=True); app/services/auth.py:209-210 |
 | 5 | "Accounts created through public sign-up also go through identity onboarding, which includes verifying a mobile phone number." | supported | app/api/auth.py:273 (identity_required=True on signup); frontend/src/lib/identity.ts:95-100 |
 | 6 | "You can put the phone step off for the current browser session, but a verified phone number is required before you can choose a paid plan." | supported | frontend/src/lib/identity.ts:78-91 (sessionStorage defer); app/api/billing.py:77; app/services/identity.py:164-173 |
@@ -1538,7 +1538,7 @@ Summary: 59 supported, 0 unsupported, 1 contradicted. (final, after re-check)
 | 12 | "Ticked: you stay signed in for 30 days from your last use. Each time the app refreshes your session, the 30 days start again… An account left unused for 30 days must sign in again." | supported | app/config.py:167-169 (sliding 2592000 s) |
 | 13 | "Not ticked: the session ends when you close the browser, or after 12 hours, whichever comes first." | supported | app/config.py:170-172 (43200 s) |
 | 14 | "the app uses a short access pass that lasts 15 minutes and renews it automatically" | supported | app/config.py:166 (jwt_access_ttl_seconds=900); app/api/auth.py:380-383 |
-| 15 | "Each renewal can be used only once. If an old, already-used session pass shows up again…, LeadPilot signs out that whole session and records the event in the security log." | supported | app/services/auth_sessions.py:9-16,188. Nuance: a reuse inside a 30-second grace window (two tabs) is tolerated (app/config.py:187-190). |
+| 15 | "Each renewal can be used only once. If an old, already-used session pass shows up again…, Vectorae signs out that whole session and records the event in the security log." | supported | app/services/auth_sessions.py:9-16,188. Nuance: a reuse inside a 30-second grace window (two tabs) is tolerated (app/config.py:187-190). |
 | 16 | "These durations are deployment settings; the numbers above are the defaults." | supported | app/config.py:166-172 |
 | 17 | "Sign out: use Log out in the app's side menu. This ends the session on the server, not just in your browser." | supported | frontend/src/components/shell/Shell.tsx:139-143; frontend/src/lib/api/auth.ts:70-77; app/api/auth.py:444-455 |
 | 18 | "Change password: open Profile, go to Change password, enter your Current password, your New password and Repeat new password, then press Change password." | supported | frontend/src/app/(app)/profile/page.tsx:115-143 |
@@ -1546,18 +1546,18 @@ Summary: 59 supported, 0 unsupported, 1 contradicted. (final, after re-check)
 | 20 | "Changing it signs you out on every device, including the one you are using, and you are taken to the sign-in page." | supported | app/api/auth.py:509 (revoke_all_for_user); frontend/src/app/(app)/profile/page.tsx:49. Nuance: an already-issued 15-minute access pass is a stateless JWT (app/services/auth.py:198-201) and keeps working on another device until it expires. |
 | 21 | "Password changes are limited to 10 attempts per 15 minutes…" | supported | app/api/auth.py:501-502 |
 | 22 | "There is no screen that lists your active sessions. To sign out everywhere, change your password." | supported | no session-list route in app/api/auth.py; :509 |
-| 23 | "LeadPilot has no "forgot password" flow and no two-factor authentication." | supported | grep for forgot/reset-password/2fa/totp/mfa over app/api and frontend/src/app: no match |
-| 24 | "On production deployments, LeadPilot blocks sign-up and sign-in from VPNs, proxies, Tor and hosting or data-centre networks." | supported | app/config.py:413-416,503-507; app/services/network_guard.py:1-12; app/api/auth.py:352 |
+| 23 | "Vectorae has no "forgot password" flow and no two-factor authentication." | supported | grep for forgot/reset-password/2fa/totp/mfa over app/api and frontend/src/app: no match |
+| 24 | "On production deployments, Vectorae blocks sign-up and sign-in from VPNs, proxies, Tor and hosting or data-centre networks." | supported | app/config.py:413-416,503-507; app/services/network_guard.py:1-12; app/api/auth.py:352 |
 | 25 | VPN block message "It looks like you're connecting through a VPN, proxy or hosting network. Please disable…" | supported | app/services/network_guard.py:36-38 |
 | 26 | ""We couldn't verify your network just now. Please try again in a minute." … the network check itself was unavailable" | supported | app/services/network_guard.py:41,64-69 (only when fail-closed is set) |
 | 27 | "Administrators can turn this blocking off, or allow specific network addresses…" | supported | app/config.py:416 (VPN_BLOCK_ENABLED), :432 (VPN_ALLOWLIST_IPS) |
 | 28 | "By default, if the outside service that checks addresses is down, sign-in is allowed rather than blocked." | supported | app/config.py:423-426 (vpn_detection_fail_closed=False) |
-| 29 | Sign-up closed message "Sign-up is closed on this LeadPilot deployment. Ask your administrator for an account." | supported | app/api/auth.py:207-208,222-223 |
-| 30 | Domain-limited message "Sign-up on this LeadPilot deployment is limited to approved email domains. Ask your administrator for an account." | supported | app/api/auth.py:209-211,224-228 |
+| 29 | Sign-up closed message "Sign-up is closed on this Vectorae deployment. Ask your administrator for an account." | supported | app/api/auth.py:207-208,222-223 |
+| 30 | Domain-limited message "Sign-up on this Vectorae deployment is limited to approved email domains. Ask your administrator for an account." | supported | app/api/auth.py:209-211,224-228 |
 | 31 | "By default sign-up is open to any email domain. Existing accounts can always sign in." | supported | app/config.py:435-448 |
 | 32 | "Open Settings and the Integrations tab. In the API keys card, type a Name and press Create key." | supported | frontend/src/app/(app)/settings/page.tsx:409-410,531; frontend/src/components/settings/WebhooksCard.tsx:238,249,252 |
 | 33 | "Copy the key straight away. It is shown once and never again ("Copy it now — it will not be shown again.")." | supported | frontend/src/components/settings/WebhooksCard.tsx:38; app/services/api_keys.py:3-4 |
-| 34 | "A key starts with `lpk_`. LeadPilot stores only a fingerprint (hash) of it…" | supported | app/services/api_keys.py:3,21,39-41 |
+| 34 | "A key starts with `lpk_`. Vectorae stores only a fingerprint (hash) of it…" | supported | app/services/api_keys.py:3,21,39-41 |
 | 35 | "A key acts as you on the normal API, but it never works on administrator pages, even if your account is an administrator." | supported | app/api/deps.py:20-23 |
 | 36 | "A key cannot download your whole account's data; that needs a signed-in person and a password." | supported | app/api/account_data.py:61-62,66 |
 | 37 | "You can have at most 10 active keys. Revoke one before creating another." | supported | app/services/api_keys.py:22,35-38 |
@@ -1605,13 +1605,13 @@ Summary: 41 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 30 | "The person a lead is assigned to is not notified, and the grid cannot filter by assignee yet." | supported | frontend/src/lib/crm/grid-state.ts:58 (filterable: false); docs/features/workspaces.md:96-97 |
 | 31 | "Open Clients and press Add a client, with a Client name and a Monthly retainer." | supported | frontend/src/app/(app)/clients/page.tsx:82,90,95 |
 | 32 | "Separate reporting – sent messages, reply rate, meetings and revenue are counted only over that client's campaigns." | supported | app/services/client_workspaces.py:243-306 |
-| 33 | "Reserve a sending domain … LeadPilot checks this at the moment of sending. A message that would go out from a domain not on the client's list is not sent; it is marked failed with a reason." | supported | clients/page.tsx:195; app/workers/outreach_tasks.py:319-331 |
+| 33 | "Reserve a sending domain … Vectorae checks this at the moment of sending. A message that would go out from a domain not on the client's list is not sent; it is marked failed with a reason." | supported | clients/page.tsx:195; app/workers/outreach_tasks.py:319-331 |
 | 34 | "A billing view – Show this month's invoice shows the retainer, the per-meeting fee, the number of meetings this month and the lines that add up to the total." | supported | clients/page.tsx:207; app/services/client_workspaces.py:310-360 |
 | 35 | "If a client has no sending domain reserved, there is no restriction … and the page warns you about this." | supported | app/services/client_workspaces.py:210-226; frontend/src/lib/clients.ts:109-116 |
 | 36 | "A campaign that is not filed under any client is treated as the agency's own work. The page warns that such work "is not on any invoice"." | supported | app/services/client_workspaces.py:24-27; frontend/src/lib/clients.ts:118-125 |
 | 37 | "Deleting a client does not delete the outreach done for it." | supported | app/db/models.py:922-925 (ON DELETE SET NULL). Note: there is no delete-client route or button at all (app/api/client_workspaces.py:3-11 lists PATCH archive only), so the sentence describes a situation customers cannot create; consider "Archiving a client…". |
 | 38 | "Creating clients, changing their prices and changing their domain lists needs a manager or the owner. Any member can read them." | supported | app/api/client_workspaces.py:88-96,118-122,140-147,177-201 |
-| 39 | "Filing a strategy under a client is currently done through the LeadPilot API; the web app has no button for it yet." | supported | app/api/client_workspaces.py:206; frontend/src/lib/api/clients.ts:55 has no importer in frontend/src |
+| 39 | "Filing a strategy under a client is currently done through the Vectorae API; the web app has no button for it yet." | supported | app/api/client_workspaces.py:206; frontend/src/lib/api/clients.ts:55 has no importer in frontend/src |
 | 40 | "An account can connect only one Gmail mailbox…" | supported | app/db/models.py:1660-1662 (user_id unique); docs/features/agency-mode.md:108-115 |
 | 41 | "WhatsApp uses one sender number for the whole deployment… Domain isolation applies to email only." | supported | app/config.py:137; docs/program/BASELINE.md:92,164 |
 | 42 | "The learning loop's playbook scores are pooled across the whole deployment…" | supported | docs/program/BASELINE.md:163; app/services/account_export.py:142 (playbook_scores: global, no owner) |
@@ -1623,7 +1623,7 @@ Summary: 42 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 ### 25-pause-stop-kill-switch.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | "LeadPilot sends outreach automatically from a server, so closing the app does not stop it." | supported | app/workers/celery_app.py:227 (leadpilot.outreach.dispatch on beat); app/workers/outreach_tasks.py:101-120. Consistent with founder decision D1. |
+| 1 | "Vectorae sends outreach automatically from a server, so closing the app does not stop it." | supported | app/workers/celery_app.py:227 (leadpilot.outreach.dispatch on beat); app/workers/outreach_tasks.py:101-120. Consistent with founder decision D1. |
 | 2 | "A pause holds messages. Nothing is deleted, and sending continues from the same place when the pause is lifted." | supported | app/workers/outreach_tasks.py:119-120,171-179 (paused → message left SCHEDULED, not cancelled); app/api/analytics.py:155-165 |
 | 3 | "A stop ends a contact's sequence for good. A stopped sequence can never send again to that contact." | supported | app/db/models.py:175; app/workers/outreach_tasks.py:173-177 |
 | 4 | "To contact them again, they must be enrolled in a sequence again." | supported | app/services/conversion_probability.py:306-308 ("re-enroll to contact again"). Nuance: not the SAME sequence; enrollment is one per lead per sequence (app/services/sequence_engine.py:199-229). |
@@ -1632,7 +1632,7 @@ Summary: 42 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 7 | "You see "Campaign paused"." | supported | campaigns/page.tsx:443 (toast), :498 (banner) |
 | 8 | "While a campaign is paused it sends nothing, including automatic follow-ups." | supported | app/workers/outreach_tasks.py:1461-1466,1512-1513 |
 | 9 | "To restart, press Resume in the "Campaign paused" banner on the same page." | supported | campaigns/page.tsx:492-506; app/api/analytics.py:155-165 |
-| 10 | "LeadPilot also pauses campaigns by itself in some cases, and they stay paused until a person presses Resume" | supported | app/services/sequence_engine.py:548-555; app/services/deliverability.py:203-204; only resume_campaign sets active (analytics.py:162) |
+| 10 | "Vectorae also pauses campaigns by itself in some cases, and they stay paused until a person presses Resume" | supported | app/services/sequence_engine.py:548-555; app/services/deliverability.py:203-204; only resume_campaign sets active (analytics.py:162) |
 | 11 | "High bounce rate: once a campaign has sent at least 10 messages, it pauses if more than 3% of them bounced." | supported | app/config.py:113-114; app/services/sequence_engine.py:536,549 (`rate > threshold`) |
 | 12 | "Both numbers are deployment defaults, and a workspace compliance rule can set a lower bounce limit." | supported | app/config.py:113-114; app/services/compliance_rules.py:245-249; sequence_engine.py:544-548 |
 | 13 | "The banner says "Bounce rate auto-pause"." | supported | campaigns/page.tsx:500-502 (the banner text reads "≥ 3%" while the code pauses on "> 3%": a UI copy nit, reported) |
@@ -1642,9 +1642,9 @@ Summary: 42 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 17 | "They reply. A reply stops or pauses their sequence automatically, depending on what kind of reply it is (an out-of-office reply pauses and retries later)." | supported | app/workers/outreach_tasks.py:1085-1108 (OOO pause for ooo_reschedule_days; others stop) |
 | 18 | "They unsubscribe. The unsubscribe link in every email works without signing in and takes effect immediately. It adds them to the suppression list and stops every sequence for them." | supported | app/api/unsubscribe.py:1-7 (no auth dependency); app/services/sequence_engine.py:495-509 |
 | 19 | "They send STOP on WhatsApp. Words such as "stop", "unsubscribe" and "opt out" are treated as an opt-out, effective immediately, and stop their sequences." | supported | app/api/webhooks_whatsapp.py:60-70,402,455; app/services/whatsapp_optin.py:185,233 |
-| 20 | "They book a meeting. A booking stops the sequence (for Calendly) or pauses it (for LeadPilot's own calendar, so a cancelled meeting can resume it)." | supported | app/api/webhooks.py:165; app/workers/calendar_tasks.py:201; app/services/sequence_engine.py:622-642 |
+| 20 | "They book a meeting. A booking stops the sequence (for Calendly) or pauses it (for Vectorae's own calendar, so a cancelled meeting can resume it)." | supported | app/api/webhooks.py:165; app/workers/calendar_tasks.py:201; app/services/sequence_engine.py:622-642 |
 | 21 | "You erase them. Delete (GDPR erasure) on the lead in Pipeline adds them to the suppression list, so they are not contacted again, and erases their personal details. This cannot be undone." (re-checked) | supported | frontend/src/app/(app)/pipeline/page.tsx:127-139; app/api/leads.py:290-339 |
-| 22 | "LeadPilot estimates each lead's chance of converting before every send." | supported | app/services/conversion_probability.py:289 (send_gate); system_settings.py:158 |
+| 22 | "Vectorae estimates each lead's chance of converting before every send." | supported | app/services/conversion_probability.py:289 (send_gate); system_settings.py:158 |
 | 23 | "After at least 4 unanswered messages, a lead below 5% is marked "cooling" and its sequence is paused for 21 days; below 1.5% it is archived and its sequence is stopped. These are deployment defaults." | supported | app/services/system_settings.py:163-170; app/services/conversion_probability.py:248-283 (kill signals can archive at any time, :256) |
 | 24 | "Reactivate lead on the lead's page resumes a cooling lead now, or clears an archived lead (its stopped sequence stays stopped)." | supported | frontend/src/components/leads/ConversionCard.tsx:54-62; frontend/src/app/(app)/leads/detail/page.tsx:42; app/services/conversion_probability.py:305-326 |
 | 25 | "Your CRM closes the lead. If a connected HubSpot or Salesforce marks the lead as won, lost or disqualified, the sequence stops." | supported | app/services/crm_sync.py:70,566-581 |
@@ -1657,7 +1657,7 @@ Summary: 42 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 32 | "There is no single "pause everything" switch for an account owner in this version." | supported | only per-strategy pause exists (app/api/analytics.py:131-150) |
 | 33 | "An administrator can suspend an account. Suspension pauses all of that account's active campaigns and blocks the account from the app. When the suspension is lifted, those campaigns become active again." | supported | app/services/admin_service.py:127-155; app/services/auth.py:207-208 |
 | 34 | "Not as a single setting in the app in this version." (no platform kill switch) | supported | no global send toggle among system settings (app/services/system_settings.py:29-224) or config |
-| 35 | "All sending is done by LeadPilot's background worker… If the deployment's operator stops that worker, nothing is sent until it runs again. Messages wait; they are not lost." | supported | app/workers/outreach_tasks.py:101-120 (dispatch picks up due SCHEDULED messages on each tick) |
+| 35 | "All sending is done by Vectorae's background worker… If the deployment's operator stops that worker, nothing is sent until it runs again. Messages wait; they are not lost." | supported | app/workers/outreach_tasks.py:101-120 (dispatch picks up due SCHEDULED messages on each tick) |
 | 36 | "Administrators can switch individual features off in system settings, for example the AI phone channel, which is off by default." | supported | app/services/system_settings.py:90 |
 
 Summary: 36 supported, 0 unsupported, 0 contradicted. (final, after re-check)
@@ -1667,18 +1667,18 @@ Summary: 36 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 ### 26-mobile-app.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | "The Android app is built from the same code as the web app, using … Capacitor… Its app ID is `com.clienthunter.app` and its name on the phone is LeadPilot." | supported | frontend/capacitor.config.ts:8-10 |
+| 1 | "The Android app is built from the same code as the web app, using … Capacitor… Its app ID is `com.clienthunter.app` and its name on the phone is Vectorae." | supported | frontend/capacitor.config.ts:8-10 |
 | 2 | "the screens are the same as on the web: Pipeline, Inbox, CRM, Campaigns, Calendar, Meetings, Strategies, Analytics, Network, Learn, Team, Clients, Profile and Settings." | supported | frontend/src/components/shell/nav.ts:27-63 (exact list and order) |
 | 3 | "On a phone these appear as a bar of tabs along the bottom of the screen instead of a side menu." | supported | frontend/src/components/shell/Shell.tsx:18,188 |
 | 4 | "There is no iPhone (iOS) app." | supported | docs/README_M7_COMPLETE.md:36 |
-| 5 | "All the work happens on LeadPilot's servers… The app … does not send messages itself and does not run campaign logic on the phone. A phone that is switched off, offline or has the app closed does not pause anything." | supported | docs/README_M7_COMPLETE.md:33-34 |
+| 5 | "All the work happens on Vectorae's servers… The app … does not send messages itself and does not run campaign logic on the phone. A phone that is switched off, offline or has the app closed does not pause anything." | supported | docs/README_M7_COMPLETE.md:33-34 |
 | 6 | "To actually pause sending, use Pause campaign on the Campaigns page…" | supported | frontend/src/app/(app)/campaigns/page.tsx:540-542 |
-| 7 | "Back button – the Android back button goes back one screen. On a main section (such as Strategies, Campaigns, Analytics or Settings) it asks "Exit LeadPilot?" before closing the app." | supported | frontend/src/hooks/useBackButton.ts:23-24,45-53 (roots: /, /strategies, /campaigns, /leads, /analytics, /settings) |
+| 7 | "Back button – the Android back button goes back one screen. On a main section (such as Strategies, Campaigns, Analytics or Settings) it asks "Exit Vectorae?" before closing the app." | supported | frontend/src/hooks/useBackButton.ts:23-24,45-53 (roots: /, /strategies, /campaigns, /leads, /analytics, /settings) |
 | 9 | Offline banner: "No connection" / "Campaigns are still running on the server — you'll be back in sync when connected."; "Server temporarily unreachable" / "Your campaigns are still running. We'll reconnect automatically." | supported | frontend/src/components/ui/OfflineBanner.tsx:32-37; mounted in frontend/src/app/layout.tsx:95 |
 | 10 | "Links – tapping a notification opens the matching screen in the app." | supported | frontend/src/hooks/usePushNotifications.ts:16-19; frontend/src/components/providers/NativeProvider.tsx:62; docs/README_M7_COMPLETE.md:24 |
 | 11 | "Status bar colour follows your chosen theme." | supported | frontend/src/hooks/useStatusBar.ts:6-8,43; NativeProvider.tsx:15 |
 | 12 | "The bottom tab bar … on a narrow phone it scrolls sideways." | supported | frontend/src/components/shell/Shell.tsx:188 (overflow-x-auto); nav.ts:29-32 |
-| 13 | "After you sign in, the app asks for permission to show notifications. If you allow it, your phone is registered with LeadPilot for push notifications." | supported | frontend/src/hooks/usePushNotifications.ts:7-10,24; NativeProvider.tsx:106 |
+| 13 | "After you sign in, the app asks for permission to show notifications. If you allow it, your phone is registered with Vectorae for push notifications." | supported | frontend/src/hooks/usePushNotifications.ts:7-10,24; NativeProvider.tsx:106 |
 | 14 | "a strategy ready, or a strategy that needs your review" | supported | app/verification/loop.py:360-367 |
 | 15 | "a new reply from a lead" | supported | app/workers/outreach_tasks.py:954-956 (M7 push sent before the push=False events) |
 | 16 | "a meeting booked" | supported | app/api/webhooks.py:182; app/workers/calendar_tasks.py:247 |
@@ -1688,7 +1688,7 @@ Summary: 36 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 20 | "a WhatsApp template approved or rejected (sent to administrators only)" (re-checked) | supported | app/services/whatsapp_templates.py:280-296 |
 | 21 | "an SDR launch waiting for your approval, or a decision on your own launch" | supported | app/api/sequences.py:355-360,377-383 |
 | 22 | "A campaign you pause yourself does not send you a push notification, because you already know." | supported | app/api/analytics.py:142-149 (push=False) |
-| 23 | "Push notifications only work if your LeadPilot deployment has push notifications (Firebase) set up." | supported | app/services/notifications.py:8,65-71 |
+| 23 | "Push notifications only work if your Vectorae deployment has push notifications (Firebase) set up." | supported | app/services/notifications.py:8,65-71 |
 | 24 | "Parts of the push setup in the app are marked in the code as not yet verified…" | supported | frontend/capacitor.config.ts:41; frontend/src/hooks/usePushNotifications.ts:22-30 |
 | 25 | "Everything they announce is also visible in the app itself." | supported | events are also stored/shown in-app (app/services/event_bus.py emit; replies in Inbox, approvals in Team, reviews in Campaigns › review) |
 | 26 | "You sign in with the same email and password as on the web, and the same rules apply" | supported | app/api/auth.py:380-405 (one login route; native gets refresh token in body, auth_sessions.py:18-20) |
@@ -1697,7 +1697,7 @@ Summary: 36 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 29 | "You cannot use the app offline to make changes… Some screens you opened recently may still show their last data while offline." | supported | docs/README_M7_COMPLETE.md:35 |
 | 30 | "The app does not send outreach from your phone or use your phone's number or SIM. WhatsApp messages go out from the deployment's WhatsApp Business number, through the server." | supported | docs/README_M7_COMPLETE.md:34; app/config.py:137 |
 | 31 | "The app is built for distribution through the Google Play Store." | supported | frontend/capacitor.config.ts:3-4; docs/README_M7_COMPLETE.md:13,20,37 |
-| 32 | "If your team runs its own LeadPilot deployment, the app must be built to point at that deployment's server." | supported | frontend/src/hooks/usePushNotifications.ts:35 (NEXT_PUBLIC_API_URL baked at build) |
+| 32 | "If your team runs its own Vectorae deployment, the app must be built to point at that deployment's server." | supported | frontend/src/hooks/usePushNotifications.ts:35 (NEXT_PUBLIC_API_URL baked at build) |
 
 Summary: 31 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 
@@ -1762,7 +1762,7 @@ Summary: 45 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 1 | "Product – what you sell… Every strategy belongs to a product." | supported | app/api/strategies.py:150-152 (strategy created under a product); account_export.py:94 (strategies → product_id) |
 | 2 | "Past client – … industry, company size, buyer role, deal size, acquisition channel, trigger event and sales-cycle length." | supported | app/db/models.py:809-821 |
 | 3 | "Flow 1 (with clients) – used when the product has at least one past client." | supported | app/api/strategies.py:168-178 (default flow by has_clients) |
-| 4 | "Flow 2 (no clients) – … LeadPilot builds the strategy and then a go-to-market plan (144 steps in all)." (re-checked) | supported | app/pipeline/engine.py:37-40; app/db/models.py:76,95 |
+| 4 | "Flow 2 (no clients) – … Vectorae builds the strategy and then a go-to-market plan (144 steps in all)." (re-checked) | supported | app/pipeline/engine.py:37-40; app/db/models.py:76,95 |
 | 5 | "Strategy – the research-backed plan… On the Pricing page, strategies are counted as "campaigns"." | supported | frontend/src/lib/pricing.ts:80 |
 | 6 | "ICP … including the people it is not for. It is settled in phase 2 of the research." | supported | app/pipeline/registry.py:69-79 (phase 2, incl. "Disqualifiers & anti-ICP") |
 | 7 | "GTM (go-to-market) – positioning, pricing, launch order, channel budget and similar groundwork. Built after the strategy, in Flow 2 only." (re-checked) | supported | app/pipeline/registry.py:153-230; app/pipeline/engine.py:37-40 |
@@ -1777,7 +1777,7 @@ Summary: 45 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 16 | "Suppression list – the do-not-contact list of email addresses, phone numbers and LinkedIn profiles. Checked before every send and before sourcing." | supported | app/db/models.py:1672-1674,3134-3141; app/workers/outreach_tasks.py:185-195; app/api/leads.py:283-285 |
 | 17 | "Entries can't be removed by customers; only a platform administrator can remove one." (re-checked) | supported | app/api/ui_support.py:275-300; app/api/admin.py:209-218 |
 | 18 | "F-P-T-A – four scores from 0 to 100 for each lead: Fit…, Problem…, Timing… and Access…. The overall score weights them 30% fit, 30% problem, 20% timing and 20% access." | supported | app/services/fpta_scoring.py:54,80,311; app/db/models.py:1203-1207 |
-| 19 | "Cooling / archived – before each send LeadPilot estimates a lead's chance of converting. A cooling lead's sequence is paused; an archived lead's sequence is stopped." | supported | app/services/conversion_probability.py:240-283,289 |
+| 19 | "Cooling / archived – before each send Vectorae estimates a lead's chance of converting. A cooling lead's sequence is paused; an archived lead's sequence is stopped." | supported | app/services/conversion_probability.py:240-283,289 |
 | 20 | "Sequence – … A sequence can be draft, active, paused, completed or pending approval." | supported | app/db/models.py:142-149 |
 | 21 | "Step – one message in a sequence, on one channel." | supported | app/api/sequences.py:82-90 (StepIn.channel overrides the sequence channel) |
 | 22 | "Enrollment – … active, paused (resumes later), stopped (can never send again to that lead) or completed (all steps sent)." | supported | app/db/models.py:172-176 |
@@ -1792,23 +1792,23 @@ Summary: 45 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 31 | "24-hour window – … free-form messages are allowed only within 24 hours of the prospect's last message. Outside it, only approved templates may be sent." | supported | app/workers/outreach_tasks.py:229-248; app/api/sequences.py:91-94 |
 | 32 | "Reply classification – each human reply is labelled interested, neutral, objection, not now or unsubscribe. Machine messages such as bounces and out-of-office replies are recognised separately." | supported | app/services/reply_intent.py:18-30 (machine messages handled by their own classification first; mapped to neutral in the intent metric) |
 | 33 | "Re-engagement memory – a "not now" reply is turned into a reminder to come back on the date the prospect gave, or after 90 days by default." | supported | app/services/system_settings.py:126-132 (reengagement_memory_days 90) |
-| 34 | "Booking page – LeadPilot's own scheduling page… Calendly is supported as an alternative." | supported | app/db/models (calendar_booking_pages, account_export.py:55,128); app/api/webhooks.py:165 (Calendly) |
+| 34 | "Booking page – Vectorae's own scheduling page… Calendly is supported as an alternative." | supported | app/db/models (calendar_booking_pages, account_export.py:55,128); app/api/webhooks.py:165 (Calendly) |
 | 35 | "Playbook – … New strategies consult it during the messaging and execution phases. On a new account it is empty and says so." | supported | app/services/playbook_service.py:7-12,25; app/pipeline/engine.py:128-132 |
 | 36 | "A/B test – sending different versions (variants) of a step to compare results." | supported | app/api/sequences.py:85 (StepIn.variant); app/api/strategies_advanced.py:29-60 |
 | 37 | "Attribution – … direct reply (… confidence 1.0), thread match (…; 0.85), last touch (… a guess whose confidence falls as time passes), or none (nothing was sent before the outcome)." | supported | app/services/attribution.py:13-23,96,153,164 |
 | 38 | "Pipeline Health Score – … reply rate (35%), sequence completion (25%), how recently new leads were added (20%) and open conversations (20%)." | supported | app/services/pipeline_health.py:9-12,53-58 |
-| 39 | "Consent ledger – the record of opt-ins, opt-outs and erasures for each prospect: when they told you, and what LeadPilot did." | supported | app/db/models.py:4413-4425 |
+| 39 | "Consent ledger – the record of opt-ins, opt-outs and erasures for each prospect: when they told you, and what Vectorae did." | supported | app/db/models.py:4413-4425 |
 | 40 | "Unsubscribe – the link in every email. It works without signing in, takes effect immediately and stops contact on every channel." | supported | app/api/unsubscribe.py:1-7; app/services/consent.py:219-230 (email, phone, LinkedIn, WhatsApp opt-in); sequence_engine.py:495-509 |
 | 41 | "Erasure (GDPR delete) – clearing a lead's personal details and adding them to the suppression list." (re-checked) | supported | app/api/leads.py:290-339 |
 | 42 | "Plan – … limits on strategies, leads, sequence steps, channels and daily AI spend." | supported | app/core/plans.py:52-178 |
-| 43 | "Deployment – one installation of LeadPilot (its own server and database)…" | supported | app/config.py:435-446 (P0-D: each deployment serves one customer organisation) |
+| 43 | "Deployment – one installation of Vectorae (its own server and database)…" | supported | app/config.py:435-446 (P0-D: each deployment serves one customer organisation) |
 | 44 | "Administrator – a person who runs the deployment, with access to the admin panel." | supported | app/db/models.py:411 (is_admin); app/api/deps.py:18-32 |
 | 45 | "Workspace – your account as seen by teammates you invite. Roles are owner, manager, SDR and viewer." | supported | app/services/rbac.py:7-13,24 |
 | 46 | "SDR – … a team member who works leads but whose campaign launches may need approval." | supported | app/services/rbac.py:10-11; app/api/sequences.py:330-337 |
 | 47 | "Client (agency mode) – a separate book of business inside an agency account, with its own reporting, sending domains and invoice view." | supported | app/services/client_workspaces.py:3-16 |
 | 48 | "White label – showing the app under your own brand name, logo and domain." | supported | app/services/workspaces.py:310-332 |
 | 49 | "API key – a secret starting with `lpk_` that lets tools such as Zapier act as you through the API." | supported | app/services/api_keys.py:1-6,21 |
-| 50 | "Webhook – a message LeadPilot sends to another tool when something happens, for example a reply or a booked meeting." | supported | app/workers/outreach_tasks.py:964-967 (reply_received webhook_payload); frontend/src/components/settings/WebhooksCard.tsx:77 |
+| 50 | "Webhook – a message Vectorae sends to another tool when something happens, for example a reply or a booked meeting." | supported | app/workers/outreach_tasks.py:964-967 (reply_received webhook_payload); frontend/src/components/settings/WebhooksCard.tsx:77 |
 
 Summary: 50 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 
@@ -1822,13 +1822,13 @@ Summary: 50 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 3 | "Use two-factor sign-in. It is not available." | supported | no 2FA/TOTP code in app/ or frontend/src |
 | 4 | "See or end individual sessions. There is no list of signed-in devices. Changing your password signs out everywhere." | supported | app/api/auth.py:494-515 |
 | 5 | "Erasing a lead clears its personal details and adds it to the suppression list, but messages already sent… and replies… are not deleted." (re-checked) | supported | app/api/leads.py:275-345 |
-| 6 | "The web app has no billing screen for cancelling a plan or disputing a pay-per-meeting charge. These exist in the LeadPilot API only…" | supported | app/api/billing.py:92-121; frontend/src/lib/api/billing.ts:57-60 (no importer outside pricing's catalog/checkout) |
+| 6 | "The web app has no billing screen for cancelling a plan or disputing a pay-per-meeting charge. These exist in the Vectorae API only…" | supported | app/api/billing.py:92-121; frontend/src/lib/api/billing.ts:57-60 (no importer outside pricing's catalog/checkout) |
 | 7 | "The payment connection to Stripe is still marked in the code as waiting for live keys…" | supported | app/services/billing.py:20-22,47; app/config.py:475-479 |
 | 8 | "A production deployment without Stripe set up cannot change plans." (re-checked) | supported | app/api/billing.py:82-84 |
 | 9 | "The Pricing page shows an analytics history length per plan; the product does not enforce it." | supported | frontend/src/lib/pricing.ts:86-88; analytics_history_days unused outside plans.py / billing_catalog.py |
 | 10 | "Multi-variate results are available on every plan that includes A/B testing…" | supported | app/api/strategies_advanced.py:36-44 |
 | 11 | "The daily AI limit amounts per plan may still change." | supported | app/core/plans.py:48-50 ("PLACEHOLDERS pending the founders' pricing decision") |
-| 12 | "LeadPilot's automated tests run against simulated versions of outside services." | supported | CLAUDE.md suite description (offline, FakeClaude); docs/program/BASELINE.md:266-267 |
+| 12 | "Vectorae's automated tests run against simulated versions of outside services." | supported | CLAUDE.md suite description (offline, FakeClaude); docs/program/BASELINE.md:266-267 |
 | 13 | "Parts of these integrations are marked in the code as not yet verified…: Gmail, WhatsApp Business, Apollo, Hunter, Calendly, LinkedIn (through Unipile), HubSpot, Zoom, Recall.ai and the AI phone-call providers." | supported | `TODO: verify` markers in app/integrations/gmail.py (10), whatsapp.py (17), apollo.py (9), hunter.py (7), calendly.py (6), unipile_linkedin.py (8), hubspot.py (3), zoom.py (5), recall.py (4), voice_providers.py (4) |
 | 14 | "Google Meet and Zoom meeting creation has not been verified against the live services. Creating a meeting with your own custom link is the only verified path. If Meet or Zoom fails, the meeting is still created, without the video link." | supported | FEATURES.md:1088-1116; app/api/meetings.py:21-28,315-351; app/integrations/google_meet.py:27 |
 | 15 | "Recall.ai … has been built and tested with simulations only and has never been called live." | supported | app/integrations/recall.py:11; FEATURES.md:1123-1131 |
@@ -1866,11 +1866,11 @@ Summary: 40 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
 | 1 | "On every page of the app after you sign in, there is a round button with a life-ring icon in the bottom-right corner ("Open support chat")." | supported | frontend/src/components/shell/Shell.tsx:170; frontend/src/components/support/ChatWidget.tsx:199-203 |
-| 2 | "It opens a panel called LeadPilot support with two modes, switched by the icons at the top of the panel: Chat … Submit a ticket" | supported | ChatWidget.tsx:211-217,226,236 |
+| 2 | "It opens a panel called Vectorae support with two modes, switched by the icons at the top of the panel: Chat … Submit a ticket" | supported | ChatWidget.tsx:211-217,226,236 |
 | 3 | "The ticket form can be opened at any time. You do not have to chat with the assistant first." | supported | ChatWidget.tsx:236 (mode switch always present); app/api/support.py:332-345 (chat_session_id optional) |
 | 4 | "You need a confirmed email address to use the chat." | supported | app/services/auth.py:209-210; docs/features/ai-support-chat.md:288 |
-| 5 | "The assistant answers questions about LeadPilot: how it works, setting up campaigns, outreach, the learning loop, tutorials, your data and getting support. It answers only from LeadPilot's written help content, not from general knowledge." | supported | app/services/support_kb.py:3,169-172; app/services/support_chat.py:81-88 |
-| 6 | "If you ask about something unrelated to LeadPilot, it replies with a fixed message: "I can only help with questions about LeadPilot — …". It does not offer a ticket for off-topic questions." | supported | app/services/support_kb.py:169-172; app/services/support_chat.py:140-151 |
+| 5 | "The assistant answers questions about Vectorae: how it works, setting up campaigns, outreach, the learning loop, tutorials, your data and getting support. It answers only from Vectorae's written help content, not from general knowledge." | supported | app/services/support_kb.py:3,169-172; app/services/support_chat.py:81-88 |
+| 6 | "If you ask about something unrelated to Vectorae, it replies with a fixed message: "I can only help with questions about Vectorae — …". It does not offer a ticket for off-topic questions." | supported | app/services/support_kb.py:169-172; app/services/support_chat.py:140-151 |
 | 7 | "If it cannot find the answer, or is not confident enough, it does not guess. It says so and offers Submit a ticket." | supported | app/services/support_chat.py:154-162,366-369; ChatWidget.tsx:290-300 |
 | 8 | "The ticket subject is then filled in for you, starting with "Question not in FAQ:" followed by your question." | supported | frontend/src/lib/support/ticketSubject.ts:14; ChatWidget.tsx:174-178 |
 | 9 | "When you open the chat, a few suggested questions are shown to get you started." | supported | ChatWidget.tsx:262-275 (first 4 FAQ questions) |
@@ -1883,7 +1883,7 @@ Summary: 40 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 16 | "Press Submit ticket. You see "Ticket submitted."" | supported | ChatWidget.tsx:343,375 |
 | 17 | "Tickets are not limited by the daily chat limit…" | supported | app/api/support.py:340-342 |
 | 18 | "The ticket form says the team responds within 24 hours. That is a commitment written in the app, not something the product enforces." | supported | ChatWidget.tsx:346,357; docs/features/ai-support-chat.md:335 |
-| 19 | "It is stored in LeadPilot's database and appears in the team's support queue, which shows your account email address." | supported | app/api/support.py:332-359; app/api/admin.py:638-690 (user_email) |
+| 19 | "It is stored in Vectorae's database and appears in the team's support queue, which shows your account email address." | supported | app/api/support.py:332-359; app/api/admin.py:638-690 (user_email) |
 | 20 | "The team is not alerted automatically when a ticket arrives; someone checks the queue." | supported | app/api/support.py:336-338; docs/features/ai-support-chat.md:293,335 |
 | 21 | "The team marks a ticket resolved in its queue. Replies are not shown inside the app, and the app has no screen listing your own tickets." | supported | app/api/admin.py:700; frontend/src/lib/api/support.ts:71 (listSupportTickets has no importer) |
 | 22 | "Each chat conversation is private to you." | supported | app/api/support.py:140-160 (ownership in WHERE clause) |
@@ -1892,8 +1892,8 @@ Summary: 40 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 | 25 | "A ticket you raised from a conversation is not deleted when the conversation is…" | supported | app/workers/support_tasks.py:15-19 |
 | 26 | "The public Contact page … offers a link to book a call, an email address, the company's LinkedIn page and WhatsApp numbers." | supported | frontend/src/app/contact/page.tsx:19-25,87,102,111,121-125 |
 | 27 | "For privacy requests, such as a request to delete your account, use the contact email on the Privacy page." | supported | frontend/src/app/privacy/page.tsx:19,144-152 |
-| 28 | "A public status page at status.calendarharvest.com is planned, designed to keep working even when LeadPilot itself is down. It is not live…" | supported | docs/program/STAR_PROMPT.md:1,30,101 |
-| 29 | "campaigns run on LeadPilot's servers, not in your browser or phone, so closing the app does not stop or pause them." | supported | docs/README_M7_COMPLETE.md:33; app/workers/celery_app.py:226-229 |
+| 28 | "A public status page at status.calendarharvest.com is planned, designed to keep working even when Vectorae itself is down. It is not live…" | supported | docs/program/STAR_PROMPT.md:1,30,101 |
+| 29 | "campaigns run on Vectorae's servers, not in your browser or phone, so closing the app does not stop or pause them." | supported | docs/README_M7_COMPLETE.md:33; app/workers/celery_app.py:226-229 |
 
 Summary: 29 supported, 0 unsupported, 0 contradicted. (final, after re-check)
 
@@ -1975,7 +1975,7 @@ Apollo/Hunter, Gmail and WhatsApp were "not yet verified live"; the founders
 confirmed all four as working end to end on 2026-10-13
 (`docs/program/ai-visibility/REPORT.md` Q6a/Q6b, `frontend/src/content/product-facts.json`),
 so all articles now say that, with the remaining code TODO markers noted.
-Article 13 said LeadPilot never replies automatically, which Reply Copilot
+Article 13 said Vectorae never replies automatically, which Reply Copilot
 contradicts; article 22 described online checkout as available although it is
 simulated only; articles 27, 29 and 30 gave the code default for the support
 chat limit (20) while `render.yaml` sets 30 on the hosted service.
@@ -2001,7 +2001,7 @@ Notes:
 |---|---|---|---|
 | 1 | Go to **Strategies**, press **New strategy** | supported | frontend/src/app/(app)/strategies/page.tsx:25 |
 | 2 | choose **A product** or **A skill / service** | supported | frontend/src/app/(app)/strategies/new/page.tsx:106 |
-| 3 | Every time you complete that form, LeadPilot creates a new product and a new strategy | supported | strategies/new/page.tsx:54-62 (createProduct then createStrategy) |
+| 3 | Every time you complete that form, Vectorae creates a new product and a new strategy | supported | strategies/new/page.tsx:54-62 (createProduct then createStrategy) |
 | 4 | The Free plan allows 3 strategies | supported | app/core/plans.py:64 |
 | 5 | verify your phone (launching outreach needs it) | supported | app/api/sequences.py:441 |
 | 6 | connect Gmail under **Settings**, **Integrations** tab | supported | frontend/src/lib/settings-tabs.ts:16; settings/page.tsx:300-326 |
@@ -2010,7 +2010,7 @@ Notes:
 | 9 | **Workspace** switcher only appears once you belong to a second workspace | supported | frontend/src/components/shell/WorkspaceSwitcher.tsx:15 |
 | 10 | Team approvals only apply to people you invite with the SDR role | supported | app/api/sequences.py:491 |
 | 11 | As the owner, your own launches never wait for approval | supported | app/api/sequences.py:491 |
-| 12 | LeadPilot sends nothing automatically until you approve the day | supported | app/services/daily_send_approval.py:1-20; on by default at app/services/system_settings.py:406 |
+| 12 | Vectorae sends nothing automatically until you approve the day | supported | app/services/daily_send_approval.py:1-20; on by default at app/services/system_settings.py:406 |
 | 13 | A banner on every page shows today's queued counts | supported, with a caveat | Shell.tsx:167; SendApprovalBanner.tsx:24,34. The banner only shows while automatic messages are waiting, and is hidden on /send-approval itself |
 | 14 | tick the channels, **Approve selected channels for today** / **Decline for today** | supported | frontend/src/app/(app)/send-approval/page.tsx:129,181,184 |
 | 15 | Inbox **Needs reply**: replies from real people, oldest first | supported | app/services/inbox.py:48,143-148 |
@@ -2023,8 +2023,8 @@ Notes:
 | 22 | A paused mailbox stays paused until you press **Resume** | supported | app/services/mailbox_health.py:377; MailboxHealthCard.tsx:127-130 |
 | 23 | Each card on **Strategies** shows the strategy's status | supported | strategies/page.tsx:39 |
 | 24 | `researching`/`verifying` = still working; `needs_human_review`, `budget_exhausted`, `failed` = waiting for you | supported | frontend/src/lib/api/types.ts:267-273; lib/api/hooks.ts:26. `pending` is not mentioned |
-| 25 | **Overview** tab shows "Campaign paused" if LeadPilot paused it (e.g. high bounce rate) | supported | campaigns/page.tsx:438-448 |
-| 26 | LeadPilot does not measure how long the daily check takes | supported (no such metric found) | — |
+| 25 | **Overview** tab shows "Campaign paused" if Vectorae paused it (e.g. high bounce rate) | supported | campaigns/page.tsx:438-448 |
+| 26 | Vectorae does not measure how long the daily check takes | supported (no such metric found) | — |
 | 27 | Research and verification run on the servers, so you can close the tab | supported | app/api/strategies.py:1,145 (pipeline enqueued) |
 | 28 | Sending, follow-ups and reply checks run on a server schedule | supported | app/workers/celery_app.py:271,275,304 |
 | 29 | Automatic messages stay queued until approved; not failed or deleted | supported | daily_send_approval.py:9-13 |
@@ -2094,7 +2094,7 @@ Summary: 35 supported, 0 unsupported, 3 contradicted.
 | 6 | **Clients** page features belong to your workspace and do not follow you | supported | client_workspaces.py:16-19,77-78; services/client_workspaces.py:129-142 |
 | 7 | No per-client plans or limits | supported | models.py:3638-3666 (no limit columns) |
 | 8 | Plan limits are counted over the whole account | supported | plans.py:45-47,225-238 |
-| 9 | Retainer and per-meeting fee are what you charge; LeadPilot does not bill them | supported | services/client_workspaces.py:310-354 (view only); no client billing in app/services/billing.py |
+| 9 | Retainer and per-meeting fee are what you charge; Vectorae does not bill them | supported | services/client_workspaces.py:310-354 (view only); no client billing in app/services/billing.py |
 | 10 | Row shows **Sent**, **Reply rate**, **Meetings**, **Revenue** (won deals) | supported | clients/page.tsx:170-174; services/client_workspaces.py:286-289 |
 | 11 | All time, no date filter | supported | services/client_workspaces.py:396 (report called with no dates) |
 | 12 | Reply rate shows "—" until something is sent | supported | services/client_workspaces.py:303; lib/clients.ts:82-83 |
@@ -2149,7 +2149,7 @@ Abbreviations in the tables: `s/` = `app/services/`, `api/` = `app/api/`, `w/` =
 ### 33-product-profile-and-icp.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | Everything LeadPilot researches … starts from what you type into the **New strategy** form | supported | app/pipeline/engine.py:77-83, 170-173 |
+| 1 | Everything Vectorae researches … starts from what you type into the **New strategy** form | supported | app/pipeline/engine.py:77-83, 170-173 |
 | 2 | The first step of **New strategy**, **What do you want clients for?** | supported | fe/app/(app)/strategies/new/page.tsx:84, 88 |
 | 3 | **Name**: required, up to 200 characters | supported | api/schemas.py:20; fe/components/intake/wizard.ts:71 (the 200 limit is server-side only; the Input has no maxLength) |
 | 4 | **Describe the product or skill**: required, no length limit; hint "What it does, who it's for, what it costs…" | supported | api/schemas.py:21; new/page.tsx:96-98 |
@@ -2160,14 +2160,14 @@ Abbreviations in the tables: `s/` = `app/services/`, `api/` = `app/api/`, `w/` =
 | 9 | Through the API, up to 50 past clients in one request | supported | api/schemas.py:49 |
 | 10 | There is no form for typing an ICP directly | supported | No ICP input anywhere in fe/; the API accepts `icp_criteria` only per sourcing request (api/schemas.py:189) |
 | 11 | Once a strategy is created, its name, description and past clients cannot be edited, in the app or through the API | **contradicted (partly)** | Name and description: there is no update route, so that part is true. Past clients: `POST /products/{id}/past-clients` (api/products.py:118-155) has no strategy check and can add clients at any time. Research steps read past clients when each step runs (engine.py:89-94), so a resumed run would include them. |
-| 12 | With no past clients, your description is the only thing LeadPilot knows about your offer | supported | engine.py:82, 87-88 |
+| 12 | With no past clients, your description is the only thing Vectorae knows about your offer | supported | engine.py:82, 87-88 |
 | 13 | Every one of the research steps receives the same three lines: name, type, description | supported | engine.py:82 (for a local business a LOCAL BUSINESS CONTEXT block is added, :83) |
 | 14 | AI turns each client's two boxes into seven fields (industry … sales cycle length) | supported | s/pattern_recognition.py:16-24, 32-53 |
 | 15 | Anything not stated or safely inferable is left empty | supported | s/pattern_recognition.py:33 |
 | 16 | The research steps see only these seven fields, not your original text | supported | engine.py:94 (the stored dict can also hold a `confidence` map, s/pattern_recognition.py:75-76) |
 | 17 | If extraction fails, clients still saved, fields unknown, strategy still launches | supported | s/pattern_recognition.py:59-72; api/products.py:131-134 |
 | 18 | First two phases cover core offering, problem/cost of inaction, pricing logic, firmographics, personas, decision-makers, pain points, triggers, disqualifiers | supported | app/pipeline/registry.py:57-79 |
-| 19 | What you say about yourself is not checked by LeadPilot's claim check | supported (caveat) | s/claim_verification.py:26-30. When F05 Guardrails Studio is on, proof claims about the sender are checked against the approved-claims library (s/claim_verification.py:497-529) |
+| 19 | What you say about yourself is not checked by Vectorae's claim check | supported (caveat) | s/claim_verification.py:26-30. When F05 Guardrails Studio is on, proof claims about the sender are checked against the approved-claims library (s/claim_verification.py:497-529) |
 | 20 | Phase 2 is ICP definition, phase 3 market sizing and segmentation | supported | registry.py:69-89 |
 | 21 | AI extracts five lists of search criteria | supported | s/icp_extraction.py:26, 73-85, 88-115 |
 | 22 | Table: titles / industries / locations / size ranges "such as 11 to 50" / keywords "3 to 8" | supported | s/icp_extraction.py:77-81 |
@@ -2199,7 +2199,7 @@ Summary: 43 supported, 0 unsupported, 1 contradicted.
 ### 34-strategy-patterns-and-playbooks.md
 | # | Sentence | Verdict | Evidence |
 |---|---|---|---|
-| 1 | LeadPilot groups strategies aiming at same buyer with same outreach, keeps running score | supported | s/icp_extraction.py:28-41, 236-249 |
+| 1 | Vectorae groups strategies aiming at same buyer with same outreach, keeps running score | supported | s/icp_extraction.py:28-41, 236-249 |
 | 2 | 64-character code (a SHA-256 hash) built from two halves | supported | s/icp_extraction.py:214-233 |
 | 3 | ICP half = five lists; lower-cased, de-duplicated, sorted | supported | s/icp_extraction.py:199-215 |
 | 4 | Tactic half classified by AI from phase 5 and phase 8, fixed values | supported | s/icp_extraction.py:134-149 |
@@ -2343,8 +2343,8 @@ Totals: 35 has 1 contradicted sentence, 10 has 6, and 13 and 22 have none. Nothi
 ### 35-google-workspace-dns-setup.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | If you send from a Gmail address on your own Google Workspace domain, LeadPilot checks that domain's SPF, DKIM and DMARC records. | supported | app/services/deliverability.py:3-11,108-120 |
-| 2 | LeadPilot checks the domain of each connected Gmail address. | supported | deliverability.py:96-105 |
+| 1 | If you send from a Gmail address on your own Google Workspace domain, Vectorae checks that domain's SPF, DKIM and DMARC records. | supported | app/services/deliverability.py:3-11,108-120 |
+| 2 | Vectorae checks the domain of each connected Gmail address. | supported | deliverability.py:96-105 |
 | 3 | Shared domains such as gmail.com are skipped, because their reputation belongs to Google. | supported | deliverability.py:54-56,103 |
 | 4 | It reads public DNS TXT records only; it never changes your DNS. | supported (caveat) | deliverability.py:68-75,108-120. Caveat: the same card's blocklist check also does DNS A lookups of `<domain>.dbl.spamhaus.org` etc. and may call MXToolbox (:78-85,126-147). Those are not records on the customer's domain. |
 | 5 | SPF row: TXT on the domain, starting `v=spf1` | supported | deliverability.py:109 |
@@ -2352,14 +2352,14 @@ Totals: 35 has 1 contradicted sentence, 10 has 6, and 13 and 22 have none. Nothi
 | 7 | DMARC row: `_dmarc.<domain>`, starting `v=DMARC1`; `p=` read as policy | supported | deliverability.py:110-116 |
 | 8 | `google` is the DKIM selector Google Workspace uses by default, and it is the only one the **Email health** card checks. | supported | deliverability.py:117,120; app/services/system_settings.py:130-132 |
 | 9 | A DNS lookup that fails, or takes longer than 5 seconds, is treated as "no record". | supported | deliverability.py:72-74 (`lifetime=5`, any exception → `[]`) |
-| 10 | You add the records at whoever hosts your domain's DNS; LeadPilot cannot do it for you. | supported | Read-only resolver, no DNS write path: deliverability.py:68-85 |
-| 11 | LeadPilot sends through the Gmail API, so your mail leaves from Google's servers. | supported | app/services/deliverability_autopilot.py:66-68 |
+| 10 | You add the records at whoever hosts your domain's DNS; Vectorae cannot do it for you. | supported | Read-only resolver, no DNS write path: deliverability.py:68-85 |
+| 11 | Vectorae sends through the Gmail API, so your mail leaves from Google's servers. | supported | app/services/deliverability_autopilot.py:66-68 |
 | 12 | Suggestion when SPF is missing: `v=spf1 include:_spf.google.com ~all` | supported | deliverability_autopilot.py:163-166 |
 | 13 | If you already have an SPF record … add `include:_spf.google.com` to it instead of creating a second one. | supported | deliverability_autopilot.py:167-170,177-180 |
 | 14 | The preflight fails more than one SPF record, SPF not reaching `_spf.google.com`, or more than 10 DNS lookups. | supported | deliverability_autopilot.py:69-70,147-149,167-180 |
 | 15 | The **Email health** card … only checks that a `v=spf1` record exists. | supported | deliverability.py:109 |
-| 16 | LeadPilot's own messages say "Turn on DKIM signing in Google Admin". | supported | deliverability_autopilot.py:206 |
-| 17 | Publish the key … at `google._domainkey` … That is where LeadPilot looks. | supported | deliverability.py:117; deliverability_autopilot.py:184-186,192 |
+| 16 | Vectorae's own messages say "Turn on DKIM signing in Google Admin". | supported | deliverability_autopilot.py:206 |
+| 17 | Publish the key … at `google._domainkey` … That is where Vectorae looks. | supported | deliverability.py:117; deliverability_autopilot.py:184-186,192 |
 | 18 | Another selector → card shows DKIM missing; line reads "DKIM not found under the Google selector" | supported | deliverability.py:177-179; frontend/src/components/settings/DeliverabilityCard.tsx:73,84-87 |
 | 19 | An administrator can add your selector to `deliverability_dkim_selectors`, but only the launch preflight reads it. | supported | system_settings.py:130-132; deliverability_autopilot.py:64,396 (the only reader) |
 | 20 | An empty `p=` → preflight reports the key as revoked and asks for a new key in Google Admin. | supported | deliverability_autopilot.py:194-203 |
@@ -2389,7 +2389,7 @@ Totals: 35 has 1 contradicted sentence, 10 has 6, and 13 and 22 have none. Nothi
 | 44 | Renews automatically within 120 seconds of expiring, and stores it encrypted. | supported | gmail.py:194,205-227; app/config.py:102 |
 | 45 | Access removed → renewal fails, **Test** shows "gmail: unhealthy ✗" | supported | gmail.py:397-405; settings/page.tsx:277 |
 | 46 | … email messages go back to the queue and are retried; nothing goes out until you reconnect. | supported | app/workers/outreach_tasks.py:985-988,1991-1994 |
-| 47 | LeadPilot shows no separate alert for this, so use **Test** if sending stops. | **contradicted** | When the last email failed on Google's token endpoint, the strategy page's "Why isn't this sending?" panel shows "Google refused your Gmail connection (revoked or expired)." with the fix "Reconnect Gmail.": app/services/send_diagnostics.py:131-148,169-172; panel mounted at frontend/src/app/(app)/strategies/detail/page.tsx:141 |
+| 47 | Vectorae shows no separate alert for this, so use **Test** if sending stops. | **contradicted** | When the last email failed on Google's token endpoint, the strategy page's "Why isn't this sending?" panel shows "Google refused your Gmail connection (revoked or expired)." with the fix "Reconnect Gmail.": app/services/send_diagnostics.py:131-148,169-172; panel mounted at frontend/src/app/(app)/strategies/detail/page.tsx:141 |
 | 48 | Reconnect if connected before calendar or draft access was added. | supported | gmail.py:44-59; settings/page.tsx:310-315,328 |
 | 49 | Connecting ends with "Google did not return a refresh_token — re-run the auth flow (prompt=consent) …" | supported | gmail.py:188-192; app/api/integrations.py:94-95; frontend/src/lib/api/ecosystem.ts:139-141 (shown as "Gmail connection failed: …") |
 | 50 | Reconnecting keeps the permissions you granted before and updates the same connection. | supported | gmail.py:110-113,175-178,186-187 |
@@ -2399,7 +2399,7 @@ Summary: 49 supported, 0 unsupported, 1 contradicted.
 ### 10-whatsapp-outreach.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot can send outreach on WhatsApp through Meta's WhatsApp Business Cloud API. | supported | app/integrations/whatsapp.py:101-105 |
+| 1 | Vectorae can send outreach on WhatsApp through Meta's WhatsApp Business Cloud API. | supported | app/integrations/whatsapp.py:101-105 |
 | 2 | Enforced at sending: recorded opt-in, approved template for the first message, free-form only inside the 24-hour window. | supported | whatsapp.py:131-212; outreach_tasks.py:462-512; sequences.py:253-261 |
 | 3 | Free is email only. Starter, Growth, Pay per meeting, Scale, Pro and Enterprise include WhatsApp. | supported | app/core/plans.py:68,84,102,117,135,154,171 |
 | 4 | Number configured by your administrator in the server settings, not in the app. | supported | config.py:136-151; settings/page.tsx:343 |
@@ -2437,7 +2437,7 @@ Summary: 49 supported, 0 unsupported, 1 contradicted.
 | 36 | Server reasons: "variable placeholders must be sequential starting at {{1}}", "duplicate variable placeholders (each {{n}} once)", name rule | supported | whatsapp_templates.py:119-123,131-134; TemplateEditor.tsx:50-51 |
 | 37 | An earlier editor could not save templates with placeholders; fixed; edits start from saved descriptions. | supported | TemplateEditor.tsx:14-17,26-28,83-90; history in docs/program/help-center-factcheck.md:592 |
 | 38 | The launch form on the strategy page creates email sequences only | supported | OutreachPanel.tsx:21,73-75,168-193 |
-| 39 | … WhatsApp steps are added through the LeadPilot API. | **contradicted** | Autopilot is on by default (`autopilot_launch_enabled` True, system_settings.py:424). It builds WhatsApp template steps from the app (app/services/autopilot.py:633-649,975), and the user picks the template in the app (frontend/src/components/strategy/AutopilotCard.tsx:111-124). |
+| 39 | … WhatsApp steps are added through the Vectorae API. | **contradicted** | Autopilot is on by default (`autopilot_launch_enabled` True, system_settings.py:424). It builds WhatsApp template steps from the app (app/services/autopilot.py:633-649,975), and the user picks the template in the app (frontend/src/components/strategy/AutopilotCard.tsx:111-124). |
 | 40 | Template step names any non-rejected template and maps each variable. | supported | sequences.py:263-293 |
 | 41 | It only sends once the template is approved. | **contradicted** | Nothing waits for approval. If the template is not approved when the step comes due, the message becomes `needs_template` and is not retried later (outreach_tasks.py:486-495; :2030-2032 says "currently terminal for that lead"). |
 | 42 | Each variable comes from the lead's record (full name, first name, title, company, email) or an AI-filled brief without invented facts. | supported | app/services/message_personalization.py:195-201,222-263 |
@@ -2468,21 +2468,21 @@ Summary: 49 supported, 0 unsupported, 1 contradicted.
 | 67 | A STOP from an unmatched number still suppresses that number. | supported | webhooks_whatsapp.py:361-406 |
 | 68 | An opted-out contact who messages again is not opted back in. | supported | whatsapp_optin.py:247-257 |
 | 69 | Replies classified like email; a real reply stops all sequences incl. email; out-of-office pauses. | supported | outreach_tasks.py:1835-1858 |
-| 70 | LeadPilot never replies automatically. | supported | outreach_tasks.py:1844; app/services/reply_copilot.py:85,321-323 (WhatsApp excluded from Reply Copilot) |
+| 70 | Vectorae never replies automatically. | supported | outreach_tasks.py:1844; app/services/reply_copilot.py:85,321-323 (WhatsApp excluded from Reply Copilot) |
 | 71 | Matching: most recently messaged lead, else the only holder, else unattached. | supported | webhooks_whatsapp.py:321-358 |
 | 72 | Undelivered → handled like an email bounce. | supported | webhooks_whatsapp.py:290-296 |
 | 73 | Not verified against Meta's live service; simulated tests; many details marked unconfirmed. | supported | TODOs throughout whatsapp.py (e.g. :24,57,236,335) and webhooks_whatsapp.py; docs/VERIFICATION_REPORT.md:579 |
 
 Summary: 67 supported, 0 unsupported, 6 contradicted (#19, #34, #39, #41, #58, #59).
 
-### 13-replies-and-unified-inbox.md (opening paragraph and "Does LeadPilot answer replies for me?" only)
+### 13-replies-and-unified-inbox.md (opening paragraph and "Does Vectorae answer replies for me?" only)
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | When a prospect replies by email, WhatsApp or LinkedIn, LeadPilot stores the reply, classifies it, and changes what happens next in their sequence. | supported | webhooks_whatsapp.py:421-453; app/api/linkedin.py:336; outreach_tasks.py:1835-1858 |
-| 2 | By default LeadPilot does not reply to a person automatically; the optional Reply Copilot is the exception. | supported | system_settings.py:318-326 (both default False); reply_copilot.py:18 |
+| 1 | When a prospect replies by email, WhatsApp or LinkedIn, Vectorae stores the reply, classifies it, and changes what happens next in their sequence. | supported | webhooks_whatsapp.py:421-453; app/api/linkedin.py:336; outreach_tasks.py:1835-1858 |
+| 2 | By default Vectorae does not reply to a person automatically; the optional Reply Copilot is the exception. | supported | system_settings.py:318-326 (both default False); reply_copilot.py:18 |
 | 3 | The **Inbox** gathers every reply into one conversation per prospect … who is waiting for an answer. | supported | app/services/inbox.py:3-18 |
 | 4 | Not by default. Replies are classified and routed, and a person writes the answer. | supported | app/services/reply_intelligence.py:16-21 |
-| 5 | Reply Copilot is off unless your administrator turns it on: it drafts an answer that a person approves before it is sent | supported | system_settings.py:318-322; reply_copilot.py:13-17. Small caveat: LinkedIn drafts are copied, not sent by LeadPilot. |
+| 5 | Reply Copilot is off unless your administrator turns it on: it drafts an answer that a person approves before it is sent | supported | system_settings.py:318-322; reply_copilot.py:13-17. Small caveat: LinkedIn drafts are copied, not sent by Vectorae. |
 | 6 | … only if automatic sending is also allowed can an answer go out without a person. | supported | reply_copilot.py:829-863; system_settings.py:323-326. This is a necessary condition only: auto-send also needs the account's opt-in, email, a "send me a time" reply and a booking link. |
 | 7 | A second AI pass reads each reply and decides what you should do next, in one of four categories | supported | reply_intelligence.py:3-14,50 |
 | 8 | **Buying signal** – interest, a question about how it works, or a request for a call or pricing. | supported | reply_intelligence.py:109-111 |
@@ -2490,7 +2490,7 @@ Summary: 67 supported, 0 unsupported, 6 contradicted (#19, #34, #39, #41, #58, #
 | 10 | **Not now** – a timing issue, not a rejection. | supported | reply_intelligence.py:111-112 |
 | 11 | **Wrong person** – not the buyer or name someone else. | supported | reply_intelligence.py:112-113 |
 | 12 | It writes a suggested draft of under 150 words onto the reply. | supported | reply_intelligence.py:56,114,154-156,352-355 |
-| 13 | The draft is never sent by LeadPilot; you read it, edit it, and send your answer yourself. | supported | reply_intelligence.py:16-21 |
+| 13 | The draft is never sent by Vectorae; you read it, edit it, and send your answer yourself. | supported | reply_intelligence.py:16-21 |
 | 14 | Buying signal → next step would be step 3; status unchanged; nothing sends until a person acts. | supported | reply_intelligence.py:17-21,64-67,246-283 |
 
 Summary: 14 supported, 0 unsupported, 0 contradicted.
@@ -2528,17 +2528,17 @@ Fact-check of three help-center articles in /home/user/LeadPilot. Every `sources
 | 5 | HubSpot does not let a lifecycle stage move backwards; … sends the rest without it | supported | crm_sync.py:358-366 (on a 400 it retries once without lifecyclestage) |
 | 6 | Each deal → HubSpot deal with dealname, amount (two decimals), dealstage map, pipeline default, deal_currency_code, closedate | supported | crm_sync.py:82, 424-431 |
 | 7 | A new deal is linked to the lead's contact | supported | crm_sync.py:441-450. The association call is marked TODO-unverified at app/integrations/hubspot.py:157 |
-| 8 | Empty LeadPilot fields are left out… | supported | crm_sync.py:355, 395 |
+| 8 | Empty Vectorae fields are left out… | supported | crm_sync.py:355, 395 |
 | 9 | Leads become Salesforce Leads, not Contacts; converting stays your users' decision | supported | app/integrations/salesforce.py:9-11 |
 | 10 | Looks for an existing Lead with the same email (does not search Contacts) | supported | salesforce.py:132-135 |
-| 11 | Salesforce field table, including LastName/Company `Unknown` and LeadSource=LeadPilot on new Leads | supported | crm_sync.py:388-395, 414 |
+| 11 | Salesforce field table, including LastName/Company `Unknown` and LeadSource=Vectorae on new Leads | supported | crm_sync.py:388-395, 414 |
 | 12 | `Status` is sent as: verified → Open - Not Contacted … | supported | crm_sync.py:83-88 |
-| 13 | Once a Lead is converted… read-only, and LeadPilot stops updating it | supported | crm_sync.py:409-412 (the update is still attempted; the CONVERTED 400 error is swallowed) |
+| 13 | Once a Lead is converted… read-only, and Vectorae stops updating it | supported | crm_sync.py:409-412 (the update is still attempted; the CONVERTED 400 error is swallowed) |
 | 14 | Opportunity with Name (up to 120), StageName map, Amount, CloseDate | supported | crm_sync.py:89, 459-465 |
-| 15 | …and a `Description` naming the LeadPilot deal and the lead's email | contradicted (minor) | crm_sync.py:466-467: the Description is `"LeadPilot deal <deal UUID> for <email>"`. It uses the deal's internal ID, not its name |
+| 15 | …and a `Description` naming the Vectorae deal and the lead's email | contradicted (minor) | crm_sync.py:466-467: the Description is `"Vectorae deal <deal UUID> for <email>"`. It uses the deal's internal ID, not its name |
 | 16 | An open deal without a close date gets a date 30 days out | supported | crm_sync.py:462-464 |
 | 17 | The Opportunity is not linked to the Lead record | supported | crm_sync.py:456-482 (no association call) |
-| 18 | By default LeadPilot sends leads that replied or went further… | contradicted (partial) | This is true for the sweep only (crm_sync.py:65, 533). Immediate pushes (`push_lead`, crm_sync.py:495-509) apply no status filter, so a manual Pipeline move to any status (e.g. contacted, proposal_sent) is pushed straight away (app/api/ui_support.py:145-151) |
+| 18 | By default Vectorae sends leads that replied or went further… | contradicted (partial) | This is true for the sweep only (crm_sync.py:65, 533). Immediate pushes (`push_lead`, crm_sync.py:495-509) apply no status filter, so a manual Pipeline move to any status (e.g. contacted, proposal_sent) is pushed straight away (app/api/ui_support.py:145-151) |
 | 19 | Checkbox "Also push every verified lead (by default only leads that replied or further)" … adds verified and contacted | supported | Label matches exactly: frontend/src/components/settings/CrmCards.tsx:126. crm_sync.py:67, 533 |
 | 20 | A lead without an email is never sent | supported | crm_sync.py:497, 536 |
 | 21 | Proposal-sent has no status mapping and the sweep does not send those leads | supported | app/db/models.py:112. crm_sync.py:65-67, 75-88 |
@@ -2548,7 +2548,7 @@ Fact-check of three help-center articles in /home/user/LeadPilot. Every `sources
 | 25 | This catches changes no event announces, such as a logged meeting outcome | supported | crm_sync.py:20-22. Detail: a closed-won outcome does send `deal_won` (app/services/meeting_followup.py:219-239) |
 | 26 | **Sync now** … sends every eligible record, not only the changed ones, and then reads linked records back | contradicted (partial) | It does a full push then a pull (app/api/crm_integrations.py:195; crm_sync.py:529-545, 845), but the full push is still capped at 500 leads and 500 deals (crm_sync.py:545) |
 | 27 | The same person in two campaigns is one CRM record; the first lead keeps the link | supported | crm_sync.py:321-325 |
-| 28 | Only records LeadPilot created or linked come back; CRM-only records not imported | supported | crm_sync.py:13-14, 695-799 |
+| 28 | Only records Vectorae created or linked come back; CRM-only records not imported | supported | crm_sync.py:13-14, 695-799 |
 | 29 | A HubSpot deal created on a linked contact is imported | supported | crm_sync.py:720-724, 737-771. Detail: this happens only through the HubSpot `deal.creation` webhook; polling (`pull`, 802-837) never imports |
 | 30 | Salesforce Opportunities created in Salesforce are not imported | supported | crm_sync.py:774-799 (linked records only; there is no import path) |
 | 31 | HubSpot contact read-back mapping | supported | crm_sync.py:91-92, 633-644 |
@@ -2561,12 +2561,12 @@ Fact-check of three help-center articles in /home/user/LeadPilot. Every `sources
 | 38 | Salesforce needs a Flow or Apex callout with a signature | supported | crm-ecosystem.md:57-62; crm_integrations.py:264-295 |
 | 39 | If guardrails are on, a daily job reads customer and open-deal companies into exclusion lists, checked before sending | supported | crm_tasks.py:81-90; celery_app.py:366-373; app/services/guardrails.py:726-778 (it also reads churned) |
 | 40 | Fixed rules, not timestamps | supported | crm_sync.py:564-602 (no timestamp comparison) |
-| 41 | Contact details belong to LeadPilot; each push overwrites; CRM edits never reach LeadPilot | supported | crm_sync.py:348-355, 376, 405, 814 |
+| 41 | Contact details belong to Vectorae; each push overwrites; CRM edits never reach Vectorae | supported | crm_sync.py:348-355, 376, 405, 814 |
 | 42 | Lead status only moves forward; a closed lead is never reopened | supported | crm_sync.py:564-570 |
-| 43 | LeadPilot keeps sending its own status; this stops the loop | supported | crm_sync.py:26-29 |
-| 44 | During the sweep LeadPilot pushes before it reads back, so LeadPilot's deal values win | supported | crm_sync.py:845 |
+| 43 | Vectorae keeps sending its own status; this stops the loop | supported | crm_sync.py:26-29 |
+| 44 | During the sweep Vectorae pushes before it reads back, so Vectorae's deal values win | supported | crm_sync.py:845 |
 | 45 | A CRM webhook change is applied when it arrives | supported | crm_integrations.py:261, 295 |
-| 46 | A deal reopened in the CRM is not reopened in LeadPilot by default | supported | crm_sync.py:626-630, 666-671 (only closed stages map inbound by default) |
+| 46 | A deal reopened in the CRM is not reopened in Vectorae by default | supported | crm_sync.py:626-630, 666-671 (only closed stages map inbound by default) |
 | 47 | Deleted in the CRM → created again on the next push | supported | crm_sync.py:377-382, 406-414, 438-442, 475-479, 725-730 |
 | 48 | When the CRM closes a lead, its sequences stop | supported | crm_sync.py:572-577 |
 | 49 | Status mapping only through the API; the settings screen has no editor | supported | CrmCards.tsx:56-60, 118-128; crm_integrations.py:197-228 |
@@ -2586,7 +2586,7 @@ Summary: 54 supported, 0 unsupported, 4 contradicted.
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
 | 1 | Events offered under **Events** when you click **Add webhook** | supported | frontend/src/components/settings/WebhooksCard.tsx:82, 182, 190-200; app/api/webhook_targets.py:80-84; app/services/webhook_delivery.py:63-83 |
-| 2 | meeting_booked: Calendly or LeadPilot calendar | supported | app/api/webhooks.py:182-189; app/workers/calendar_tasks.py:247-254 |
+| 2 | meeting_booked: Calendly or Vectorae calendar | supported | app/api/webhooks.py:182-189; app/workers/calendar_tasks.py:247-254 |
 | 3 | reply_received: a lead replies on any channel | supported | webhook_delivery.py:65. Detail: it fires for email, WhatsApp and LinkedIn only (app/workers/outreach_tasks.py:1813, 1894, 1951); AI phone calls do not send reply_received |
 | 4 | reply_interested: a reply or AI call classified interested | supported | outreach_tasks.py:1649-1654; app/services/phone_calls.py:404-412 |
 | 5 | lead_sourced: a sourcing batch finishes | contradicted (partial) | app/workers/lead_tasks.py:639-644: no event is sent when the batch has no verified leads |
@@ -2653,7 +2653,7 @@ Summary: 54 supported, 0 unsupported, 4 contradicted.
 | 66 | Daily send approval needed, Autopilot updates, personal video suggested | supported | app/services/daily_send_approval.py:761; app/services/autopilot.py:396; app/services/loom_video.py:153 |
 | 67 | AI call in progress, paused for disclosure incident, message taken | supported | app/services/voice_twin.py:596, 629-634, 1522, 1552 |
 | 68 | reply_received and lead_sourced go to webhooks only, never Slack | supported | outreach_tasks.py:1646; lead_tasks.py:646 |
-| 69 | Each post has a title, short text and an "Open in LeadPilot" button when there is a screen | supported | slack.py:164-176; event_bus.py:176 |
+| 69 | Each post has a title, short text and an "Open in Vectorae" button when there is a screen | supported | slack.py:164-176; event_bus.py:176 |
 | 70 | Not connected, no channel, or Slack fails → skipped, nothing else affected | supported | slack.py:150-161; event_bus.py:13-18, 181-183 |
 | 71 | The Slack connection has not been tested against a live Slack workspace | supported | FULL_PRODUCT_AUDIT.md:119-120 (a general "all integrations mock-tested" statement, nothing Slack-specific) |
 
@@ -2666,7 +2666,7 @@ Summary: 69 supported, 0 unsupported, 2 contradicted.
 | 2 | 5 lead-sourcing requests per hour | supported | app/core/config.py:8, 200 |
 | 3 | 10 sign-in attempts per 15 minutes | supported | app/core/config.py:12, 335; app/core/rate_limiting.py:211 (900 s) |
 | 4 | 20 support chat messages per day | supported | app/core/config.py:13, 358; app/api/support.py:42, 244-245 (86,400 s window) |
-| 5 | (LeadPilot's hosted service raises this to 30) | supported | render.yaml:133-135 and 233-235 (`RATE_LIMIT_SUPPORT_CHAT: "30"` on both services). This conflicts with app/core/config.py:340 ("20, lowered from 30 on 2026-08-30 at the product owner's instruction"). render.yaml was apparently never lowered, so ask the founder whether 30 is intended or stale before relying on it |
+| 5 | (Vectorae's hosted service raises this to 30) | supported | render.yaml:133-135 and 233-235 (`RATE_LIMIT_SUPPORT_CHAT: "30"` on both services). This conflicts with app/core/config.py:340 ("20, lowered from 30 on 2026-08-30 at the product owner's instruction"). render.yaml was apparently never lowered, so ask the founder whether 30 is intended or stale before relying on it |
 | 6 | These are deployment settings | supported | app/core/config.py:1-13 (env-overridable) |
 
 Summary: 6 supported, 0 unsupported, 0 contradicted.
@@ -2718,11 +2718,11 @@ I checked every cited source path in all five front-matter lists with Glob, and 
 | 24 | the lead is not suppressed or excluded, and its status is still Replied, Contacted, Verified or Flagged. A lead that booked a meeting, was closed or disqualified gets no draft. | supported | reply_copilot.py:350-379 |
 | 25 | Each reply gets at most one draft, of at most 140 words. | supported | reply_copilot.py:691-694, :108, :560-564 |
 | 26 | When the same lead writes again, any older draft still waiting is marked superseded. | supported | reply_copilot.py:731-740 |
-| 27 | If the AI writes a draft containing a link other than your booking link or your own sending domain, a placeholder such as `[Name]`, or a forbidden phrase, LeadPilot asks once more; if the second try fails, no draft is made… | supported | reply_copilot.py:204-206, :567-587, :636-650 |
-| 28 | Claims LeadPilot cannot back are removed and listed on the draft. | supported | reply_copilot.py:720-729, :665-670; frontend/src/components/inbox/ReplyCopilotPanel.tsx:147-153 |
+| 27 | If the AI writes a draft containing a link other than your booking link or your own sending domain, a placeholder such as `[Name]`, or a forbidden phrase, Vectorae asks once more; if the second try fails, no draft is made… | supported | reply_copilot.py:204-206, :567-587, :636-650 |
+| 28 | Claims Vectorae cannot back are removed and listed on the draft. | supported | reply_copilot.py:720-729, :665-670; frontend/src/components/inbox/ReplyCopilotPanel.tsx:147-153 |
 | 29 | Open the prospect's conversation in **Inbox**. Waiting drafts appear in the **Reply Copilot** card above the conversation. | supported | frontend/src/app/(app)/inbox/page.tsx:206-212; ReplyCopilotPanel.tsx:66-70; frontend/src/components/shell/nav.ts:33 |
 | 30 | **Approve & send** (email), or **Send edited** once you changed it; | supported | frontend/src/lib/replyCopilot.ts:114 |
-| 31 | **Copy** or **Copy edited** (LinkedIn): … clipboard … LeadPilot never sends LinkedIn drafts; | supported | replyCopilot.ts:113; ReplyCopilotPanel.tsx:112-117; reply_copilot.py:1047-1050 |
+| 31 | **Copy** or **Copy edited** (LinkedIn): … clipboard … Vectorae never sends LinkedIn drafts; | supported | replyCopilot.ts:113; ReplyCopilotPanel.tsx:112-117; reply_copilot.py:1047-1050 |
 | 32 | **Discard**: the reply stays in "Needs reply"; | supported | reply_copilot.py:1062-1065; inbox/page.tsx:46; ReplyCopilotPanel.tsx:164 |
 | 33 | **Undo edits** puts the original draft back. | supported | ReplyCopilotPanel.tsx:166-169 |
 | 34 | An answer longer than 5000 characters, one containing a forbidden phrase, or one with a claim it cannot back is refused, with the reason shown. | supported | reply_copilot.py:109, :915-967; ReplyCopilotPanel.tsx:126 |
@@ -2749,8 +2749,8 @@ Summary: 49 supported, 0 unsupported, 2 contradicted.
 ### 39-daily-send-approval-and-notifications.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | Before LeadPilot sends anything on its own on a given day, a person has to say yes for that channel. | supported | dsa:3-7; outreach_tasks.py:586-597 |
-| 2 | The founders decided that nothing LeadPilot sends automatically should go out on a day when nobody chose to let it. | supported | DECISIONS.md:25 (LINKEDIN-AUTO), :9 (D1 2026-10-13 addendum) |
+| 1 | Before Vectorae sends anything on its own on a given day, a person has to say yes for that channel. | supported | dsa:3-7; outreach_tasks.py:586-597 |
+| 2 | The founders decided that nothing Vectorae sends automatically should go out on a day when nobody chose to let it. | supported | DECISIONS.md:25 (LINKEDIN-AUTO), :9 (D1 2026-10-13 addendum) |
 | 3 | Daily approval is a safety guard built into the point every message passes … on by default. | supported | outreach_tasks.py:586-611; system_settings.py:406 |
 | 4 | One decision covers one channel for one day: email, LinkedIn, WhatsApp or AI phone calls. | **contradicted** (wording) | One decision can approve several channels at once. `approve(channels=[…])` stores them all on one row (dsa:559-601), and the button is "Approve selected channels for today". Approval is per channel per local day. The channel names and labels are right (dsa:63-65). |
 | 5 | sequence steps and automatic follow-ups; | supported | dsa:16-20 |
@@ -2760,7 +2760,7 @@ Summary: 49 supported, 0 unsupported, 2 contradicted.
 | 9 | a message approved in the send-review queue; | supported | dsa:203-207 |
 | 10 | a Reply Copilot answer you approved yourself; | supported | dsa:208-213 |
 | 11 | a single LinkedIn network message you send now, an AI call you start with "Call now", and a meeting follow-up email you send yourself. | supported | docs/features/daily-send-approval.md:98-101; dsa:375-376; frontend/src/components/calls/CallHistory.tsx:192 |
-| 12 | Anything LeadPilot cannot positively identify as a person's decision is treated as automatic. | supported | dsa:20, :212-213 |
+| 12 | Anything Vectorae cannot positively identify as a person's decision is treated as automatic. | supported | dsa:20, :212-213 |
 | 13 | Open the **Today's automatic sending** page. | supported | frontend/src/app/(app)/send-approval/page.tsx:49 |
 | 14 | You reach it from the banner's **Review and decide** button, the link in the notification email, or by tapping the push notification; it has no entry in the main menu. | supported | SendApprovalBanner.tsx:41; dsa:692; frontend/src/lib/deeplinks.ts:139; not in nav.ts. Not a complete list: AutopilotCard.tsx:85,129 also links to it, and non-deciders see the button as "View". |
 | 15 | The page shows the date, which time zone your day is counted in, and how many messages are queued today on each channel. | supported | send-approval/page.tsx:103, :112, :144 |
@@ -2778,18 +2778,18 @@ Summary: 49 supported, 0 unsupported, 2 contradicted.
 | 27 | Declining clears the acknowledgement, so approving LinkedIn again later that day asks again. | supported | dsa:658-659; send-approval/page.tsx:65-68 |
 | 28 | LinkedIn sending itself has not yet been checked against the live LinkedIn provider… | supported | app/integrations/unipile_linkedin.py:15-16, :71-129 (TODO: verify); DECISIONS.md:9 |
 | 29 | They wait. Nothing is failed, cancelled or deleted… | supported | dsa:12-13; outreach_tasks.py:593-594 |
-| 30 | Without a decision, or after a decline, each automatic message stays scheduled and moves to the next midnight in your account's time zone. Next day, LeadPilot asks again. | supported | dsa:183-191, :316-325, :693-694. "Account's time zone" means the owner's earliest active calendar-availability zone, else UTC (dsa:22-24, :161-180). |
+| 30 | Without a decision, or after a decline, each automatic message stays scheduled and moves to the next midnight in your account's time zone. Next day, Vectorae asks again. | supported | dsa:183-191, :316-325, :693-694. "Account's time zone" means the owner's earliest active calendar-availability zone, else UTC (dsa:22-24, :161-180). |
 | 31 | If you approved some channels but not this one, the same happens for that channel only. | supported | dsa:309-315 |
-| 32 | If LeadPilot cannot check the approval … holds the message and tries again in 1 hour. | supported | dsa:79; outreach_tasks.py:600-611 |
+| 32 | If Vectorae cannot check the approval … holds the message and tries again in 1 hour. | supported | dsa:79; outreach_tasks.py:600-611 |
 | 33 | A held LinkedIn network message stays queued and nothing reaches LinkedIn. | supported | network_tasks.py:79-82; dsa:515-525 |
 | 34 | …waiting messages build up, so the queued counts can grow from day to day. | supported | dsa:398-431 (counts include gate-deferred messages, :427-428) |
 | 35 | When you approve, released messages go through every normal check again: send window, daily cap, mailbox health, the send-review queue and suppression. | supported | dsa:497-498, :509; outreach_tasks.py:665-743 |
 | 36 | Messages over the daily cap wait for the next day. | supported | outreach_tasks.py:729-743 |
 | 37 | The approval is only asked for when a message could actually go out now. A message that is still outside the prospect's sending hours does not trigger the request. | supported | outreach_tasks.py:551-573, :590-591 |
 | 38 | Autopilot needs daily approval to stay on… | supported | app/services/autopilot.py:31-34 |
-| 39 | The first time on a given day that an automatic message is due and nobody has decided, LeadPilot notifies the account owner, once that day | supported | dsa:708-727, :316-325 |
-| 40 | **Email** … subject "Approve today's automatic sending in LeadPilot", with the queued counts per channel and, when LinkedIn is included, the LinkedIn warning. | supported | dsa:685-705, :744-750 |
-| 41 | It is sent from LeadPilot's own mail service, never from your Gmail. | supported | dsa:746-750 (email_sender, Resend); daily-send-approval.md:41 |
+| 39 | The first time on a given day that an automatic message is due and nobody has decided, Vectorae notifies the account owner, once that day | supported | dsa:708-727, :316-325 |
+| 40 | **Email** … subject "Approve today's automatic sending in Vectorae", with the queued counts per channel and, when LinkedIn is included, the LinkedIn warning. | supported | dsa:685-705, :744-750 |
+| 41 | It is sent from Vectorae's own mail service, never from your Gmail. | supported | dsa:746-750 (email_sender, Resend); daily-send-approval.md:41 |
 | 42 | **Push notification** to the owner's phones … titled "Approve today's automatic sending". Tapping it opens the approval page. | supported | dsa:761-768; app/services/event_bus.py:152-168; deeplinks.ts:139 |
 | 43 | **Slack**, if your account has Slack connected: the same message is also posted to Slack. | supported | event_bus.py:97-98, :117-118. Slack gets the push title and body, not the full email text. |
 | 44 | **Banner** at the top of every app page, in the browser and in the Android app, while messages are waiting. It refreshes every 5 minutes. | supported | frontend/src/components/shell/Shell.tsx:167; SendApprovalBanner.tsx:3-6, :21; sendApproval.ts:110-113. It is hidden on /send-approval itself. |
@@ -2808,28 +2808,28 @@ Summary: 50 supported, 0 unsupported, 1 contradicted.
 ### 44-learn-tab-and-tutorials.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot has a built-in tutorial section with short video lessons. | supported | frontend/src/app/(app)/learn/page.tsx:3-14 |
+| 1 | Vectorae has a built-in tutorial section with short video lessons. | supported | frontend/src/app/(app)/learn/page.tsx:3-14 |
 | 2 | Click **Learn** in the main menu. | supported | nav.ts:55 |
-| 3 | The page is called **Learn LeadPilot** and lists the tutorials in three levels: **Beginner**, **Intermediate** and **Advanced**. | supported | learn/page.tsx:106; app/services/tutorials.py:58-64 |
+| 3 | The page is called **Learn Vectorae** and lists the tutorials in three levels: **Beginner**, **Intermediate** and **Advanced**. | supported | learn/page.tsx:106; app/services/tutorials.py:58-64 |
 | 4 | Each tutorial shows its title, a short description, its length, a progress bar and a **Watch** button (**Resume** …, **Close** …). | supported | learn/page.tsx:297-336 |
 | 5 | **Your progress** shows how many tutorials you have finished out of the total, as a number and a percentage, with a count per level. | supported | learn/page.tsx:119-151 |
 | 6 | Under it are your badges. | supported | learn/page.tsx:156 |
 | 7 | You can type in **Search tutorials** to search titles and descriptions… | supported | learn/page.tsx:161; tutorials.py:261-280 |
 | 8 | …or use the level buttons (**All** or one level) to narrow the list. | supported | learn/page.tsx:183-203 |
 | 9 | Searching and filtering do not change your overall progress figures. | supported | app/api/tutorials.py:157-170, :304 |
-| 10 | The standard set that LeadPilot's setup script adds has nine tutorials, three per level, on topics such as … | supported | scripts/seed_tutorials.py:44-152 |
-| 11 | Your LeadPilot administrator can add, edit and remove tutorials on the **Tutorials** page of the admin area… | **contradicted** (partly) | The admin Tutorials page (frontend/src/app/(admin)/admin/tutorials/page.tsx) offers edit, publish/unpublish and delete, but has no add/create form. Creating exists only as API `POST /admin/tutorials` (app/api/admin.py:435) and `adminApi.createTutorial` (frontend/src/lib/api/admin.ts:93), which no page calls. |
+| 10 | The standard set that Vectorae's setup script adds has nine tutorials, three per level, on topics such as … | supported | scripts/seed_tutorials.py:44-152 |
+| 11 | Your Vectorae administrator can add, edit and remove tutorials on the **Tutorials** page of the admin area… | **contradicted** (partly) | The admin Tutorials page (frontend/src/app/(admin)/admin/tutorials/page.tsx) offers edit, publish/unpublish and delete, but has no add/create form. Creating exists only as API `POST /admin/tutorials` (app/api/admin.py:435) and `adminApi.createTutorial` (frontend/src/lib/api/admin.ts:93), which no page calls. |
 | 12 | Your progress is saved per video as you watch: where you stopped, and how much you have seen. | supported | api/tutorials.py:348-371 |
 | 13 | **Resume** starts from where you stopped; a tutorial you have finished plays from the beginning. | supported | frontend/src/components/tutorials/VideoPlayer.tsx:187-192 |
 | 14 | Going back in a video moves your resume point but never reduces how much you have watched. | supported | api/tutorials.py:348-349, :367 |
 | 15 | A tutorial counts as finished once you have watched 90% of it. | supported | api/tutorials.py:43-50, :370-371 |
 | 16 | You can also click **Mark complete** … and **Reset progress** to start a tutorial again. | supported | learn/page.tsx:344-361; api/tutorials.py:377-414 |
-| 17 | There are four badges: **Beginner Complete**, **Intermediate Complete**, **Advanced Complete** … **LeadPilot Certified**… | supported | tutorials.py:209-218 |
+| 17 | There are four badges: **Beginner Complete**, **Intermediate Complete**, **Advanced Complete** … **Vectorae Certified**… | supported | tutorials.py:209-218 |
 | 18 | Badges are worked out from your progress each time, so resetting a tutorial removes the badge it earned. | supported | tutorials.py:194-197; api/tutorials.py:397 |
 | 19 | Your progress is private … Administrators can see only totals (how many people finished or started each video)… | supported | api/tutorials.py:10-14; admin.py:576-635 |
 | 20 | Your tutorial progress is included in your account export and deleted when your account is erased. | supported | app/services/account_export.py:111; app/services/account_erasure.py:157, :168 |
 | 21 | The videos are on YouTube and are played … through YouTube's privacy-enhanced embed (youtube-nocookie.com). | supported | VideoPlayer.tsx:165-171. The IFrame API script itself loads from www.youtube.com (:45). |
-| 22 | LeadPilot stores only each video's YouTube ID, not the video itself. | supported | seed_tutorials.py:16-21; tutorials.py:313 |
+| 22 | Vectorae stores only each video's YouTube ID, not the video itself. | supported | seed_tutorials.py:16-21; tutorials.py:313 |
 | 23 | An administrator adds or changes a video by setting that ID on the **Tutorials** admin page; no new release … is needed. | supported | admin/tutorials/page.tsx:7, :50-61, :98-105 |
 | 24 | The videos can be Unlisted … but they cannot be Private… | supported | scripts/TUTORIAL_VIDEO_URLS.md:18-19; docs/features/tutorial-section.md:121-122 |
 | 25 | …it plays only where your browser and network can reach YouTube. | supported | VideoPlayer.tsx:45, :171 |
@@ -2844,7 +2844,7 @@ Summary: 28 supported, 0 unsupported, 2 contradicted.
 ### 29-known-limitations.md (Support chat bullet only, line 106)
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | **Support chat** is limited to 30 messages per person per day on LeadPilot's hosted service (a deployment setting; the built-in default is 20). | supported | render.yaml:133-135 (api) and :233-235 (worker) `RATE_LIMIT_SUPPORT_CHAT: "30"`; app/core/config.py:13, :358 (default 20); app/api/support.py:42, :231-245 (per user id, 86,400 s window). The window is a 24 h counter from the first message (app/core/rate_limiting.py:45-60), not a calendar day. |
+| 1 | **Support chat** is limited to 30 messages per person per day on Vectorae's hosted service (a deployment setting; the built-in default is 20). | supported | render.yaml:133-135 (api) and :233-235 (worker) `RATE_LIMIT_SUPPORT_CHAT: "30"`; app/core/config.py:13, :358 (default 20); app/api/support.py:42, :231-245 (per user id, 86,400 s window). The window is a 24 h counter from the first message (app/core/rate_limiting.py:45-60), not a calendar day. |
 | 2 | Tickets are not limited. | supported | app/api/support.py:364-376 (no rate limit on POST /tickets) |
 
 Summary: 2 supported, 0 unsupported, 0 contradicted.
@@ -2852,7 +2852,7 @@ Summary: 2 supported, 0 unsupported, 0 contradicted.
 ### 30-contact-support-and-status.md (chat-messages-per-day sentence only, line 65)
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | You can send 30 chat messages per day on LeadPilot's hosted service. | supported | render.yaml:133-135, :233-235; app/api/support.py:231-245 |
+| 1 | You can send 30 chat messages per day on Vectorae's hosted service. | supported | render.yaml:133-135, :233-235; app/api/support.py:231-245 |
 | 2 | This is a deployment setting: the hosted service sets 30, and the built-in default is 20. | supported | app/core/config.py:13, :358; render.yaml:135 |
 
 Summary: 2 supported, 0 unsupported, 0 contradicted.
@@ -2887,11 +2887,11 @@ File: /home/user/LeadPilot/docs/help-center/40-annual-billing-and-plan-changes.m
 | 8 | "…gets the same once-per-account 14-day free trial" | supported | app/core/billing_catalog.py:35 (`TRIAL_DAYS = 14`); app/services/billing.py:183,194-198,363 |
 | 9 | "…renews automatically every year until you cancel." | supported | app/core/billing_catalog.py:17,151 |
 | 10 | "There is no annual version of Pay per meeting or Free." | supported | app/core/billing_catalog.py:128-131 (annual only for priced monthly tiers), :77-106 (no Free tier) |
-| 11 | "LeadPilot never moves you to annual by itself; only you can choose it, at checkout." | supported | docs/features/annual-billing.md:138-145; app/services/billing.py:504-509 (the billing model only changes for subscriptions with checkout metadata) |
+| 11 | "Vectorae never moves you to annual by itself; only you can choose it, at checkout." | supported | docs/features/annual-billing.md:138-145; app/services/billing.py:504-509 (the billing model only changes for subscriptions with checkout metadata) |
 | 12 | "Before an annual plan renews, the account owner gets an email 30 days ahead with the amount and the date." | supported | app/core/billing_catalog.py:64 (`RENEWAL_NOTICE_DAYS = 30`); docs/features/annual-billing.md:177-216. Note: no notice for stub-mode subscriptions, and email delivery depends on the unverified Resend/SPF/DKIM setup (GAP-007) |
 | 13 | "Online payment through Stripe is marked "simulated only"…" | supported | frontend/src/content/product-facts.json:72 (`stripe_checkout` status `simulated_only`), :54 |
 | 14 | "…the **Pricing** page shows the prices but … says "Online checkout opens soon. To start now, book a call." with a **Book a call** button." | supported | frontend/src/lib/productFacts.ts:42-43; frontend/src/app/pricing/PricingClient.tsx:280-302,365-373; frontend/src/app/pricing/page.tsx:45-49 |
-| 15 | "So today, starting a paid plan, switching … goes through a conversation with the LeadPilot team" | supported | Follows from row 14 (no checkout button while `CHECKOUT_LIVE` is false) |
+| 15 | "So today, starting a paid plan, switching … goes through a conversation with the Vectorae team" | supported | Follows from row 14 (no checkout button while `CHECKOUT_LIVE` is false) |
 | 16 | "On a production deployment where payments are not set up at all, choosing a plan fails with a message saying payments are not configured." | supported | app/api/billing.py:98-100 ("payments are not configured; plans cannot be changed right now", 503) |
 | 17 | "Moving up and moving down work the same way … change happens as soon as that checkout is completed. There is no option to schedule a change…" | supported | app/services/billing.py:286-388 (one checkout path, no scheduling parameter), :585-623 (the switch is applied when the checkout completes) |
 | 18 | "Your account gets the new plan's limits straight away." | supported | app/services/billing.py:621 (`_sync_plan` runs when the checkout completes) |
@@ -2900,7 +2900,7 @@ File: /home/user/LeadPilot/docs/help-center/40-annual-billing-and-plan-changes.m
 | 21 | "The free trial is once per account. If you are in a trial and switch, the trial of the old plan ends … and the new plan does not get a second 14-day trial." | supported | app/services/billing.py:194-198,363 (`trial_days=0 if used_trial`); frontend/src/lib/pricing.ts:323-325. Small gap: during an active pilot, a pilot-extended trial is still given (billing.py:180-187) |
 | 22 | "If you choose the plan you are already on, you see "You are already on this plan."" | supported | app/services/billing.py:300 |
 | 23 | "…cancel instead (**Profile**, **Plan** card, **Cancel plan**). You keep the current plan until that date, then the account returns to Free" | supported | frontend/src/components/billing/PlanCard.tsx:47,62-65; app/services/billing.py:424-430; frontend/src/lib/pricing.ts:305. Small gap: a past-due plan is cancelled immediately (billing.py:413-423) |
-| 24 | "LeadPilot does not refund or credit the unused part of a period when you switch." | supported | app/services/billing.py:227-230,585-591 |
+| 24 | "Vectorae does not refund or credit the unused part of a period when you switch." | supported | app/services/billing.py:227-230,585-591 |
 | 25 | "The Pricing page warns you of this before checkout: "The unused part … (prorated changes are not available online yet)."" | supported | frontend/src/lib/pricing.ts:327-329; frontend/src/app/pricing/PricingClient.tsx:183-188. Only shown when there is a non-stub monthly or annual subscription that is active or past due |
 | 26 | "No refunds are issued by the product itself." | supported | docs/features/annual-billing.md:246 |
 | 27 | "Once an annual year has been paid, you cannot start a checkout … "Your annual plan is paid until (date). Changing it before then needs a prorated refund…"" | supported | app/services/billing.py:227-239,295-297 (exact text, uses " - ") |
@@ -2925,12 +2925,12 @@ File: /home/user/LeadPilot/docs/help-center/41-benchmarks-what-good-looks-like.m
 
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | "LeadPilot has no fixed target reply rate and never labels your reply rate as good or bad on its own." | supported | No reply-rate target or label found anywhere in app/ (grep). frontend/src/components/analytics/BenchmarkPanel.tsx:20-24 shows numbers only |
+| 1 | "Vectorae has no fixed target reply rate and never labels your reply rate as good or bad on its own." | supported | No reply-rate target or label found anywhere in app/ (grep). frontend/src/components/analytics/BenchmarkPanel.tsx:20-24 shows numbers only |
 | 2 | "On **Analytics**, **How you compare** shows your reply rate next to the median and the "Middle half" (25th to 75th percentile)…" | supported | frontend/src/app/(app)/analytics/page.tsx:186; BenchmarkPanel.tsx:44,82-99; app/services/benchmarks.py:215-217 |
-| 3 | "…of other accounts on your LeadPilot deployment…" (repeated in the meeting-rate bullet) | contradicted (minor) | app/services/benchmarks.py:190-203: the snapshot includes every account that is not suspended, including the viewer's own. It is "accounts on your deployment", not "other accounts" |
+| 3 | "…of other accounts on your Vectorae deployment…" (repeated in the meeting-rate bullet) | contradicted (minor) | app/services/benchmarks.py:190-203: the snapshot includes every account that is not suspended, including the viewer's own. It is "accounts on your deployment", not "other accounts" |
 | 4 | "…over the last 90 days." | supported | app/services/system_settings.py:263 (default 90; an admin can set 7-365, benchmarks.py:86) |
 | 5 | "Your own rate is shown only once you have at least 30 sends on that channel." | supported | app/services/system_settings.py:261; app/services/benchmarks.py:268; BenchmarkPanel.tsx:95 |
-| 6 | "LeadPilot treats this as an observation about its own customers, not an industry statistic." | supported | app/services/benchmarks.py:3-8,292-293 |
+| 6 | "Vectorae treats this as an observation about its own customers, not an industry statistic." | supported | app/services/benchmarks.py:3-8,292-293 |
 | 7 | "On **Campaigns**, the **Funnel** tab names your **Best converting step**: the step with the highest reply rate, counted only once a step has been sent to at least 20 leads." | supported | app/services/funnel.py:41,163-166; frontend/src/components/campaigns/FunnelHeatmap.tsx:54,60-61; frontend/src/app/(app)/campaigns/page.tsx:522 |
 | 8 | "Reply rate is 35% of the score and counts as its raw percentage, so a 10% reply rate earns 10 of 100 points on that part." | supported | app/services/pipeline_health.py:54,195,200. Note: the part score is 10/100, but it adds only 3.5 points to the total (10 × 0.35). The sentence is correct but could be misread |
 | 9 | "A reply rate also counts replies such as "remove me"." | supported | app/services/reply_intent.py:293,325 (`reply_rate` = all replies / sent) |
@@ -2948,7 +2948,7 @@ File: /home/user/LeadPilot/docs/help-center/41-benchmarks-what-good-looks-like.m
 | 21 | "Missing DNS records or a high complaint rate take further points off, so a mailbox can be paused at a lower bounce rate." | supported | app/services/mailbox_health.py:237-260 (a volume spike also costs 10 points, :269-272) |
 | 22 | "The mailbox check has no minimum number of sends…" | supported | app/services/mailbox_health.py:164-166 (returns None only when there are 0 sends) |
 | 23 | "…complaint rate (its proxy: unsubscribes plus stop requests) of 0.1% as a warning and 0.3% as the danger line." | supported | app/services/mailbox_health.py:21-27,95-96,176-206,255-260 |
-| 24 | "LeadPilot has three scores out of 100" | supported | pipeline_health.py:202; mailbox_health.py:274; deliverability.py:187 |
+| 24 | "Vectorae has three scores out of 100" | supported | pipeline_health.py:202; mailbox_health.py:274; deliverability.py:187 |
 | 25 | Pipeline Health: "**Pipeline health** card on a verified strategy's page", "0–40 critical, 41–60 low, 61–80 moderate, 81–100 strong" | supported | app/services/pipeline_health.py:75-80,88-98; frontend/src/app/(app)/strategies/detail/page.tsx:138-142 (shown for verified and executing strategies); PipelineHealthCard.tsx:32 |
 | 26 | Mailbox health: "**Mailbox health** card under **Settings**", "70 or more healthy, 40–69 throttled, under 40 paused" | supported | app/services/mailbox_health.py:83-84,277-282; frontend/src/app/(app)/settings/page.tsx:545; MailboxHealthCard.tsx:67 |
 | 27 | Email health: "**Email health** card under **Settings**", "under 70 gives a warning, also when you launch a campaign" | supported | app/services/system_settings.py:115 (default 70); app/services/deliverability.py:263-269,320-330; app/api/sequences.py:469; frontend/src/components/settings/DeliverabilityCard.tsx:110; settings/page.tsx:546 |
@@ -2960,7 +2960,7 @@ File: /home/user/LeadPilot/docs/help-center/41-benchmarks-what-good-looks-like.m
 | 33 | "For the domain, 70 is the threshold for a warning" | supported | app/services/system_settings.py:115 (admin-configurable) |
 | 34a | "…once a domain's bounce rate over the last 30 days…" | contradicted (minor) | app/services/deliverability.py:150-163,220,231: the bounce rate is the whole account's (all the user's sends), and that one figure is applied to every sending domain. It is not measured per domain |
 | 34b | "…is above 2%, it costs one point for every 0.1 percentage point of the whole rate (2.5% costs 25 points), up to 30 points." | supported | app/services/deliverability.py:180-182: `bounces > 0.02`, `penalty = min(30, int(round(bounces*1000)))`, and round(0.025×1000) = 25 |
-| 35 | "LeadPilot does not set a target for meetings booked, and nothing pauses or alerts on a low meeting rate." | supported | No meeting-rate threshold, pause or alert found (grep of `meeting_rate`/`booking_rate` in app/ finds only reporting code) |
+| 35 | "Vectorae does not set a target for meetings booked, and nothing pauses or alerts on a low meeting rate." | supported | No meeting-rate threshold, pause or alert found (grep of `meeting_rate`/`booking_rate` in app/ finds only reporting code) |
 | 36 | "**Meeting-booked rate** (meetings booked divided by messages sent or bounced) … the last 90 days, at least 30 sends from you, and enough other accounts to publish a comparison." | supported | app/services/benchmarks.py:30-32,68-71; BenchmarkPanel.tsx:22; system_settings.py:259-263 (publishing needs at least 10 accounts by default and never fewer than 5, benchmarks.py:74,84). The "other accounts" wording has the same problem as row 3 |
 | 37 | "If too few accounts qualify, you see "Not enough accounts yet to publish a benchmark for this channel."" | supported | frontend/src/components/analytics/BenchmarkPanel.tsx:66-69 |
 | 38 | "The **Funnel** tab on **Campaigns** shows a booking rate for each step of each sequence" | supported | app/services/funnel.py:159; FunnelHeatmap.tsx:24 (the column is labelled "Booked") |
@@ -2969,7 +2969,7 @@ File: /home/user/LeadPilot/docs/help-center/41-benchmarks-what-good-looks-like.m
 | 41 | "**Objection spike** alert … both weeks have at least 10 human replies, … rose by more than 20% (relative), and … at least 5 percentage points." | supported | app/services/reply_sentiment.py:14-18,42,93-102; system_settings.py:60-65; SentimentTrend.tsx:47 |
 | 42 | "If the earlier week had no objections, the 5-point rise alone is enough." | supported | app/services/reply_sentiment.py:102 (`p == 0 or …`) |
 | 43 | "Each campaign week alerts once." | supported | app/services/reply_sentiment.py:21-22,166-171 |
-| 44 | "LeadPilot treats a smaller change as normal week-to-week noise, so no alert means the change was below these lines…" | supported | app/services/reply_sentiment.py:19-21 |
+| 44 | "Vectorae treats a smaller change as normal week-to-week noise, so no alert means the change was below these lines…" | supported | app/services/reply_sentiment.py:19-21 |
 | 45 | "Your administrator can change the 20% and the 10-reply minimum for the whole deployment." | supported | app/services/system_settings.py:60-65 |
 
 Summary: 44 supported, 0 unsupported, 2 contradicted.
@@ -2994,7 +2994,7 @@ Founder decision D1 (outreach sends automatically; research runs once per strate
 ### 42-security-faq-for-buyers.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | LeadPilot never stores your password … PBKDF2-HMAC-SHA256 at 600,000 iterations, with a random 16-byte salt | supported | app/services/auth.py:32, :55-57 |
+| 1 | Vectorae never stores your password … PBKDF2-HMAC-SHA256 at 600,000 iterations, with a random 16-byte salt | supported | app/services/auth.py:32, :55-57 |
 | 2 | …compared in constant time | supported | app/services/auth.py:74 (`hmac.compare_digest`) |
 | 3 | Passwords must be at least 8 characters. | supported | app/services/auth.py:53; app/api/auth.py:92, :505, :570 |
 | 4 | Sign-in uses signed tokens (JWT, HS256). | supported | app/services/auth.py:5, :90, :160 |
@@ -3003,7 +3003,7 @@ Founder decision D1 (outreach sends automatically; research runs once per strate
 | 7 | …each refresh token can be used only once. | supported | auth_sessions.py:9-11. One detail: within a short grace window (AUTH_REFRESH_REUSE_GRACE_SECONDS, line 12-16) a second use gets an access token but no new refresh token. |
 | 8 | If an already-used refresh token turns up again … the whole session is signed out and the event is written to the security log. | supported | auth_sessions.py:11-15; security_audit.py:64 (`auth.refresh_reuse_detected`). This only happens after the grace window. |
 | 9 | In the web app the refresh token is kept in an HttpOnly cookie | supported | app/api/auth.py:13, :144, :154 |
-| 10 | LeadPilot keeps only a SHA-256 fingerprint of each key, plus its first few characters | supported | app/services/api_keys.py:31, :41 (`prefix=plaintext[:12]`) |
+| 10 | Vectorae keeps only a SHA-256 fingerprint of each key, plus its first few characters | supported | app/services/api_keys.py:31, :41 (`prefix=plaintext[:12]`) |
 | 11 | The full key is shown once … cannot be shown again | supported | app/services/api_keys.py:4 |
 | 12 | Access tokens for connected services (… Gmail, WhatsApp, Calendly, … Apollo or Hunter keys) are encrypted … Fernet … key set on the server, never in the code | supported | app/core/crypto.py:2-16, :47-57; app/integrations/gmail.py:194; app/integrations/token_store.py:107; render.yaml:94 (`sync: false`) |
 | 13 | The encryption key can be rotated: … previous key used only to read old values, and can be removed afterwards. | supported | app/core/crypto.py:10-11, :40-45, :123-127 |
@@ -3017,7 +3017,7 @@ Founder decision D1 (outreach sends automatically; research runs once per strate
 | 21 | An older `X-ClientHunter-Signature` header (HMAC-SHA256 of the body alone) is still sent | supported | webhook_delivery.py:22, :276-277, :375 |
 | 22 | A delivery that fails is retried, up to 6 attempts in all. | supported | webhook_delivery.py:26-27, :90-92. A 410 response and a blocked (non-public) host stop retries early (:360-365, :389-395). |
 | 23 | **Settings**, **Integrations** tab, **Webhooks (Zapier, Make)** card | supported | frontend/src/lib/settings-tabs.ts:16; settings/page.tsx:411, :526 (label is the tab id, shown capitalised), :539; WebhooksCard.tsx:77 |
-| 24 | Two features make LeadPilot call an address you give it: outgoing webhooks, and **Quickstart** | supported | app/services/safe_fetch.py:4-12. Note: admin-set hosts for AegisAudit and SIGNALFORGE (default 127.0.0.1, app/services/tool_integrations.py:95, :145) are a deployment-admin setting, not a customer input. |
+| 24 | Two features make Vectorae call an address you give it: outgoing webhooks, and **Quickstart** | supported | app/services/safe_fetch.py:4-12. Note: admin-set hosts for AegisAudit and SIGNALFORGE (default 127.0.0.1, app/services/tool_integrations.py:95, :145) are a deployment-admin setting, not a customer input. |
 | 25 | the address must use `https` | supported | webhook_delivery.py:181 |
 | 26 | it may not contain a user name or password | supported | webhook_delivery.py:186 |
 | 27 | `localhost` and names ending in `.localhost`, `.local` or `.internal` are refused | supported | webhook_delivery.py:188 |
@@ -3050,10 +3050,10 @@ Summary: 50 supported, 0 unsupported, 0 contradicted. The notes in rows 7, 8, 15
 ### 43-data-processing-and-subprocessors.md
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | This article lists the outside companies that store or process data for LeadPilot … | contradicted (list incomplete) | The code also sends data to providers this article never names: NewsAPI (prospect company name; app/integrations/newsapi.py:24, app/services/personalization_context.py:6, app/services/credentials.py:80); Vapi.ai and ElevenLabs (prospect phone numbers, call prompts, voicemail audio, voice-clone samples; app/integrations/voice_providers.py:1-31, credentials.py:100-104); Mailreach (app/integrations/mailreach.py:18, credentials.py:125); Google Postmaster Tools, Calendar/Meet and Firebase Cloud Messaging (app/integrations/google_postmaster.py:13, app/integrations/google_meet.py, app/services/notifications.py); RapidAPI (app/integrations/linkedin_posts.py); AegisAudit, PostIQ (script.google.com) and SIGNALFORGE (app/services/tool_integrations.py:22). frontend/src/app/privacy/page.tsx:130-141 lists all of them. |
-| 2 | Neon … the main database. Everything LeadPilot stores lives here … | supported (minor caveat) | render.yaml:10, :77. Caveat: voicemail audio is written to a local `voicemails` directory (app/services/phone_calls.py:104; app/services/account_erasure.py:375), not to Neon. |
+| 1 | This article lists the outside companies that store or process data for Vectorae … | contradicted (list incomplete) | The code also sends data to providers this article never names: NewsAPI (prospect company name; app/integrations/newsapi.py:24, app/services/personalization_context.py:6, app/services/credentials.py:80); Vapi.ai and ElevenLabs (prospect phone numbers, call prompts, voicemail audio, voice-clone samples; app/integrations/voice_providers.py:1-31, credentials.py:100-104); Mailreach (app/integrations/mailreach.py:18, credentials.py:125); Google Postmaster Tools, Calendar/Meet and Firebase Cloud Messaging (app/integrations/google_postmaster.py:13, app/integrations/google_meet.py, app/services/notifications.py); RapidAPI (app/integrations/linkedin_posts.py); AegisAudit, PostIQ (script.google.com) and SIGNALFORGE (app/services/tool_integrations.py:22). frontend/src/app/privacy/page.tsx:130-141 lists all of them. |
+| 2 | Neon … the main database. Everything Vectorae stores lives here … | supported (minor caveat) | render.yaml:10, :77. Caveat: voicemail audio is written to a local `voicemails` directory (app/services/phone_calls.py:104; app/services/account_erasure.py:375), not to Neon. |
 | 3 | Upstash … job queue … short-term cache … holds answers from the contact-finding providers | supported | render.yaml:11, :86-90; app/integrations/apollo.py:92, :126; app/integrations/hunter.py:62, :72 |
-| 4 | Render: runs the LeadPilot API and the background worker | supported | render.yaml:8-9, :36-40, :148-152 |
+| 4 | Render: runs the Vectorae API and the background worker | supported | render.yaml:8-9, :36-40, :148-152 |
 | 5 | Render's request logs record IP addresses. | supported (docs only) | privacy/page.tsx:75, :217 |
 | 6 | Vercel: hosts the web app | supported | render.yaml:12 |
 | 7 | Anthropic: writes research, strategies and message drafts, and classifies replies | supported | app/services/message_personalization.py:164; app/services/reply_classification.py:81; render.yaml:96 |
@@ -3097,7 +3097,7 @@ Summary: 50 supported, 0 unsupported, 0 contradicted. The notes in rows 7, 8, 15
 | 45 | Cached contact-finding answers … expire after 30 days; search results after 1 day. | supported | app/config.py:80-81 |
 | 46 | Billing records are kept for 7 years … without your name or email address. | supported | account_erasure.py:25, :86, :194 |
 | 47 | Consent and suppression records are kept without a time limit | supported | account_erasure.py:27-33, :117; privacy/page.tsx:205-209 |
-| 48 | When you delete your account, LeadPilot disconnects … Unipile, but does not ask Stripe to delete … does not revoke … Google, HubSpot, Salesforce or Slack | supported | account_erasure.py:6, :328-368 |
+| 48 | When you delete your account, Vectorae disconnects … Unipile, but does not ask Stripe to delete … does not revoke … Google, HubSpot, Salesforce or Slack | supported | account_erasure.py:6, :328-368 |
 | 49 | No data processing agreement (DPA) or downloadable subprocessor list is published | supported (nothing found) | No DPA or subprocessor text in frontend/src outside help content |
 | 50 | The public **Privacy** page … lists the email address for privacy requests. | supported | privacy/page.tsx:38, :225-230 |
 | 51 | you can erase one prospect's data, which also puts their email, phone number and LinkedIn profile on the do-not-contact list | supported | app/api/leads.py:345-373 |
@@ -3169,7 +3169,7 @@ I edited no files. All 36 `sources` paths in the front matter of article 43 exis
 | 37 | **Google Calendar and Meet**: meeting details and attendee emails, through your connected Google account | supported | google_meet.py:133-165 |
 | 38 | **Google Postmaster Tools** is asked for your sending domain's spam rate; built but switched off | supported | google_postmaster.py:3-7, :13-15; system_settings.py:133 (`postmaster_import_enabled` False) |
 | 39 | **Firebase Cloud Messaging**: notification titles and text sent to the Android app | supported | app/services/notifications.py:153-192 (a deep-link `data` map is also sent) |
-| 40 | **AegisAudit, PostIQ and SIGNALFORGE**: separate tools that receive drafts, captured posts or research requests when connected. | **contradicted** | PostIQ receives only the connection token and the client name, and LeadPilot deliberately sends no capture (app/integrations/postiq.py:96-111; app/workers/tool_integration_tasks.py:14-15 "There is no PostIQ task"). Captured posts come from PostIQ's own Chrome extension (postiq.py:7-12). The AegisAudit draft-audit and SIGNALFORGE research tasks exist (tool_integration_tasks.py:41, :77), but nothing in app/ calls them; only tests/test_tool_integrations.py does. In product code these tools only get health and key checks (app/api/tool_integrations.py:88, :131-136, :199). Suggested wording: "connection checks only; LeadPilot sends them no drafts or prospect data today". |
+| 40 | **AegisAudit, PostIQ and SIGNALFORGE**: separate tools that receive drafts, captured posts or research requests when connected. | **contradicted** | PostIQ receives only the connection token and the client name, and Vectorae deliberately sends no capture (app/integrations/postiq.py:96-111; app/workers/tool_integration_tasks.py:14-15 "There is no PostIQ task"). Captured posts come from PostIQ's own Chrome extension (postiq.py:7-12). The AegisAudit draft-audit and SIGNALFORGE research tasks exist (tool_integration_tasks.py:41, :77), but nothing in app/ calls them; only tests/test_tool_integrations.py does. In product code these tools only get health and key checks (app/api/tool_integrations.py:88, :131-136, :199). Suggested wording: "connection checks only; Vectorae sends them no drafts or prospect data today". |
 | 41 | **At sign-up and sign-in on production deployments:** IP checking services … receive your IP address to find its country and spot VPNs. | supported (minor imprecision) | The VPN check runs at sign-up and login and is on by default only in production (app/config.py:440-449; app/services/network_guard.py:59-63). The country lookup runs at the onboarding identity step, not at sign-in, and in every environment unless set to `disabled` (config.py:428-436; app/services/identity.py:242). |
 | 42 | The **Privacy** page also lists Calendly, Zoom, HubSpot, Salesforce and Slack | supported | privacy/page.tsx:137-138 |
 | 43 | Not yet. On 2026-10-18 the founders approved Voyage AI … turns text into search vectors and ranks results | supported | DECISIONS.md:42 |
@@ -3181,7 +3181,7 @@ I edited no files. All 36 `sources` paths in the front matter of article 43 exis
 | 49 | Cached contact-finding answers expire after 30 days; search results after 1 day | supported | app/config.py:80-81 |
 | 50 | Billing records kept 7 years … without name or email | supported | account_erasure.py:25, :86, :194 |
 | 51 | Consent and suppression records kept without a time limit | supported | account_erasure.py:27-33, :117 |
-| 52 | On account deletion LeadPilot disconnects Unipile, not Stripe/Google/HubSpot/Salesforce/Slack | supported | account_erasure.py:6, :328-368 |
+| 52 | On account deletion Vectorae disconnects Unipile, not Stripe/Google/HubSpot/Salesforce/Slack | supported | account_erasure.py:6, :328-368 |
 | 53 | No DPA or downloadable subprocessor list … Privacy page lists the privacy email | supported | privacy/page.tsx:38, :225-230 |
 | 54 | erase one prospect … email, phone and LinkedIn on the do-not-contact list | supported | app/api/leads.py:345-373 |
 | 55 | download everything … and delete your whole account | supported | account_export.py:303 |
@@ -3192,7 +3192,7 @@ Summary: 55 supported, 0 unsupported, 1 contradicted.
 ### 36-crm-sync-field-mapping.md (edited sentences)
 | # | Sentence | Verdict | Evidence |
 |---|---|---|---|
-| 1 | …a `Description` with LeadPilot's internal deal ID and the lead's email | supported | app/services/crm_sync.py:466-467 (the email is added only when the lead has one) |
+| 1 | …a `Description` with Vectorae's internal deal ID and the lead's email | supported | app/services/crm_sync.py:466-467 (the email is added only when the lead has one) |
 | 2 | The 15-minute sweep sends leads that replied or went further: replied, meeting booked, opportunity, closed won, closed lost and disqualified. | supported | crm_sync.py:65-66 (ENGAGED), :533 |
 | 3 | The checkbox "Also push every verified lead …" adds verified and contacted leads. | supported | crm_sync.py:67, :533; CrmCards.tsx:126 |
 | 4 | The proposal-sent stage has no status mapping and is not in either list. A lead without an email is never sent. Every deal is sent. | supported | models.py:112; crm_sync.py:65-67, :76-87, :497, :536, :538 |
@@ -3278,7 +3278,7 @@ Summary: 1 supported, 0 unsupported, 0 contradicted.
 Summary: 1 supported, 0 unsupported, 0 contradicted.
 
 ### What to fix
-1. **Article 43, row 40 (the only remaining error).** PostIQ receives only a token check from LeadPilot. The AegisAudit and SIGNALFORGE send tasks are never called outside tests. Reword to say these tools currently get connection and key checks only.
+1. **Article 43, row 40 (the only remaining error).** PostIQ receives only a token check from Vectorae. The AegisAudit and SIGNALFORGE send tasks are never called outside tests. Reword to say these tools currently get connection and key checks only.
 2. **Optional, row 41.** The country lookup runs at the onboarding identity step in every environment. Only the VPN check is tied to sign-up/sign-in and to production.
 
 D1: none of the checked sentences conflicts with it (outreach sends automatically after daily approval; research runs once per strategy).
@@ -3320,7 +3320,7 @@ Summary: 2 supported, 0 unsupported, 0 contradicted.
 | 4 | "Drafts are never submitted automatically." | supported | whatsapp_templates.py:19,378,427-428 |
 | 5 | "Only **approved** templates are sent, and approval and the opt-out instruction are checked again at the moment of sending." | supported | app/workers/outreach_tasks.py:483-495 (status must be APPROVED); :496-512 (`validate_opt_out` at send time) |
 | 6 | "A template that fails either (for example one approved before the opt-out rule) is not sent; the message is not sent and stops with the reason recorded (the timeline shows "WhatsApp not sent", and the campaign's WhatsApp card counts it under "need template")." | supported with caveat | Status NEEDS_TEMPLATE plus `message.error` (outreach_tasks.py:489-495,504-512); "WhatsApp not sent" label (frontend/src/lib/conversation.ts:69, frontend/src/tests/conversation.test.ts:24); "need template" badge (campaigns/page.tsx:79, count from app/api/strategies.py:630-632). Caveat: "stops" is not final when an earlier message in the sequence was sent (see row 9). |
-| 7 | "The launch form on the strategy page creates email sequences only. WhatsApp steps come from Autopilot (where you pick the template on the strategy page) or through the LeadPilot API." | supported | frontend/src/components/strategy/OutreachPanel.tsx:21,73-75,168 (email only); frontend/src/components/strategy/AutopilotCard.tsx:111-120 ("WhatsApp template Autopilot uses:"); app/services/autopilot.py:633-649; app/api/autopilot.py:202; API steps validated in app/api/sequences.py:263-283 |
+| 7 | "The launch form on the strategy page creates email sequences only. WhatsApp steps come from Autopilot (where you pick the template on the strategy page) or through the Vectorae API." | supported | frontend/src/components/strategy/OutreachPanel.tsx:21,73-75,168 (email only); frontend/src/components/strategy/AutopilotCard.tsx:111-120 ("WhatsApp template Autopilot uses:"); app/services/autopilot.py:633-649; app/api/autopilot.py:202; API steps validated in app/api/sequences.py:263-283 |
 | 8 | "**Template step:** names any template that has not been rejected (draft, submitted or approved) and says how each variable is filled." | supported | app/api/sequences.py:263-283 (REJECTED refused with 422; a template under review may be referenced; variable mapping checked) |
 | 9 | "The template must be approved by the time the step is due: if it is not, the message is not sent and does not wait for a later approval." | contradicted in part | The first half is right (outreach_tasks.py:483-495). The "does not wait" part is wrong in a common case. The follow-up sweep runs every 30 minutes (app/workers/celery_app.py:303-306, app/config.py:355). It only skips enrollments with a SCHEDULED, SENDING or AWAITING_REVIEW message (app/services/send_holds.py:91-92,103-106). A NEEDS_TEMPLATE message is none of these, so the sweep re-queues step last_sent+1, which is the same failed step (outreach_tasks.py:2147-2161,2208-2247). It then rebuilds the message from the step's template and sends it through every check again (:2295-2302,2326-2344). This happens once `followup_delay_hours` (default 72) has passed since the last sent message with no reply, and only if `followup_enabled` (default True) is on (app/db/models.py:1524-1529). The code comments say this is intended to recover a "WhatsApp step stuck on needs_template" (outreach_tasks.py:2030-2036; tests/test_followup.py:10). So if the template is approved by then, the message goes out. It only truly stops when no earlier message in the sequence was sent (`no_prior_send`, :2284-2285), for example a WhatsApp template first step. |
 | 10 | "A free-form message can only go out while their window is open." | supported | outreach_tasks.py:468-481 (window re-checked at send, fails closed); app/services/whatsapp_window.py:25 |
@@ -3332,7 +3332,7 @@ Summary: 11 supported, 0 unsupported, 2 contradicted (rows 3 and 9; row 6 carrie
 
 Suggested fixes:
 - Row 3: drop "keeping the same placeholders", or reword it to "describe every placeholder".
-- Row 9: say the message is not sent then, but if an earlier message in the sequence went out and the lead has not replied, LeadPilot retries that step automatically about 72 hours (by default) after the last message sent, and sends it if the template has been approved by then.
+- Row 9: say the message is not sent then, but if an earlier message in the sequence went out and the lead has not replied, Vectorae retries that step automatically about 72 hours (by default) after the last message sent, and sends it if the template has been approved by then.
 
 ### 33-product-profile-and-icp.md
 | # | Sentence | Verdict | Evidence |
@@ -3368,7 +3368,7 @@ All 5 paths I relied on exist (Glob): `app/integrations/{aegisaudit,postiq,signa
 
 | # | Sentence (verbatim, may be shortened with …) | Verdict | Evidence (path:line) / what the code says |
 |---|---|---|---|
-| 1 | "AegisAudit, PostIQ and SIGNALFORGE: separate tools that can be connected; today LeadPilot only checks the connection and key…" | supported | Config and test endpoints are at `/home/user/LeadPilot/app/api/tool_integrations.py:4-18`. The only live calls are health and key checks: `:84-90` (aegisaudit.health_check), `:124-140` (postiq.health_check + verify_token), `:193-201` (signalforge.health_check). Nit: AegisAudit has no key ("No auth", `/home/user/LeadPilot/app/integrations/aegisaudit.py:20`), so for AegisAudit only the connection is checked. Better wording: "checks the connection (and, for PostIQ and SIGNALFORGE, the key)". |
+| 1 | "AegisAudit, PostIQ and SIGNALFORGE: separate tools that can be connected; today Vectorae only checks the connection and key…" | supported | Config and test endpoints are at `/home/user/LeadPilot/app/api/tool_integrations.py:4-18`. The only live calls are health and key checks: `:84-90` (aegisaudit.health_check), `:124-140` (postiq.health_check + verify_token), `:193-201` (signalforge.health_check). Nit: AegisAudit has no key ("No auth", `/home/user/LeadPilot/app/integrations/aegisaudit.py:20`), so for AegisAudit only the connection is checked. Better wording: "checks the connection (and, for PostIQ and SIGNALFORGE, the key)". |
 | 2 | "…and sends them no drafts or prospect data." | supported | The two Celery tasks that would send drafts or prospect IDs are `audit_draft_with_aegisaudit` and `signalforge_research_lead` (`/home/user/LeadPilot/app/workers/tool_integration_tasks.py:41,77`). They are registered (`/home/user/LeadPilot/app/workers/celery_app.py:51-53`), but a repo-wide search outside tests finds no caller, no `.delay`/`apply_async`, no API route and no beat entry. There is no PostIQ task at all (`tool_integration_tasks.py:14-15`). `postiq.verify_token` sends only the token (`/home/user/LeadPilot/app/integrations/postiq.py:96-110`). Risk: the code to send exists and is merely unwired. If someone wires it up, this sentence becomes false (AegisAudit would get prompt and draft, SIGNALFORGE a prospect_id). |
 | 3 | "ipapi.co or ipinfo.io receive your IP address at the onboarding identity step to find its country" | supported | `/home/user/LeadPilot/app/services/identity.py:242` calls `geolocation.lookup_country(ip)`. Providers are at `/home/user/LeadPilot/app/integrations/geolocation.py:66-109`; the default is `ipapi_co` (`/home/user/LeadPilot/app/config.py:436`). Both provider classes carry "TODO: verify against current … docs" (`geolocation.py:68,86`). That doesn't affect this sentence, since it only says the IP is sent. |
 | 4 | "proxycheck.io or IPQualityScore receive it at sign-up and sign-in on production deployments to spot VPNs." | supported | `enforce_clean_network` is called at `/home/user/LeadPilot/app/api/auth.py:267` (signup) and `:413` (login), and calls `ip_intelligence.assess(ip)` (`/home/user/LeadPilot/app/services/network_guard.py:63`). Blocking is on in production by default (`config.py:539-542`, app_env in {production, prod, live}), and an env var can override it either way (`config.py:441-445`). The default provider is `proxycheck` (`config.py:449`). Non-public and allow-listed IPs are not sent (`network_guard.py:59`). Both provider classes have "TODO: verify" markers (`/home/user/LeadPilot/app/integrations/ip_intelligence.py:67,99`). |
@@ -3382,7 +3382,7 @@ All 5 paths I relied on exist (Glob): `app/workers/outreach_tasks.py`, `app/serv
 |---|---|---|---|
 | 1 | "Choose one and press **Edit & save this draft**; you can change the placeholders as long as each one is described." | supported (with caveat) | The label matches exactly at `/home/user/LeadPilot/frontend/src/app/(app)/campaigns/page.tsx:151`. That button only opens the editor; the actual save is the "Save draft" button (`/home/user/LeadPilot/frontend/src/components/campaigns/TemplateEditor.tsx:93-94`). Save is disabled until every placeholder has a description (`TemplateEditor.tsx:32-35`), and the server requires one per placeholder (`/home/user/LeadPilot/app services/whatsapp_templates.py:138-154`). Caveat: "as long as each one is described" is not the only rule. Placeholders must also run in order from {{1}} with no gaps or repeats (`whatsapp_templates.py:116-124`), and a marketing body needs the STOP opt-out (`TemplateEditor.tsx:33`). If line 66 of the article doesn't already say this, the sentence oversimplifies. |
 | 2 | "The template must be approved by the time the step is due; if it is not, the message is not sent then." | supported | At send time a template that is not APPROVED moves the message to NEEDS_TEMPLATE and it is not sent: `/home/user/LeadPilot/app/workers/outreach_tasks.py:483-495`. |
-| 3 | "If an earlier message in the sequence went out and the lead has not replied, LeadPilot retries that step automatically…" | supported | NEEDS_TEMPLATE is not a pending status (`/home/user/LeadPilot/app/services/send_holds.py:91-106`), so the sweep does not skip the enrollment. The sweep takes the last SENT message (`outreach_tasks.py:2214`), checks for no reply (`:2226`), and re-sends step last+1 (`:2156`, `:2243-2246`). The code comment names this case explicitly (`:2030-2032`). Further conditions the article leaves out: the enrollment must still be ACTIVE (`:2203`), the campaign must not be paused (`:2234`), the earlier step must have `followup_enabled` (`:2219`), and the lead must not be a local-business customer (`:2240`). |
+| 3 | "If an earlier message in the sequence went out and the lead has not replied, Vectorae retries that step automatically…" | supported | NEEDS_TEMPLATE is not a pending status (`/home/user/LeadPilot/app/services/send_holds.py:91-106`), so the sweep does not skip the enrollment. The sweep takes the last SENT message (`outreach_tasks.py:2214`), checks for no reply (`:2226`), and re-sends step last+1 (`:2156`, `:2243-2246`). The code comment names this case explicitly (`:2030-2032`). Further conditions the article leaves out: the enrollment must still be ACTIVE (`:2203`), the campaign must not be paused (`:2234`), the earlier step must have `followup_enabled` (`:2219`), and the lead must not be a local-business customer (`:2240`). |
 | 4 | "…once the step's follow-up delay has passed (72 hours by default)…" | contradicted (detail) | 72 is correct as a default (`outreach_tasks.py:2221`, `/home/user/LeadPilot/app/db/models.py:1527-1528`, `/home/user/LeadPilot/app/api/sequences.py:110-112`). But the delay is read from the earlier step that was sent (`_step_for(..., last.step_no)`, `outreach_tasks.py:2218-2221`), not from the WhatsApp template step. It is counted from when that earlier message was sent (`:2223-2224`), and the sweep runs every 30 minutes (`/home/user/LeadPilot/app/config.py:355`). The API describes the field as "Hours of silence after this step before the automatic follow-up fires" (`sequences.py:111`). Suggested wording: "once the previous step's follow-up delay (72 hours by default) has passed since that message went out". |
 | 5 | "…and sends it if the template has been approved by then." | supported | The retry creates a new message with the step's `whatsapp_template_id` (`outreach_tasks.py:2295-2301`, `:2326-2339`) and runs it through `send_message_impl` (`:2343`). That repeats the approval check (`:488`), so the message sends only if the template is approved. If it is still unapproved, it falls back to NEEDS_TEMPLATE and the sweep can try again on later runs. |
 | 6 | "A WhatsApp template that is the first step is not retried." | supported | With nothing sent yet, `_last_sent_message` returns None and the sweep skips the enrollment (`outreach_tasks.py:2214-2216`). `send_followup_impl` returns "no_prior_send" (`:2283-2285`). |
