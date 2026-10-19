@@ -64,6 +64,7 @@ OWNERSHIP: dict[str, list[str]] = {
     "customer_imports": ["user_id"],               # local business win-back imports (no PII)
     "voice_clones": ["user_id"],                   # voice twin: consent + clone metadata (no audio)
     "voice_twin_settings": ["user_id"],            # voice twin switches
+    "agent_runs": ["user_id"],                     # agent supervisor run log
     "daily_send_approvals": ["user_id"],           # daily send approval decisions
     "champion_moves": ["user_id"],                 # F10 (address hash only)
     "crm_custom_fields": ["user_id"],

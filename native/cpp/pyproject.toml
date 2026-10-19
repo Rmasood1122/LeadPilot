@@ -1,0 +1,13 @@
+[build-system]
+requires = ["scikit-build-core>=0.10,<2", "pybind11>=2.13,<4"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "vectorae-native-cpp"
+version = "0.1.0"
+description = "Vectorae agents, C++ core (deliverability guard, reply triage, claim check)"
+requires-python = ">=3.11"
+
+[tool.scikit-build]
+cmake.version = ">=3.18"
+wheel.packages = []

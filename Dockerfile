@@ -12,6 +12,27 @@
 # corrupt, every trixie-based image -- python:3.11-slim included -- dies on its
 # first RUN with "exec format error", and re-pulling does not help.
 ARG PYTHON_IMAGE=python:3.11-slim
+
+# --- Vectorae agents: native cores (docs/features/vectorae-agents.md) --------
+# Builds the Rust (PyO3) and C++ (pybind11) wheels in a throwaway stage so the
+# production image carries neither a compiler nor a Rust toolchain. The Rust
+# wheel is abi3 (any CPython >= 3.11); both are built against PYTHON_IMAGE.
+FROM ${PYTHON_IMAGE} AS native-builder
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+ENV RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/opt/cargo \
+    PATH=/opt/cargo/bin:$PATH
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --profile minimal --default-toolchain 1.88.0
+COPY native/ /native/
+RUN pip install --upgrade pip \
+    && pip wheel --no-deps -w /wheels /native/rust /native/cpp
+
 FROM ${PYTHON_IMAGE} AS production
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -40,6 +61,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install dependencies first for better layer caching.
 COPY pyproject.toml ./
 RUN pip install --upgrade pip && pip install .
+
+# The agents' native cores. VECTORAE_REQUIRE_NATIVE=1 makes app/agents/native.py
+# refuse to import without them, so the image can never quietly run the Python
+# reference fallback.
+COPY --from=native-builder /wheels /wheels
+RUN pip install --no-deps /wheels/*.whl && rm -rf /wheels
+ENV VECTORAE_REQUIRE_NATIVE=1
 
 # Then copy the application code (source changes don't bust the deps layer).
 COPY . .

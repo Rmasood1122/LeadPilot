@@ -670,6 +670,18 @@ See `docs/features/trust-deliverability.md`.
 
 ---
 
+## Vectorae agents
+
+Five advisory agents (Rust and C++ cores) and the master supervisor. They read
+only the caller's own data and change nothing. Spec:
+[features/vectorae-agents.md](features/vectorae-agents.md).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/agents` | Master status, then each agent's language, backend (`native` / `python`) and health (`idle`, `healthy`, `degraded`, `down`; circuit `closed`, `open`, `half_open`) |
+| POST | `/agents/{name}/run` | Run `lead_priority`, `followup_timing`, `deliverability_guard`, `reply_triage` or `claim_check`. Body `{"params": {...}}`. **404** unknown agent, **422** bad parameter, **503** circuit open, **502** agent failed. Limited by `RATE_LIMIT_AGENT_RUN` (120/hour) |
+| POST | `/agents/claim_check/check` | Body `{"subject", "body", "first_touch"}`: check one draft's wording; reads no data |
+
 ## Webhooks (no auth — signed)
 
 ### POST /webhooks/whatsapp
