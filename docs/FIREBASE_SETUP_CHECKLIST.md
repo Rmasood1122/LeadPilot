@@ -1,4 +1,4 @@
-# Firebase Setup Checklist — ClientHunter Enterprise Push Notifications
+# Firebase Setup Checklist — Victorae Push Notifications
 
 Complete these steps in the Firebase console before running the backend
 notification service. All steps are user actions (not code).
