@@ -22,6 +22,19 @@ reaching production, and layer 6 makes it visible. Rule for humans: merge only
 with `scripts/gate/safe_merge.sh <PR>` (ask a Claude Code cloud session to run
 it if your machine has no `gh`).
 
+## 1b. Brand lint (added 2026-10-20, Victorae program Phase 1)
+
+`scripts/gate/brand_lint.py` fails on any old product name (LeadPilot,
+ClientHunter, Vectorae; any case, with or without a separator) in a
+git-tracked file or file name that `.brand-allowlist` does not cover. Each
+allowlist entry is `<path glob> | <regex> | <B: or C:> <reason>`; an entry
+that allows nothing is itself an error. It runs in two places:
+
+- the quick gate (`brand` step, every push);
+- the offline suite (`tests/test_brand_lint.py::test_the_repository_has_no_old_name_outside_the_allowlist`),
+  so the CI `gate` job fails when an old name comes back. The workflows are
+  sealed, so it rides the existing suite rather than a new workflow step.
+
 ## 2. Required checks
 
 `scripts/gate/required_checks.txt` is the list `safe_merge` requires on the PR
