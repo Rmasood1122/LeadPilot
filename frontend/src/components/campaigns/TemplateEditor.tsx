@@ -67,7 +67,7 @@ export function TemplateEditor({ initial, onSave, onClose }: {
         <Label htmlFor="tbody">Body</Label>
         <Textarea id="tbody" rows={5} value={body}
                   onChange={e => setBody(e.target.value)}
-                  placeholder="Hi {{1}}, Sam from Vectorae. Reply STOP to opt out." />
+                  placeholder="Hi {{1}}, Sam from Acme Co. Reply STOP to opt out." />
         <p className="text-xs text-muted-foreground">
           Variables: {"{{1}}"} {"{{2}}"} etc., numbered from 1. Include
           &quot;Reply STOP to opt out.&quot;

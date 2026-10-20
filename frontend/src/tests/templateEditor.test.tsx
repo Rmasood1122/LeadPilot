@@ -24,7 +24,7 @@ import {
   variableDescriptions,
 } from "@/lib/whatsappTemplate";
 
-const EXAMPLE = "Hi {{1}}, Sam from Vectorae. Reply STOP to opt out.";
+const EXAMPLE = "Hi {{1}}, Sam from Acme Co. Reply STOP to opt out.";
 
 describe("template rules", () => {
   it("finds each placeholder once, in order", () => {
@@ -75,10 +75,17 @@ describe("TemplateEditor", () => {
     expect(onSave).toHaveBeenCalled();
   });
 
+  it("shows a sample in the customer's voice, never our product name (BR-D2)", () => {
+    render(<TemplateEditor onSave={vi.fn()} onClose={() => undefined} />);
+    const sample = screen.getByLabelText(/^body/i).getAttribute("placeholder") ?? "";
+    expect(sample).toMatch(/STOP/);
+    expect(sample).not.toMatch(/victorae|vectorae|lead ?pilot|client ?hunter|calendarharvest/i);
+  });
+
   it("will not save a body without the STOP opt-out", async () => {
     render(<TemplateEditor onSave={vi.fn()} onClose={() => undefined} />);
     await userEvent.type(screen.getByLabelText(/name/i), "intro");
-    await userEvent.type(screen.getByLabelText(/^body/i), "NON-STOP deals from Vectorae.");
+    await userEvent.type(screen.getByLabelText(/^body/i), "NON-STOP deals from Acme Co.");
     expect(screen.getByRole("button", { name: /save draft/i })).toBeDisabled();
     expect(screen.getByText(/must tell the recipient how to opt out/i)).toBeInTheDocument();
   });
