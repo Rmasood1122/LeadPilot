@@ -165,6 +165,9 @@ DELETED: frozenset[str] = frozenset({
     "whatsapp_optins", "workspace_invitations", "workspace_members", "workspaces",
     # Agent supervisor run log (docs/features/vectorae-agents.md).
     "agent_runs",
+    # F-DB-01: the account's own learned playbook rates (migration 0093).
+    # Pre-0093 pooled rows have no owner and are not this account's data.
+    "playbook_scores",
 })
 
 ERASURE: dict[str, str] = {**{name: DELETE for name in DELETED}, **KEPT}

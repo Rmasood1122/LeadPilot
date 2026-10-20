@@ -1714,17 +1714,27 @@ class PlaybookScore(TimestampMixin, Base):
     """Learned effectiveness of a tactic, aggregated nightly (M8).
 
     M8-C1 (migration 0008_m8c2) reshapes this from the M1 (pattern_key, metric)
-    scalar rows into per-variant rows carrying both rates, keyed on
-    (pattern_key, variant) — the upsert key used by the nightly aggregation.
-    `metric` is kept nullable for backwards compatibility with M1 rows.
+    scalar rows into per-variant rows carrying both rates. `metric` is kept
+    nullable for backwards compatibility with M1 rows.
+
+    F-DB-01 (migration 0093): rows are per ACCOUNT, keyed on (user_id,
+    pattern_key, variant) -- the upsert key used by the nightly aggregation.
+    Before 0093 a row pooled the outcomes of every account whose strategy
+    shared a pattern_key, and pipeline prompts presented that pool as "this
+    account's" results. Rows written before 0093 have user_id NULL; no reader
+    returns them and the aggregation never updates them.
     """
 
     __tablename__ = "playbook_scores"
     __table_args__ = (
-        UniqueConstraint("pattern_key", "variant", name="pattern_variant"),
+        UniqueConstraint("user_id", "pattern_key", "variant",
+                         name="uq_playbook_scores_owner_pattern_variant"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     pattern_key: Mapped[str] = mapped_column(String(200), index=True)
     metric: Mapped[str | None] = mapped_column(String(50), nullable=True)  # legacy M1
     variant: Mapped[str] = mapped_column(String(20), default="A", nullable=False)
@@ -1742,7 +1752,9 @@ class PlaybookScore(TimestampMixin, Base):
     oldest_outcome_ts: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    trend: Mapped[str | None] = mapped_column(String(20), nullable=True)  # new/rising/falling/stable
+    # new/rising/falling/stable. String(16) as created by migration 0010; the
+    # model said 20, which only SQLite (no length check) accepted.
+    trend: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class GmailAccount(TimestampMixin, Base):

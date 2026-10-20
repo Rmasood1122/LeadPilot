@@ -111,6 +111,9 @@ async def get_playbook_scores(
 ) -> list[dict]:
     """User's playbook scores. Includes decay metadata (effective_n, trend).
 
+    F-DB-01: only rows the caller owns (playbook_scores.user_id), joined to
+    the caller's strategies on pattern_key for the strategy_id label.
+
     Written in SQLAlchemy Core so the ids bind through the Uuid type: the
     raw-SQL version bound str(current_user.id), which matched nothing on
     SQLite (Uuid is stored there as 32 undashed hex digits). A malformed
@@ -135,7 +138,7 @@ async def get_playbook_scores(
         .distinct()
         .join(Strategy, Strategy.pattern_key == ps.pattern_key)
         .join(Product, Product.id == Strategy.product_id)
-        .where(Product.user_id == current_user.id)
+        .where(Product.user_id == current_user.id, ps.user_id == current_user.id)
     )
     if strategy_id:
         stmt = stmt.where(Strategy.id == strategy_id)

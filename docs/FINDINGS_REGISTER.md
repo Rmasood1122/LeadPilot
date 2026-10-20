@@ -153,6 +153,7 @@ Branches audited: `master` @ `1ad2cab`, `feature/8-new-features` @ `5705e81`.
 - **Evidence:** learned scores are global; read paths join to tenant via `strategies→products.user_id`, but stored rows and the nightly upsert are not tenant-scoped.
 - **Impact:** one tenant's outcomes can influence another's playbook if `pattern_key` is not tenant-unique; small statistical disclosure.
 - **Remediation (if SaaS):** add `user_id`; scope the upsert. Else document the global-by-design intent.
+- **Status (2026-10-20):** fixed on branch `claude/bold-heisenberg-58xvzj`: migration `0093_playbook_scores_owner`, per-account aggregation and readers (`docs/program/plans/f-db-01-playbook-owner.md`). Closed when merged to master.
 
 ## F-DB-02 — admin playbook-scores filters a nonexistent column, swallowed (master)
 - **Category:** Data / correctness · **Severity:** MEDIUM · **Confidence:** CONFIRMED

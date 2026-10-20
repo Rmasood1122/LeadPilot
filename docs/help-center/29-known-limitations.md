@@ -2,9 +2,13 @@
 id: known-limitations
 title: Known limitations
 audience: customer
-last_verified: 2026-10-12
+last_verified: 2026-10-20
 owner: help-center
 sources:
+  - app/services/score_decay.py
+  - app/workers/learning_tasks.py
+  - app/services/playbook_service.py
+  - alembic/versions/0093_playbook_scores_owner.py
   - render.yaml
   - FEATURES.md
   - docs/program/STATUS_PAGE.md
@@ -110,7 +114,7 @@ In particular:
 
 ## What else should I know about reporting and testing?
 
-- **Learning is shared within a deployment.** The playbook scores that guide new strategies are pooled across the deployment. In agency mode, that means different clients' outcomes feed the same scores, even though each client's reports are kept separate.
+- **Learning is shared within an account, not per client.** The playbook scores that guide new strategies are kept per account, so other accounts' outcomes never feed yours. In agency mode, different clients of the same agency account feed the same scores, even though each client's reports are kept separate.
 - **Benchmarks in small groups** can reflect one account's rounded rate, and industry comes from the strategy's ICP. A strategy aimed at several industries is grouped as "multiple".
 - **Database testing.** Key safety behaviours (separating accounts, GDPR lead deletion, suppression at send, bounce pause, STOP handling, sending exactly once) are proven by the automated test suite on a lightweight test database. The tests that run them on the production database type (PostgreSQL) were not working when this article was last verified, so those behaviours are not yet proven on PostgreSQL.
 

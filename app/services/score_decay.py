@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import datetime
 import math
+import uuid
 from dataclasses import dataclass
 from typing import Optional
 
@@ -124,12 +125,23 @@ def determine_trend(
     return "stable"
 
 
+def _as_uuid(value) -> uuid.UUID:
+    """products.user_id as a UUID: PostgreSQL returns uuid.UUID, SQLite (the
+    offline suite) returns the 32-hex-digit string it stores."""
+    return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
+
 def compute_scores_with_decay(db_session, half_life_days: Optional[int] = None) -> dict[str, dict]:
     """
-    Full decayed aggregation over the outcomes table.
+    Full decayed aggregation over the outcomes table, PER ACCOUNT.
 
     Replaces the simple mean in the nightly aggregation job.
-    Returns: {pattern_key: {reply_rate, meeting_rate, effective_n, oldest_outcome_ts, trend}}
+    Returns: {"<user_id hex>::<pattern_key>::<variant>": {user_id, pattern_key,
+    variant, reply_rate, booking_rate, effective_n, raw_n, is_reliable, ...}}
+
+    F-DB-01: outcomes are bucketed by the strategy's owner as well as by
+    (pattern_key, variant). Two accounts whose strategies share a pattern_key
+    get two separate rows; one account's results never reach another's score.
 
     Called from learning_tasks.run_strategy_aggregation().
     """
@@ -141,6 +153,7 @@ def compute_scores_with_decay(db_session, half_life_days: Optional[int] = None) 
     # Pull raw outcomes with timestamps
     sql = text("""
         SELECT
+            p.user_id,
             s.pattern_key,
             o.event,
             o.ts,
@@ -148,9 +161,10 @@ def compute_scores_with_decay(db_session, half_life_days: Optional[int] = None) 
             o.lead_id
         FROM outcomes o
         JOIN strategies s ON s.id = o.strategy_id
+        JOIN products p ON p.id = s.product_id
         WHERE o.event IN ('sent', 'replied', 'booked', 'won')
           AND s.pattern_key IS NOT NULL
-        ORDER BY s.pattern_key, o.ts
+        ORDER BY p.user_id, s.pattern_key, o.ts
     """)
 
     try:
@@ -160,10 +174,10 @@ def compute_scores_with_decay(db_session, half_life_days: Optional[int] = None) 
         return {}
 
     from collections import defaultdict
-    # group by (pattern_key, variant)
+    # group by (owner, pattern_key, variant)
     buckets: dict[tuple, list[dict]] = defaultdict(list)
     for row in rows:
-        k = (row["pattern_key"], row["variant"] or "control")
+        k = (_as_uuid(row["user_id"]), row["pattern_key"], row["variant"] or "control")
         buckets[k].append({"ts": row["ts"], "event": row["event"],
                            "lead_id": row["lead_id"]})
 
@@ -171,7 +185,7 @@ def compute_scores_with_decay(db_session, half_life_days: Optional[int] = None) 
     now = datetime.datetime.now(datetime.timezone.utc)  # REPAIR: tz-aware (see above)
     min_sample = settings.PLAYBOOK_MIN_SAMPLE
 
-    for (pattern_key, variant), raw_outcomes in buckets.items():
+    for (user_id, pattern_key, variant), raw_outcomes in buckets.items():
         sends = [o for o in raw_outcomes if o["event"] == "sent"]
         replies = [o for o in raw_outcomes if o["event"] == "replied"]
         bookings = [o for o in raw_outcomes if o["event"] == "booked"]
@@ -211,8 +225,9 @@ def compute_scores_with_decay(db_session, half_life_days: Optional[int] = None) 
 
         oldest_ts = min(o["ts"] for o in raw_outcomes) if raw_outcomes else None
 
-        composite_key = f"{pattern_key}::{variant}"
+        composite_key = f"{user_id.hex}::{pattern_key}::{variant}"
         results[composite_key] = {
+            "user_id": user_id,
             "pattern_key": pattern_key,
             "variant": variant,
             "reply_rate": round(decayed_reply, 4),

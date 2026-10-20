@@ -68,7 +68,8 @@ def test_ab_statistics_and_learning_rollup_see_real_sends(
     assert stats.sends == 3
 
     scores = score_decay.compute_scores_with_decay(db_session)
-    assert scores["pk-attribution::A"]["raw_n"] == 3
+    owner = verified_strategy.product.user_id
+    assert scores[f"{owner.hex}::pk-attribution::A"]["raw_n"] == 3
 
 
 def _two_sent_messages(db, strategy, external_id):

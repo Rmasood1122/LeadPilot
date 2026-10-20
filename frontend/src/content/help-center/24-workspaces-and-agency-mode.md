@@ -2,9 +2,13 @@
 id: workspaces-and-agency-mode
 title: Workspaces, team roles and agency mode
 audience: customer
-last_verified: 2026-10-18
+last_verified: 2026-10-20
 owner: help-center
 sources:
+  - app/services/score_decay.py
+  - app/workers/learning_tasks.py
+  - app/services/playbook_service.py
+  - alembic/versions/0093_playbook_scores_owner.py
   - app/services/rbac.py
   - app/api/workspaces.py
   - app/core/plans.py
@@ -118,7 +122,7 @@ The web form sets only the name and the monthly retainer. A client's per-meeting
 - Filing a strategy under a client is currently done through the Vectorae API; the web app has no button for it yet.
 - An account can connect only one Gmail mailbox. So a client's domain list can block sends from the wrong domain, but it cannot route sends between several mailboxes.
 - WhatsApp uses one sender number for the whole deployment, so every client's prospects see the same WhatsApp number. Domain isolation applies to email only.
-- The learning loop's playbook scores are pooled across the whole deployment, so outcomes from different clients feed the same scores.
+- The learning loop's playbook scores are kept per account, not per client: all of an agency account's strategies with the same pattern key feed one score, so outcomes from different clients can feed the same score. Other accounts' outcomes never do.
 
 ## Related
 - [Plans, limits and billing](22-plans-limits-billing.md)
