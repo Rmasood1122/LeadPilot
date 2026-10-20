@@ -1,17 +1,16 @@
 """P0-6 — GET /admin/playbook/scores.
 
-playbook_scores has no user_id column (models.PlaybookScore; migrations
-0001, 0008, 0010). Rows are keyed on (pattern_key, variant) and belong to a
-user only through strategies.pattern_key -> strategies.product_id ->
-products.user_id. The handler filtered on `ps.user_id`, which raised
-UndefinedColumn whenever ?user_id= was passed, and a bare `except Exception`
-turned that into a 200 with {"scores": []} -- indistinguishable from "no data
-yet".
+Originally playbook_scores had no user_id column; the handler filtered on
+`ps.user_id`, which raised UndefinedColumn whenever ?user_id= was passed, and
+a bare `except Exception` turned that into a 200 with {"scores": []} --
+indistinguishable from "no data yet". F-DB-01 (migration 0093) then gave the
+table an owner column, so ownership is the column, not the pattern key.
 
 What must hold:
-  * ?user_id= returns the rows for that user's strategies' pattern keys, and
-    nothing else, with no duplicates when two strategies share a key;
-  * the unfiltered call returns every row;
+  * ?user_id= returns the rows that user owns, and nothing else -- not
+    another account's row on a shared pattern key, not a pre-0093 pooled row
+    (user_id NULL) -- with no duplicates when two strategies share a key;
+  * the unfiltered call returns every row, pooled ones included;
   * a database error is a 500, never an empty 200.
 """
 
@@ -44,8 +43,9 @@ def _owner_with_strategies(db_session, email, *pattern_keys):
     return user
 
 
-def _score(db_session, pattern_key, variant, reply_rate):
-    db_session.add(m.PlaybookScore(pattern_key=pattern_key, variant=variant, score=reply_rate,
+def _score(db_session, owner, pattern_key, variant, reply_rate):
+    db_session.add(m.PlaybookScore(user_id=owner.id if owner else None,
+                                   pattern_key=pattern_key, variant=variant, score=reply_rate,
                                    reply_rate=reply_rate, booking_rate=0.01, sample_size=40,
                                    is_reliable=True))
 
@@ -55,10 +55,10 @@ def seeded(db_session):
     # Two strategies on the same key: the filter must not duplicate rows.
     alice = _owner_with_strategies(db_session, "alice@agency.test", "pk-alice", "pk-alice")
     bob = _owner_with_strategies(db_session, "bob@agency.test", "pk-bob")
-    _score(db_session, "pk-alice", "A", 0.12)
-    _score(db_session, "pk-alice", "B", 0.08)
-    _score(db_session, "pk-bob", "A", 0.05)
-    _score(db_session, "pk-orphan", "A", 0.02)
+    _score(db_session, alice, "pk-alice", "A", 0.12)
+    _score(db_session, alice, "pk-alice", "B", 0.08)
+    _score(db_session, bob, "pk-bob", "A", 0.05)
+    _score(db_session, None, "pk-orphan", "A", 0.02)
     db_session.commit()
     return alice, bob
 
@@ -83,6 +83,24 @@ class TestUserFilter:
         assert by_variant["A"]["reply_rate"] == pytest.approx(0.12)
         assert by_variant["A"]["sample_size"] == 40
         assert by_variant["A"]["is_reliable"] is True
+
+    def test_shared_pattern_key_returns_only_the_owners_rows(self, client, admin, seeded,
+                                                             db_session):
+        # F-DB-01: bob also runs a "pk-alice" strategy. His row on that key
+        # and a pooled pre-0093 row on it are not alice's.
+        alice, bob = seeded
+        _score(db_session, bob, "pk-alice", "C", 0.40)
+        _score(db_session, None, "pk-alice", "D", 0.30)
+        db_session.commit()
+        assert _rows(client.get(f"/admin/playbook/scores?user_id={alice.id}")) == [
+            ("pk-alice", "A"), ("pk-alice", "B")]
+        assert _rows(client.get(f"/admin/playbook/scores?user_id={bob.id}")) == [
+            ("pk-alice", "C"), ("pk-bob", "A")]
+
+    def test_rows_carry_their_owner(self, client, admin, seeded):
+        alice, _ = seeded
+        scores = client.get(f"/admin/playbook/scores?user_id={alice.id}").json()["scores"]
+        assert {r["user_id"] for r in scores} == {str(alice.id)}
 
     def test_user_without_strategies_gets_an_empty_list(self, client, admin, seeded,
                                                         db_session):

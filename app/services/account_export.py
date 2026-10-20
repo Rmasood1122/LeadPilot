@@ -65,6 +65,7 @@ OWNERSHIP: dict[str, list[str]] = {
     "voice_clones": ["user_id"],                   # voice twin: consent + clone metadata (no audio)
     "voice_twin_settings": ["user_id"],            # voice twin switches
     "agent_runs": ["user_id"],                     # agent supervisor run log
+    "playbook_scores": ["user_id"],                # F-DB-01: per-account learning rates
     "daily_send_approvals": ["user_id"],           # daily send approval decisions
     "champion_moves": ["user_id"],                 # F10 (address hash only)
     "crm_custom_fields": ["user_id"],
@@ -169,7 +170,6 @@ OWNERSHIP: dict[str, list[str]] = {
 EXCLUDED: dict[str, str] = {
     "benchmark_buckets": "global aggregate, no owner",
     "linkedin_suppressions": "global do-not-contact list, no owner",
-    "playbook_scores": "global aggregate, no owner",
     "processed_webhooks": "provider event ids, no owner",
     "subject_line_patterns": "global aggregate, no owner",
     "suppression_list": "global do-not-contact list, no owner",

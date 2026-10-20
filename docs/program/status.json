@@ -219,7 +219,7 @@
       "id": "F-DB-01",
       "from": "HIGH",
       "to": "MEDIUM",
-      "status": "OPEN"
+      "status": "FIXED ON BRANCH claude/bold-heisenberg-58xvzj (migration 0093), pending merge; rated HIGH again since P0-D-ENF kept sign-up open"
     },
     {
       "id": "RF-5",

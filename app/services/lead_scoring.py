@@ -31,7 +31,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db.models import Lead, LeadStatus, PlaybookScore, Strategy
+from app.db.models import Lead, LeadStatus, PlaybookScore, Product, Strategy
 from app.services import anthropic_client
 
 logger = logging.getLogger(__name__)
@@ -146,11 +146,17 @@ def company_signals(lead: Lead, icp: dict, now: datetime) -> float:
 
 
 def playbook_rate(session: Session, strategy: Strategy) -> float | None:
-    """Best reliable booking rate for this strategy's pattern, else None."""
+    """Best reliable booking rate for this strategy's pattern, else None.
+
+    F-DB-01: only the strategy owner's own rows count, never another
+    account's results for the same pattern_key.
+    """
     if not strategy.pattern_key:
         return None
+    owner_id = select(Product.user_id).where(Product.id == strategy.product_id)
     rate = session.execute(
         select(func.max(PlaybookScore.booking_rate)).where(
+            PlaybookScore.user_id == owner_id.scalar_subquery(),
             PlaybookScore.pattern_key == strategy.pattern_key,
             PlaybookScore.is_reliable.is_(True),
         )

@@ -144,22 +144,27 @@ def run_strategy_aggregation(self) -> dict:
 
 
 def _upsert_playbook_score(db, score_data: dict) -> None:
-    """Upsert a single playbook score row with decay data."""
+    """Upsert one account's playbook score row with decay data.
+
+    F-DB-01: keyed on (user_id, pattern_key, variant), so each account has its
+    own row per pattern. A row without a user_id is never written.
+    """
     from sqlalchemy import text
 
     db.execute(text("""
         INSERT INTO playbook_scores
             -- REPAIR: id is a UUID PK with no DB default; PG16 supplies it.
-            (id, pattern_key, variant, score, reply_rate, booking_rate,
+            (id, user_id, pattern_key, variant, score, reply_rate, booking_rate,
              sample_size, effective_sample_size,
              decay_half_life_days, oldest_outcome_ts,
              is_reliable, trend, last_aggregated_at)
         VALUES
-            (gen_random_uuid(), :pattern_key, :variant, :reply_rate, :reply_rate, :booking_rate,
+            (gen_random_uuid(), CAST(:user_id AS uuid), :pattern_key, :variant, :reply_rate, :reply_rate,
+             :booking_rate,
              :raw_n, :effective_n,
              :half_life, :oldest_ts,
              :reliable, 'new', NOW())
-        ON CONFLICT (pattern_key, variant) DO UPDATE SET
+        ON CONFLICT (user_id, pattern_key, variant) DO UPDATE SET
             score = EXCLUDED.score,
             reply_rate = EXCLUDED.reply_rate,
             booking_rate = EXCLUDED.booking_rate,
@@ -176,6 +181,7 @@ def _upsert_playbook_score(db, score_data: dict) -> None:
             END,
             last_aggregated_at = NOW()
     """), {
+        "user_id": str(score_data["user_id"]),
         "pattern_key": score_data["pattern_key"],
         "variant": score_data["variant"],
         "reply_rate": score_data["reply_rate"],

@@ -4,6 +4,9 @@ Reconstructed for the combined build to the original contract:
 
     PlaybookService.get_insights(db, user_id=None, limit=8) -> str
 
+F-DB-01: only the given account's own rows are read (playbook_scores.user_id);
+without a user_id the empty block is returned.
+
 Used by the pipeline engine at Phase 6 (messaging & offer design) and
 Phase 8 (execution plan). The returned block is injected into the step
 prompt so new strategies consult what actually worked before.
@@ -15,8 +18,9 @@ pipeline must behave identically on run #1 and run #1000.
 from __future__ import annotations
 
 import logging
+import uuid
 
-from sqlalchemy import text
+from sqlalchemy import select
 
 log = logging.getLogger(__name__)
 
@@ -30,38 +34,31 @@ _EMPTY_BLOCK = (
 
 class PlaybookService:
     @staticmethod
-    def get_insights(db, user_id: str | None = None, limit: int = 8) -> str:
-        """Top reliable playbook scores rendered as a compact prompt block.
+    def get_insights(db, user_id: str | uuid.UUID | None = None, limit: int = 8) -> str:
+        """Top reliable playbook scores OF THIS ACCOUNT, as a compact prompt block.
+
+        F-DB-01: only rows owned by `user_id` are read. Without an owner there
+        is no account to learn from, so the empty block is returned -- there is
+        no global fallback, because a pooled or foreign row in a prompt would
+        present another account's results as this account's.
 
         Never raises — pipeline steps must not fail because the learning
         loop tables are empty or mid-migration.
         """
+        if user_id is None:
+            return _EMPTY_BLOCK
         try:
-            params: dict = {"limit": limit}
-            user_filter = ""
-            if user_id:
-                # Scope to the user's own strategies' pattern keys when the
-                # column linkage exists; fall back to global patterns.
-                user_filter = """
-                    AND ps.pattern_key IN (
-                        SELECT DISTINCT s.pattern_key
-                        FROM strategies s
-                        JOIN products p ON p.id = s.product_id
-                        WHERE p.user_id = :uid AND s.pattern_key IS NOT NULL
-                    )
-                """
-                params["uid"] = user_id
+            from app.db.models import PlaybookScore as ps  # noqa: PLC0415
 
-            rows = db.execute(text(f"""
-                SELECT ps.pattern_key, ps.variant, ps.reply_rate,
-                       ps.booking_rate, ps.sample_size, ps.trend
-                FROM playbook_scores ps
-                WHERE COALESCE(ps.is_reliable, false) = true
-                  {user_filter}
-                ORDER BY ps.booking_rate DESC NULLS LAST,
-                         ps.reply_rate DESC NULLS LAST
-                LIMIT :limit
-            """), params).mappings().all()
+            owner = user_id if isinstance(user_id, uuid.UUID) else uuid.UUID(str(user_id))
+            rows = db.execute(
+                select(ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
+                       ps.sample_size, ps.trend)
+                .where(ps.user_id == owner, ps.is_reliable.is_(True))
+                .order_by(ps.booking_rate.desc().nulls_last(),
+                          ps.reply_rate.desc().nulls_last())
+                .limit(limit)
+            ).mappings().all()
 
             if not rows:
                 return _EMPTY_BLOCK

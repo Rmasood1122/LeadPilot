@@ -280,29 +280,25 @@ async def list_playbook_scores(
 ) -> dict:
     """Returns all playbook scores, including decay metadata. Supports degrading_only filter.
 
-    playbook_scores has no owner column: rows are keyed on (pattern_key,
-    variant) and reach a user only through strategies.pattern_key ->
-    products.user_id, so ?user_id= means "rows for the pattern keys of this
-    user's strategies". A DB error propagates as a 500 -- an empty list here
-    must mean "no data", never "the query failed".
+    F-DB-01 (migration 0093): rows are owned (playbook_scores.user_id), so
+    ?user_id= returns that account's own rows. Rows written before 0093 have
+    user_id NULL (pooled across accounts); they appear only in the unfiltered
+    list, with user_id null. A DB error propagates as a 500 -- an empty list
+    here must mean "no data", never "the query failed".
     """
     from app.core.config import settings
-    from app.db.models import PlaybookScore, Product, Strategy
+    from app.db.models import PlaybookScore
 
     ps = PlaybookScore
     min_sample = settings.PLAYBOOK_MIN_SAMPLE
     stmt = select(
-        ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
+        ps.user_id, ps.pattern_key, ps.variant, ps.reply_rate, ps.booking_rate,
         ps.sample_size, ps.effective_sample_size, ps.is_reliable,
         ps.decay_half_life_days, ps.oldest_outcome_ts, ps.trend,
         ps.last_aggregated_at,
     )
     if user_id:
-        stmt = stmt.where(ps.pattern_key.in_(
-            select(Strategy.pattern_key)
-            .join(Product, Product.id == Strategy.product_id)
-            .where(Product.user_id == user_id, Strategy.pattern_key.isnot(None))
-        ))
+        stmt = stmt.where(ps.user_id == user_id)
     if degrading_only:
         stmt = stmt.where(ps.effective_sample_size < min_sample, ps.sample_size >= min_sample)
     stmt = (stmt.order_by(ps.last_aggregated_at.desc().nulls_last())

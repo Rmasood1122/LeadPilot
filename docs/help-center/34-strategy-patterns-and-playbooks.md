@@ -2,7 +2,7 @@
 id: strategy-patterns-and-playbooks
 title: Strategy patterns and playbooks
 audience: customer
-last_verified: 2026-10-18
+last_verified: 2026-10-20
 owner: help-center
 sources:
   - app/services/icp_extraction.py
@@ -53,11 +53,11 @@ A pattern key is a fingerprint of a strategy's "play": who it targets and how it
 
 An answer outside these lists is dropped rather than creating a new value. If the classification fails, the channels, sales motion and cadence are left empty; the flow type is still recorded.
 
-Two strategies with identical values share a pattern key, and their results are pooled. A strategy gets its key once, when research finishes, or at its first **Find leads** if that step failed. It never changes afterwards, even if later sourcing uses different criteria. The exact inputs are stored with the strategy, so the key can be audited.
+Two of your strategies with identical values share a pattern key, and their results are pooled into one score for your account. A strategy gets its key once, when research finishes, or at its first **Find leads** if that step failed. It never changes afterwards, even if later sourcing uses different criteria. The exact inputs are stored with the strategy, so the key can be audited.
 
 ## What is a playbook score?
 
-A playbook score is one row per pattern key and A/B variant (sends with no variant are grouped as "control"). It is recalculated every night from the outcome records of every strategy that has that pattern key. It holds:
+A playbook score is one row per account, pattern key and A/B variant (sends with no variant are grouped as "control"). It is recalculated every night from the outcome records of your strategies that have that pattern key. It holds:
 
 - **Reply rate:** the share of sends that went to a lead who replied.
 - **Booking rate:** the share of sends that went to a lead who booked a meeting.
@@ -68,7 +68,7 @@ A playbook score is one row per pattern key and A/B variant (sends with no varia
 
 Both rates are weighted by age with a 90-day half-life: a send from 90 days ago counts half as much as one from today. Replies and bookings are matched to sends by lead, so if a lead received three emails and replied once, all three sends count as replied.
 
-Because pattern keys are shared, a score can include results from other accounts' strategies on the same Vectorae deployment that have the same key.
+Scores are kept per account. Another account's strategies with the same pattern key never count towards your score, and yours never count towards theirs. Scores calculated before this change pooled every account on the deployment; they are no longer shown or used.
 
 ## How do I read a playbook score?
 
