@@ -163,6 +163,8 @@ DELETED: frozenset[str] = frozenset({
     "email_contacts", "email_contact_matches", "email_network_imports",
     "email_network_messages",
     "whatsapp_optins", "workspace_invitations", "workspace_members", "workspaces",
+    # Agent supervisor run log (docs/features/vectorae-agents.md).
+    "agent_runs",
 })
 
 ERASURE: dict[str, str] = {**{name: DELETE for name in DELETED}, **KEPT}

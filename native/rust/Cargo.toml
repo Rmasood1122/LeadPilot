@@ -1,0 +1,22 @@
+[package]
+name = "vectorae_native_rs"
+version = "0.1.0"
+edition = "2021"
+description = "Vectorae agents: lead priority, follow-up timing and the master supervisor (Rust core)"
+publish = false
+
+[lib]
+name = "vectorae_native_rs"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# The Python bindings are a feature so `cargo test` builds and links the pure
+# Rust core without a Python interpreter. maturin turns it on (pyproject.toml).
+python = ["dep:pyo3"]
+
+[dependencies]
+pyo3 = { version = "0.25", features = ["extension-module", "abi3-py311"], optional = true }
+
+[profile.release]
+lto = true
+codegen-units = 1

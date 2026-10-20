@@ -6191,6 +6191,37 @@ class VoiceTwinSettings(TimestampMixin, Base):
     paused_reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
+
+class AgentRun(Base):
+    """One run of a Vectorae agent (app/agents/), written by the master
+    supervisor (app/agents/supervisor.py).
+
+    The supervisor is stateless: API and Celery processes share nothing in
+    memory, so this table IS its memory. Circuit-breaker state, error rate and
+    latency for an agent are evaluated from its most recent rows on every
+    call. Rows hold no prospect content -- name, timing, outcome, and a short
+    error class only -- and are owned by the account the run was for.
+    """
+
+    __tablename__ = "agent_runs"
+    __table_args__ = (Index("ix_agent_runs_agent_started_at", "agent", "started_at"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    agent: Mapped[str] = mapped_column(String(40), nullable=False)
+    ok: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    latency_ms: Mapped[float] = mapped_column(Float, nullable=False)
+    # "native" (the C++/Rust core) or "python" (the reference fallback).
+    backend: Mapped[str] = mapped_column(String(10), nullable=False)
+    # Exception class and a truncated message; never request data.
+    error: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    items: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
 # Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new
 # Outcome (the learning loop and A/B promotion read those columns). Imported
 # last so the listener module can import the classes above.

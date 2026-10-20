@@ -106,3 +106,9 @@ docs/
 docker-compose*.yml
 Dockerfile
 .dockerignore
+
+# ---------------------------------------------------------------------------
+# Native agent build output (the image builds its own in native-builder)
+# ---------------------------------------------------------------------------
+native/rust/target/
+native/cpp/build/

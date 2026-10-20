@@ -261,6 +261,10 @@ class Settings(BaseSettings):
     NOTE: read from app/core/config.py, not app/config.py.
     """
 
+    RATE_LIMIT_AGENT_RUN: int = 120
+    """Max Vectorae agent runs (POST /agents/{name}/run) per user per hour.
+    No model call, but a run reads up to a few thousand rows."""
+
     RATE_LIMIT_CRM_WRITE: int = 600
     """Max CRM write calls per user per hour (M9). Default: 600.
 

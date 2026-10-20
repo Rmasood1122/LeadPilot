@@ -10,3 +10,4 @@ verify-frontend          # tsc + vitest + lint
 verify-security          # secret scan
 verify-image             # Docker image builds and boots
 verify-status-page       # optional status-page/ app (job always concludes; scoped steps skip)
+verify-native-agents     # Rust + C++ agent cores: cargo test, ctest, native parity
