@@ -5,6 +5,10 @@ audience: customer
 last_verified: 2026-10-20
 owner: help-center
 sources:
+  - app/services/score_decay.py
+  - app/workers/learning_tasks.py
+  - app/services/playbook_service.py
+  - alembic/versions/0093_playbook_scores_owner.py
   - app/services/rbac.py
   - app/api/workspaces.py
   - app/core/plans.py

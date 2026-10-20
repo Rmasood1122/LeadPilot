@@ -76,6 +76,7 @@ created `varchar(16)`. The model now says 16. The longest value is 7 characters.
   - lead-scoring isolation.
 - `tests/test_admin_playbook_scores.py`: owner filter on a shared key, and `user_id` on each row.
 - `tests/test_outcome_attribution.py`: new result key `<owner hex>::<pattern_key>::<variant>`.
+- `tests/test_playbook_owner_migration.py`: the upgraded table matches the model, pooled rows survive with `user_id` NULL, the downgrade restores the old shape, 0093 is the single head, and `scripts/activate_with_keys.py` `TARGET_REVISION` targets it.
 
 **PostgreSQL 16:**
 

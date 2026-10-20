@@ -68,7 +68,7 @@ A playbook score is one row per account, pattern key and A/B variant (sends with
 
 Both rates are weighted by age with a 90-day half-life: a send from 90 days ago counts half as much as one from today. Replies and bookings are matched to sends by lead, so if a lead received three emails and replied once, all three sends count as replied.
 
-Scores are kept per account. Another account's strategies with the same pattern key never count towards your score, and yours never count towards theirs. Scores calculated before this change pooled every account on the deployment; they are no longer shown or used.
+Scores are kept per account. Another account's strategies with the same pattern key never count towards your score, and yours never count towards theirs. Scores calculated before this change pooled every account on the deployment. They are no longer used, and you no longer see them; only administrators can still see them.
 
 ## How do I read a playbook score?
 
