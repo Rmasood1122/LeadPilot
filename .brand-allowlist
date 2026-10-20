@@ -201,3 +201,4 @@ frontend/src/tests/templateEditor.test.tsx | victorae\|vectorae\|lead \?pilot\|c
 scripts/gate/brand_lint.py | .* | B: the brand lint defines and documents every old-name variant it blocks
 tests/test_brand_lint.py | .* | B: the brand lint's test must contain every variant it proves is caught
 tests/test_gate_scripts.py | Welcome to LeadPilot|"leadpilot-gate" | B: gate test: the sample old name the brand step must block, and the stamp directory name
+evals/run_evals.py | LeadPilot | B: the eval baseline hashes this adapter (dataset_hash); a docstring change makes every gate run stale until a sealed baseline refresh

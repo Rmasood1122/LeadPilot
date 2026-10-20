@@ -24,9 +24,10 @@ it if your machine has no `gh`).
 
 ## 1b. Brand lint (added 2026-10-20, Victorae program Phase 1)
 
-`scripts/gate/brand_lint.py` fails on any old product name (LeadPilot,
-ClientHunter, Vectorae; any case, with or without a separator) in a
-git-tracked file or file name that `.brand-allowlist` does not cover. Each
+`scripts/gate/brand_lint.py` fails on any previous product name (the
+three it blocks are listed in the script; any case, with or without a
+separator) in a git-tracked file or file name that `.brand-allowlist` does
+not cover. Each
 allowlist entry is `<path glob> | <regex> | <B: or C:> <reason>`; an entry
 that allows nothing is itself an error. It runs in two places:
 

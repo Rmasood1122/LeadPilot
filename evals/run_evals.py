@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Victorae release-gate adapter (eval-conductor consumer-3, the last one).
+"""LeadPilot release-gate adapter (eval-conductor consumer-3, the last one).
 
-Before this gate, Victorae had NO test CI at all — 1,985 offline tests
+Before this gate, LeadPilot had NO test CI at all — 1,985 offline tests
 (SQLite in-memory, FakeClaude, stubbed broker; zero network) existed and
 never ran on push. This adapter runs the offline suite with JUnit XML output
 and turns the results into fail-closed release metrics that a bare
