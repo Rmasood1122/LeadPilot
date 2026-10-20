@@ -1,4 +1,4 @@
-# ─── ClientHunter Enterprise — Backend Requirements ───────────────────────────
+# ─── Victorae — Backend Requirements ───────────────────────────
 # Pin major versions; update with care (run full test suite after any change).
 # Install: pip install -r requirements.txt --break-system-packages
 

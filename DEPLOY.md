@@ -1,4 +1,4 @@
-# DEPLOY.md — ClientHunter Enterprise Deployment Guide
+# DEPLOY.md — Victorae Deployment Guide
 
 This document covers the complete path from a fresh Ubuntu 24.04 VPS to a running production instance. Read it fully before starting.
 

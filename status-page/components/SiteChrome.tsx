@@ -4,7 +4,7 @@ export function SiteHeader() {
   return (
     <header className="site-header">
       <Link href="/" className="brand">
-        Vectorae <span>Status</span>
+        Victorae <span>Status</span>
       </Link>
       <nav aria-label="Status page">
         <Link href="/history">History</Link>
@@ -23,7 +23,7 @@ export function SiteFooter() {
       </p>
       <p>
         Times are in UTC; hover a time to see it in your time zone. This page runs separately from
-        Vectorae, so it stays up when Vectorae does not. Uptime history comes from independent
+        Victorae, so it stays up when Victorae does not. Uptime history comes from independent
         external checks.
       </p>
     </footer>

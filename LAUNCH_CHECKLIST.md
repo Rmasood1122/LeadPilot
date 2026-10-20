@@ -1,4 +1,4 @@
-# ClientHunter Enterprise — Launch Checklist
+# Victorae — Launch Checklist
 
 Work through this from top to bottom before going live. Every item has a verification step.
 
