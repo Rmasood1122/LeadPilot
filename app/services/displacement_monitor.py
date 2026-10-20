@@ -70,8 +70,10 @@ MAX_TOKENS = 1000
 MAX_SENTENCES = 4
 MAX_QUESTIONS = 1
 # The product must not name itself in a first touch. A Day 0 DM that pitches
-# is a Day 0 DM that gets ignored.
-FORBIDDEN_MENTIONS = ("vectorae", "leadpilot", "lead pilot")
+# is a Day 0 DM that gets ignored. Every name the product has had is listed:
+# the current one (Victorae) and the earlier ones a model may still produce.
+FORBIDDEN_MENTIONS = ("victorae", "vectorae", "leadpilot", "lead pilot", "clienthunter",
+                      "client hunter")
 
 _DM_SYSTEM = (
     "You are Vectorae's displacement DM writer. A prospect has just posted "

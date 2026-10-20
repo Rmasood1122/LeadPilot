@@ -104,6 +104,12 @@ class TestDayZeroRules:
         problems = dm.validate_dm("Vectorae fixes this. Want a look?")
         assert any("names the product" in p for p in problems)
 
+    @pytest.mark.parametrize("name", ["Victorae", "VICTORAE", "Vectorae", "LeadPilot",
+                                      "Lead Pilot", "ClientHunter", "Client Hunter"])
+    def test_every_product_name_is_rejected(self, name):
+        problems = dm.validate_dm(f"{name} fixes this. Want a look?")
+        assert any("names the product" in p for p in problems)
+
     def test_banned_words_are_rejected(self):
         problems = dm.validate_dm("Our platform fixes this. Worth a look?")
         assert any("banned words" in p for p in problems)
