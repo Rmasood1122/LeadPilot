@@ -34,6 +34,22 @@ logger = logging.getLogger(__name__)
 DEFAULT_EXPORT_DIR = "/tmp/leadpilot_site_export"
 
 
+def _brand_name(session: Session, page: SitePage) -> str | None:
+    """The business a page is written for (BR-D1): None for a page of our own
+    marketing site (no workspace), else the workspace's white-label brand
+    name when white-label is on, otherwise the workspace's name."""
+    if page.workspace_id is None:
+        return None
+    from app.db.models import Workspace  # noqa: PLC0415
+
+    workspace = session.get(Workspace, page.workspace_id)
+    if workspace is None:
+        return "this business"
+    if workspace.white_label_enabled and workspace.brand_name:
+        return workspace.brand_name
+    return workspace.name
+
+
 def generate_page_impl(session: Session, page_id, user_id=None) -> dict:
     """Generate and store the HTML for one page.
 
@@ -87,6 +103,7 @@ def generate_page_impl(session: Session, page_id, user_id=None) -> dict:
                 slug=page.slug or "",
                 meta_title=page.meta_title,
                 meta_description=page.meta_description,
+                brand_name=_brand_name(session, page),
             )
     except Exception:  # noqa: BLE001 -- see the docstring
         logger.exception("website builder: generation failed for page %s (%s)",
