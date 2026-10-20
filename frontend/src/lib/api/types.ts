@@ -46,7 +46,7 @@ export interface TokenBundle {
 }
 
 // --------------------------------------------------------------------------
-// Learn Vectorae — tutorials (Feature 2)
+// Learn Victorae — tutorials (Feature 2)
 // --------------------------------------------------------------------------
 
 export type TutorialLevel = "beginner" | "intermediate" | "advanced";

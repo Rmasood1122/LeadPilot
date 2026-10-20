@@ -7,8 +7,9 @@ import { describe, expect, it } from "vitest";
 import { PRODUCT_FACTS, PRODUCT_FULL_NAME } from "@/lib/productFacts";
 
 describe("product facts", () => {
-  it("builds the full product name from the brand constants", () => {
-    expect(PRODUCT_FULL_NAME).toBe(`${PRODUCT_FACTS.brand.product_name} by ${PRODUCT_FACTS.brand.company_name}`);
+  it("names the product by its own name, without the company (VIC-NAME)", () => {
+    expect(PRODUCT_FULL_NAME).toBe(PRODUCT_FACTS.brand.product_name);
+    expect(PRODUCT_FULL_NAME).not.toContain(PRODUCT_FACTS.brand.company_name);
     expect(PRODUCT_FACTS.description.startsWith(PRODUCT_FULL_NAME)).toBe(true);
   });
 

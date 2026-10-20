@@ -120,7 +120,7 @@ export default function IntakeWizard() {
               {local.businessType && (
                 <p className="text-xs text-muted-foreground">
                   {BUSINESS_TYPES.find((t) => t.key === local.businessType)?.hint}{" "}
-                  Vectorae finds business buyers near you; it never contacts consumers.
+                  Victorae finds business buyers near you; it never contacts consumers.
                 </p>
               )}
             </div>

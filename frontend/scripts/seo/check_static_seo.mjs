@@ -45,7 +45,8 @@ const REPORT = args.includes('--report');
 // 2.3: the one source of product facts.
 const FACTS_FILE = path.join(FRONTEND, 'src', 'content', 'product-facts.json');
 const FACTS = JSON.parse(fs.readFileSync(FACTS_FILE, 'utf8'));
-const PRODUCT_FULL_NAME = `${FACTS.brand.product_name} by ${FACTS.brand.company_name}`;
+// Same rule as src/lib/productFacts.ts: the product name alone (VIC-NAME dropped "by Calendarharvest").
+const PRODUCT_FULL_NAME = FACTS.brand.product_name;
 const SNAPSHOT_FILE = path.join(FRONTEND, 'src', 'content', 'plans-snapshot.json');
 
 const failures = [];

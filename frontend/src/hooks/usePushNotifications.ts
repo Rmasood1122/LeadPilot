@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * usePushNotifications — ClientHunter Enterprise (M7 Chunk 3)
+ * usePushNotifications — Victorae (M7 Chunk 3)
  *
  * FCM device token lifecycle management on Android.
  *

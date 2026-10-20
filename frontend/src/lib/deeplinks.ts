@@ -1,5 +1,5 @@
 /**
- * deeplinks.ts - ClientHunter Enterprise
+ * deeplinks.ts - Victorae
  *
  * Deep link handling for the Capacitor Android app.
  *

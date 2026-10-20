@@ -1,5 +1,5 @@
 /**
- * storage.ts — ClientHunter Enterprise
+ * storage.ts — Victorae
  *
  * Platform-aware key-value storage abstraction.
  *

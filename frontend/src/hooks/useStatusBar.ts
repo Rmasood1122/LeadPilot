@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * useStatusBar — ClientHunter Enterprise
+ * useStatusBar — Victorae
  *
  * Syncs the Android status bar color with the active theme's primary color.
  * Reads the CSS variable --color-primary from the document root, so it

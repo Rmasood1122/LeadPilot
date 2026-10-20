@@ -21,7 +21,7 @@ import { pageGraph } from "@/lib/seo/structuredData";
 import { PricingClient } from "./PricingClient";
 
 export const metadata: Metadata = {
-  title: "Vectorae by Calendarharvest pricing | Calendarharvest",
+  title: "Victorae pricing | Calendarharvest",
   description:
     `Plans for ${PRODUCT_FULL_NAME}: monthly plans (${planNames.monthly_tiers.join(", ")}), ` +
     `or ${planNames.pay_per_meeting.toLowerCase()} booked.`,

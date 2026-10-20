@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * NetworkContext — ClientHunter Enterprise
+ * NetworkContext — Victorae
  *
  * Provides two distinct network states to the entire component tree:
  *

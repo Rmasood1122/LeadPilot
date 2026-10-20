@@ -45,7 +45,7 @@ const COLUMNS = [
   {
     heading: "Resources",
     links: [
-      { href: "/what-is-leadpilot", label: "What is Vectorae" },
+      { href: "/what-is-leadpilot", label: "What is Victorae" },
       { href: "/faq", label: "FAQ" },
       { href: "/help", label: "Help center" },
       { href: "/outbound-statistics", label: "Outbound statistics" },

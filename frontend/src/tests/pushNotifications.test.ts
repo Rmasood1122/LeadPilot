@@ -1,5 +1,5 @@
 /**
- * pushNotifications.test.ts — ClientHunter Enterprise (M7 Chunk 4)
+ * pushNotifications.test.ts — Victorae (M7 Chunk 4)
  *
  * Tests for src/hooks/usePushNotifications.ts
  *

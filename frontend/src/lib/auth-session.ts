@@ -1,5 +1,5 @@
 /**
- * auth-session.ts — ClientHunter Enterprise
+ * auth-session.ts — Victorae
  *
  * JWT access + refresh token management.
  *
