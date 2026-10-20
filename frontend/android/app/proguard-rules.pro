@@ -1,4 +1,4 @@
-# proguard-rules.pro — ClientHunter Enterprise
+# proguard-rules.pro — Victorae
 #
 # ProGuard / R8 rules for release builds.
 # For a Capacitor app, the JavaScript app logic is in the assets/ WebView and

@@ -1,4 +1,4 @@
-"""ClientHunter Python SDK.
+"""Victorae Python SDK.
 
 Quickstart::
 
