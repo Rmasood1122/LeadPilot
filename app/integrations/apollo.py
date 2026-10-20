@@ -22,7 +22,7 @@ _LOCKED_EMAIL_MARKERS = ("email_not_unlocked", "not_unlocked")
 
 
 def icp_to_apollo_params(icp_criteria: dict) -> dict:
-    """Translate Vectorae's structured ICP criteria into Apollo people
+    """Translate Victorae's structured ICP criteria into Apollo people
     search parameters.
 
     Our ICP criteria schema (produced by app/services/icp_extraction.py or

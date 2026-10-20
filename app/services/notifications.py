@@ -1,5 +1,5 @@
 """
-notifications.py — ClientHunter Enterprise (M7 Chunk 3)
+notifications.py — Victorae (M7 Chunk 3)
 
 Firebase Cloud Messaging notification service.
 

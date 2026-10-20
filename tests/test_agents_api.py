@@ -1,4 +1,4 @@
-"""Vectorae agents -- API, tenant isolation, advisory-only, and the master
+"""Victorae agents -- API, tenant isolation, advisory-only, and the master
 supervisor's circuit breaker (app/agents/, app/api/agents.py)."""
 
 from __future__ import annotations

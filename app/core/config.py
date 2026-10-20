@@ -262,7 +262,7 @@ class Settings(BaseSettings):
     """
 
     RATE_LIMIT_AGENT_RUN: int = 120
-    """Max Vectorae agent runs (POST /agents/{name}/run) per user per hour.
+    """Max Victorae agent runs (POST /agents/{name}/run) per user per hour.
     No model call, but a run reads up to a few thousand rows."""
 
     RATE_LIMIT_CRM_WRITE: int = 600

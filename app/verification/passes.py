@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from app.db.models import FlowType
 
 JUDGE_SYSTEM = (
-    "You are a strict, senior go-to-market reviewer inside Vectorae. "
+    "You are a strict, senior go-to-market reviewer inside Victorae. "
     "You evaluate a strategy against EXACTLY ONE criterion and respond "
     "with ONLY a JSON object: "
     '{"result": "PASS" | "FAIL", "fix_description": "<required when FAIL: '
@@ -74,7 +74,7 @@ Evaluate the strategy document against the single criterion above and
 respond with the required JSON object only."""
 
 FIXER_SYSTEM = (
-    "You are Vectorae's strategy editor. You revise a strategy document "
+    "You are Victorae's strategy editor. You revise a strategy document "
     "to resolve ONE specific reviewer finding, changing only what the fix "
     "requires and preserving everything else, including all markdown "
     "structure. Respond with ONLY the full revised document."

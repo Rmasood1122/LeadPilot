@@ -1,5 +1,5 @@
 """
-devices.py — ClientHunter Enterprise (M7 Chunk 3)
+devices.py — Victorae (M7 Chunk 3)
 
 Device token registration API for FCM push notifications.
 

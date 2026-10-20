@@ -76,7 +76,7 @@ FORBIDDEN_MENTIONS = ("victorae", "vectorae", "leadpilot", "lead pilot", "client
                       "client hunter")
 
 _DM_SYSTEM = (
-    "You are Vectorae's displacement DM writer. A prospect has just posted "
+    "You are Victorae's displacement DM writer. A prospect has just posted "
     "publicly about a problem you can solve. You write the FIRST message to "
     "them -- a Day 0 cold DM. Respond with ONLY a JSON object, no prose and "
     'no markdown fences: {"dm": "the message"}\n'
