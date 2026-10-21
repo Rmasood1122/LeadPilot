@@ -38,6 +38,13 @@ SYSTEM = (
     "told about."
 )
 
+NETWORK_MESSAGE_SCHEMA = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}},
+    "required": ["text"],
+    "additionalProperties": False,
+}
+
 
 class MessageError(Exception):
     def __init__(self, status: int, detail: str):
@@ -101,7 +108,7 @@ def draft(db: Session, user: User, connection_id, product_id) -> LinkedInNetwork
     try:
         data = anthropic_client.get_client().complete_json(
             system=SYSTEM + style_profile.system_suffix(user.style_profile_json),
-            prompt=prompt, max_tokens=600)
+            prompt=prompt, max_tokens=600, schema=NETWORK_MESSAGE_SCHEMA)
     except Exception as exc:  # noqa: BLE001
         raise MessageError(502, "The writer is unavailable. Try again.") from exc
     text = str((data or {}).get("text") or "").strip()[:MESSAGE_MAX]

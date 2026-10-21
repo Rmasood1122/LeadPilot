@@ -493,7 +493,7 @@ class _RecordingClaude:
     def __init__(self):
         self.calls = []
 
-    def complete_json(self, *, system, prompt, max_tokens):
+    def complete_json(self, *, system, prompt, max_tokens, schema=None):
         self.calls.append({"system": system, "prompt": prompt})
         return {"html_content": GOOD_HTML, "word_count": 1400, "reading_time_mins": 6,
                 "internal_links": [], "schema_markup": {}}

@@ -106,6 +106,13 @@ WHO THEY ARE:
 
 Write the Day 0 DM now."""
 
+DM_SCHEMA = {
+    "type": "object",
+    "properties": {"dm": {"type": "string"}},
+    "required": ["dm"],
+    "additionalProperties": False,
+}
+
 
 def scan_post_for_triggers(post_text: str) -> list[str]:
     """Every trigger keyword or phrase present in one post.
@@ -199,7 +206,7 @@ def generate_displacement_dm(lead: Lead, post_excerpt: str,
     try:
         for attempt in (1, 2):
             data = get_client().complete_json(system=system, prompt=prompt,
-                                              max_tokens=MAX_TOKENS)
+                                              max_tokens=MAX_TOKENS, schema=DM_SCHEMA)
             dm = str((data or {}).get("dm") or "").strip()
             problems = validate_dm(dm)
             if not problems:
