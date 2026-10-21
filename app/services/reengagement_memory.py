@@ -515,11 +515,15 @@ def brief_for(plan: ReengagementPlan, lead: Lead) -> str:
     "just circling back" -- the second is indistinguishable from every other
     unwanted follow-up they get.
     """
-    who = lead.full_name or "there"
+    # The brief becomes the step template, which every renderer reads as OUR
+    # instructions (message_personalization, the call script). The prospect's
+    # name and their own words are outside text, so they arrive delimited;
+    # each renderer's prompt carries prompt_safety.NOTICE.
+    who = prompt_safety.inline(lead.full_name or "there")
     if plan.reason_kind == JOB_CHANGE:
         return _job_change_brief(lead, who)
     when = plan.stated_return_on.isoformat() if plan.stated_return_on else "around now"
-    quoted = (f'They said: "{plan.reason_text}".' if plan.reason_text
+    quoted = (f"They said: {prompt_safety.inline(plan.reason_text)}." if plan.reason_text
               else "They gave no reason beyond bad timing.")
     return (
         f"RE-ENGAGEMENT AFTER A 'NOT NOW'. {who} asked us to come back {when}. "
@@ -537,9 +541,12 @@ def _job_change_brief(lead: Lead, who: str) -> str:
     anything -- a job change is something we observed, not something they
     told us."""
     champion = (lead.enrichment_json or {}).get("champion") or {}
-    before = " at ".join(p for p in (champion.get("from_title"),
-                                     champion.get("from_company")) if p) or "their previous company"
-    now_at = " at ".join(p for p in (lead.title, lead.company) if p) or "a new company"
+    # Each "title at company" phrase is enrichment text, delimited as one value.
+    before = " at ".join(str(p) for p in (champion.get("from_title"),
+                                          champion.get("from_company")) if p)
+    before = prompt_safety.inline(before) if before else "their previous company"
+    now_at = " at ".join(p for p in (lead.title, lead.company) if p)
+    now_at = prompt_safety.inline(now_at) if now_at else "a new company"
     return (
         f"RE-ENGAGEMENT AFTER A JOB CHANGE. {who} worked with us before as "
         f"{before} and is now {now_at}. Acknowledge the move briefly and "

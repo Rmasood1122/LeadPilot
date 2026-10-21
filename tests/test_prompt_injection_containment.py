@@ -243,6 +243,45 @@ class TestScrapedAndTranscribedText:
         assert "seller note: follow up Thursday" in outside, (
             "the seller's own notes are trusted and stay outside the block")
 
+    def test_not_now_reason_reaches_the_next_message_as_data(self, db_session, prompts,
+                                                            lead, verified_strategy):
+        """Second order: a prospect's "not now" reply is reduced to a reason the
+        model quotes back (reason_text), and reengagement_memory.brief_for puts
+        it in the step brief the next message is written from. That brief is
+        stored as the step template, which every renderer treats as OUR
+        instructions -- so the prospect's words must arrive there already
+        delimited."""
+        from app.services import message_personalization
+        from app.services import reengagement_memory as memory
+
+        plan = m.ReengagementPlan(lead_id=lead.id, due_at=NOW, reason_kind=memory.CONTRACT,
+                                  reason_text=PAYLOAD, stated_return_on=date(2027, 3, 1))
+        step = m.SequenceStep(step_no=2, template=memory.brief_for(plan, lead),
+                              variant="A", delay_days=0)
+        message_personalization.render_message(db_session, verified_strategy, lead, step)
+
+        assert_contained(prompts[-1][1])
+        outside, _inside = _outside_and_inside(prompts[-1][1])
+        assert "RE-ENGAGEMENT AFTER A 'NOT NOW'" in outside, \
+            "our own brief stays outside the data blocks"
+
+    def test_job_change_brief_reaches_the_next_message_as_data(self, db_session, prompts,
+                                                              lead, verified_strategy):
+        """The job-change brief quotes enrichment: the old and new title and
+        company, which the person (or a scraped profile) controls."""
+        from app.services import message_personalization
+        from app.services import reengagement_memory as memory
+
+        lead.title = "Head of Ops"
+        lead.company = PAYLOAD
+        lead.enrichment_json = {"champion": {"from_title": "Founder", "from_company": "Acme"}}
+        plan = m.ReengagementPlan(lead_id=lead.id, due_at=NOW, reason_kind=memory.JOB_CHANGE)
+        step = m.SequenceStep(step_no=2, template=memory.brief_for(plan, lead),
+                              variant="A", delay_days=0)
+        message_personalization.render_message(db_session, verified_strategy, lead, step)
+
+        assert_contained(prompts[-1][1])
+
     def test_live_call_system_prompt(self, lead):
         """The outbound voice assistant's system prompt (phone_calls.system_prompt,
         sent to the call provider, so no golden set can replay it). The
