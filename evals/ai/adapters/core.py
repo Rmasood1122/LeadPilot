@@ -1,29 +1,9 @@
-"""One adapter per touchpoint: (case input, model client) -> the app's output.
-
-Each adapter calls the SAME function production calls, with every
-get_client() pointed at `client` (context.use_client). It returns what the
-app returns after its own parsing, coercion and guards -- the thing a user
-or a send path actually receives -- so graders judge the product, not the
-raw model text. Records an adapter needs are seeded in a fresh in-memory
-database (context.fresh_session); inputs are synthetic.
-
-Names here are the `adapter:` values in evals/ai/golden/*.yaml.
-"""
+"""Adapters for T05-T08 (claim verification, reply routing), T23 and T35."""
 
 from __future__ import annotations
 
-from typing import Any, Callable
-
+from evals.ai.adapters._registry import adapter
 from evals.ai.context import fresh_session, seed_account, seed_lead, use_client
-
-ADAPTERS: dict[str, Callable[[dict, Any], Any]] = {}
-
-
-def adapter(name: str):
-    def register(fn):
-        ADAPTERS[name] = fn
-        return fn
-    return register
 
 
 # --- T06 inbound reply routing (consent-critical) -------------------------
