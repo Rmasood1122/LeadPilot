@@ -265,7 +265,8 @@ class FakeClaude:
 
     # ---- text completions (pipeline steps + fixes) ----
     def complete(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None,
-                 schema=None) -> str:
+                 schema=None, cache_prefix=None) -> str:
+        prompt = (cache_prefix or "") + prompt  # what the model reads, in order
         if self.fail_after is not None and self.completions >= self.fail_after:
             raise RuntimeError("simulated crash: model call failed")
         self.completions += 1
@@ -289,7 +290,8 @@ class FakeClaude:
 
     # ---- JSON completions (patterns + verification judge) ----
     def complete_json(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None,
-                      schema=None) -> dict:
+                      schema=None, cache_prefix=None) -> dict:
+        prompt = (cache_prefix or "") + prompt  # what the model reads, in order
         self.completions += 1
         self.json_schemas.append(schema)
         if "Reply Copilot drafter" in system:  # F04
