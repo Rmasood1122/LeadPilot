@@ -2,6 +2,11 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-21 — **Victorae Phase 3, I1: consent defects fixed in code** (5 commits, local, on top of item 4 and I4).
+  - Known defects 53 → 41. Baseline 1,075 → 1,087 cases at pass@1 1.0. No safety slice regressed.
+  - Opt-out replies get no model call and no draft (T09). A later rewrite cannot silently drop what the legal pass approved (T31, presence floor only). Spoken stops on outbound calls are recorded without the model (T15). Foreign links are stripped from email bodies (T03). Promotional WhatsApp "utility" drafts are saved as marketing (T33).
+  - Founder decisions: `not_interested` drafts, no-lead callee suppression, the promotional word list, third-party link stripping.
+  - Not measured live (no eval key). Report: `docs/program/ai/phase3-i1-consent.md`.
 - 2026-10-21 — **Victorae Phase 3 item 4 (Batch API): decision record, not built.**
   - The item's premise fails: pipeline steps and verification passes are chained, each reads the previous output, so they cannot be batched within a strategy.
   - Never batch: send-path rendering and claim check, reply routing and consent, call analysis (stop requests), meeting prep.
