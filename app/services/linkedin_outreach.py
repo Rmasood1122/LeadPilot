@@ -38,7 +38,7 @@ from sqlalchemy.orm import Session
 from app.db.models import Lead, LinkedInAccount, Strategy
 from app.integrations.linkedin_posts import public_identifier
 from app.integrations.unipile_linkedin import CONNECTION_NOTE_MAX, UnipileClient
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -146,12 +146,23 @@ def render(session: Session, strategy: Strategy, lead: Lead, step, action: str) 
     from app.services.message_personalization import _playbook  # noqa: PLC0415
 
     context, _ = personalization_context.prompt_block(lead)
+    # prompt_block leads with the NOTICE when it has content; this prompt
+    # states it once at the top, so drop the repeat.
+    context = context.replace(f"{prompt_safety.NOTICE}\n\n", "", 1)
     kind = {"connect": "CONNECTION NOTE", "message": "MESSAGE", "inmail": "INMAIL"}[action]
+    # F-AI-02: the prospect's name, title and company are scraped from a
+    # profile they control, so the whole PROSPECT line is one delimited,
+    # escaped value folded onto a single line. The step brief and playbook
+    # are OURS and stay unwrapped; `context` is already delimited by
+    # personalization_context.prompt_block.
     prompt = "\n".join([
+        prompt_safety.NOTICE,
         f"WRITE A LINKEDIN {kind}.",
         f"STEP BRIEF: {step.template}",
         f"MESSAGING PLAYBOOK:\n{_playbook(session, strategy)[:6000]}",
-        f"PROSPECT: {lead.full_name or 'unknown'} — {lead.title or ''} at {lead.company or ''}",
+        prompt_safety.inline(
+            f"PROSPECT: {lead.full_name or 'unknown'} — {lead.title or ''}"
+            f" at {lead.company or ''}"),
         context,
         "Return the JSON object now.",
     ])

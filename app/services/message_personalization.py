@@ -201,7 +201,9 @@ _WA_SYSTEM = (
     "names, or statistics."
 )
 
-_WA_PROMPT = """TEMPLATE BODY (for context — do NOT rewrite it):
+_WA_PROMPT = """{notice}
+
+TEMPLATE BODY (for context — do NOT rewrite it):
 {body}
 
 VARIABLES TO FILL (number -> what it means / brief):
@@ -268,13 +270,17 @@ def render_whatsapp_variables(
             # Feature Group 2: the sender's voice, like every outreach copy call.
             system=_WA_SYSTEM + _voice(session, strategy),
             prompt=_WA_PROMPT.format(
+                notice=prompt_safety.NOTICE,
                 body=template_body,
                 briefs="\n".join(f"{{{{{n}}}}} -> {b}" for n, b in briefs.items()),
                 playbook=_playbook(session, strategy),
-                full_name=lead.full_name or "unknown",
-                title=lead.title or "unknown",
-                company=lead.company or "unknown",
-                enrichment=str(enrichment)[:1500],
+                # F-AI-02: lead fields and enrichment are scraped from
+                # profiles the prospect controls -- delimited, one line each.
+                # The template body, briefs and playbook are OURS.
+                full_name=prompt_safety.inline(lead.full_name or "unknown"),
+                title=prompt_safety.inline(lead.title or "unknown"),
+                company=prompt_safety.inline(lead.company or "unknown"),
+                enrichment=prompt_safety.inline(str(enrichment)[:1500]),
             ),
         )
         for n in briefs:
@@ -333,7 +339,9 @@ _FOLLOWUP_SYSTEM = (
     "first message."
 )
 
-_FOLLOWUP_PROMPT = """WHAT WAS SENT BEFORE (most recent last):
+_FOLLOWUP_PROMPT = """{notice}
+
+WHAT WAS SENT BEFORE (most recent last):
 {history}
 
 WHAT THIS PROSPECT HAS DONE (outcome log):
@@ -415,13 +423,17 @@ def build_followup_brief(
         data = get_client().complete_json(
             system=_FOLLOWUP_SYSTEM,
             prompt=_FOLLOWUP_PROMPT.format(
-                history=history[:6000],
+                notice=prompt_safety.NOTICE,
+                # F-AI-02: earlier bodies were model-written from lead data,
+                # and the lead fields are scraped -- all delimited. Outcomes
+                # (our event enums), product brief and playbook are OURS.
+                history=prompt_safety.block(history[:6000]),
                 outcomes=outcomes,
                 product=product_brief[:1000],
                 playbook=_playbook(session, strategy)[:4000],
-                full_name=lead.full_name or "there",
-                title=lead.title or "unknown",
-                company=lead.company or "their company",
+                full_name=prompt_safety.inline(lead.full_name or "there"),
+                title=prompt_safety.inline(lead.title or "unknown"),
+                company=prompt_safety.inline(lead.company or "their company"),
                 channel=channel,
             ),
         )
@@ -505,13 +517,17 @@ def build_reengagement_brief(
         data = get_client().complete_json(
             system=_REENGAGEMENT_SYSTEM,
             prompt=_FOLLOWUP_PROMPT.format(
-                history=history[:6000],
+                notice=prompt_safety.NOTICE,
+                # F-AI-02: earlier bodies were model-written from lead data,
+                # and the lead fields are scraped -- all delimited. Outcomes
+                # (our event enums), product brief and playbook are OURS.
+                history=prompt_safety.block(history[:6000]),
                 outcomes=outcomes,
                 product=product_brief[:1000],
                 playbook=_playbook(session, strategy)[:4000],
-                full_name=lead.full_name or "there",
-                title=lead.title or "unknown",
-                company=lead.company or "their company",
+                full_name=prompt_safety.inline(lead.full_name or "there"),
+                title=prompt_safety.inline(lead.title or "unknown"),
+                company=prompt_safety.inline(lead.company or "their company"),
                 channel=channel,
             ).replace("Write the brief for the next touch now.",
                       "Write the brief for the re-engagement message now."),

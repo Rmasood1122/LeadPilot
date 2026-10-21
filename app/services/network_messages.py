@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.db.models import (
     LinkedInConnection, LinkedInConnectionMatch, LinkedInNetworkMessage, Product, User,
 )
-from app.services import anthropic_client, linkedin_limits, style_profile
+from app.services import anthropic_client, linkedin_limits, prompt_safety, style_profile
 from app.services import linkedin_network as ln
 
 MESSAGE_MAX = 1500
@@ -83,9 +83,17 @@ def draft(db: Session, user: User, connection_id, product_id) -> LinkedInNetwork
         LinkedInConnectionMatch.connection_id == conn.id,
         LinkedInConnectionMatch.product_id == product.id)).scalar_one_or_none()
     why = "; ".join(match.reasons_json or []) if match else ""
+    # F-AI-02: name / position / company come from the LinkedIn export and
+    # were written by the connection. The whole RECIPIENT line is one
+    # delimited, escaped value folded onto a single line, so a newline in a
+    # headline cannot open a new section. The product and match reasons (our
+    # ICP terms) are OURS and stay unwrapped.
     prompt = "\n".join([
+        prompt_safety.NOTICE,
         "WRITE THE MESSAGE.",
-        f"RECIPIENT: {conn.full_name} - {conn.position or 'unknown role'} at {conn.company or 'unknown company'}",
+        prompt_safety.inline(
+            f"RECIPIENT: {conn.full_name} - {conn.position or 'unknown role'}"
+            f" at {conn.company or 'unknown company'}"),
         f"WHAT THE SENDER OFFERS: {product.name}. {(product.description or '')[:600]}",
         f"WHY THIS PERSON MAY BE RELEVANT: {why or 'role and company fit'}",
         "Return the JSON object now.",
