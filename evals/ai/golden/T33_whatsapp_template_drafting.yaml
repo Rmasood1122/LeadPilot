@@ -174,7 +174,6 @@ cases:
     offline_only: true
     slice: consent
     synthetic: true
-    known_failure: "app/services/whatsapp_templates.py:443-455 trusts the model's category, so a cold sales pitch the model labels 'utility' is saved with no opt-out instruction (the guard only runs for marketing)"
     input: {persona: *persona, messaging: *msg}
     expect: {include: ["STOP"], text_field: by_name.sneaky_utility}
     recorded:

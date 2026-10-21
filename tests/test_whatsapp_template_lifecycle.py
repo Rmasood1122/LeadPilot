@@ -150,3 +150,31 @@ class TestValidation:
         # never auto-submitted: no meta id, opt-out present in body
         assert all(r.meta_template_id is None for r in rows)
         assert all("STOP" in (r.body or "") for r in rows)
+
+    def test_promotional_draft_labelled_utility_is_saved_as_marketing(
+            self, db_session, fake_claude, verified_strategy, monkeypatch):
+        """I1 consent hardening (T33): the model's category label is not
+        trusted. A cold pitch labelled 'utility' is saved as MARKETING with the
+        standard opt-out; a genuine confirmation stays UTILITY, unchanged."""
+        pitch = ("Hi {{1}}, this is Sam from Brightline Bookkeeping. We close agency "
+                 "books in 5 working days. Want a 15-minute call?")
+        confirm = ("Hi {{1}}, this is Sam from Brightline Bookkeeping. Your onboarding "
+                   "call is confirmed for {{2}}.")
+
+        class _Client:
+            def complete_json(self, **kw):
+                return {"templates": [
+                    {"name": "sneaky_utility", "language": "en_US", "category": "utility",
+                     "body": pitch, "variable_descriptions": {"1": "first name"}},
+                    {"name": "booking_confirmation", "language": "en_US",
+                     "category": "utility", "body": confirm,
+                     "variable_descriptions": {"1": "first name", "2": "call time"}}]}
+
+        monkeypatch.setattr(svc, "get_client", lambda: _Client())
+        rows = {r.name: r for r in svc.generate_drafts(db_session, verified_strategy)}
+        sneaky, real = rows["sneaky_utility"], rows["booking_confirmation"]
+        assert sneaky.category is m.WhatsAppTemplateCategory.MARKETING
+        assert sneaky.body == f"{pitch} {svc.STANDARD_OPT_OUT}"
+        assert svc.has_opt_out_instruction(sneaky.body)
+        assert real.category is m.WhatsAppTemplateCategory.UTILITY
+        assert real.body == confirm

@@ -83,6 +83,31 @@ def validate_opt_out(body: str | None, category) -> None:
             f'"{STANDARD_OPT_OUT}" or "STOP to unsubscribe" (STOP is the '
             "keyword Victorae acts on to stop messaging a contact)"
         )
+# I1 consent hardening (T33 c-cold-pitch-labelled-utility). Meta classes a
+# template by its CONTENT: anything promotional is MARKETING whatever label it
+# carries. generate_drafts writes the first COLD touch, so a generated draft is
+# kept as UTILITY only when its body shows none of these promotional signals
+# (an offer, a value claim about what "we" do, an invitation to talk or buy).
+# Deterministic, and it fails closed: any signal => MARKETING, which then gets
+# the opt-out instruction. A plain confirmation or reminder stays UTILITY.
+_PROMOTIONAL_SIGNAL = re.compile(
+    r"(?i)\b(?:"
+    r"(?:we|i)(?:'re| are| am)?\s+(?:help|helps|close|closes|offer|cut|save|"
+    r"build|provide|deliver|work with|specialise|specialize|can)"
+    r"|want|interested|open to|keen|fancy|worth a|would you like|shall we|"
+    r"book a|schedule a|grab|learn more|check out|find out|"
+    r"discount|offer|deal|deals|free|trial|demo|promo|promotion|sale|"
+    r"price|pricing|save|saving|savings|limited|special|exclusive|"
+    r"chat|quick call|\d+[- ]minute"
+    r")\b"
+)
+
+
+def is_promotional(body: str | None) -> bool:
+    """True when a body carries a promotional signal (see _PROMOTIONAL_SIGNAL)."""
+    return bool(_PROMOTIONAL_SIGNAL.search(body or ""))
+
+
 # Meta template names: lowercase letters, digits, underscores.
 # TODO: verify against current WhatsApp docs (exact charset + max length)
 _NAME_RE = re.compile(r"^[a-z0-9_]{1,200}$")
@@ -480,6 +505,11 @@ def generate_drafts(session: Session, strategy: Strategy) -> list[WhatsAppTempla
         except ValueError:
             category = WhatsAppTemplateCategory.MARKETING
         body = str(cand.get("body", "")).strip()
+        if category is not WhatsAppTemplateCategory.MARKETING and is_promotional(body):
+            # T33: the model's label is not trusted for a promotional body.
+            logger.info("generated template %r labelled %s is promotional; saved as marketing",
+                        cand.get("name"), category.value)
+            category = WhatsAppTemplateCategory.MARKETING
         if (category is WhatsAppTemplateCategory.MARKETING and body
                 and not has_opt_out_instruction(body)):
             # Product defect #28: add the standard instruction rather than
