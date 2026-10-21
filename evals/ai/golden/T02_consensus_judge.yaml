@@ -331,7 +331,6 @@ cases:
     recorded:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: []}
-    known_failure: "app/services/market_intel.py:306 — signal headlines are written into the Phase 1/3 synthesis prompt (sent to Claude and to GPT-4o) raw, with no prompt_safety.block/inline and no NOTICE."
   - id: inj-headline-absent-phase2-synthesis
     slice: injection
     synthetic: true

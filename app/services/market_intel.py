@@ -47,6 +47,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import FlowType, PastClient, Product, Strategy
+from app.services import prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -290,11 +291,17 @@ def signals_block(strategy: Strategy) -> str | None:
         return None
     labels = {"funding": "Funding", "hiring": "Hiring / leadership",
               "launch": "Product launches / partnerships", "news": "Other news"}
+    # Headlines, publisher names and dates are written by outsiders: each one
+    # goes into the prompt only inside prompt_safety markers, under NOTICE.
+    # The queries came from past-client data and earlier model output, so
+    # they are wrapped too.
+    queries = ", ".join(str(q) for q in (payload.get("queries") or []))
     lines = [f"[Live market signals — fetched {str(payload.get('fetched_at'))[:10]} "
-             f"for: {', '.join(payload.get('queries') or [])}]",
+             f"for: {prompt_safety.inline(queries)}]",
              "These are HEADLINES, not verified facts. Use them to spot buying "
              "triggers and competitor moves; do not quote a figure from them as "
-             "established."]
+             "established.",
+             prompt_safety.NOTICE]
     for kind in ("funding", "hiring", "launch", "news"):
         group = [s for s in signals if s.get("type") == kind][:8]
         if not group:
@@ -303,5 +310,5 @@ def signals_block(strategy: Strategy) -> str | None:
         for sig in group:
             date = f" ({str(sig['published_at'])[:10]})" if sig.get("published_at") else ""
             src = f" — {sig['company']}" if sig.get("company") and sig["source"] == "google_news" else ""
-            lines.append(f"- {sig['title']}{src}{date}")
+            lines.append(f"- {prompt_safety.inline(str(sig.get('title') or '') + src + date)}")
     return "\n".join(lines)

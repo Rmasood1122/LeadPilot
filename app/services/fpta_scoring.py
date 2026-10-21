@@ -42,7 +42,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Lead, LeadStatus, Message, MessageStatus, Product, Strategy
-from app.services import anthropic_client, lead_scoring
+from app.services import anthropic_client, lead_scoring, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -339,8 +339,13 @@ def _prospect_line(lead: Lead, base: dict) -> dict:
 
 
 def _model_pass(batch: list[tuple[Lead, dict]], brief: str, icp: dict) -> dict[str, dict]:
+    # The prospect rows carry the lead's name, title and company, enrichment
+    # fields and scraped post excerpts (the evidence): all written outside
+    # this system, so the whole list goes in one untrusted block (F-AI-02).
+    prospects = json.dumps([_prospect_line(l, b) for l, b in batch], default=str)
     prompt = (f"PRODUCT: {brief}\nICP: {json.dumps(icp, default=str)[:2000]}\n\n"
-              f"PROSPECTS:\n{json.dumps([_prospect_line(l, b) for l, b in batch], default=str)}"
+              f"{prompt_safety.NOTICE}\n\n"
+              f"PROSPECTS:\n{prompt_safety.block(prospects)}"
               "\n\nReturn the JSON object now.")
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
                                                        max_tokens=3000)

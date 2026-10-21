@@ -142,7 +142,6 @@ cases:
     input: {mode: criteria, research: *icp_research}
     expect: {forbidden: ["{'name'", "'id':"]}
     recorded: {<<: *criteria, industries: [{name: Marketing and Advertising, id: 42}]}
-    known_failure: "icp_extraction.py:130 -- list items are str()-ed without a type check, so a nested object becomes a Python repr (\"{'name': ...}\") that is sent to the paid lead search as an industry."
   - id: criteria-extra-keys-dropped
     offline_only: true
     slice: edge

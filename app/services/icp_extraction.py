@@ -127,8 +127,27 @@ def criteria_from_research(research: str) -> dict:
     criteria = {}
     for key in CRITERIA_KEYS:
         value = data.get(key)
-        criteria[key] = [str(v) for v in value] if isinstance(value, list) else []
+        criteria[key] = ([item for item in (_criterion(v) for v in value) if item is not None]
+                         if isinstance(value, list) else [])
     return criteria
+
+
+def _criterion(value) -> str | None:
+    """One list item of the model's criteria, as the string the lead search
+    gets -- or None to drop it. Fail closed: a nested object used to be
+    str()-ed into a Python repr ("{'name': ...}") and sent to the paid lead
+    search as a title or industry. Strings pass; numbers become strings (a
+    size range of [11, 50]); an object passes only its own name or label
+    string; anything else (booleans, lists, other objects, null) is dropped."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+    if isinstance(value, dict):
+        for field in ("name", "label"):
+            if isinstance(value.get(field), str) and value[field].strip():
+                return value[field]
+    return None
 
 
 def extract_tactic_profile(session: Session, strategy: Strategy) -> dict:
