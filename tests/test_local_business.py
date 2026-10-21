@@ -173,7 +173,7 @@ class TestResearchPrompts:
         original = fake_claude.complete
 
         def complete(system, prompt, **kw):
-            prompts.append(prompt)
+            prompts.append((kw.get("cache_prefix") or "") + prompt)  # what the model reads
             return original(system, prompt, **kw)
 
         monkeypatch.setattr(fake_claude, "complete", complete)

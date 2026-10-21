@@ -159,3 +159,36 @@ def test_the_fixer_retry_reads_the_document_from_the_cache(monkeypatch):
     assert len(calls) == 2 and calls[0]["cache_prefix"] == calls[1]["cache_prefix"]
     assert "original" in calls[0]["cache_prefix"]
     assert "tighten the pricing" in calls[0]["prompt"]
+
+
+# --- the research pipeline: nine steps per phase -------------------------
+
+def test_steps_of_a_phase_share_one_cached_prefix(db_session, verified_strategy, fake_claude,
+                                                  monkeypatch):
+    """Every step of a phase must send the same prefix (product, patterns,
+    earlier phases' syntheses, the phase's live inputs) for steps 2-9 to read
+    it from the cache; the next phase's prefix adds the new synthesis."""
+    from app.pipeline import engine
+
+    prefixes: list[str] = []
+    prompts: list[str] = []
+    original = fake_claude.complete
+
+    def complete(system, prompt, **kw):
+        prefixes.append(kw.get("cache_prefix") or "")
+        prompts.append(prompt)
+        return original(system, prompt, **kw)
+
+    monkeypatch.setattr(fake_claude, "complete", complete)
+    for _ in range(18):
+        engine.run_step(db_session, verified_strategy,
+                        engine.next_step(db_session, verified_strategy))
+
+    phase_1, phase_2 = set(prefixes[:9]), set(prefixes[9:18])
+    assert len(phase_1) == 1 and len(phase_2) == 1, "a step changed its phase's prefix"
+    assert phase_1 != phase_2
+    assert prefixes[9].startswith(prefixes[0].split("RELEVANT PRIOR RESEARCH")[0])
+    assert "[Phase 1 / Step 9:" in prefixes[9]            # phase 1's synthesis, cached
+    assert "[Phase 2 / Step 10:" in prompts[10]           # this phase so far, after it
+    for prefix in set(prefixes):
+        assert "CURRENT STEP" not in prefix and "STEP GUIDANCE" not in prefix

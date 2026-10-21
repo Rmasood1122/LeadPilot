@@ -31,9 +31,14 @@ class TestRegistryIntegrity:
 
     def test_prompt_renders_with_all_blocks(self, pipeline):
         s = get_steps(pipeline)[41]  # arbitrary mid-pipeline step
-        prompt = s.build_prompt("PRODUCT", "PATTERNS", "CONTEXT")
-        for token in (s.name, s.phase_title, "PRODUCT", "PATTERNS", "CONTEXT"):
+        prefix, step = s.build_prompt("PRODUCT", "PATTERNS", "STABLE", "PHASE")
+        prompt = prefix + step  # what the model reads, in order
+        for token in (s.name, s.phase_title, "PRODUCT", "PATTERNS", "STABLE", "PHASE"):
             assert token in prompt
+        # The cached prefix is shared by every step of a phase: nothing in it
+        # may name the step (Phase 3 item 3).
+        for token in (s.name, s.phase_title, s.guidance, "PHASE"):
+            assert token not in prefix
 
     def test_phase_titles_resolve(self, pipeline):
         for phase in range(1, 9):

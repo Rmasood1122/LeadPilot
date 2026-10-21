@@ -27,7 +27,8 @@ cases:
       text_field: output
       calls: 1
       prompt_include: ["CURRENT STEP: Core offering definition", "Tallyfold Payroll",
-                       "(this is the first step — no prior research yet)",
+                       "(none yet — this is the first phase)",
+                       "(this is the first step of this phase)",
                        "You never invent statistics"]
     recorded: "## Core offering\nTallyfold runs payroll and monthly books for agencies of 5-40 people.\n\n### Key takeaways\n- Sell the monthly close, not software.\n- Agencies buy on time saved."
   - id: second-step-sees-first

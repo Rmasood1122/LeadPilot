@@ -17,19 +17,21 @@ from dataclasses import dataclass
 from app.db.models import PipelineKind
 
 # --------------------------------------------------------------------------
-# Prompt template shared by all steps (edit freely — it is data).
-# Placeholders are filled by the engine: {step_name}, {phase_title},
-# {product_block}, {patterns_block}, {context_block}, {guidance}
+# Prompt templates shared by all steps (edit freely -- they are data).
+# The engine fills them; a step's prompt is PREFIX_TEMPLATE then STEP_TEMPLATE.
+#
+# Phase 3 item 3: the prefix holds what every step of a phase shares (the
+# product, past-client patterns, earlier phases' syntheses and the phase's
+# live inputs) and is sent as the gateway's cache_prefix, so steps 2-9 of a
+# phase read it from the cache. The step template holds what changes: this
+# phase's outputs so far, then the step and its instructions -- the question
+# after the long material it is about.
 # --------------------------------------------------------------------------
 
-PROMPT_TEMPLATE = """You are an elite B2B go-to-market strategist working inside
+PREFIX_TEMPLATE = """You are an elite B2B go-to-market strategist working inside
 Victorae, an automated client-acquisition system. You are executing ONE
 research step of a larger pipeline. Be concrete, decision-ready and
 specific to THIS product — never generic filler.
-
-CURRENT PHASE: {phase_title}
-CURRENT STEP: {step_name}
-STEP GUIDANCE: {guidance}
 
 PRODUCT / SKILL UNDER RESEARCH:
 {product_block}
@@ -37,8 +39,17 @@ PRODUCT / SKILL UNDER RESEARCH:
 PROVEN PAST-CLIENT PATTERNS (anchor on these when present):
 {patterns_block}
 
-RELEVANT PRIOR RESEARCH (earlier pipeline outputs):
-{context_block}
+RELEVANT PRIOR RESEARCH (earlier phases' syntheses and live inputs):
+{stable_context}
+
+"""
+
+STEP_TEMPLATE = """RELEVANT PRIOR RESEARCH (this phase so far):
+{phase_context}
+
+CURRENT PHASE: {phase_title}
+CURRENT STEP: {step_name}
+STEP GUIDANCE: {guidance}
 
 Produce the output for the CURRENT STEP only, in clear markdown,
 300-600 words, ending with a 2-3 bullet "Key takeaways" list."""
@@ -256,15 +267,16 @@ class StepSpec:
     name: str
     guidance: str
 
-    def build_prompt(self, product_block: str, patterns_block: str, context_block: str) -> str:
-        return PROMPT_TEMPLATE.format(
-            step_name=self.name,
-            phase_title=self.phase_title,
-            guidance=self.guidance,
-            product_block=product_block,
-            patterns_block=patterns_block,
-            context_block=context_block,
-        )
+    def build_prompt(self, product_block: str, patterns_block: str, stable_context: str,
+                     phase_context: str) -> tuple[str, str]:
+        """(cache prefix, step prompt). The prefix is identical for every step
+        of a phase; the model reads it first, then the step prompt."""
+        prefix = PREFIX_TEMPLATE.format(product_block=product_block,
+                                        patterns_block=patterns_block,
+                                        stable_context=stable_context)
+        prompt = STEP_TEMPLATE.format(step_name=self.name, phase_title=self.phase_title,
+                                      guidance=self.guidance, phase_context=phase_context)
+        return prefix, prompt
 
 
 def _build(pipeline: PipelineKind, prefix: str, phases: list[tuple[str, list[str]]]) -> list[StepSpec]:

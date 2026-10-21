@@ -95,10 +95,16 @@ def _patterns_block(session: Session, strategy: Strategy) -> str:
     return "\n".join(parts) or "(no past clients recorded)"
 
 
-def _context_block(session: Session, strategy: Strategy, spec: StepSpec) -> str:
+def _context_block(session: Session, strategy: Strategy, spec: StepSpec) -> tuple[str, str]:
     """Prior research relevant to this step, without blowing the context:
-    full outputs of the current phase so far + each earlier phase's
-    synthesis step (step 9 of that phase)."""
+    each earlier phase's synthesis step (step 9 of that phase) + full outputs
+    of the current phase so far.
+
+    Returned as (stable, phase). `stable` -- earlier phases' syntheses, the
+    strategy syntheses a GTM step sees, playbook insights and market signals
+    -- is the same for every step of a phase, so it goes in the cached prefix
+    (Phase 3 item 3); `phase` -- this phase's outputs so far -- grows step by
+    step and follows it."""
     rows = session.execute(
         select(ResearchStep)
         .where(
@@ -110,11 +116,13 @@ def _context_block(session: Session, strategy: Strategy, spec: StepSpec) -> str:
     ).scalars().all()
 
     parts: list[str] = []
+    phase_parts: list[str] = []
     for r in rows:
-        is_current_phase = r.phase == spec.phase
-        is_synthesis = r.step_no % 9 == 0
-        if is_current_phase or is_synthesis:
-            parts.append(f"[Phase {r.phase} / Step {r.step_no}: {r.name}]\n{r.output}")
+        entry = f"[Phase {r.phase} / Step {r.step_no}: {r.name}]\n{r.output}"
+        if r.phase == spec.phase:
+            phase_parts.append(entry)
+        elif r.step_no % 9 == 0:
+            parts.append(entry)
 
     # Flow 2 GTM steps also see the strategy pipeline's phase syntheses.
     if spec.pipeline is PipelineKind.GTM:
@@ -154,7 +162,8 @@ def _context_block(session: Session, strategy: Strategy, spec: StepSpec) -> str:
         if block:
             parts.append(block)
 
-    return "\n\n".join(parts) or "(this is the first step — no prior research yet)"
+    return ("\n\n".join(parts) or "(none yet — this is the first phase)",
+            "\n\n".join(phase_parts) or "(this is the first step of this phase)")
 
 
 # --------------------------------------------------------------------------
@@ -167,11 +176,13 @@ def run_step(session: Session, strategy: Strategy, spec: StepSpec) -> None:
     product = session.get(Product, strategy.product_id)
     from app.services import local_business  # noqa: PLC0415
 
-    prompt = spec.build_prompt(
+    stable_context, phase_context = _context_block(session, strategy, spec)
+    prefix, prompt = spec.build_prompt(
         product_block=_product_block(product,
                                      local_business.block_for_strategy(session, strategy)),
         patterns_block=_patterns_block(session, strategy),
-        context_block=_context_block(session, strategy, spec),
+        stable_context=stable_context,
+        phase_context=phase_context,
     )
     # Feature Group 1: on a phase-synthesis step, with consensus enabled and an
     # OpenAI key configured, GPT-4o answers the same brief in parallel and
@@ -182,9 +193,9 @@ def run_step(session: Session, strategy: Strategy, spec: StepSpec) -> None:
     claude = get_client()
     if consensus.applies(session, strategy, spec):
         output = consensus.run_step(session, strategy, spec, system=SYSTEM_PROMPT,
-                                    prompt=prompt, claude=claude)
+                                    prompt=prompt, claude=claude, cache_prefix=prefix)
     else:
-        output = claude.complete(system=SYSTEM_PROMPT, prompt=prompt)
+        output = claude.complete(system=SYSTEM_PROMPT, prompt=prompt, cache_prefix=prefix)
 
     session.add(
         ResearchStep(
@@ -194,7 +205,7 @@ def run_step(session: Session, strategy: Strategy, spec: StepSpec) -> None:
             step_no=spec.step_no,
             step_id=spec.id,
             name=spec.name,
-            inputs_json={"prompt_chars": len(prompt)},
+            inputs_json={"prompt_chars": len(prefix) + len(prompt)},
             output=output,
             model=settings.anthropic_model,
         )
