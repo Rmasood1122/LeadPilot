@@ -177,6 +177,7 @@ class ReplayClient:
         if not self._queue:
             raise ReplayExhausted(f"call {len(self.calls)} has no recorded output")
         out = self._queue.pop(0)
+        self.calls[-1]["output"] = out
         if isinstance(out, dict) and out.get("__raise__"):
             raise RuntimeError(out["__raise__"])
         return out

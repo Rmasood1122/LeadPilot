@@ -109,6 +109,24 @@ _NON_STREAMING_MAX_TOKENS = 20_000
 # generation. Temperature is therefore chosen per call site, never globally.
 JUDGE_TEMPERATURE = 0.0
 
+# Phase 3 item 2: models that accept output_config.format (structured outputs,
+# constrained JSON). Source: Anthropic API reference, read 2026-10-21
+# (docs/program/ai/phase3-item2-output-contracts.md). claude-sonnet-4-6, the
+# current default, is NOT on it: on that model a schema changes nothing and
+# the caller's own parsing and guards stay the only contract. A dated id
+# (claude-haiku-4-5-20251001) counts as its family.
+STRUCTURED_OUTPUT_MODELS = frozenset({
+    "claude-fable-5-1", "claude-fable-5", "claude-opus-5-5", "claude-opus-5",
+    "claude-opus-4-8", "claude-sonnet-5-5", "claude-sonnet-5", "claude-haiku-5-5",
+    "claude-haiku-4-5", "claude-opus-4-5", "claude-opus-4-1",
+})
+
+
+def supports_structured_output(model: str) -> bool:
+    """Whether `model` accepts output_config.format."""
+    base = re.sub(r"-\d{8}$", "", (model or "").strip())
+    return base in STRUCTURED_OUTPUT_MODELS
+
 
 def _accepts_temperature(sdk_messages) -> bool:
     """Whether the SDK's create()/stream() take `temperature` as a keyword.
@@ -186,7 +204,7 @@ class ClaudeClient:
         reraise=True,
     )
     def complete(self, system: str, prompt: str, max_tokens: int | None = None,
-                 temperature: float | None = None) -> str:
+                 temperature: float | None = None, schema: dict | None = None) -> str:
         """One text completion. Returns concatenated text blocks.
 
         `temperature` is omitted from the request when None, which leaves the
@@ -226,6 +244,10 @@ class ClaudeClient:
             # Only sent when a caller asked for it. Absent, the account/API
             # default applies, which is what every generation path wants.
             _set_temperature(request, temperature, self._client.messages)
+        if schema is not None and supports_structured_output(settings.anthropic_model):
+            # The model can only emit JSON that matches `schema`; on any other
+            # model the request is unchanged (see STRUCTURED_OUTPUT_MODELS).
+            request["output_config"] = {"format": {"type": "json_schema", "schema": schema}}
         if limit > _NON_STREAMING_MAX_TOKENS:
             # The SDK REFUSES a non-streaming request whose max_tokens implies a
             # generation that could exceed 10 minutes — it raises
@@ -269,7 +291,7 @@ class ClaudeClient:
         return text
 
     def complete_json(self, system: str, prompt: str, max_tokens: int | None = None,
-                      temperature: float | None = None) -> dict:
+                      temperature: float | None = None, schema: dict | None = None) -> dict:
         """Completion that must return a single JSON object.
 
         The system prompt should already demand JSON-only output; this
@@ -283,7 +305,7 @@ class ClaudeClient:
         than being forced to 0 here.
         """
         raw = self.complete(system=system, prompt=prompt, max_tokens=max_tokens,
-                            temperature=temperature)
+                            temperature=temperature, schema=schema)
         cleaned = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
         try:
             data = json.loads(cleaned)

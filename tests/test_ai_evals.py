@@ -89,6 +89,30 @@ def test_case_passes_offline(spec, case):
     assert not result.error, result.error
     detail = [f"{v.grader}: {v.ok} ({v.detail})" for v in result.verdicts]
     assert result.passed, f"{spec.id}/{case.id} output={result.output!r}\n" + "\n".join(detail)
+    if not case.offline_only:
+        _assert_good_answers_fit_their_schema(spec, case, result.calls)
+
+
+def _assert_good_answers_fit_their_schema(spec, case, calls):
+    """Phase 3 item 2: a call that names a schema (sent as output_config.format
+    to models that support it) must accept every answer the app accepts. A
+    live-eligible case's recorded answers are good answers by definition
+    (offline_only marks the deliberately bad ones), so each must validate --
+    otherwise the schema would stop a real model giving an answer the app
+    handles, and that would only show up live."""
+    import json
+
+    import jsonschema
+
+    for call in calls:
+        schema = (call.get("kwargs") or {}).get("schema")
+        out = call.get("output")
+        if schema is None or call.get("kind") != "json" or out is None:
+            continue
+        data = json.loads(out) if isinstance(out, str) else out
+        errors = sorted(jsonschema.Draft202012Validator(schema).iter_errors(data), key=str)
+        assert not errors, (f"{spec.id}/{case.id}: a good recorded answer breaks its schema: "
+                            + "; ".join(f"{list(e.path)}: {e.message}" for e in errors[:5]))
 
 
 def test_offline_summary_passes_the_gate_against_its_own_baseline():
