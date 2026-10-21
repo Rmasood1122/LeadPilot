@@ -199,6 +199,21 @@ def _ticket(reason: str) -> SupportAnswer:
     )
 
 
+# Output contract (Phase 3 item 2): the four keys SYSTEM_PROMPT_HEADER asks
+# for. `confidence` may arrive as a string; _coerce_confidence handles it.
+SUPPORT_ANSWER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "on_topic": {"type": "boolean"},
+        "confidence": {"type": ["number", "string"]},
+        "answer": {"type": "string"},
+        "faq_ids": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["on_topic", "confidence", "answer", "faq_ids"],
+    "additionalProperties": False,
+}
+
+
 def _coerce_confidence(raw) -> float:
     try:
         value = float(raw)
@@ -429,6 +444,7 @@ def _live_answer(question: str, history: list[dict] | None = None) -> SupportAns
             system=SYSTEM_PROMPT_HEADER,
             prompt=prompt,
             max_tokens=settings.support_chat_max_tokens,
+            schema=SUPPORT_ANSWER_SCHEMA,
         )
     except Exception as exc:
         # A PERMANENT failure is a configuration problem, not an outage: a

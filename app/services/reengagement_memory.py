@@ -137,6 +137,19 @@ _SYSTEM = (
     "null."
 )
 
+# Output contract (Phase 3 item 2). `confidence` is asked for but not read.
+NOT_NOW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reason_kind": {"type": "string", "enum": list(REASON_KINDS)},
+        "reason_text": {"type": "string"},
+        "return_on": {"type": ["string", "null"]},
+        "confidence": {"type": ["number", "string"]},
+    },
+    "required": ["reason_kind", "reason_text", "return_on"],
+    "additionalProperties": False,
+}
+
 # F-AI-02: sender, subject and body are written by the prospect.
 _PROMPT = """{notice}
 
@@ -269,6 +282,7 @@ def extract(db: Session, reply: InboundReply, today: date | None = None) -> dict
                 subject=prompt_safety.inline(reply.subject or "(none)"),
                 body=prompt_safety.block(body[:4000])),
             max_tokens=400,
+            schema=NOT_NOW_SCHEMA,
         )
         return _clean_extraction(answer, body, today)
     except Exception as exc:  # noqa: BLE001 -- see the docstring
