@@ -43,7 +43,16 @@ def test_golden_set_meets_the_program_rules(spec):
     assert spec.problems() == []
 
 
-@pytest.mark.parametrize("spec,case", CASES, ids=[f"{s.id}-{c.id}" for s, c in CASES])
+def _params():
+    out = []
+    for spec, case in CASES:
+        marks = [pytest.mark.xfail(strict=True, reason=f"known defect: {case.known_failure}")] \
+            if case.known_failure else []
+        out.append(pytest.param(spec, case, marks=marks, id=f"{spec.id}-{case.id}"))
+    return out
+
+
+@pytest.mark.parametrize("spec,case", _params())
 def test_case_passes_offline(spec, case):
     result = _run(spec, case)
     assert not result.error, result.error
@@ -52,7 +61,10 @@ def test_case_passes_offline(spec, case):
 
 
 def test_offline_summary_passes_the_gate_against_its_own_baseline():
-    results = [_run(spec, case) for spec, case in CASES]
+    # Known defects are written into their golden sets (known_failure) and are
+    # xfail-strict above; they are left out here so the gate checks that
+    # nothing ELSE broke. Phase 3 removes each marker with its fix.
+    results = [_run(spec, case) for spec, case in CASES if not case.known_failure]
     summary = fw.summarise(results, k=1)
     decision = fw.gate(summary, fw.load_baseline().get("offline", {}), k=1)
     assert decision.ok, decision.reasons

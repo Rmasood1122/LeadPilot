@@ -50,9 +50,9 @@ def _field(output: Any, path: str | None) -> Any:
 def label(case, output, calls):
     """expect.label (or expect.labels): the app's final label equals it.
     expect.label_field picks a field when the output is a dict."""
-    want = case.expect.get("label", case.expect.get("labels"))
-    if want is None:
+    if "label" not in case.expect and "labels" not in case.expect:
         return None, "n/a"
+    want = case.expect["label"] if "label" in case.expect else case.expect["labels"]
     got = _field(output, case.expect.get("label_field"))
     allowed = want if isinstance(want, list) else [want]
     return (got in allowed), f"got {got!r}, want {allowed!r}"

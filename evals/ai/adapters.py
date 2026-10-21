@@ -118,3 +118,33 @@ def website_page(inp: dict, client) -> dict:
             inp.get("brief", "A page about keeping an agency's pipeline full every month."),
             list(inp.get("existing_pages") or []), slug=inp.get("slug", "page"),
             brand_name=inp.get("brand_name"))
+
+
+# --- T05 claim verification: model extraction + the rules that act on it ---
+
+@adapter("claim_verification")
+def claim_verification(inp: dict, client) -> dict:
+    """The outreach text after claim verification, as a send would get it:
+    `text` with unsupported claims about the prospect removed or rewritten,
+    and the decisions taken."""
+    from app.services import claim_verification as cv  # noqa: PLC0415
+
+    db = fresh_session()
+    try:
+        _user, _product, strategy = seed_account(db)
+        lead = seed_lead(db, strategy, full_name=inp.get("full_name", "Dana Whitfield"),
+                         title=inp.get("title", "Founder"),
+                         company=inp.get("company", "Northwind Studio"),
+                         enrichment_json=inp.get("enrichment") or {},
+                         linkedin_posts_json=inp.get("posts") or [])
+        db.commit()
+        text = inp.get("message", "")
+        with use_client(client):
+            claims = cv._model_claims(db, [text])
+        out, decisions = cv.verify_text(text, field_name="body", lead=lead,
+                                        evidence=cv.build_evidence(lead), sender_vocab="",
+                                        model_claims=claims)
+        return {"text": out, "decisions": [{"claim": d.claim_text, "verdict": d.verdict,
+                                            "category": d.category} for d in decisions]}
+    finally:
+        db.close()

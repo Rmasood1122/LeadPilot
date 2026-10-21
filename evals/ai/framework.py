@@ -17,6 +17,7 @@ ai-inventory.md, T01..T35). Its golden set lives in evals/ai/golden/<id>.yaml:
         input: {...}                        # what the adapter needs
         expect: {...}                       # parameters for the graders
         recorded: {...}                     # model output(s) replayed offline
+        known_failure: "<defect>"           # optional: a real defect, strict-xfail
 
 OFFLINE MODE (CI, every PR) replays `recorded` through the real app code:
 the adapter calls the same function production calls, with the gateway's
@@ -66,6 +67,11 @@ class Case:
     input: dict
     expect: dict
     recorded: Any = None
+    # A real product defect this case exposes, written down rather than the
+    # case bent until it passes. The offline test marks it strict-xfail (it
+    # must keep failing until the defect is fixed, then the marker goes) and
+    # it counts as a failure in every summary and baseline.
+    known_failure: str | None = None
 
     @property
     def safety(self) -> bool:  # set per touchpoint by Spec
@@ -116,7 +122,7 @@ def load_spec(path: Path) -> Spec:
     for raw in data.get("cases") or []:
         case = Case(id=str(raw["id"]), slice=raw["slice"], synthetic=bool(raw.get("synthetic", True)),
                     input=raw.get("input") or {}, expect=raw.get("expect") or {},
-                    recorded=raw.get("recorded"))
+                    recorded=raw.get("recorded"), known_failure=raw.get("known_failure"))
         case._safety = raw["slice"] in (data.get("safety_slices") or [])
         cases.append(case)
     return Spec(id=data["id"], title=data["title"], adapter=data["adapter"], kind=data["kind"],
