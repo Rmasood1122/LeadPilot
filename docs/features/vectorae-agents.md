@@ -1,4 +1,4 @@
-# Vectorae agents
+# Victorae agents
 
 Five advisory agents with native cores, plus a master supervisor that runs and
 watches them. Code: `app/agents/` (Python orchestration), `native/rust/`

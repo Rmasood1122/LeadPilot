@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * useNetwork — ClientHunter Enterprise
+ * useNetwork — Victorae
  *
  * Monitors network status and populates NetworkContext.
  * Called ONCE inside NativeProvider — do not call elsewhere.

@@ -15,7 +15,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { pageGraph } from "@/lib/seo/structuredData";
 
 export const metadata: Metadata = {
-  title: "About Vectorae by Calendarharvest | Calendarharvest",
+  title: "About Victorae | Calendarharvest",
   description:
     `${PRODUCT_FULL_NAME} was built by a founder who used it to find his own clients. Here is the story.`,
   ...canonicalMeta("/about/"),
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 const STEPS = [
   {
     title: "Research",
-    body: "Research runs once per campaign strategy before a single message is written: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability, and right before an email is written Vectorae can pull company news so the opening references something real. The AI is instructed never to invent a detail.",
+    body: "Research runs once per campaign strategy before a single message is written: 72 research steps, or 144 if you have no past clients yet, covering your ideal client profile, market, competitors, channels, and messaging. Sourced email addresses are checked for deliverability, and right before an email is written Victorae can pull company news so the opening references something real. The AI is instructed never to invent a detail.",
   },
   {
     title: "Outreach",
@@ -32,7 +32,7 @@ const STEPS = [
   },
   {
     title: "Replies and meetings",
-    body: "Replies come to you, classified, and a reply stops the prospect's sequence. You write every answer. Prospects book on your own Vectorae booking page.",
+    body: "Replies come to you, classified, and a reply stops the prospect's sequence. You write every answer. Prospects book on your own Victorae booking page.",
   },
 ];
 
@@ -61,6 +61,9 @@ export default function AboutPage() {
               time he went deep on delivery, his pipeline went quiet. So he built the system he wished
               existed: {PRODUCT_FULL_NAME}.
             </p>
+            <p className="mt-4 max-w-3xl text-base leading-relaxed text-gray-400">
+              {PRODUCT_FULL_NAME} was formerly called LeadPilot.
+            </p>
           </div>
         </section>
 
@@ -83,7 +86,7 @@ export default function AboutPage() {
         {/* 3. How it works */}
         <section className="border-t border-white/10 px-6 py-24">
           <div className="mx-auto max-w-6xl">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How Vectorae works</h2>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How Victorae works</h2>
             <ol className="mt-12 grid gap-10 md:grid-cols-3">
               {STEPS.map((step, i) => (
                 <li key={step.title} className="border-t border-white/10 pt-6">
@@ -127,7 +130,7 @@ export default function AboutPage() {
               Rehan is an AI engineer based in {FOUNDER.home_location}, working with clients around the
               world. He builds AI-powered automation and agent systems. His strongest conviction is
               simple: a founder who is excellent at delivery should never have to choose between doing the
-              work and finding the next client. Vectorae is his answer to that problem.
+              work and finding the next client. Victorae is his answer to that problem.
             </p>
           </div>
         </section>
@@ -163,7 +166,7 @@ function SiteNav() {
     <header className="border-b border-white/10 px-6 py-5">
       <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-8 gap-y-3">
         <Link href="/" className="text-lg font-bold text-white">
-          Vectorae
+          Victorae
         </Link>
         <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-gray-300">
           <li><Link href="/how-it-works" className="hover:text-white">How it Works</Link></li>

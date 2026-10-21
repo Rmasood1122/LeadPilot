@@ -19,8 +19,11 @@ export type CapabilityId = (typeof facts.capabilities)[number]["id"];
 export const PRODUCT_FACTS = facts;
 export const PRODUCT_NAME = facts.brand.product_name;
 export const COMPANY_NAME = facts.brand.company_name;
-/** "Vectorae by Calendarharvest": how the product is named in titles and first mentions. */
-export const PRODUCT_FULL_NAME = `${PRODUCT_NAME} by ${COMPANY_NAME}`;
+/** "Victorae": how the product is named in titles and first mentions. The
+ *  "by Calendarharvest" suffix was dropped with the Victorae rename
+ *  (docs/program/DECISIONS.md VIC-NAME); the company stays in each title's
+ *  "| Calendarharvest" site name and in the organisation JSON-LD. */
+export const PRODUCT_FULL_NAME = PRODUCT_NAME;
 
 export function capability(id: CapabilityId) {
   const found = facts.capabilities.find((c) => c.id === id);

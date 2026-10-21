@@ -442,7 +442,7 @@ def concealment_problems(text: str | None, owner_names=()) -> list[str]:
 
 
 CONCEALMENT_REFUSAL = (
-    "This text asks the AI to hide that it is an AI ({labels}). Vectorae's AI calls "
+    "This text asks the AI to hide that it is an AI ({labels}). Victorae's AI calls "
     "always say they are an AI assistant and that the call is recorded, and never "
     "claim to be you or a human. Sounding natural is fine; pretending to be human is "
     "not. Remove that instruction and save again."
@@ -771,7 +771,7 @@ def _eleven(db: Session, user_id):
 
 def _provider_error(exc: Exception, what: str) -> VoiceTwinError:
     logger.warning("voice twin: %s failed: %s", what, exc)
-    return VoiceTwinError(f"ElevenLabs refused to {what}. Nothing was kept by Vectorae; "
+    return VoiceTwinError(f"ElevenLabs refused to {what}. Nothing was kept by Victorae; "
                           "please try again.", 502)
 
 
@@ -811,7 +811,7 @@ def assert_can_verify(db: Session, user: User) -> VoiceClone:
 
 
 REVOKED_MEANWHILE = ("This voice clone was revoked while the recording was uploading. "
-                     "Nothing was kept by Vectorae, and the voice is being deleted at "
+                     "Nothing was kept by Victorae, and the voice is being deleted at "
                      "ElevenLabs.")
 
 
@@ -880,7 +880,7 @@ def verification_challenge(db: Session, user: User) -> dict:
 
 VERIFY_ON_ELEVENLABS = (
     "If no text appears here, verify on ElevenLabs instead: sign in at elevenlabs.io "
-    "with the account Vectorae uses, open Voices > My voices, choose the voice named "
+    "with the account Victorae uses, open Voices > My voices, choose the voice named "
     "\"Vectorae - <your name>\", press Verify and read the sentence aloud yourself. "
     "Then come back here and press \"Check status\"."
 )
@@ -1066,7 +1066,7 @@ def _delete_or_queue(db: Session, provider: str, voice_id: str, eleven) -> bool:
         db.add(row)
         db.flush()
         _operator_alert(db, row, f"A voice clone could not be deleted at {provider} "
-                                 f"({last}). Vectorae retries hourly; delete it by hand "
+                                 f"({last}). Victorae retries hourly; delete it by hand "
                                  "if this persists.")
     logger.error("voice twin: voice %s queued for deletion at %s: %s", voice_id, provider, last)
     return False
@@ -1553,7 +1553,7 @@ def notify_live(db: Session, call: Call) -> None:
             title=f"AI call live: {who}",
             body=("Your AI assistant is on a call now"
                   + (" in your voice" if call.voice_clone_used else "")
-                  + ". Open Vectorae and press Take over to talk yourself."),
+                  + ". Open Victorae and press Take over to talk yourself."),
             deep_link=_call_link(call),
             data={"call_id": str(call.id), "action": "take_over"})
 

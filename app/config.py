@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # --- App -----------------------------------------------------------
-    app_name: str = "Vectorae"
+    app_name: str = "Victorae"
     app_env: str = "development"  # development | production | test
     # DEDICATED flag for app/api/debug.py. Deliberately separate from app_env,
     # is_test and log_level so that no unrelated configuration change can turn

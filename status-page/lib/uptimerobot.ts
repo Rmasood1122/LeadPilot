@@ -1,6 +1,6 @@
 /**
  * UptimeRobot v2 `getMonitors` — the external prober, independent of the
- * Vectorae infrastructure it reports on.
+ * Victorae infrastructure it reports on.
  *
  * Read-only API key, server-side env var UPTIMEROBOT_API_KEY. The key goes in
  * the POST body to UptimeRobot and nowhere else: it is not returned from any

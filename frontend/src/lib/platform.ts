@@ -1,5 +1,5 @@
 /**
- * platform.ts - ClientHunter Enterprise
+ * platform.ts - Victorae
  *
  * Single source of truth for platform detection.
  * All conditional native/web code in the app imports from here - never

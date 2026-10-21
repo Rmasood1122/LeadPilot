@@ -53,9 +53,9 @@ PAGE_TYPES = ("landing", "blog", "case_study", "comparison", "location")
 
 SYSTEM_PROMPT = (
     "You are an expert SEO content engineer and conversion copywriter. "
-    "You write HTML pages that rank on Google and convert agency founders "
-    "into Vectorae Enterprise leads. You write as a founder who solved "
-    "his own pipeline problem — direct, specific, no buzzwords. "
+    "You write HTML pages that rank on Google and turn readers into leads "
+    "for the business described under BRAND CONTEXT, in that business's own "
+    "voice — direct, specific, no buzzwords. "
     "Banned words: solution, platform, synergy, game-changer, leverage, "
     "excited, seamless, disruptive, revolutionary, innovative. "
     "Respond ONLY with a JSON object. No prose outside JSON. "
@@ -72,20 +72,14 @@ EXISTING PAGES TO LINK TO:
 {existing_pages}
 
 BRAND CONTEXT:
-Product: Vectorae Enterprise
-Also known as: Calendarharvest
-Founder: Rehan Masood
-ICP: Boutique agency founders, 3-30 staff
-Markets: US, UK, Canada, Australia, New Zealand, Ireland, Singapore
-Core pain: Their pipeline runs when they push it. It stops when they stop.
-Voice: Founder to founder. Direct. Specific. No hype. No buzzwords.
+{brand_context}
 
 HTML STRUCTURE REQUIREMENTS:
 Complete HTML5 document with DOCTYPE html
 head must contain:
   meta charset UTF-8
   meta viewport width=device-width initial-scale=1.0
-  title tag: {meta_title} | Vectorae Enterprise
+  title tag: {meta_title} | {brand_name}
   meta name description content {meta_description}
   meta property og:title content {meta_title}
   meta property og:description content {meta_description}
@@ -104,7 +98,7 @@ body must contain:
   footer with copyright and links to /privacy and /terms
 
 SCHEMA MARKUP BY PAGE TYPE:
-blog:        Article schema with author Rehan Masood, datePublished {today}
+blog:        Article schema with author {author}, datePublished {today}
 case_study:  Article plus Review schema
 comparison:  Article schema
 landing:     Organization plus WebPage schema
@@ -118,6 +112,39 @@ OUTPUT — respond with ONLY this JSON object:
   "internal_links": ["slug1", "slug2"],
   "schema_markup": {{ JSON-LD object }}
 }}"""
+
+
+# BR-D1 (docs/program/brand/rename-inventory.md §4). Pages belong either to
+# our own marketing site (workspace_id NULL) or to a customer's workspace.
+# Only our own pages may carry our brand, founder and ICP; a customer's pages
+# are written for the customer's business, named by the caller, and must
+# never name us as their author or provider.
+OWN_SITE_BRAND = "Victorae"
+OWN_SITE_AUTHOR = "Rehan Masood"
+_OWN_SITE_CONTEXT = """Product: Victorae, made by Calendarharvest
+Founder: Rehan Masood
+ICP: Boutique agency founders, 3-30 staff
+Markets: US, UK, Canada, Australia, New Zealand, Ireland, Singapore
+Core pain: Their pipeline runs when they push it. It stops when they stop.
+Voice: Founder to founder. Direct. Specific. No hype. No buzzwords."""
+
+
+def brand_context(brand_name: str | None) -> tuple[str, str, str]:
+    """(context block, title-tag brand, schema author) for one page.
+
+    None means a page of our own marketing site. A name means a customer's
+    page: the block names only that business and tells the model the
+    audience and offer come from the brief, so nothing of ours (brand,
+    founder, ICP) reaches a customer's site.
+    """
+    if brand_name is None:
+        return _OWN_SITE_CONTEXT, OWN_SITE_BRAND, OWN_SITE_AUTHOR
+    name = " ".join(str(brand_name).split())[:100] or "this business"
+    context = (f"Business: {name}\n"
+               "Audience, offer and pain points: take them from the CONTENT BRIEF only.\n"
+               f"Write as {name}. Do not name any other company or product as the "
+               "author, owner or provider of this page.")
+    return context, name, name
 
 
 def _format_existing_pages(existing_pages: list[dict]) -> str:
@@ -147,8 +174,13 @@ def generate_page_html(
     slug: str = "",
     meta_title: str = "",
     meta_description: str = "",
+    brand_name: str | None = None,
 ) -> dict:
     """Write one complete, SEO-structured HTML page with Claude.
+
+    `brand_name` is the business the page is for: None for a page of our own
+    marketing site, the workspace's name for a customer's page
+    (brand_context explains why the two never mix).
 
     WHAT IT DOES. Builds the brand-and-structure prompt, makes ONE call
     through app/services/anthropic_client.py, and coerces the reply into the
@@ -167,9 +199,13 @@ def generate_page_html(
     propagates whatever the Anthropic gateway raises, including
     TruncatedResponseError: a half-written page must never be stored.
     """
+    context, title_brand, author = brand_context(brand_name)
     data = get_client().complete_json(
         system=SYSTEM_PROMPT,
         prompt=_USER_PROMPT.format(
+            brand_context=context,
+            brand_name=title_brand,
+            author=author,
             page_type=page_type,
             target_keyword=target_keyword,
             secondary_keywords=", ".join(secondary_keywords or []) or "(none)",

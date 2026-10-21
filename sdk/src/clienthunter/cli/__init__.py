@@ -1,4 +1,4 @@
-"""ClientHunter CLI — main Typer application.
+"""Victorae CLI — main Typer application.
 
 Registered commands::
 
@@ -35,7 +35,7 @@ from clienthunter.cli._status import status
 app = typer.Typer(
     name="clienthunter",
     help=(
-        "ClientHunter Enterprise — AI-powered client acquisition.\n\n"
+        "Victorae — AI-powered client acquisition.\n\n"
         "Start here: [bold]clienthunter init[/bold]\n"
         "Launch a campaign: [bold]clienthunter run[/bold]\n"
         "Watch progress: [bold]clienthunter status[/bold]"

@@ -45,7 +45,10 @@ const REPORT = args.includes('--report');
 // 2.3: the one source of product facts.
 const FACTS_FILE = path.join(FRONTEND, 'src', 'content', 'product-facts.json');
 const FACTS = JSON.parse(fs.readFileSync(FACTS_FILE, 'utf8'));
-const PRODUCT_FULL_NAME = `${FACTS.brand.product_name} by ${FACTS.brand.company_name}`;
+// Same rule as src/lib/productFacts.ts: the product name alone (VIC-NAME dropped "by Calendarharvest").
+const PRODUCT_FULL_NAME = FACTS.brand.product_name;
+// Legal pages whose title is legal text (see the title rule below).
+const LEGAL_PAGES = new Set(['/privacy/', '/terms/']);
 const SNAPSHOT_FILE = path.join(FRONTEND, 'src', 'content', 'plans-snapshot.json');
 
 const failures = [];
@@ -254,7 +257,12 @@ function main() {
     if (html.includes('TODO')) fail(where, 'HTML contains the string TODO');
 
     // 2.3: titles carry the full product name built from the brand constant.
-    if (title && !title.includes(PRODUCT_FULL_NAME)) fail(where, `title lacks "${PRODUCT_FULL_NAME}"`);
+    // Terms and Privacy are legal text (Class C in docs/program/brand/rename-inventory.md):
+    // their wording, title included, changes only with counsel, so they keep the
+    // previous product name until the founders update them (founder-actions.md).
+    if (title && !LEGAL_PAGES.has(urlPath) && !title.includes(PRODUCT_FULL_NAME)) {
+      fail(where, `title lacks "${PRODUCT_FULL_NAME}"`);
+    }
     checkFactsInJsonLd(where, nodes);
 
     const bodyText = (doc.querySelector('main') ?? doc.body)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';

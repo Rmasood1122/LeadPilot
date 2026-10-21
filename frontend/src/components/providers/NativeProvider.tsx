@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * NativeProvider — ClientHunter Enterprise
+ * NativeProvider — Victorae
  *
  * Single component that boots all native-only side-effects.
  * Imported ONCE in app/layout.tsx — nowhere else.

@@ -157,6 +157,20 @@ def test_quick_gate_secret_step_fails_on_a_committed_key(repo, monkeypatch):
     assert not _stamp(repo).exists()
 
 
+def test_quick_gate_brand_step_fails_on_an_old_product_name(repo, monkeypatch):
+    shutil.copytree(GATE, repo / "scripts" / "gate")
+    (repo / ".brand-allowlist").write_text(
+        "scripts/gate/* | .* | B: the gate scripts name the variants they block\n",
+        encoding="utf-8")
+    _git(repo, "add", "-A"); _git(repo, "commit", "-q", "-m", "tools")
+    _git(repo, "update-ref", "refs/remotes/origin/master", "HEAD")
+    monkeypatch.chdir(repo)
+    assert quick_gate.main(["--steps", "brand"]) == 0
+    _commit(repo, "docs/intro.md", "Welcome to LeadPilot.\n")
+    assert quick_gate.main(["--steps", "brand"]) == 1
+    assert not _stamp(repo).exists()
+
+
 def _all_pass(root, base, steps):
     return [quick_gate.StepResult(s, True, "ok") for s in steps], _git(root, "rev-parse", base)
 

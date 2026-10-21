@@ -1,4 +1,4 @@
-# Architecture — ClientHunter Enterprise
+# Architecture — Victorae
 
 ## Design Philosophy
 

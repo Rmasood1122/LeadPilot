@@ -22,7 +22,7 @@ GOOD_HTML = """<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Outbound Pipeline for Agencies | Vectorae</title>
+<title>Outbound Pipeline for Agencies | Acme Agency</title>
 <meta name="description" content="Your pipeline runs when you push it and stops when you stop. Here is how to build an outbound pipeline for agencies that does not need you.">
 <meta property="og:title" content="Outbound Pipeline for Agencies">
 <meta property="og:description" content="A pipeline that runs without the founder in it.">
@@ -45,7 +45,7 @@ structural reason every time.</p>
 <p>Read <a href="/blog/cold-email-not-working-agency">why cold email stops
 working</a> and <a href="/blog/apollo-clay-leadpilot-comparison">how the tools
 compare</a>.</p>
-<footer><p>&copy; 2026 Vectorae.
+<footer><p>&copy; 2026 Acme Agency.
 <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></p></footer>
 </body>
 </html>"""
@@ -58,7 +58,7 @@ def _body(**overrides) -> dict:
         "page_type": "blog",
         "slug": "blog/test-page",
         "title": "A Test Page About Agency Pipelines",
-        "meta_title": "A Test Page About Agency Pipelines | Vectorae",
+        "meta_title": "A Test Page About Agency Pipelines | Acme Agency",
         "meta_description": "A test page used to exercise the website builder end to end.",
         "target_keyword": "agency pipeline",
         "secondary_keywords": ["agency outbound"],
@@ -86,7 +86,7 @@ def _make_page(db_session, **overrides) -> m.SitePage:
         "page_type": m.PageType.BLOG,
         "slug": f"blog/{uuid.uuid4().hex[:8]}",
         "title": "Seeded page",
-        "meta_title": "Seeded page | Vectorae",
+        "meta_title": "Seeded page | Acme Agency",
         "meta_description": "Seeded directly in the database.",
         "target_keyword": KEYWORD,
         "brief": "x" * 60,
@@ -397,7 +397,7 @@ class TestScorePageSeoUnit:
 
     def test_an_over_long_title_fails_the_title_rule(self):
         long_title = "x" * 80
-        page = GOOD_HTML.replace("Outbound Pipeline for Agencies | Vectorae", long_title)
+        page = GOOD_HTML.replace("Outbound Pipeline for Agencies | Acme Agency", long_title)
         assert any("70 characters" in issue
                    for issue in score_page_seo(page, KEYWORD)["issues"])
 
@@ -476,3 +476,107 @@ class TestExportStaticSiteUnit:
                           "index_generated": False}
         assert (tmp_path / "sitemap.xml").exists()
         assert (tmp_path / "robots.txt").exists()
+
+
+# ---------------------------------------------------------------------------
+# BR-D1: whose brand a generated page carries. A page of our own marketing
+# site (no workspace) is written as Victorae; a customer workspace's page is
+# written for that customer's business and never names us, our founder or
+# our ideal customer profile.
+# ---------------------------------------------------------------------------
+
+OUR_MARKERS = ("Victorae", "Vectorae", "LeadPilot", "Calendarharvest", "Rehan Masood",
+               "Boutique agency founders")
+
+
+class _RecordingClaude:
+    def __init__(self):
+        self.calls = []
+
+    def complete_json(self, *, system, prompt, max_tokens):
+        self.calls.append({"system": system, "prompt": prompt})
+        return {"html_content": GOOD_HTML, "word_count": 1400, "reading_time_mins": 6,
+                "internal_links": [], "schema_markup": {}}
+
+
+@pytest.fixture()
+def recording_claude(monkeypatch):
+    from app.services import website_builder
+
+    fake = _RecordingClaude()
+    monkeypatch.setattr(website_builder, "get_client", lambda: fake)
+    return fake
+
+
+def _generate(**kwargs):
+    from app.services.website_builder import generate_page_html
+
+    return generate_page_html("blog", "Agency pipelines", "agency pipeline", [],
+                              "A brief about keeping an agency's pipeline full.", [],
+                              slug="agency-pipelines", **kwargs)
+
+
+class TestBrandContext:
+    def test_our_own_site_is_written_as_victorae(self, recording_claude):
+        _generate()
+        prompt = recording_claude.calls[0]["prompt"]
+        assert "Product: Victorae, made by Calendarharvest" in prompt
+        assert "title tag: Agency pipelines | Victorae" in prompt
+        assert "author Rehan Masood" in prompt
+
+    def test_a_customer_page_names_only_the_customer(self, recording_claude):
+        _generate(brand_name="Northwind Cleaning")
+        call = recording_claude.calls[0]
+        assert "Business: Northwind Cleaning" in call["prompt"]
+        assert "title tag: Agency pipelines | Northwind Cleaning" in call["prompt"]
+        assert "author Northwind Cleaning" in call["prompt"]
+        for marker in OUR_MARKERS:
+            assert marker not in call["prompt"], marker
+            assert marker not in call["system"], marker
+
+    def test_a_blank_customer_name_still_never_falls_back_to_ours(self, recording_claude):
+        _generate(brand_name="   ")
+        prompt = recording_claude.calls[0]["prompt"]
+        assert "Business: this business" in prompt
+        assert not any(marker in prompt for marker in OUR_MARKERS)
+
+    def test_the_worker_passes_the_workspace_name(self, db_session, test_user,
+                                                  recording_claude):
+        from app.workers.site_tasks import generate_page_impl
+
+        ws = m.Workspace(owner_user_id=test_user.id, name="Northwind Cleaning",
+                         slug=f"nw-{uuid.uuid4().hex[:8]}")
+        db_session.add(ws)
+        db_session.flush()
+        page = m.SitePage(workspace_id=ws.id, slug="nw-page", title="Office cleaning", meta_title="Office cleaning",
+                          meta_description="Office cleaning in Leeds",
+                          target_keyword="office cleaning", page_type=m.PageType.LANDING,
+                          brief="Office cleaning for small firms in Leeds, weekly or daily.")
+        db_session.add(page)
+        db_session.commit()
+
+        assert generate_page_impl(db_session, page.id, user_id=test_user.id)["status"] \
+            == "generated"
+        prompt = recording_claude.calls[0]["prompt"]
+        assert "Business: Northwind Cleaning" in prompt
+        assert not any(marker in prompt for marker in OUR_MARKERS)
+
+    def test_the_worker_uses_the_white_label_brand_when_it_is_on(self, db_session,
+                                                                 test_user,
+                                                                 recording_claude):
+        from app.workers.site_tasks import generate_page_impl
+
+        ws = m.Workspace(owner_user_id=test_user.id, name="Agency Ltd",
+                         slug=f"ag-{uuid.uuid4().hex[:8]}", white_label_enabled=True,
+                         brand_name="Bright Leads")
+        db_session.add(ws)
+        db_session.flush()
+        page = m.SitePage(workspace_id=ws.id, slug="bl-page", title="Lead generation", meta_title="Lead generation",
+                          meta_description="Lead generation for accountants",
+                          target_keyword="lead generation", page_type=m.PageType.LANDING,
+                          brief="Lead generation for accountants, done for you each month.")
+        db_session.add(page)
+        db_session.commit()
+
+        generate_page_impl(db_session, page.id, user_id=test_user.id)
+        assert "Business: Bright Leads" in recording_claude.calls[0]["prompt"]

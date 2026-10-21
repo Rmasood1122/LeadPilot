@@ -16,6 +16,8 @@ WHAT IT RUNS (against the diff from the merge-base with origin/master)
   lint        ruff, critical rules only (E9,F63,F7,F82), on changed .py files
   migrations  Alembic has exactly one head
   registry    evals/tools/registry_lint.py
+  brand       scripts/gate/brand_lint.py: no old product name outside
+              .brand-allowlist, across the whole repository
   tests       changed test files + tests that import changed app modules +
               the sealed compliance files (evals/compliance_testset.yaml)
   frontend    type-check, lint, unit tests -- only if frontend/ changed
@@ -41,7 +43,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-ALL_STEPS = ("secrets", "syntax", "lint", "migrations", "registry", "tests", "frontend")
+ALL_STEPS = ("secrets", "syntax", "lint", "migrations", "registry", "brand", "tests", "frontend")
 RUFF_CRITICAL = "E9,F63,F7,F82"
 MAX_SELECTED_TEST_FILES = 60
 
@@ -203,6 +205,11 @@ def step_registry(root: Path) -> StepResult:
     return StepResult("registry", code == 0, _tail(out, 5))
 
 
+def step_brand(root: Path) -> StepResult:
+    code, out = _run([sys.executable, "scripts/gate/brand_lint.py", "--root", str(root)], root)
+    return StepResult("brand", code == 0, _tail(out, 1) if code == 0 else _tail(out, 20))
+
+
 def step_tests(root: Path, changed: list[str]) -> StepResult:
     tests = select_tests(root, changed)
     code, out = _run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *tests], root)
@@ -234,6 +241,7 @@ def run(root: Path, base: str, steps: list[str]) -> tuple[list[StepResult], str]
         "lint": lambda: step_lint(root, changed),
         "migrations": lambda: step_migrations(root),
         "registry": lambda: step_registry(root),
+        "brand": lambda: step_brand(root),
         "tests": lambda: step_tests(root, changed),
         "frontend": lambda: step_frontend(root, changed),
     }

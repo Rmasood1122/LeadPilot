@@ -1,5 +1,5 @@
 """
-Structured logging for ClientHunter Enterprise.
+Structured logging for Victorae.
 
 Every log line is JSON with: timestamp, level, service, event, and context fields
 (strategy_id, lead_id, user_id, duration_ms, error, request_id).

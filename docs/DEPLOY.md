@@ -1,4 +1,4 @@
-# DEPLOY.md — ClientHunter Enterprise
+# DEPLOY.md — Victorae
 
 Zero-to-live deployment: from a fresh clone to a production system with Android app.
 Follow each section in order.

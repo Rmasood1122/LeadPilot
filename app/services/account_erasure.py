@@ -325,7 +325,7 @@ def cancel_billing(db: Session, user_id: uuid.UUID, now: datetime | None = None)
 
 
 # --------------------------------------------------------------------------
-# Outside Vectorae: providers and files
+# Outside Victorae: providers and files
 # --------------------------------------------------------------------------
 
 

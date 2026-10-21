@@ -1,4 +1,4 @@
-# Production docker-compose for ClientHunter Enterprise.
+# Production docker-compose for Victorae.
 #
 # NOTE ON RAILWAY: the live deployment targets Railway, which does NOT read this
 # file. This compose file is (a) the source of truth for what each Railway
