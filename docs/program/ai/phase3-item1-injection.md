@@ -47,7 +47,14 @@ Items 4 and 5 were not in any golden set. A read-only audit of every model call 
 
 ## Tool access
 
-No model call in the app is given tools, so untrusted text cannot reach tool access. Checked by the audit: every call is `complete`/`complete_json` with no `tools` parameter.
+- **Gateway calls: no tools.** `ClaudeClient.complete`/`complete_json` take no `tools` parameter (`app/services/anthropic_client.py:188,271`). No prompt built in the app can reach a tool.
+- **One model has tools: the inbound voice assistant** (T16, `voice_twin.py:1432`, run by the voice provider). A caller's live speech reaches it, and speech cannot be wrapped. Containment is therefore on the tool side (`voice_twin.py:1448-1535`), checked 2026-10-21. Every tool is scoped to the call's owner, so a manipulative caller can do nothing a visitor to the public booking page cannot.
+  - `find_times` returns only the owner's own free slots, the same as the public booking page.
+  - `book_meeting` re-checks the slot under the same host lock and offered-slot check as the public booking page, and validates and length-limits the name and email.
+  - `take_message` stores a length-limited note shown to the owner. It never reaches a prompt: `messages_taken` is read nowhere else.
+  - Any other tool name is refused.
+
+  Not proven: how a real model behaves under a hostile caller. That needs a live call test, outside the offline evals.
 
 ## Remaining limits
 
