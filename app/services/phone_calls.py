@@ -405,6 +405,18 @@ def analyze(session: Session, call: Call) -> dict:
     """Classify a conversation with Claude and route the lead. Commits."""
     from app.services import crm_events, event_bus  # noqa: PLC0415
     from app.services import sequence_engine as engine  # noqa: PLC0415
+    from app.services import voice_twin  # noqa: PLC0415
+
+    # Consent backstop, BEFORE the model call: a spoken stop in the other
+    # party's own turns is recorded whatever the model then does (outage,
+    # bad JSON, a missed stop_request). The webhook's post-call check does the
+    # same first; suppress_caller is idempotent, so neither it nor a Celery
+    # retry records the stop twice.
+    _assistant_turns, caller_turns = voice_twin.split_turns(call.transcript)
+    spoken_stop = voice_twin.caller_asked_to_stop(caller_turns)
+    if spoken_stop:
+        voice_twin.suppress_caller(session, call)
+        session.commit()
 
     data = anthropic_client.get_client().complete_json(
         system=ANALYSIS_SYSTEM,
@@ -422,24 +434,23 @@ def analyze(session: Session, call: Call) -> dict:
                              if isinstance(x, str)][:8],
         "next_step": str(data.get("next_step") or "")[:500],
         "sentiment": str(data.get("sentiment") or "neutral")[:20],
-        "stop_request": bool(data.get("stop_request")),
+        "stop_request": bool(data.get("stop_request")) or spoken_stop,
     }
     call.analysis_json = analysis
     lead = session.get(Lead, call.lead_id) if call.lead_id is not None else None
     _stamp_lead(lead, call)
     session.commit()
     if lead is None:
-        # Voice twin: an inbound caller who is no lead and asked not to be
-        # called is suppressed by number (the same stop handling).
-        if analysis["stop_request"] and call.direction == "inbound":
-            from app.services import voice_twin  # noqa: PLC0415
-
+        # A party who is no lead and asked not to be called is suppressed by
+        # number (the same stop handling; idempotent).
+        if analysis["stop_request"]:
             voice_twin.suppress_caller(session, call)
             session.commit()
         return analysis
 
     if analysis["stop_request"]:
-        engine.unsubscribe_lead(session, lead, source="call_stop_request", channel="phone")
+        # The lead's unsubscribe, unless this stop is already recorded.
+        voice_twin.suppress_caller(session, call)
         return analysis
 
     if call.outcome in (CallOutcome.INTERESTED, CallOutcome.NOT_INTERESTED):
