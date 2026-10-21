@@ -91,13 +91,19 @@ def displacement_dm(inp: dict, client) -> str | None:
 def website_page(inp: dict, client) -> dict:
     from app.services import website_builder as wb  # noqa: PLC0415
 
-    with use_client(client):
-        return wb.generate_page_html(
-            inp.get("page_type", "blog"), inp.get("title", "Agency pipelines"),
-            inp.get("target_keyword", "agency pipeline"), list(inp.get("secondary") or []),
-            inp.get("brief", "A page about keeping an agency's pipeline full every month."),
-            list(inp.get("existing_pages") or []), slug=inp.get("slug", "page"),
-            brand_name=inp.get("brand_name"))
+    # The app raises (ValueError on an unusable reply, the gateway's own
+    # errors otherwise) so the worker leaves the stored page untouched; the
+    # exception's type is that outcome, so it is returned for grading.
+    try:
+        with use_client(client):
+            return wb.generate_page_html(
+                inp.get("page_type", "blog"), inp.get("title", "Agency pipelines"),
+                inp.get("target_keyword", "agency pipeline"), list(inp.get("secondary") or []),
+                inp.get("brief", "A page about keeping an agency's pipeline full every month."),
+                list(inp.get("existing_pages") or []), slug=inp.get("slug", "page"),
+                brand_name=inp.get("brand_name"))
+    except Exception as exc:  # noqa: BLE001 -- graded, see above
+        return {"raised": type(exc).__name__}
 
 
 # --- T05 claim verification: model extraction + the rules that act on it ---

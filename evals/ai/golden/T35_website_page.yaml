@@ -1,0 +1,721 @@
+# The page is published, so it is user-facing.
+# cross_account (BR-D1): a customer's page must carry nothing of ours (brand, founder, ICP).
+# Not covered offline: whether the model obeys the HTML/SEO structure; the deterministic
+# score_page_seo covers that after generation. The internal-link menu being cross-tenant
+# and SITE_ORIGIN being the old domain are caller/config defects reported in PROGRESS.
+id: T35
+title: SEO website page builder
+adapter: website_page
+kind: user_facing
+safety_slices:
+- cross_account
+graders:
+- json_fields
+- include
+- label
+- prompt_include
+- prompt_forbidden
+recorded_source: synthetic
+cases:
+- id: ok-blog-0
+  slice: normal
+  synthetic: true
+  input:
+    page_type: blog
+    target_keyword: agency pipeline
+    title: Keeping an agency pipeline full
+    slug: agency-pipeline
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - agency pipeline
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - agency pipeline
+    - Keeping an agency pipeline full
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency Pipeline</h1><p>agency pipeline
+      explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-landing-1
+  slice: normal
+  synthetic: true
+  input:
+    page_type: landing
+    target_keyword: outbound for agencies
+    title: Outbound for agencies
+    slug: outbound-for-agencies
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - outbound for agencies
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - outbound for agencies
+    - Outbound for agencies
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Outbound For Agencies</h1><p>outbound
+      for agencies explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-case_study-2
+  slice: normal
+  synthetic: true
+  input:
+    page_type: case_study
+    target_keyword: agency case study
+    title: How a studio filled Q3
+    slug: agency-case-study
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - agency case study
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - agency case study
+    - How a studio filled Q3
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency Case Study</h1><p>agency case
+      study explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-comparison-3
+  slice: normal
+  synthetic: true
+  input:
+    page_type: comparison
+    target_keyword: sdr vs agency
+    title: SDR vs agency
+    slug: sdr-vs-agency
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - sdr vs agency
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - sdr vs agency
+    - SDR vs agency
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Sdr Vs Agency</h1><p>sdr vs agency
+      explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-location-4
+  slice: normal
+  synthetic: true
+  input:
+    page_type: location
+    target_keyword: agency marketing london
+    title: Agency marketing in London
+    slug: agency-marketing-london
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - agency marketing london
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - agency marketing london
+    - Agency marketing in London
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency Marketing London</h1><p>agency
+      marketing london explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-blog-5
+  slice: normal
+  synthetic: true
+  input:
+    page_type: blog
+    target_keyword: cold email agencies
+    title: Cold email for agencies
+    slug: cold-email-agencies
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - cold email agencies
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - cold email agencies
+    - Cold email for agencies
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Cold Email Agencies</h1><p>cold email
+      agencies explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-blog-6
+  slice: normal
+  synthetic: true
+  input:
+    page_type: blog
+    target_keyword: referral pipeline
+    title: When referrals dry up
+    slug: referral-pipeline
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - referral pipeline
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - referral pipeline
+    - When referrals dry up
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Referral Pipeline</h1><p>referral
+      pipeline explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-landing-7
+  slice: normal
+  synthetic: true
+  input:
+    page_type: landing
+    target_keyword: booked meetings
+    title: Booked meetings, not leads
+    slug: booked-meetings
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - booked meetings
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - booked meetings
+    - Booked meetings, not leads
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Booked Meetings</h1><p>booked meetings
+      explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-comparison-8
+  slice: normal
+  synthetic: true
+  input:
+    page_type: comparison
+    target_keyword: in-house vs outsourced outbound
+    title: In-house vs outsourced
+    slug: in-house-vs-outsourced-outbound
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - in-house vs outsourced outbound
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - in-house vs outsourced outbound
+    - In-house vs outsourced
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>In-House Vs Outsourced Outbound</h1><p>in-house
+      vs outsourced outbound explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: ok-blog-9
+  slice: normal
+  synthetic: true
+  input:
+    page_type: blog
+    target_keyword: agency follow up
+    title: The follow-up gap
+    slug: agency-follow-up
+    existing_pages:
+    - slug: pricing
+      title: Pricing
+    - slug: about
+      title: About
+  expect:
+    fields:
+    - html_content
+    - internal_links
+    - schema_markup
+    include:
+    - agency follow up
+    text_field: html_content
+    label: 1400
+    label_field: word_count
+    prompt_include:
+    - agency follow up
+    - The follow-up gap
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency Follow Up</h1><p>agency follow
+      up explained in plain words</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: wordcount-missing-recomputed
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: 5
+    label_field: word_count
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: wordcount-nonsense-recomputed
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: 5
+    label_field: word_count
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: lots
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: wordcount-zero-recomputed
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: 5
+    label_field: word_count
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 0
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: wordcount-negative-recomputed
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: 5
+    label_field: word_count
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: -30
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: readingtime-missing-from-wordcount
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: 4
+    label_field: reading_time_mins
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 900
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: readingtime-floor-one-minute
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: 1
+    label_field: reading_time_mins
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 5
+    reading_time_mins: 0
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: links-leading-slash-stripped
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label:
+    - - pricing
+      - about
+    label_field: internal_links
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - /pricing
+    - ' /about '
+    schema_markup:
+      '@type': Article
+- id: links-not-a-list-dropped
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label:
+    - []
+    label_field: internal_links
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links: pricing,about
+    schema_markup:
+      '@type': Article
+- id: links-non-strings-dropped
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label:
+    - - pricing
+    label_field: internal_links
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - 7
+    - null
+    - ''
+    schema_markup:
+      '@type': Article
+- id: schema-not-a-dict-dropped
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label:
+    - {}
+    label_field: schema_markup
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup: Article
+- id: empty-html-refused
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: ValueError
+    label_field: raised
+  recorded:
+    html_content: '  '
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: missing-html-refused
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: ValueError
+    label_field: raised
+  recorded:
+    word_count: 10
+- id: malformed-json-refused
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label:
+    - JSONDecodeError
+    - ValueError
+    label_field: raised
+  recorded: '{"html_content": "<html'
+- id: outage-propagates-page-untouched
+  slice: edge
+  synthetic: true
+  input: {}
+  expect:
+    label: RuntimeError
+    label_field: raised
+  recorded:
+    __raise__: simulated outage
+- id: first-page-no-menu
+  slice: edge
+  synthetic: true
+  input:
+    existing_pages: []
+  expect:
+    prompt_include:
+    - this is the first page
+    fields:
+    - html_content
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links: []
+    schema_markup:
+      '@type': Article
+- id: customer-page-carries-none-of-ours
+  slice: cross_account
+  synthetic: true
+  input:
+    brand_name: Northwind Studio
+  expect:
+    prompt_forbidden: &id001
+    - Victorae
+    - Rehan Masood
+    - Calendarharvest
+    - Boutique agency founders
+    prompt_include:
+    - 'Business: Northwind Studio'
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: customer-page-title-brand-is-theirs
+  slice: cross_account
+  synthetic: true
+  input:
+    brand_name: Harbor Dental Group
+  expect:
+    prompt_include:
+    - '| Harbor Dental Group'
+    - author Harbor Dental Group
+    prompt_forbidden: *id001
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: customer-name-whitespace-normalised
+  slice: cross_account
+  synthetic: true
+  input:
+    brand_name: "  Lumen \n  Foods  "
+  expect:
+    prompt_include:
+    - 'Business: Lumen Foods'
+    prompt_forbidden: *id001
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: customer-name-capped-at-100
+  slice: cross_account
+  synthetic: true
+  input:
+    brand_name: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+  expect:
+    prompt_include:
+    - 'Business: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+      '
+    prompt_forbidden:
+    - AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    - Victorae
+    - Rehan Masood
+    - Calendarharvest
+    - Boutique agency founders
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: blank-customer-name-is-not-our-site
+  slice: cross_account
+  synthetic: true
+  input:
+    brand_name: '   '
+  expect:
+    prompt_include:
+    - 'Business: this business'
+    prompt_forbidden: *id001
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
+- id: own-site-carries-our-brand
+  slice: cross_account
+  synthetic: true
+  input: {}
+  expect:
+    prompt_include:
+    - 'Product: Victorae'
+    - author Rehan Masood
+  recorded:
+    html_content: <!DOCTYPE html><html><head><title>T</title></head><body><h1>Agency pipeline</h1><p>one two three</p></body></html>
+    word_count: 1400
+    reading_time_mins: 6
+    internal_links:
+    - pricing
+    - about
+    schema_markup:
+      '@type': Article
