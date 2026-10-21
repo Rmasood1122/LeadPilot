@@ -2,6 +2,21 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-21 — **Victorae Phase 3 item 2 (output contracts)**, local commits on top of PR #122 (item 1, open). Phase 2 (#121) was merged 18:11Z from the web UI with no review recorded, not via `safe_merge.sh` (MERGE-B bypass, reported).
+
+  **Done**
+  - `complete_json(schema=)` sends `output_config.format` only to structured-output models.
+  - All 38 call sites name a schema (39 schemas).
+  - Coverage is enforced.
+
+  **Proven offline**
+  - API-valid schemas: 39/39.
+  - Every good golden answer fits its schema; a wrong schema was shown to turn T07 red.
+  - Evals unchanged: 1,173 passed, 53 xfailed. Sealed tests: 801 passed.
+
+  **No change on claude-sonnet-4-6** (not a structured-output model). The benefit comes with item 6, which needs the eval key and I4.
+
+  Known limits: WhatsApp variable keys 1-20; closed JSON-LD keys on an unread field. Report: `docs/program/ai/phase3-item2-output-contracts.md`.
 - 2026-10-21 — **Victorae Phase 3 item 1 (prompt injection)** on `claude/bold-heisenberg-58xvzj`, local commits on top of PR #121 (Phase 2, open, all 7 required checks green). Not pushed until #121 merges.
 
   **Done**
