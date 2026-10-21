@@ -145,7 +145,5 @@ def _json_calls_without_a_schema() -> list[str]:
     return out
 
 
-@pytest.mark.xfail(strict=True, reason="Phase 3 item 2 in progress: call sites get their "
-                   "schemas one module group per commit; this marker comes off with the last")
 def test_every_complete_json_call_passes_a_schema():
     assert _json_calls_without_a_schema() == []
