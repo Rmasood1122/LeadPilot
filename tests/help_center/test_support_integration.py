@@ -26,7 +26,7 @@ class Recorder:
         self.reply = reply or {"on_topic": True, "confidence": 0.9,
                                "answer": "Grounded.", "faq_ids": []}
 
-    def complete_json(self, system, prompt, max_tokens=None, temperature=None):
+    def complete_json(self, system, prompt, max_tokens=None, temperature=None, schema=None):
         self.calls.append((system, prompt))
         return self.reply
 
