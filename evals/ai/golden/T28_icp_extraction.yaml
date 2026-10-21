@@ -226,7 +226,6 @@ cases:
     input: {mode: tactic, research: *tactic_research}
     expect: {label: [[]], label_field: channels}
     recorded: '[{"channels": ["email"]}]'
-    known_failure: "icp_extraction.py:176 -- data.get() runs outside the try, so a non-object JSON reply (array/null) raises AttributeError although extract_tactic_profile is documented never to raise."
   # I3 / #30: what the scorers read from the ICP this touchpoint persists.
   - id: persisted-icp-is-readable-by-the-scorers
     slice: edge

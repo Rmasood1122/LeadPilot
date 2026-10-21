@@ -182,10 +182,13 @@ class ReplayClient:
         return out
 
     def complete_json(self, *, system: str = "", prompt: str = "", **kwargs) -> Any:
+        # Same contract as the gateway's complete_json: a JSON object or
+        # ValueError (JSONDecodeError is one) -- never a list, string or None.
+        from app.services.anthropic_client import require_object  # noqa: PLC0415
+
         out = self._next("json", system, prompt, kwargs)
-        if isinstance(out, str):
-            return json.loads(out)
-        return out
+        raw = out if isinstance(out, str) else json.dumps(out)
+        return require_object(json.loads(out) if isinstance(out, str) else out, raw)
 
     def complete(self, *, system: str = "", prompt: str = "", **kwargs) -> str:
         out = self._next("text", system, prompt, kwargs)

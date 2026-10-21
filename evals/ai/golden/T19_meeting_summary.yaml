@@ -95,7 +95,7 @@ cases:
     slice: edge
     synthetic: true
     input: {transcript: "Dana: Hi."}
-    expect: {label: null, label_field: summary, text_field: status, include: ["did not return a JSON object"]}
+    expect: {label: null, label_field: summary, text_field: status, include: ["not an object"]}
     recorded: [["summary", "points"]]
   - id: nothing-to-summarise-no-model
     slice: edge
