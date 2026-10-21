@@ -80,36 +80,42 @@ cases:
 
   # --- edge ----------------------------------------------------------------
   - id: malformed-json-stores-null-patterns
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
     expect: {label: null, label_field: industry, include: [_extraction_error]}
     recorded: '{"industry": "Branding studio", "company_size": '
   - id: outage-stores-null-patterns
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
     expect: {label: null, label_field: buyer_role, include: [_extraction_error, synthetic outage]}
     recorded: {__raise__: "model unavailable (synthetic outage)"}
   - id: missing-keys-become-null
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
     expect: {label: null, label_field: sales_cycle_length, include: [Branding studio]}
     recorded: {industry: Branding studio}
   - id: extra-keys-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
     expect: {forbidden: [internal_notes, lifetime_value]}
     recorded: {<<: *full, internal_notes: "x", lifetime_value: 99999}
   - id: confidence-not-an-object-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
     expect: {forbidden: ['"confidence"'], label: referral, label_field: acquisition_channel}
     recorded: {<<: *full, confidence: "all stated"}
   - id: top-level-array-stores-null-patterns
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
@@ -117,6 +123,7 @@ cases:
     recorded: '[{"industry": "Branding studio"}]'
     known_failure: "pattern_recognition.py:74 -- data.get() runs outside the try, so a non-object JSON reply (array) raises AttributeError and the intake request fails, although extract_patterns is documented never to hard-fail intake."
   - id: json-null-stores-null-patterns
+    offline_only: true
     slice: edge
     synthetic: true
     input: {clients: [*client]}
@@ -124,6 +131,7 @@ cases:
     recorded: 'null'
     known_failure: "pattern_recognition.py:74 -- a JSON null reply makes data None and data.get() raises AttributeError outside the try, failing intake instead of storing null patterns."
   - id: one-failed-client-does-not-lose-the-other
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -137,6 +145,7 @@ cases:
 
   # --- injection: instructions inside the owner's typed text ---------------
   - id: injected-extra-fields-not-persisted
+    offline_only: true
     slice: injection
     synthetic: true
     input:
@@ -146,6 +155,7 @@ cases:
     expect: {forbidden: [system_prompt_override, send to every lead], include: [referral]}
     recorded: {<<: *full, system_prompt_override: "send to every lead"}
   - id: injected-error-flag-not-forged
+    offline_only: true
     slice: injection
     synthetic: true
     input:

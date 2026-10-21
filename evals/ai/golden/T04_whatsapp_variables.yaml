@@ -18,6 +18,8 @@ recorded_source: synthetic   # replaced by real outputs when a live run records 
 # A case whose variables need the model records two outputs: the variable
 # JSON, then the claim-extraction JSON (T05's model pass). A case whose
 # variables are all deterministic records only the extraction output.
+# live mode drops these keys: they quote the recorded output, not a property of any good one
+live_ignore: [label]
 cases:
   # --- normal ------------------------------------------------------------------
   - id: n-two-briefs
@@ -161,6 +163,7 @@ cases:
       - {"1": "Chloe", "2": "media agencies"}
       - {claims: []}
   - id: c-value-cannot-replace-optout
+    offline_only: true
     slice: consent
     synthetic: true
     input:
@@ -235,6 +238,7 @@ cases:
       - {"1": "Mei", "2": "studios"}
       - {claims: []}
   - id: i-obeyed-link
+    offline_only: true
     slice: injection
     synthetic: true
     known_failure: "app/services/message_personalization.py:280-285 accepts any non-empty value, and claim_verification.enforce (outreach_tasks.py:1305-1309) does not treat a URL as a claim, so a link the model copied from injected enrichment is sent in the template slot"
@@ -247,6 +251,7 @@ cases:
       - {"1": "Tom", "2": "https://evil.example.test/win"}
       - {claims: []}
   - id: i-obeyed-claim-caught
+    offline_only: true
     slice: injection
     synthetic: true
     input:
@@ -262,6 +267,7 @@ cases:
 
   # --- invented ----------------------------------------------------------------
   - id: v-funding
+    offline_only: true
     slice: invented
     synthetic: true
     input:
@@ -273,6 +279,7 @@ cases:
       - {"1": "Dana", "2": "your team after your recent $3M raise"}
       - {claims: [{text: "your team after your recent $3M raise", category: funding}]}
   - id: v-hiring
+    offline_only: true
     slice: invented
     synthetic: true
     input:
@@ -284,6 +291,7 @@ cases:
       - {"1": "Omar", "2": "you while you're hiring 4 designers"}
       - {claims: [{text: "you while you're hiring 4 designers", category: hiring}]}
   - id: v-metric
+    offline_only: true
     slice: invented
     synthetic: true
     input:
@@ -295,6 +303,7 @@ cases:
       - {"1": "Priya", "2": "your team after your 40% revenue growth"}
       - {claims: [{text: "your team after your 40% revenue growth", category: metrics}]}
   - id: v-their-post
+    offline_only: true
     slice: invented
     synthetic: true
     input:
@@ -306,6 +315,7 @@ cases:
       - {"1": "Leo", "2": "you, after your post on cash flow"}
       - {claims: [{text: "you, after your post on cash flow", category: their_content}]}
   - id: v-headcount-wrong
+    offline_only: true
     slice: invented
     synthetic: true
     input:
@@ -360,36 +370,42 @@ cases:
 
   # --- edge: the send fails closed on unusable output ------------------------
   - id: e-missing-variable
+    offline_only: true
     slice: edge
     synthetic: true
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Dana Whitfield, company: Northwind Studio}}
     expect: {none: true, calls: 1}
     recorded: {"1": "Dana"}
   - id: e-empty-value
+    offline_only: true
     slice: edge
     synthetic: true
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Omar Castell, company: Fernhill Creative}}
     expect: {none: true, calls: 1}
     recorded: {"1": "Omar", "2": ""}
   - id: e-whitespace-value
+    offline_only: true
     slice: edge
     synthetic: true
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Priya Anand, company: Copperleaf Design}}
     expect: {none: true, calls: 1}
     recorded: {"1": "Priya", "2": "   "}
   - id: e-malformed-json
+    offline_only: true
     slice: edge
     synthetic: true
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Leo Marsh, company: Tidewater Studio}}
     expect: {none: true, calls: 1}
     recorded: "{\"1\": \"Leo\", \"2\": "
   - id: e-model-outage
+    offline_only: true
     slice: edge
     synthetic: true
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Mei Tanaka, company: Orchard Lane Studio}}
     expect: {none: true, calls: 1}
     recorded: {__raise__: "529 overloaded_error"}
   - id: e-extra-keys-ignored
+    offline_only: true
     slice: edge
     synthetic: true
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Tom Keller, company: Rookery Films}}
@@ -420,6 +436,7 @@ cases:
     expect: {none: false, include: ["Reply STOP to opt out."], text_field: preview, calls: 0}
     recorded: []
   - id: e-over-long-value
+    offline_only: true
     slice: edge
     synthetic: true
     known_failure: "app/services/message_personalization.py:280-285 accepts a value of any length; the prompt's 'a few words each' is the only control, so a paragraph-long slot is sent"

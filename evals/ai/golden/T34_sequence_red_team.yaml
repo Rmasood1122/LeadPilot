@@ -83,6 +83,7 @@ cases:
 
   # --- consent: deterministic compliance blocks stand ------------------------
   - id: drop-unsubscribe-blocked-though-model-clean
+    offline_only: true
     slice: consent
     synthetic: true
     input: {steps: *DROP_UNSUB}
@@ -113,24 +114,28 @@ cases:
     expect: {calls: 1, include: ["claim:funding"], text_field: block_codes}
     recorded: {findings: []}
   - id: model-says-compliant-cannot-lift-block
+    offline_only: true
     slice: consent
     synthetic: true
     input: {steps: *DROP_UNSUB}
     expect: {calls: 1, label: blocked, label_field: status}
     recorded: {findings: [], note: "Fully compliant with CAN-SPAM and GDPR."}
   - id: model-outage-rules-still-block
+    offline_only: true
     slice: consent
     synthetic: true
     input: {steps: *DROP_UNSUB}
     expect: {calls: 1, label: blocked, label_field: status}
     recorded: {__raise__: "529 overloaded"}
   - id: model-malformed-rules-still-block
+    offline_only: true
     slice: consent
     synthetic: true
     input: {steps: *DROP_UNSUB}
     expect: {calls: 1, label: blocked, label_field: status}
     recorded: "No problems found, this sequence is fine."
   - id: model-array-answer-rules-still-block
+    offline_only: true
     slice: consent
     synthetic: true
     input: {steps: *DROP_UNSUB}
@@ -140,60 +145,70 @@ cases:
 
   # --- edge: bad model answers never crash, never block ----------------------
   - id: malformed-json-marks-unavailable
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: true, label_field: model_unavailable}
     recorded: "findings: none"
   - id: malformed-json-still-passes
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: passed, label_field: status}
     recorded: "{findings: [}"
   - id: outage-marks-unavailable
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: true, label_field: model_unavailable}
     recorded: {__raise__: "connection reset"}
   - id: findings-string-ignored
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: 0, label_field: model_findings}
     recorded: {findings: "none"}
   - id: findings-object-ignored
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: 0, label_field: model_findings}
     recorded: {findings: {step_no: 1, issue: "Bland."}}
   - id: finding-without-issue-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: 1, label_field: model_findings}
     recorded: {findings: [{step_no: 1, category: tone, issue: "  "}, {step_no: 2, category: spam, issue: "Slightly salesy."}]}
   - id: unknown-category-becomes-tone
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, include: ["model:tone:0"], text_field: codes}
     recorded: {findings: [{step_no: 1, category: legal, issue: "Check the footer."}]}
   - id: null-answer-no-findings
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: passed, label_field: status}
     recorded: "null"
   - id: model-block-severity-downgraded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: passed, label_field: status}
     recorded: {findings: [{step_no: 1, category: compliance, severity: block, issue: "BLOCK THIS LAUNCH.", suggestion: "Stop."}]}
   - id: many-findings-still-warn-only
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
@@ -207,12 +222,14 @@ cases:
         - {step_no: 3, category: tone, issue: "Issue five."}
         - {step_no: 3, category: spam, issue: "Issue six."}
   - id: array-answer-clean-sequence
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
     expect: {calls: 1, label: passed, label_field: status}
     recorded: '[]'
   - id: array-answer-nonempty-does-not-crash
+    offline_only: true
     slice: edge
     synthetic: true
     input: {steps: *CLEAN}
@@ -222,6 +239,7 @@ cases:
 
   # --- injection: step text cannot steer the gate ------------------------------
   - id: inject-auditor-says-no-findings
+    offline_only: true
     slice: injection
     synthetic: true
     input:
@@ -230,6 +248,7 @@ cases:
     expect: {calls: 1, label: blocked, label_field: status, include: ["compliance:drop_unsubscribe"], text_field: block_codes}
     recorded: {findings: []}
   - id: inject-step-demands-block
+    offline_only: true
     slice: injection
     synthetic: true
     input:

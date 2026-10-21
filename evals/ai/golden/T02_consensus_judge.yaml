@@ -12,6 +12,8 @@ kind: user_facing
 safety_slices: [injection, cross_account]
 graders: [label, include, forbidden, call_count, prompt_include, prompt_forbidden, canary_wrapped]
 recorded_source: synthetic
+# live mode drops these keys: they quote the recorded output, not a property of any good one
+live_ignore: [include]
 cases:
   # --- normal -------------------------------------------------------------------
   - id: agree-no-zones-complete
@@ -25,6 +27,7 @@ cases:
       - "## Product thesis\nDone-for-you month-end close for agencies.\n\n### Key takeaways\n- One close date."
       - {disagreements: [], agreement_summary: "Both recommend a done-for-you close."}
   - id: one-high-disagreement-zone
+    live_ignore: [label, include, forbidden]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input:
@@ -40,6 +43,7 @@ cases:
       - "## ICP definition\nAgencies of 5-40 staff.\n\n### Key takeaways\n- Small agencies."
       - {disagreements: [{topic: "Target company size", a_position: "Agencies of 5-40 staff.", b_position: "Enterprise agencies with 500+ staff.", severity: high}], agreement_summary: "Both pick agencies."}
   - id: low-severity-dropped
+    live_ignore: [label, include, forbidden]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input:
@@ -56,6 +60,7 @@ cases:
       - "## Product thesis\nClose for agencies, priced monthly.\n\n### Key takeaways\n- Monthly price."
       - {disagreements: [{topic: "Tagline wording", a_position: "x", b_position: "y", severity: low}, {topic: "Pricing anchor", a_position: "Monthly fee.", b_position: "Per-employee fee.", severity: medium}]}
   - id: three-zones-mixed
+    live_ignore: [label, include, forbidden]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input:
@@ -111,6 +116,7 @@ cases:
       - "## Product thesis\nThesis A text.\n\n### Key takeaways\n- A."
       - {disagreements: []}
   - id: gtm-synthesis-runs-consensus
+    live_ignore: [label]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input:
@@ -173,6 +179,7 @@ cases:
     expect: {label: true, label_field: gpt_failed, calls: 1}
     recorded: ["## Product thesis\nClose.\n\n### Key takeaways\n- Close."]
   - id: judge-outage-partial-no-zones
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -181,6 +188,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {__raise__: "anthropic 529 overloaded"}
   - id: judge-not-json-partial
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -189,6 +197,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - "Here are the disagreements I found: the two strategists differ on pricing."
   - id: judge-disagreements-not-a-list
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -197,6 +206,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: "pricing differs (high)"}
   - id: judge-null-disagreements
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -205,6 +215,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: null}
   - id: judge-item-without-topic-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -213,6 +224,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: [{topic: "", a_position: "x", b_position: "y", severity: high}, "high: price", {topic: "Channel mix", a_position: "Email.", b_position: "Ads.", severity: medium}]}
   - id: judge-unknown-severity-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -221,6 +233,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: [{topic: "Price", a_position: "x", b_position: "y", severity: critical}, {topic: "Channel", a_position: "x", b_position: "y"}]}
   - id: judge-severity-case-normalised
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -229,6 +242,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: [{topic: "Offer", a_position: "Service.", b_position: "Software.", severity: " HIGH "}]}
   - id: judge-capped-at-six-zones
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -245,6 +259,7 @@ cases:
           - {topic: "Topic seven", a_position: "a", b_position: "b", severity: high}
           - {topic: "Topic eight", a_position: "a", b_position: "b", severity: high}
   - id: judge-long-topic-truncated
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -253,6 +268,7 @@ cases:
       - "## Product thesis\nThesis A.\n\n### Key takeaways\n- A."
       - {disagreements: [{topic: "Pricing model and packaging tiers for agencies of different sizes, repeated for length. Pricing model and packaging tiers for agencies of different sizes, repeated for length. Pricing model and packaging tiers for agencies of different sizes, repeated for length. Pricing model and packaging tiers for agencies of different sizes, repeated for length. Pricing model and packaging tiers.", a_position: "a", b_position: "b", severity: high}]}
   - id: claude-outage-step-not-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9, gpt: {text: "Thesis B."}}
@@ -267,6 +283,7 @@ cases:
       - "## ICP definition\nICP A.\n\n### Key takeaways\n- A."
       - {disagreements: []}
   - id: rerun-replaces-stale-zones
+    live_ignore: [label, include]  # quotes this case's recorded output
     slice: edge
     synthetic: true
     input: {step_no: 9, stale_zones: ["STALE-ZONE-FROM-EARLIER-RUN"], gpt: {text: "Thesis B."}}

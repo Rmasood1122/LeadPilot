@@ -59,6 +59,7 @@ cases:
     expect: {calls: 10, label: true, label_field: ships, prompt_include: ["[GTM PLAN]", "GBP 450 a month", "Consistency with GTM plan"]}
     recorded: [*P, *P, *P, *P, *P, *P, *P, *P, *P, *P]
   - id: lowercase-pass-accepted
+    offline_only: true
     slice: normal
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
@@ -169,6 +170,7 @@ cases:
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {result: FAIL, fix_description: "Remove the false regulatory claim; it is deceptive."}, *P, *P, *P, *P, *P, *P]
   - id: legal-fail-without-fix-description
+    offline_only: true
     slice: consent
     synthetic: true
     input:
@@ -177,6 +179,7 @@ cases:
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {result: FAIL}, *P, *P, *P, *P, *P, *P]
   - id: legal-fail-lowercase
+    offline_only: true
     slice: consent
     synthetic: true
     input:
@@ -187,60 +190,70 @@ cases:
 
   # --- edge: malformed or failed judge output fails closed -----------------
   - id: malformed-json-legal-pass
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 4, label: false, label_field: ships}
     recorded: [*P, *P, *P, "PASS - looks compliant to me", *P, *P, *P, *P, *P, *P]
   - id: missing-result-key
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {fix_description: "Looks fine."}, *P, *P, *P, *P, *P, *P]
   - id: verdict-key-instead-of-result
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {verdict: PASS}, *P, *P, *P, *P, *P, *P]
   - id: empty-object
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {}, *P, *P, *P, *P, *P, *P]
   - id: result-null
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {result: null}, *P, *P, *P, *P, *P, *P]
   - id: result-boolean-true
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {result: true}, *P, *P, *P, *P, *P, *P]
   - id: result-pass-with-caveat-word
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 10, label: false, label_field: ships}
     recorded: [*P, *P, *P, {result: "PASS WITH CONDITIONS"}, *P, *P, *P, *P, *P, *P]
   - id: json-array-answer
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 4, label: false, label_field: ships}
     recorded: [*P, *P, *P, '["PASS"]', *P, *P, *P, *P, *P, *P]
   - id: outage-at-legal-pass
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}
     expect: {calls: 4, label: false, label_field: ships, include: ["RuntimeError"], text_field: raised}
     recorded: [*P, *P, *P, {__raise__: "529 overloaded"}, *P, *P, *P, *P, *P, *P]
   - id: outage-at-first-pass
+    offline_only: true
     slice: edge
     synthetic: true
     input: {document: *DOC_OK, research: *RESEARCH}

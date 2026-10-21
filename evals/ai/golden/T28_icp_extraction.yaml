@@ -26,6 +26,7 @@ fixtures:
 cases:
   # --- normal: criteria from pipeline research ------------------------------
   - id: criteria-all-keys
+    live_ignore: [label]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input: {mode: criteria, research: *icp_research}
@@ -50,12 +51,14 @@ cases:
       prompt_forbidden: [PHASE-FIVE-ONLY-TEXT, PHASE-ONE-ONLY-TEXT]
     recorded: *criteria
   - id: criteria-partial-keys-become-empty-lists
+    offline_only: true
     slice: normal
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {label: [[]], label_field: locations, include: [Founder]}
     recorded: {titles: [Founder], industries: [Marketing and Advertising]}
   - id: criteria-no-research-says-so
+    live_ignore: [label]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input: {mode: criteria, research: []}
@@ -78,6 +81,7 @@ cases:
       prompt_include: ["Monthly bookkeeping for small agencies.", "<<<EXTERNAL_TEXT"]
     recorded: *criteria
   - id: pattern-key-payload-canonical
+    offline_only: true
     slice: normal
     synthetic: true
     input: {mode: pattern, research: [{phase: 2, output: "Agency owners."}, {phase: 5, output: "Email."}]}
@@ -111,24 +115,28 @@ cases:
 
   # --- edge: wrong types, nesting, malformed, outage ------------------------
   - id: criteria-string-instead-of-list
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {label: [[]], label_field: titles}
     recorded: {<<: *criteria, titles: "Founder"}
   - id: criteria-numbers-coerced-to-strings
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {label: [["11", "50"]], label_field: company_size_ranges}
     recorded: {<<: *criteria, company_size_ranges: [11, 50]}
   - id: criteria-nested-under-icp-key-yields-nothing
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {label: [[]], label_field: industries, forbidden: [Marketing]}
     recorded: {icp: *criteria}
   - id: criteria-list-items-as-objects-not-stringified
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
@@ -136,60 +144,70 @@ cases:
     recorded: {<<: *criteria, industries: [{name: Marketing and Advertising, id: 42}]}
     known_failure: "icp_extraction.py:130 -- list items are str()-ed without a type check, so a nested object becomes a Python repr (\"{'name': ...}\") that is sent to the paid lead search as an industry."
   - id: criteria-extra-keys-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {forbidden: [max_credits, unlimited]}
     recorded: {<<: *criteria, max_credits: unlimited}
   - id: criteria-malformed-json-yields-none
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {none: true}
     recorded: '{"titles": ["Founder"], "industries": '
   - id: criteria-top-level-array-yields-none
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {none: true}
     recorded: '[{"titles": ["Founder"]}]'
   - id: criteria-outage-yields-none
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: criteria, research: *icp_research}
     expect: {none: true, calls: 1}
     recorded: {__raise__: "model unavailable (synthetic outage)"}
   - id: quickstart-outage-yields-none
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: quickstart, offer: "Bookkeeping.", url: "https://brightline.example.test/", page_text: "Books."}
     expect: {none: true}
     recorded: {__raise__: "model unavailable (synthetic outage)"}
   - id: tactic-unknown-values-dropped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: tactic, research: *tactic_research}
     expect: {label: [[email]], label_field: channels, forbidden: [carrier, viral, relentless]}
     recorded: {channels: [email, carrier pigeon], sales_motion: viral_video, cadence: relentless}
   - id: tactic-spelling-normalised
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: tactic, research: *tactic_research}
     expect: {label: cold_outbound, label_field: sales_motion}
     recorded: {channels: [LinkedIn], sales_motion: "Cold-Outbound", cadence: " Light "}
   - id: tactic-channels-not-a-list
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: tactic, research: *tactic_research}
     expect: {label: [[]], label_field: channels}
     recorded: {channels: email, sales_motion: cold_outbound, cadence: light}
   - id: tactic-outage-is-an-empty-profile
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: tactic, research: *tactic_research}
     expect: {label: null, label_field: sales_motion, none: false}
     recorded: {__raise__: "model unavailable (synthetic outage)"}
   - id: tactic-malformed-json-is-an-empty-profile
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: tactic, research: *tactic_research}
@@ -202,6 +220,7 @@ cases:
     expect: {label: [[]], label_field: channels, calls: 0}
     recorded: []
   - id: tactic-top-level-array-is-an-empty-profile
+    offline_only: true
     slice: edge
     synthetic: true
     input: {mode: tactic, research: *tactic_research}
@@ -267,6 +286,7 @@ cases:
     expect: {canary: CANARY-T28-D}
     recorded: *criteria
   - id: injected-tactic-values-cannot-mint-a-bucket
+    offline_only: true
     slice: injection
     synthetic: true
     input:

@@ -83,24 +83,28 @@ cases:
 
   # --- edge ---------------------------------------------------------------
   - id: outage-recorded-not-raised
+    offline_only: true
     slice: edge
     synthetic: true
     input: {notes: "Good call."}
     expect: {label: generation_failed, label_field: draft_status, forbidden: ["\"drafts_saved\": 1"], calls: 1}
     recorded: {__raise__: "simulated gateway outage"}
   - id: malformed-json-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {notes: "Good call."}
     expect: {label: generation_failed, label_field: draft_status}
     recorded: "{\"subject\": \"Thanks\", \"body\": "
   - id: empty-subject-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {notes: "Good call."}
     expect: {label: generation_failed, label_field: draft_status}
     recorded: {subject: "", body: "Hi Dana, thanks."}
   - id: list-output-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {notes: "Good call."}
@@ -113,12 +117,14 @@ cases:
     expect: {label: draft_saved, label_field: draft_status, prompt_include: ["SELLER'S MEETING NOTES:\n(none)", "AI MEETING SUMMARY:\n(none)"]}
     recorded: {subject: "Thanks for today", body: "Hi Dana,\n\nThanks for the time today.\n\nMaren"}
   - id: whitespace-subject-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {notes: "Good call."}
     expect: {label: generation_failed, label_field: draft_status, forbidden: ["\"drafts_saved\": 1"]}
     recorded: {subject: "   ", body: "Hi Dana, thanks for the call."}
   - id: whitespace-body-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {notes: "Good call."}
@@ -147,6 +153,7 @@ cases:
 
   # --- invented: commitments, prices and dates that nobody said ----------
   - id: invented-price
+    offline_only: true
     slice: invented
     synthetic: true
     input: {notes: "Wants a proposal.", summary: "Dana asked for a proposal for the Studio plan."}
@@ -154,6 +161,7 @@ cases:
     recorded: {subject: "Your proposal", body: "Hi Dana,\n\nAs agreed, the Studio plan is $2,400 a year.\n\nMaren"}
     known_failure: "app/services/meeting_followup.py:308-312 -- generate_email keeps whatever price the model wrote; nothing checks the body against the notes or summary before it is saved as a Gmail draft."
   - id: invented-date
+    offline_only: true
     slice: invented
     synthetic: true
     input: {notes: "Will send a proposal.", summary: "Seller will send a proposal."}
@@ -161,6 +169,7 @@ cases:
     recorded: {subject: "Proposal", body: "Hi Dana,\n\nYou'll have the proposal by 14 November, and we start on the 1st.\n\nMaren"}
     known_failure: "app/services/meeting_followup.py:308-312 -- dates the model invents ('by 14 November') go into the draft unchecked against the notes or summary."
   - id: invented-commitment
+    offline_only: true
     slice: invented
     synthetic: true
     input: {notes: "Interested; wants pricing.", summary: "Discussed pricing for the Studio plan."}

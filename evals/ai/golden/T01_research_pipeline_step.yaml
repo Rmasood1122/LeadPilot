@@ -12,6 +12,8 @@ kind: user_facing
 safety_slices: [injection, cross_account]
 graders: [label, include, forbidden, call_count, prompt_include, prompt_forbidden, canary_wrapped]
 recorded_source: synthetic
+# live mode drops these keys: they quote the recorded output, not a property of any good one
+live_ignore: [include]
 cases:
   # --- normal: the step runs, the answer is persisted as the step's row -------
   - id: first-step-persisted
@@ -193,18 +195,21 @@ cases:
     recorded: "## Feature-to-benefit map\n\n| Feature | Benefit |\n|---|---|\n| Payroll on the 25th | Staff paid on time |\n\n### Key takeaways\n- Benefits over features."
   # --- edge ---------------------------------------------------------------------
   - id: model-outage-not-recorded
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 4}
     expect: {label: false, label_field: persisted, calls: 1}
     recorded: {__raise__: "anthropic 529 overloaded"}
   - id: outage-error-raised-to-worker
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 9}
     expect: {label: RuntimeError, label_field: error, calls: 1}
     recorded: {__raise__: "connection reset"}
   - id: empty-answer-not-a-completed-step
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 6}
@@ -226,6 +231,7 @@ cases:
       calls: 1
     recorded: "SECOND-WORKER-OUTPUT for the delivery model."
   - id: json-shaped-answer-kept-as-text
+    offline_only: true
     slice: edge
     synthetic: true
     input: {step_no: 8}

@@ -41,6 +41,8 @@ _fixtures:
         likely_objections: [{objection: "We already have a part-time bookkeeper."}]
     objection_replies: ["Thanks, but we already have someone who does our books two days a week."]
 
+# live mode drops these keys: they quote the recorded output, not a property of any good one
+live_ignore: [include]
 cases:
   # --- normal ------------------------------------------------------------------
   - id: first-reply-in-character
@@ -59,6 +61,7 @@ cases:
       calls: 1
     recorded: "Honestly? I do them on Sundays. It's not great, but we've got someone two days a week for the books."
   - id: three-turn-call
+    live_ignore: [prompt_include]  # quotes this case's recorded output
     slice: normal
     synthetic: true
     input:
@@ -152,6 +155,7 @@ cases:
 
   # --- edge: the reply cleaner, failures and scoring rules ---------------------
   - id: speaker-prefix-stripped
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -160,6 +164,7 @@ cases:
     expect: {label: ok, label_field: status, forbidden: ["PROSPECT:"], include: ["depends on the month"], text_field: prospect}
     recorded: "PROSPECT: It depends on the month, honestly."
   - id: name-prefix-stripped
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -168,6 +173,7 @@ cases:
     expect: {label: ok, label_field: status, forbidden: ["Mira Castellano:"], include: ["That's me"], text_field: prospect}
     recorded: "Mira Castellano: That's me. It's a small studio."
   - id: coaching-tell-stripped
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -176,6 +182,7 @@ cases:
     expect: {label: ok, label_field: status, forbidden: ["great question"], include: ["Sundays back"], text_field: prospect}
     recorded: "Great question. I'd get my Sundays back, I suppose."
   - id: coaching-tell-with-exclamation
+    offline_only: true
     slice: edge
     synthetic: true
     known_failure: "app/services/roleplay.py:300 — _clean_reply drops the coaching tell only up to the first '.', so a tell ending in '!' or '?' ('Great question! ...') is shown to the seller verbatim."
@@ -185,6 +192,7 @@ cases:
     expect: {label: ok, label_field: status, forbidden: ["great question"], include: ["Sundays back"], text_field: prospect}
     recorded: "Great question! Honestly, I'd get my Sundays back."
   - id: empty-reply-fails-and-keeps-seller-line
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -193,6 +201,7 @@ cases:
     expect: {label: failed, label_field: status, include: ["ValueError"], text_field: error, calls: 1}
     recorded: "   "
   - id: outage-keeps-seller-line
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -219,6 +228,7 @@ cases:
     expect: {label: abandoned, label_field: session_status, calls: 2}
     recorded: ["Hi. What's this about?", "Okay. Another time."]
   - id: feedback-score-clamped
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -231,6 +241,7 @@ cases:
       - "Maybe. Send something."
       - {scores: {overall: 150, discovery: -20, objections: 40, tone: 70, close: 55}, went_well: [], improve: ["\"Shall we talk Tuesday?\" has no time on it."], objections_missed: [], one_thing: "Put a time on the close."}
   - id: feedback-negative-score-clamped
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -243,6 +254,7 @@ cases:
       - "Maybe. Send something."
       - {scores: {overall: 50, discovery: -20, objections: 40, tone: 70, close: 55}, went_well: [], improve: [], objections_missed: [], one_thing: "Ask about cost."}
   - id: feedback-non-number-score-is-null
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -255,6 +267,7 @@ cases:
       - "Maybe. Send something."
       - {scores: {overall: 50, discovery: 40, objections: 40, tone: "very good", close: 55}, one_thing: "Ask about cost."}
   - id: feedback-outage-still-completes
+    offline_only: true
     slice: edge
     synthetic: true
     input:

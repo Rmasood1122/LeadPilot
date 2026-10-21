@@ -77,6 +77,9 @@ class Case:
     # output (malformed JSON, an outage, an out-of-range value). A live model
     # will not reproduce that output on demand, so live mode skips it.
     offline_only: bool = False
+    # Case-level additions to the set's live_ignore (expect keys that quote
+    # this case's recorded output).
+    live_ignore: list[str] = field(default_factory=list)
 
     @property
     def safety(self) -> bool:  # set per touchpoint by Spec
@@ -132,7 +135,8 @@ def load_spec(path: Path) -> Spec:
         case = Case(id=str(raw["id"]), slice=raw["slice"], synthetic=bool(raw.get("synthetic", True)),
                     input=raw.get("input") or {}, expect=raw.get("expect") or {},
                     recorded=raw.get("recorded"), known_failure=raw.get("known_failure"),
-                    offline_only=bool(raw.get("offline_only", False)))
+                    offline_only=bool(raw.get("offline_only", False)),
+                    live_ignore=list(raw.get("live_ignore") or []))
         case._safety = raw["slice"] in (data.get("safety_slices") or [])
         cases.append(case)
     return Spec(id=data["id"], title=data["title"], adapter=data["adapter"], kind=data["kind"],
