@@ -24,6 +24,15 @@ The baseline (`evals/ai/baseline.json`, commit `6deefef`) now scores the 12 case
 
 Each commit message lists the tests that fail on the old code and the covering test counts.
 
+## Evidence run (clean worktree, commit `e4a3bab`, tree `c5cc3f7`)
+
+| Command | Result |
+|---|---|
+| `scripts/gate/quick_gate.sh` | 8/8 PASS, stamped; tests step 3,989 passed, 41 xfailed |
+| `python3 evals/run_evals.py` | exit 0; 7,916 tests; full and compliance pass rate 1.0 |
+| `python3 evals/tools/promote.py` | **PROMOTE**, 1 soft WARN on runtime (1,577 s vs 900 s) |
+| `python3 evals/fixtures/verify_block_fixtures.py` | all 3 hard gates fire |
+
 ## Limits, stated plainly
 
 - **The legal-pass check is a presence floor, not a re-judge.** A rewrite that keeps the words but empties their meaning is not caught. The stronger fix is to re-run the legal judge after later rewrites, and its cost needs the live eval.
