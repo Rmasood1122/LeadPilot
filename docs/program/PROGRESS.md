@@ -2,6 +2,13 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-21 — **Victorae Phase 3 item 4 (Batch API): decision record, not built.**
+  - The item's premise fails: pipeline steps and verification passes are chained, each reads the previous output, so they cannot be batched within a strategy.
+  - Never batch: send-path rendering and claim check, reply routing and consent, call analysis (stop requests), meeting prep.
+  - Ranked candidates: displacement DMs, idle mutation, lead scoring with Loom, F-P-T-A at enrollment, website bulk.
+  - Building needs a migration, submit and poll tasks, and metering at the 50% price. Its value depends on the founders' `api_usage` volume query.
+  - Proposed threshold: build if the candidates spend more than about $50 a month.
+  - Record: `docs/program/ai/phase3-item4-batch-api.md`.
 - 2026-10-21 — **Victorae Phase 3 item 3 (prompt caching)**, local commits on top of item 2.
 
   **Measured first:** no touchpoint's stable prefix in the golden replays reaches sonnet-4-6's 1,024-token minimum. The production volume is in the verification loop (10 passes × document + research) and the research pipeline (72/144 steps).
