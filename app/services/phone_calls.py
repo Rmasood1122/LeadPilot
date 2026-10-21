@@ -211,7 +211,12 @@ def write_script(session: Session, strategy: Strategy, lead: Lead, brief: str) -
         f"STEP BRIEF: {brief}",
         f"MESSAGING PLAYBOOK:\n{_playbook(session, strategy)[:6000]}",
         f"IDEAL CUSTOMER PROFILE: {strategy.pattern_inputs_json or '(not extracted)'}",
-        f"PROSPECT: {lead.full_name or 'unknown'} — {lead.title or ''} at {lead.company or ''}",
+        # Name/title/company come from enrichment (outside text): wrapped,
+        # and one notice for the prompt -- personalization_context already
+        # opens its block with it, so only add it when that block is empty.
+        *([] if context else [prompt_safety.NOTICE]),
+        f"PROSPECT: {prompt_safety.inline(lead.full_name or 'unknown')} — "
+        f"{prompt_safety.inline(lead.title or '')} at {prompt_safety.inline(lead.company or '')}",
         context,
         "Return the JSON object now.",
     ])

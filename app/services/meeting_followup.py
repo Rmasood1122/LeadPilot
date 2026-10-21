@@ -64,7 +64,7 @@ from app.db.models import (
     Strategy,
     User,
 )
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -273,8 +273,14 @@ def build_prompt(db: Session, row: MeetingOutcome, lead: Lead, user: User) -> st
         f"OUTCOME: {OUTCOME_LABELS[row.outcome]}",
         f"WHAT TO DO: {_GUIDANCE[row.outcome]}",
         "",
-        f"PROSPECT: {profile.get('name') or 'unknown'} — {profile.get('title') or ''} "
-        f"at {profile.get('company') or 'unknown company'}",
+        # Outside text below (prospect profile, the AI summary of what they
+        # said in the meeting, the brief's reading of their replies) is
+        # wrapped; our own notes, guidance and strategy are not.
+        prompt_safety.NOTICE,
+        "",
+        f"PROSPECT: {prompt_safety.inline(profile.get('name') or 'unknown')} — "
+        f"{prompt_safety.inline(profile.get('title') or '')} "
+        f"at {prompt_safety.inline(profile.get('company') or 'unknown company')}",
         f"SELLER FIRST NAME: {seller_name or '(not given)'}",
         f"WHAT THE SELLER SELLS: "
         f"{(product.name + ' — ' + (product.description or '')) if product else '(unknown)'}",
@@ -283,10 +289,11 @@ def build_prompt(db: Session, row: MeetingOutcome, lead: Lead, user: User) -> st
         row.notes or "(none)",
         "",
         "AI MEETING SUMMARY:",
-        (meeting.summary if meeting and meeting.summary else "(none)"),
+        (prompt_safety.block(meeting.summary) if meeting and meeting.summary else "(none)"),
         "",
         "WHY THEY BOOKED (from the prep brief):",
-        brief_sections.get("why_they_booked") or "(none)",
+        (prompt_safety.block(brief_sections["why_they_booked"])
+         if brief_sections.get("why_they_booked") else "(none)"),
         "",
         "STRATEGY EXCERPT:",
         ((strategy.strategy_document or "")[:4000] if strategy else "(none)"),
