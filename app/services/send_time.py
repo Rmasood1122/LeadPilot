@@ -351,6 +351,42 @@ _PLAN_SYSTEM = (
     "works weekends. No prose, no markdown fences."
 )
 
+_PLAN_CHANNEL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "windows": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"days": {"type": "array", "items": {"type": "string"}},
+                               "start": {"type": "string"},
+                               "end": {"type": "string"}},
+                "required": ["days", "start", "end"],
+                "additionalProperties": False,
+            },
+        },
+        "reason": {"type": "string"},
+    },
+    "required": ["windows", "reason"],
+    "additionalProperties": False,
+}
+
+# Output contract (Phase 3 item 2). Each channel is optional (the priors fill
+# the rest); the window count, quarter-hour and permitted-hours rules stay in
+# _validated_model_channels (the API rejects minItems/maxItems).
+PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "channels": {
+            "type": "object",
+            "properties": {ch: _PLAN_CHANNEL_SCHEMA for ch in ("email", "linkedin", "whatsapp")},
+            "additionalProperties": False,
+        },
+    },
+    "required": ["channels"],
+    "additionalProperties": False,
+}
+
 
 def _plan_prompt(icp: dict, priors: dict) -> str:
     from app.services import prompt_safety  # noqa: PLC0415
@@ -431,7 +467,8 @@ def ensure_plan(session: Session, strategy: Strategy, *, now: datetime | None = 
 
             with usage_meter.owner_scope(session, strategy, "send_time"):
                 data = get_client().complete_json(system=_PLAN_SYSTEM,
-                                                  prompt=_plan_prompt(icp, channels))
+                                                  prompt=_plan_prompt(icp, channels),
+                                                  schema=PLAN_SCHEMA)
                 usage_meter.flush_active(session)
             refined = _validated_model_channels(data)
             if refined:

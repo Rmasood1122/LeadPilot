@@ -95,6 +95,34 @@ SYSTEM = (
     "fabricated one is not."
 )
 
+_DIMENSION_SCHEMA = {
+    "type": "object",
+    "properties": {"score": {"type": ["number", "string"]}, "reason": {"type": "string"}},
+    "required": ["score", "reason"],
+    "additionalProperties": False,
+}
+
+# Output contract (Phase 3 item 2). The +/-MAX_ADJUSTMENT clamp is enforced in
+# _resolve, never by the schema (the API rejects minimum/maximum). The score
+# may come as a string: _resolve coerces it with float().
+FPTA_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "prospects": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"lead_id": {"type": "string"},
+                               **{name: _DIMENSION_SCHEMA for name in DIMENSIONS}},
+                "required": ["lead_id", *DIMENSIONS],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["prospects"],
+    "additionalProperties": False,
+}
+
 
 # --------------------------------------------------------------------------
 # Helpers over the enrichment blob
@@ -348,7 +376,7 @@ def _model_pass(batch: list[tuple[Lead, dict]], brief: str, icp: dict) -> dict[s
               f"PROSPECTS:\n{prompt_safety.block(prospects)}"
               "\n\nReturn the JSON object now.")
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
-                                                       max_tokens=3000)
+                                                       max_tokens=3000, schema=FPTA_SCHEMA)
     out: dict[str, dict] = {}
     for row in (data or {}).get("prospects") or []:
         if isinstance(row, dict) and row.get("lead_id"):

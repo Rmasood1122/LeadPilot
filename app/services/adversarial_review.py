@@ -88,6 +88,32 @@ RED_TEAM_SYSTEM = (
     "\"suggestion\": \"<short>\"}]}. Respond {\"findings\": []} when nothing is wrong."
 )
 
+# Output contract (Phase 3 item 2). category is an enum: the prompt names this
+# closed set and model_findings maps exactly it (case-sensitive; anything else
+# becomes "tone").
+RED_TEAM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "findings": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "step_no": {"type": ["integer", "null"]},
+                    "category": {"type": "string",
+                                 "enum": ["spam", "tone", "compliance", "claim"]},
+                    "issue": {"type": "string"},
+                    "suggestion": {"type": "string"},
+                },
+                "required": ["category", "issue"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["findings"],
+    "additionalProperties": False,
+}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -285,7 +311,8 @@ def model_findings(session: Session, sequence: Sequence) -> list[dict]:
     try:
         data = anthropic_client.get_client().complete_json(
             system=RED_TEAM_SYSTEM, prompt=prompt,
-            max_tokens=1200, temperature=anthropic_client.JUDGE_TEMPERATURE)
+            max_tokens=1200, temperature=anthropic_client.JUDGE_TEMPERATURE,
+            schema=RED_TEAM_SCHEMA)
     except Exception as exc:  # noqa: BLE001 -- the rules still stand
         logger.info("red-team model pass unavailable: %s", type(exc).__name__)
         return [_finding("system:model_unavailable", INFO, "system",

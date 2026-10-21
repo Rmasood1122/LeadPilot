@@ -64,6 +64,20 @@ EXECUTION PLAN AND CHANNEL RESEARCH:
 {research}
 """
 
+# Output contract (Phase 3 item 2). The labels are plain strings, not enums:
+# _one() below normalises case, spaces and hyphens ("Cold Outbound" counts),
+# so the parsing and its filter to the allowed vocabulary stay the contract.
+TACTIC_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "channels": {"type": "array", "items": {"type": "string"}},
+        "sales_motion": {"type": ["string", "null"]},
+        "cadence": {"type": ["string", "null"]},
+    },
+    "required": ["channels"],
+    "additionalProperties": False,
+}
+
 _SYSTEM = (
     "You are Victorae's ICP extraction engine. From strategy research you "
     "produce structured lead-search criteria. Respond with ONLY a single "
@@ -83,6 +97,15 @@ empty list when unknown):
 RESEARCH:
 {research}
 """
+
+# Output contract (Phase 3 item 2): every criteria key, each a list of strings.
+CRITERIA_SCHEMA = {
+    "type": "object",
+    "properties": {key: {"type": "array", "items": {"type": "string"}}
+                   for key in CRITERIA_KEYS},
+    "required": list(CRITERIA_KEYS),
+    "additionalProperties": False,
+}
 
 
 def extract_icp_criteria(session: Session, strategy: Strategy) -> dict:
@@ -123,7 +146,8 @@ def criteria_from_research(research: str) -> dict:
     of their website instead of pipeline research, so both paths share one
     prompt, one output schema and one normalisation. Untrusted text inside
     `research` must already be delimited by the caller (prompt_safety)."""
-    data = get_client().complete_json(system=_SYSTEM, prompt=_PROMPT.format(research=research))
+    data = get_client().complete_json(system=_SYSTEM, prompt=_PROMPT.format(research=research),
+                                       schema=CRITERIA_SCHEMA)
     criteria = {}
     for key in CRITERIA_KEYS:
         value = data.get(key)
@@ -182,6 +206,7 @@ def extract_tactic_profile(session: Session, strategy: Strategy) -> dict:
                 cadences=", ".join(TACTIC_CADENCES),
                 research=research,
             ),
+            schema=TACTIC_SCHEMA,
         )
     except Exception as exc:  # noqa: BLE001 - classification must not fail a pipeline
         logger.warning("tactic classification failed for strategy %s: %s",

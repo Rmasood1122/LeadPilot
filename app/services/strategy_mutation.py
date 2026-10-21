@@ -68,6 +68,35 @@ SYSTEM = (
     "to this product and ICP."
 )
 
+
+def _strings(*keys: str) -> dict:
+    return {"type": "object", "properties": {k: {"type": "string"} for k in keys},
+            "required": list(keys), "additionalProperties": False}
+
+
+# Output contract (Phase 3 item 2). channel.recommended is a string, not an
+# enum: _clean_changes lower-cases it and blanks anything outside the four
+# channels, so that filter stays the contract.
+MUTATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "diagnosis": {"type": "string"},
+        "messaging_angle": _strings("current", "proposed", "rationale"),
+        "channel": _strings("recommended", "rationale"),
+        "icp_refinement": {
+            "type": "object",
+            "properties": {"changes": {"type": "array", "items": {"type": "string"}},
+                           "rationale": {"type": "string"}},
+            "required": ["changes", "rationale"],
+            "additionalProperties": False,
+        },
+        "revised_messaging": {"type": "string"},
+    },
+    "required": ["diagnosis", "messaging_angle", "channel", "icp_refinement",
+                 "revised_messaging"],
+    "additionalProperties": False,
+}
+
 ACTIVE_CAMPAIGN = "active"
 
 
@@ -275,7 +304,7 @@ def mutate(session: Session, strategy: Strategy, *, trigger: str,
         "Return the JSON object now.",
     ])
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
-                                                       max_tokens=4096)
+                                                       max_tokens=4096, schema=MUTATION_SCHEMA)
     changes = _clean_changes(data)
     if not changes["diagnosis"] or not changes["messaging_angle"]["proposed"]:
         raise ValueError("the model returned an empty mutation")

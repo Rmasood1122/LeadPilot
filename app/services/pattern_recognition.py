@@ -52,6 +52,22 @@ HOW THEY WERE ACQUIRED:
 {acquisition_story}
 """
 
+# Output contract (Phase 3 item 2). Every pattern key is asked for (null when
+# unknown); the confidence map is optional and its labels are stored as given.
+PATTERNS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        **{key: {"type": ["string", "null"]} for key in PATTERN_KEYS},
+        "confidence": {
+            "type": "object",
+            "properties": {key: {"type": ["string", "null"]} for key in PATTERN_KEYS},
+            "additionalProperties": False,
+        },
+    },
+    "required": list(PATTERN_KEYS),
+    "additionalProperties": False,
+}
+
 
 def extract_patterns(details: str, acquisition_story: str) -> dict:
     """Extract structured patterns for one past client.
@@ -66,6 +82,7 @@ def extract_patterns(details: str, acquisition_story: str) -> dict:
         data = client.complete_json(
             system=_SYSTEM,
             prompt=_PROMPT.format(details=details, acquisition_story=acquisition_story),
+            schema=PATTERNS_SCHEMA,
         )
     except Exception as exc:  # extraction must never break intake
         logger.warning("pattern extraction failed: %s", exc)

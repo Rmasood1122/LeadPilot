@@ -71,6 +71,30 @@ JUDGE_SYSTEM = (
 
 _KEEP = {"medium", "high"}
 
+# Output contract (Phase 3 item 2). severity is a string, not an enum: judge()
+# lower-cases it and keeps only medium/high. The 6-item cap is applied in
+# judge(), never by the schema (the API rejects maxItems).
+JUDGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "disagreements": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"topic": {"type": "string"},
+                               "a_position": {"type": "string"},
+                               "b_position": {"type": "string"},
+                               "severity": {"type": "string"}},
+                "required": ["topic", "a_position", "b_position", "severity"],
+                "additionalProperties": False,
+            },
+        },
+        "agreement_summary": {"type": "string"},
+    },
+    "required": ["disagreements"],
+    "additionalProperties": False,
+}
+
 
 def is_synthesis_step(spec) -> bool:
     return spec.step_no % 9 == 0
@@ -134,7 +158,7 @@ def judge(claude, section_title: str, claude_text: str, gpt_text: str) -> list[d
     from app.services.anthropic_client import JUDGE_TEMPERATURE  # noqa: PLC0415
 
     data = claude.complete_json(system=JUDGE_SYSTEM, prompt=prompt, max_tokens=2048,
-                                temperature=JUDGE_TEMPERATURE)
+                                temperature=JUDGE_TEMPERATURE, schema=JUDGE_SCHEMA)
     zones = []
     for item in (data or {}).get("disagreements") or []:
         if not isinstance(item, dict):

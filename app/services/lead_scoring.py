@@ -60,6 +60,28 @@ SYSTEM = (
     '"one sentence"}]}. Never invent facts about a lead.'
 )
 
+# Output contract (Phase 3 item 2). The +/-20 clamp is enforced in
+# score_leads, never by the schema (the API rejects minimum/maximum); the
+# score may come as a string, which score_leads coerces with float().
+SCORES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "scores": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"lead_id": {"type": "string"},
+                               "score": {"type": ["number", "string"]},
+                               "reason": {"type": "string"}},
+                "required": ["lead_id", "score", "reason"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["scores"],
+    "additionalProperties": False,
+}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -202,7 +224,7 @@ def _model_scores(batch: list[tuple[Lead, dict]], strategy: Strategy,
               f"LEADS:\n{prompt_safety.block(leads)}\n\n"
               "Return the JSON object now.")
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
-                                                       max_tokens=2048)
+                                                       max_tokens=2048, schema=SCORES_SCHEMA)
     out = {}
     for row in (data or {}).get("scores") or []:
         if isinstance(row, dict) and row.get("lead_id"):

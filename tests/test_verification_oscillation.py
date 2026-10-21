@@ -69,7 +69,8 @@ class OscillatingClaude:
         match = re.search(r"criterion #(\d+)", prompt, re.IGNORECASE)
         return int(match.group(1)) if match else 0
 
-    def complete_json(self, system: str, prompt: str, max_tokens=None, temperature=None) -> dict:
+    def complete_json(self, system: str, prompt: str, max_tokens=None, temperature=None,
+                      schema=None) -> dict:
         pass_no = self._pass_no(prompt)
         self.judge_calls.append(pass_no)
         if pass_no != self.target_pass:
