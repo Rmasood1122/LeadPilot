@@ -2,6 +2,28 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-21 — **Victorae Phase 3 item 1 (prompt injection)** on `claude/bold-heisenberg-58xvzj`, local commits on top of PR #121 (Phase 2, open, all 7 required checks green). Not pushed until #121 merges.
+
+  **Done**
+  - `complete_json` returns an object or raises ValueError (output contract).
+  - Untrusted text is wrapped in 17 modules, including the live call's system prompt.
+  - ICP criteria are validated.
+  - The re-engagement brief's second-order injection is closed.
+  - Analysed model text (our sent message, the draft under claim check) is delimited.
+
+  **Before and after (offline):**
+  - known defects 102 → 53;
+  - baseline 1,026 → 1,075 cases at pass@1 1.0;
+  - all 43 pinned injection defects and all 6 pinned output-shape defects fixed;
+  - no safety slice regressed.
+
+  Live before/after: blocked (no eval key). Report: `docs/program/ai/phase3-item1-injection.md`.
+
+  **Found by audit, not by a golden set:** the re-engagement brief path (HIGH) and four analysed-text sites; each now has a failing-first test.
+
+  **Reported, not fixed**
+  - Dependabot #117 (on master) broke a fresh `npm ci` (vitest 5 vs @types/node 20), so Vercel builds from master likely fail. A founder decision.
+  - Research text is wrapped inconsistently; this is for item 5.
 - 2026-10-21 — **Victorae Phase 2 (AI eval foundation)** on `claude/bold-heisenberg-58xvzj` after PR #118 (Phase 1) merged at 11:42Z. #118 was merged from the web UI as a merge commit, not via `safe_merge.sh`, and before the fresh-session /code-review and /security-review: that bypasses MERGE-B again (reported, not fixed). Master was merged into the branch, not rebased (no force-push).
 
   **Done**
