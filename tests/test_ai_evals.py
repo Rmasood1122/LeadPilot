@@ -41,6 +41,15 @@ def test_golden_set_meets_the_program_rules(spec):
     assert spec.adapter in ADAPTERS, f"{spec.id}: no adapter {spec.adapter!r}"
     assert all(g in gr.GRADERS for g in spec.graders), spec.graders
     assert spec.problems() == []
+    unread, unlisted = [], []
+    for case in spec.cases:
+        for key in case.expect:
+            if key not in gr.EXPECT_KEYS:
+                unread.append(f"{case.id}: {key}")
+            elif gr.EXPECT_KEYS[key] and gr.EXPECT_KEYS[key] not in spec.graders:
+                unlisted.append(f"{case.id}: {key} needs grader {gr.EXPECT_KEYS[key]}")
+    assert not unread, f"expect keys no grader reads: {unread}"
+    assert not unlisted, f"expect keys whose grader is not listed: {unlisted}"
 
 
 def _params():
@@ -116,6 +125,26 @@ class TestSummarise:
         s = summary["T99"]["slices"]["normal"]
         assert s["pass_at_1"] == pytest.approx(5 / 6, abs=1e-3)
         assert s["pass_pow_3"] == 0.5
+
+
+def test_use_client_restores_modules_first_imported_inside_it():
+    import sys
+    import types
+
+    from app.services import anthropic_client
+    from evals.ai.context import use_client
+
+    original = anthropic_client.get_client
+    name = "evals_ai_late_import_probe"
+    with use_client(object()):
+        late = types.ModuleType(name)
+        late.get_client = anthropic_client.get_client  # what `from ... import` does
+        sys.modules[name] = late
+    try:
+        assert late.get_client is original
+        assert anthropic_client.get_client is original
+    finally:
+        del sys.modules[name]
 
 
 class TestGraders:

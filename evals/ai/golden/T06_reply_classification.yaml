@@ -74,7 +74,7 @@ cases:
     slice: normal
     synthetic: true
     input: {subject: "Re: bookkeeping", body: "Sounds useful. Can we talk Thursday at 3pm?"}
-    expect: {label: interested, call_count: 1}
+    expect: {label: interested, calls: 1}
     recorded: {classification: interested}
   - id: interested-pricing
     slice: normal

@@ -28,22 +28,35 @@ def use_client(client: Any):
     from app.services import anthropic_client  # noqa: PLC0415
 
     original = anthropic_client.get_client
-    patched: list[tuple[object, str]] = []
+
+    def fake():
+        return client
+
+    patched: list[object] = []
     for module in list(sys.modules.values()):
         if module is None:
             continue
         try:
             if getattr(module, "get_client", None) is original:
-                patched.append((module, "get_client"))
+                patched.append(module)
         except Exception:  # noqa: BLE001 -- lazy modules can raise on getattr
             continue
     try:
-        for module, name in patched:
-            setattr(module, name, lambda: client)
+        for module in patched:
+            module.get_client = fake
         yield client
     finally:
-        for module, name in patched:
-            setattr(module, name, original)
+        # A module imported for the first time inside the block copied
+        # anthropic_client.get_client while it was `fake`; restore those too,
+        # or that module keeps this case's client for every later case.
+        for module in list(sys.modules.values()):
+            if module is None:
+                continue
+            try:
+                if getattr(module, "get_client", None) is fake:
+                    module.get_client = original
+            except Exception:  # noqa: BLE001 -- lazy modules can raise on getattr
+                continue
 
 
 def fresh_session():

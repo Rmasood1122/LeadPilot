@@ -231,6 +231,20 @@ JUDGE_SYSTEM = (
 )
 
 
+# Every expect key and the grader that reads it. The program-rules test
+# rejects a key that is not here (a typo would otherwise never be graded)
+# and a key whose grader the golden set does not list.
+EXPECT_KEYS = {
+    "label": "label", "labels": "label", "label_field": None, "not_label": "not_label",
+    "include": "include", "forbidden": "forbidden", "text_field": None,
+    "max_chars": "max_chars", "allowed_links": "links_allowlisted",
+    "numbers_from": "numbers_from_input", "numbers_ok": "numbers_from_input",
+    "fields": "json_fields", "none": "is_none", "canary": "canary_wrapped",
+    "prompt_include": "prompt_include", "prompt_forbidden": "prompt_forbidden",
+    "calls": "call_count",
+}
+
+
 def judge_rubric(client, dimension: str, rubric: str, case_input: Any, output: Any) -> tuple[bool | None, str]:
     """One judge call for one rubric dimension. Returns (True/False/None, reason).
 
