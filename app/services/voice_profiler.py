@@ -80,6 +80,20 @@ SYSTEM = (
     "private detail in signature_phrases -- describe habits, not content."
 )
 
+# Output contract (Phase 3 item 2): every dimension is the closed vocabulary
+# the prompt names and clean_dimensions maps.
+VOICE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        **{name: {"type": "string", "enum": list(allowed)}
+           for name, (allowed, _default) in DIMENSIONS.items()},
+        "uses_numbers": {"type": "boolean"},
+        "signature_phrases": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
 _PROMPT_HEADER = (
     "These are one person's recent LinkedIn posts. Extract their writing "
     "style.\n\n"
@@ -183,7 +197,7 @@ def extract_voice_profile(db: Session, product_id, linkedin_posts: list[str]) ->
         f"POST {index + 1}:\n{post}" for index, post in enumerate(posts)
     ) + "\n\nReturn the JSON object now."
     data = anthropic_client.get_client().complete_json(
-        system=SYSTEM, prompt=prompt, max_tokens=MAX_TOKENS)
+        system=SYSTEM, prompt=prompt, max_tokens=MAX_TOKENS, schema=VOICE_SCHEMA)
     dimensions, phrases = clean_dimensions(data)
 
     profile = get_profile(db, product_id)

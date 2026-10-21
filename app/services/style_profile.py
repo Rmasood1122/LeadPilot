@@ -47,6 +47,29 @@ _LENGTH = {"short", "medium", "long"}
 _HUMOR = {"none", "light", "frequent"}
 
 
+# Output contract (Phase 3 item 2): what _clean_profile reads. Numbers are
+# coerced with float(), so a number sent as a string is accepted too.
+STYLE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "tone": {"type": "string"},
+        "formality": {"type": ["number", "string"]},
+        "vocabulary_level": {"type": "string", "enum": sorted(_VOCAB)},
+        "sentence_length": {"type": "string", "enum": sorted(_LENGTH)},
+        "avg_words_per_sentence": {"type": ["number", "string"]},
+        "humor": {"type": "string", "enum": sorted(_HUMOR)},
+        "greeting_style": {"type": "string"},
+        "signoff_style": {"type": "string"},
+        "signature_habits": {"type": "array", "items": {"type": "string"}},
+        "do": {"type": "array", "items": {"type": "string"}},
+        "dont": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+    },
+    "required": ["tone", "summary"],
+    "additionalProperties": False,
+}
+
+
 class InvalidSamples(ValueError):
     pass
 
@@ -107,7 +130,8 @@ def extract(db: Session, user: User, samples: list[str]) -> dict:
     cleaned = clean_samples(samples)
     prompt = "\n\n".join(f"SAMPLE {i + 1}:\n{s}" for i, s in enumerate(cleaned))
     data = anthropic_client.get_client().complete_json(
-        system=SYSTEM, prompt=prompt + "\n\nReturn the JSON object now.", max_tokens=1500)
+        system=SYSTEM, prompt=prompt + "\n\nReturn the JSON object now.", max_tokens=1500,
+        schema=STYLE_SCHEMA)
     profile = _clean_profile(data)
     if not profile["tone"] and not profile["summary"]:
         raise ValueError("the style analysis came back empty -- try longer samples")

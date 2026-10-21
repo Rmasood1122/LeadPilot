@@ -125,6 +125,15 @@ SYSTEM = (
 )
 
 
+# Output contract (Phase 3 item 2): generate_email reads these two keys.
+FOLLOWUP_EMAIL_SCHEMA = {
+    "type": "object",
+    "properties": {"subject": {"type": "string"}, "body": {"type": "string"}},
+    "required": ["subject", "body"],
+    "additionalProperties": False,
+}
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -311,6 +320,7 @@ def generate_email(db: Session, row: MeetingOutcome, lead: Lead, user: User) -> 
         system=SYSTEM + system_suffix(getattr(user, "style_profile_json", None)),
         prompt=build_prompt(db, row, lead, user),
         max_tokens=settings.meeting_followup_max_tokens,
+        schema=FOLLOWUP_EMAIL_SCHEMA,
     )
     subject = str((data or {}).get("subject") or "").strip()
     body = str((data or {}).get("body") or "").strip()

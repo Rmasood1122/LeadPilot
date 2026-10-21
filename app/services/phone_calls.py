@@ -101,6 +101,48 @@ ANALYSIS_SYSTEM = (
     "never invent them."
 )
 
+# Output contracts (Phase 3 item 2): what write_script and analyze read.
+SCRIPT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "first_message": {"type": "string"},
+        "objective": {"type": "string"},
+        "talking_points": {"type": "array", "items": {"type": "string"}},
+        "objection_handling": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"objection": {"type": "string"},
+                               "response": {"type": "string"}},
+                "required": ["objection", "response"],
+                "additionalProperties": False,
+            },
+        },
+        "questions": {"type": "array", "items": {"type": "string"}},
+        "close": {"type": "string"},
+        "voicemail": {"type": "string"},
+    },
+    "required": ["first_message"],
+    "additionalProperties": False,
+}
+
+# `outcome` is a closed set the code maps exactly (anything else is
+# `answered`); `sentiment` is stored as given, so it stays a free string.
+ANALYSIS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "outcome": {"type": "string", "enum": ["interested", "not_interested", "answered"]},
+        "summary": {"type": "string"},
+        "objections": {"type": "array", "items": {"type": "string"}},
+        "interest_signals": {"type": "array", "items": {"type": "string"}},
+        "next_step": {"type": "string"},
+        "stop_request": {"type": "boolean"},
+        "sentiment": {"type": "string"},
+    },
+    "required": ["outcome"],
+    "additionalProperties": False,
+}
+
 VOICEMAIL_DIR = "voicemails"
 
 
@@ -222,7 +264,7 @@ def write_script(session: Session, strategy: Strategy, lead: Lead, brief: str) -
     ])
     data = anthropic_client.get_client().complete_json(
         system=SCRIPT_SYSTEM + style_profile.suffix_for_strategy(session, strategy),
-        prompt=prompt, max_tokens=2048)
+        prompt=prompt, max_tokens=2048, schema=SCRIPT_SCHEMA)
     script = _clean_script(data)
     if not script["first_message"]:
         raise ValueError("the call script came back without a first message")
@@ -367,7 +409,7 @@ def analyze(session: Session, call: Call) -> dict:
     data = anthropic_client.get_client().complete_json(
         system=ANALYSIS_SYSTEM,
         prompt=analysis_prompt(call),
-        max_tokens=1500)
+        max_tokens=1500, schema=ANALYSIS_SCHEMA)
     data = data if isinstance(data, dict) else {}
     outcome = str(data.get("outcome") or "answered").lower()
     call.outcome = {"interested": CallOutcome.INTERESTED,

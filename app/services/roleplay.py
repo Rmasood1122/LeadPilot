@@ -109,6 +109,37 @@ _FEEDBACK_SYSTEM = (
 )
 
 
+# Output contract (Phase 3 item 2): what _clean_feedback reads. Scores are
+# coerced with float(), so a number sent as a string is accepted too.
+FEEDBACK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "scores": {
+            "type": "object",
+            "properties": {key: {"type": ["number", "string"]} for key in SCORE_KEYS},
+            "required": list(SCORE_KEYS),
+            "additionalProperties": False,
+        },
+        "went_well": {"type": "array", "items": {"type": "string"}},
+        "improve": {"type": "array", "items": {"type": "string"}},
+        "tone_notes": {"type": "string"},
+        "pacing_notes": {"type": "string"},
+        "objections_missed": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"objection": {"type": "string"}, "why": {"type": "string"}},
+                "required": ["objection", "why"],
+                "additionalProperties": False,
+            },
+        },
+        "one_thing": {"type": "string"},
+    },
+    "required": ["scores"],
+    "additionalProperties": False,
+}
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -456,6 +487,7 @@ def finish(db: Session, session: RoleplaySession, *, abandoned: bool = False,
                     + f"\n\nTRANSCRIPT\n{prompt_safety.block(_transcript(rows))}"
                     + "\n\nReturn the JSON object now."),
             max_tokens=MAX_TOKENS_FEEDBACK,
+            schema=FEEDBACK_SCHEMA,
         )
         feedback = _clean_feedback(data)
     except Exception as exc:  # noqa: BLE001

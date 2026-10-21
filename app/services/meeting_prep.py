@@ -103,6 +103,28 @@ _LIST_KEYS = {"pain_points": 8, "talking_points": 8,
               "discovery_questions": 8, "next_steps": 6}
 
 
+# Output contract (Phase 3 item 2): every key clean_sections reads.
+BRIEF_SCHEMA = {
+    "type": "object",
+    "properties": {
+        **{key: {"type": "string"} for key in _TEXT_KEYS},
+        **{key: {"type": "array", "items": {"type": "string"}} for key in _LIST_KEYS},
+        "likely_objections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"objection": {"type": "string"},
+                               "response": {"type": "string"}},
+                "required": ["objection", "response"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": [],
+    "additionalProperties": False,
+}
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -587,6 +609,7 @@ def generate_brief(db: Session, brief_id: uuid.UUID, *, notify: bool = True,
         data = anthropic_client.get_client().complete_json(
             system=SYSTEM, prompt=build_prompt(ctx),
             max_tokens=settings.meeting_prep_max_tokens,
+            schema=BRIEF_SCHEMA,
         )
     except Exception as exc:  # noqa: BLE001 -- see the module docstring
         logger.warning("meeting prep generation failed for brief %s: %s: %s",

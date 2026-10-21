@@ -66,6 +66,34 @@ _SYSTEM = (
     "state a fact, name, number or date that is not in the material given."
 )
 
+# Output contract (Phase 3 item 2). `sentiment` and `owner` are closed sets
+# the sanitiser maps exactly; `done` is read if present (the UI writes it).
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "key_points": {"type": "array", "items": {"type": "string"}},
+        "action_items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "owner": {"type": "string", "enum": ["us", "client"]},
+                    "due": {"type": ["string", "null"]},
+                    "done": {"type": "boolean"},
+                },
+                "required": ["text"],
+                "additionalProperties": False,
+            },
+        },
+        "next_steps": {"type": "array", "items": {"type": "string"}},
+        "sentiment": {"type": "string", "enum": list(_SENTIMENTS)},
+    },
+    "required": ["summary"],
+    "additionalProperties": False,
+}
+
 # F-AI-02: the transcript is what the PROSPECT (and anyone else on the call)
 # said, and the prospect's name, company and title come from enrichment --
 # outside text, delimited and escaped. The seller's own notes and the product
@@ -196,6 +224,7 @@ def generate_meeting_summary(
         data = get_client().complete_json(
             system=_SYSTEM, prompt=prompt,
             max_tokens=settings.meeting_ai_max_tokens,
+            schema=SUMMARY_SCHEMA,
         )
     except Exception as exc:  # noqa: BLE001 — see the module docstring
         logger.warning("meeting summary generation failed: %s: %s",
