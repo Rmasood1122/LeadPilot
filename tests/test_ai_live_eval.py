@@ -172,3 +172,49 @@ class TestRun:
         [(_s, case)] = le.live_cases([spec], None)
         assert case.expect == {"label": "a"}
         assert spec.cases[0].expect["include"] == ["recorded words"]  # offline keeps it
+
+
+class TestSandbox:
+    """The live runner's environment (evals/ai/sandbox.py). Run in a
+    subprocess: this process was already configured by tests/conftest.py."""
+
+    def _run(self, code: str, env_extra: dict) -> str:
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        env = {**os.environ, **env_extra}
+        root = Path(__file__).resolve().parents[1]
+        out = subprocess.run([sys.executable, "-c", code], cwd=root, env=env,
+                             capture_output=True, text=True, timeout=120)
+        assert out.returncode == 0, out.stderr[-2000:]
+        return out.stdout.strip()
+
+    def test_production_values_in_the_shell_are_overridden(self):
+        prod = {"REDIS_URL": "rediss://prod.example.invalid:6379",
+                "CELERY_BROKER_URL": "rediss://prod.example.invalid:6379",
+                "DATABASE_URL": "postgresql://prod.example.invalid/db",
+                "EMAIL_PROVIDER": "resend", "SMS_PROVIDER": "twilio",
+                "ENCRYPTION_KEY": "prod-key"}
+        code = ("import json, os; from evals.ai import sandbox; sandbox.apply(); "
+                "from app.config import settings; "
+                "print(json.dumps([os.environ[k] for k in "
+                f"{sorted(prod)!r}] + [settings.redis_url]))")
+        values = json.loads(self._run(code, prod))
+        assert not any("prod" in v or v in ("resend", "twilio") for v in values), values
+
+    def test_refuses_once_settings_are_loaded(self):
+        code = ("from app.config import settings; from evals.ai import sandbox\n"
+                "try:\n    sandbox.apply()\nexcept RuntimeError:\n    print('refused')")
+        assert self._run(code, {}) == "refused"
+
+
+def test_case_level_live_ignore_adds_to_the_sets():
+    from evals.ai import framework as fw
+
+    spec = fw.Spec("T99", "t", "x", "internal", [], [], [
+        fw.Case("c", "normal", True, {}, {"include": ["x"], "label": 1, "forbidden": ["y"]},
+                live_ignore=["label"])], live_ignore=["include"])
+    [(_s, case)] = le.live_cases([spec], None)
+    assert case.expect == {"forbidden": ["y"]}

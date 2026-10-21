@@ -194,9 +194,33 @@ def live_cases(specs: list[fw.Spec], touchpoints: set[str] | None) -> list[tuple
     """Every case a live model can meaningfully answer, with the expect keys
     that only hold for the recorded output (spec.live_ignore) removed."""
     return [(s, dataclasses.replace(c, expect={k: v for k, v in c.expect.items()
-                                               if k not in s.live_ignore}))
+                                               if k not in s.live_ignore + c.live_ignore}))
             for s in specs if not touchpoints or s.id in touchpoints
             for c in s.cases if not c.offline_only]
+
+
+def replay_mismatches(specs: list[fw.Spec], touchpoints: set[str] | None,
+                      adapters: dict) -> list[str]:
+    """Replay every selected case offline, in THIS process's environment, and
+    list each one whose result differs from the offline gate's: a case must
+    pass unless it carries known_failure, which must fail. The gate runs
+    under tests/conftest.py; this runs under evals/ai/sandbox.py. Any
+    difference means the live run would not exercise the app as tested."""
+    out = []
+    logging.disable(logging.CRITICAL)
+    try:
+        for spec in specs:
+            if touchpoints and spec.id not in touchpoints:
+                continue
+            for case in spec.cases:
+                res = fw.run_case(spec, case, adapters[spec.adapter],
+                                  fw.ReplayClient(case.recorded), gr.GRADERS)
+                if res.passed == bool(case.known_failure):
+                    out.append(f"{spec.id}/{case.id}: "
+                               + (res.error[:120] or ("passed" if res.passed else "failed")))
+    finally:
+        logging.disable(logging.NOTSET)
+    return out
 
 
 def estimate_usd(pairs, price: dict, k: int, adapters: dict) -> tuple[float, int]:
@@ -261,9 +285,15 @@ def run(args) -> int:
     prices = load_prices()
     state = read_state()
     price = preflight(args, prices, state)
-    pairs = live_cases(fw.load_all(), set(args.touchpoints or []) or None)
+    specs = fw.load_all()
+    selected = set(args.touchpoints or []) or None
+    pairs = live_cases(specs, selected)
     if not pairs:
         raise Refused("no live cases selected")
+    drift = replay_mismatches(specs, selected, ADAPTERS)
+    if drift:
+        raise Refused(f"{len(drift)} case(s) replay differently here than in the offline gate, "
+                      "so this environment is not the tested one: " + "; ".join(drift[:10]))
     est, n_calls = estimate_usd(pairs, price, args.k, ADAPTERS)
     print(f"{len(pairs)} cases x k={args.k}: about {n_calls} calls, worst case ${est:.2f} "
           f"on {args.model} (limit ${args.max_usd:.2f})")
@@ -313,6 +343,9 @@ def run(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from evals.ai import sandbox  # noqa: PLC0415
+
+    sandbox.apply()  # before anything reads app settings; see sandbox.py
     p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     p.add_argument("--model", required=True)
     p.add_argument("--k", type=int, default=3)
