@@ -250,7 +250,10 @@ def system_prompt(script: dict, lead: Lead, identity: dict | None = None) -> str
         # claims to BE the owner or a human, before it reaches the prompt.
         return voice_twin.strip_identity_claims(str(text or ""), names)
 
-    objections = "\n".join(f"- If they say \"{o['objection']}\": {said(o['response'])}"
+    # What the prospect may say is quoted as data; the reply after it is a
+    # line the assistant speaks, so it stays ours (and identity-checked).
+    objections = "\n".join(f"- If they say {prompt_safety.inline(o['objection'])}: "
+                           f"{said(o['response'])}"
                            for o in script.get("objection_handling") or [])
     rules = voice_twin.identity_rules(
         str(identity.get("owner_name") or "the seller"),
@@ -266,7 +269,9 @@ def system_prompt(script: dict, lead: Lead, identity: dict | None = None) -> str
         "Be brief and polite. Your only goal: book a short meeting. If the person "
         "asks not to be called again, apologise, confirm they will not be called "
         "again, and end the call.",
-        f"Prospect: {lead.full_name or 'unknown'}, {lead.title or ''} at {lead.company or ''}.",
+        prompt_safety.NOTICE,
+        f"Prospect: {prompt_safety.inline(lead.full_name or 'unknown')}, "
+        f"{prompt_safety.inline(lead.title or '')} at {prompt_safety.inline(lead.company or '')}.",
         f"Objective: {script.get('objective')}",
         "Talking points:\n" + "\n".join(f"- {said(p)}" for p in script.get("talking_points") or []),
         f"Objections:\n{objections}",

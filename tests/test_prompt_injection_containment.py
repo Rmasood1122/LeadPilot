@@ -243,6 +243,24 @@ class TestScrapedAndTranscribedText:
         assert "seller note: follow up Thursday" in outside, (
             "the seller's own notes are trusted and stay outside the block")
 
+    def test_live_call_system_prompt(self, lead):
+        """The outbound voice assistant's system prompt (phone_calls.system_prompt,
+        sent to the call provider, so no golden set can replay it). The
+        prospect's name, title and company are typed by people outside this
+        system, and a scripted objection quotes what the prospect may say."""
+        from app.services import phone_calls
+
+        lead.company = PAYLOAD
+        lead.title = "Founder. " + INJECTION
+        script = {"objective": "Book a call", "talking_points": ["Payroll in a day"],
+                  "objection_handling": [{"objection": PAYLOAD, "response": "Fair."}],
+                  "questions": ["How do you run payroll today?"], "close": "Thursday?"}
+        prompt = phone_calls.system_prompt(script, lead, {"owner_name": "Maren"})
+
+        assert_contained(prompt)
+        assert "Payroll in a day" in prompt and "Thursday?" in prompt, \
+            "what the assistant says aloud must stay outside the data blocks"
+
     def test_call_transcript_analysis(self, db_session, prompts, lead):
         from app.services import phone_calls
 
