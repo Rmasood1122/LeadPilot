@@ -2,6 +2,23 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-21 — **Victorae Phase 3 item 3 (prompt caching)**, local commits on top of item 2.
+
+  **Measured first:** no touchpoint's stable prefix in the golden replays reaches sonnet-4-6's 1,024-token minimum. The production volume is in the verification loop (10 passes × document + research) and the research pipeline (72/144 steps).
+
+  **Done**
+  - Gateway `cache_prefix` with a 5-minute breakpoint.
+  - Metering at the real cache price (input + 1.25× writes + 0.1× reads). Without it, the spend caps would under-count cached calls.
+  - Judge, fixer and pipeline prompts reordered stable-first.
+  - The live runner reports `cache_hit_rate`.
+
+  **Proven offline:** byte-identical prefixes across the 10 judge passes and across the 9 steps of each phase (each check fails on the old layout); verification 2,048 passed; pipeline 5,104 passed; PostgreSQL integration 155 passed.
+
+  **Not measured:** hit rate and cost (no eval key); the ~78% judge-input saving is an ESTIMATE.
+
+  **Process miss, caught:** item 2's first full run BLOCKed (pass rate 0.99898). A test fake in `tests/help_center/` did not accept `schema=`. The per-group checks had searched only `tests/*.py`. Fixed (`c2a64e6`); searches now include subdirectories.
+
+  Report: `docs/program/ai/phase3-item3-prompt-caching.md`.
 - 2026-10-21 — **Victorae Phase 3 item 2 (output contracts)**, local commits on top of PR #122 (item 1, open). Phase 2 (#121) was merged 18:11Z from the web UI with no review recorded, not via `safe_merge.sh` (MERGE-B bypass, reported).
 
   **Done**
