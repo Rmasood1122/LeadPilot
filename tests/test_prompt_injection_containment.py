@@ -170,22 +170,30 @@ class TestInboundReplies:
 
         assert_contained(prompts[-1][1])
 
-    def test_reply_intent_keeps_our_own_message_outside_the_block(
+    def test_reply_intent_reads_our_sent_message_as_data(
             self, db_session, prompts, lead, reply, email_sequence):
-        """Trusted text is NOT wrapped: wrapping it would tell the model to
-        disregard our own context."""
+        """What the prospect replied to is OUR message, but a model wrote it
+        from the prospect's own data (posts, news, profile), so it can carry
+        their text. It reaches the classifier as context to read -- inside a
+        block, never as instructions. (Phase 3 item 1; before, it was plain
+        context on the reasoning that wrapping it would make the model
+        disregard it: the NOTICE says to analyse wrapped text, not ignore it.)"""
         from app.services import reply_intent
 
         db_session.add(m.Message(sequence_id=email_sequence.id, lead_id=lead.id,
                                  channel=m.ChannelType.EMAIL, step_no=1, template="t",
-                                 subject="Inspections", body="who owns inspections today?",
+                                 subject="Inspections",
+                                 body="who owns inspections today? " + INJECTION,
                                  status=m.MessageStatus.SENT,
                                  sent_at=NOW - timedelta(days=1)))
         db_session.commit()
         reply_intent.classify(db_session, reply.id)
 
-        outside, _inside = _outside_and_inside(prompts[-1][1])
-        assert "who owns inspections today?" in outside
+        prompt = [p for _s, p in prompts if "WHAT THEY WERE REPLYING TO" in p][-1]
+        _outside, inside = _outside_and_inside(prompt)
+        assert any("who owns inspections today?" in chunk for chunk in inside), \
+            "our sent message must still reach the classifier"
+        assert_contained(prompt)
 
     def test_reply_intelligence(self, db_session, prompts, reply):
         from app.services import reply_intelligence
