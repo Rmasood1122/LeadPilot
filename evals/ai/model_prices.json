@@ -1,0 +1,9 @@
+{
+  "_source": "Anthropic first-party API list prices, USD per million tokens, from the claude-api reference (model table cached 2026-10-06), read 2026-10-21. Haiku 5.5 is priced for prompts up to 100K tokens; the eval prompts are far below that. Re-check before any live run that is not dry.",
+  "models": {
+    "claude-sonnet-4-6": {"input_per_mtok": 3.00, "output_per_mtok": 15.00, "accepts_temperature": true},
+    "claude-sonnet-5-5": {"input_per_mtok": 2.00, "output_per_mtok": 10.00, "accepts_temperature": false},
+    "claude-haiku-5-5":  {"input_per_mtok": 0.10, "output_per_mtok": 0.50,  "accepts_temperature": false},
+    "claude-opus-5-5":   {"input_per_mtok": 4.00, "output_per_mtok": 20.00, "accepts_temperature": false}
+  }
+}
