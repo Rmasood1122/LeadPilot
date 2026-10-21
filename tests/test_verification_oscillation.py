@@ -244,6 +244,79 @@ class TestConvergenceStillWorks:
         assert not any(e.get("outcome") == "conflicting_sources" for e in p4)
 
 
+class _LaterFixClaude:
+    """Judge passes everything except pass `fail_pass` on its first attempt;
+    the fixer returns `rewrite`. Counts every model call."""
+
+    def __init__(self, fail_pass: int, rewrite: str):
+        self.fail_pass, self.rewrite = fail_pass, rewrite
+        self.judge_calls: list[int] = []
+        self.fix_calls = 0
+
+    def complete_json(self, system, prompt, cache_prefix=None, **_kw) -> dict:
+        import re
+
+        pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
+        self.judge_calls.append(pass_no)
+        if pass_no == self.fail_pass and self.judge_calls.count(pass_no) == 1:
+            return {"result": "FAIL", "fix_description": "Add a warm-up ramp."}
+        return {"result": "PASS"}
+
+    def complete(self, system, prompt, cache_prefix=None, **_kw) -> str:
+        self.fix_calls += 1
+        return self.rewrite
+
+
+_COMPLIANT_DOC = (
+    "# Plan\nEmail with the sender's postal address and a working unsubscribe "
+    "link. WhatsApp: approved template only, to opted-in numbers."
+)
+
+
+class TestShipBlockingPassRechecked:
+    """A later pass's full-document rewrite must not silently undo what the
+    ship-blocking pass #4 (legal & compliance) approved."""
+
+    @pytest.mark.parametrize("fail_pass, rewrite, dropped", [
+        (5, "# Plan\nEmail signed by the founder. Warm-up 10 to 40 a day. "
+            "WhatsApp: approved template only, to opted-in numbers.",
+         "postal address, unsubscribe"),
+        (9, "# Plan\nEmail with the sender's postal address and a working "
+            "unsubscribe link. WhatsApp: personalised free-form message to "
+            "every number found.",
+         "WhatsApp approved template, WhatsApp opt-in"),
+    ])
+    def test_rewrite_dropping_approved_element_fails_closed(
+        self, db_session, monkeypatch, product_with_strategy, fail_pass, rewrite, dropped
+    ):
+        fake = _LaterFixClaude(fail_pass, rewrite)
+        monkeypatch.setattr("app.verification.loop.get_client", lambda: fake)
+        strategy = _prepare(db_session, product_with_strategy, _COMPLIANT_DOC)
+
+        final = run_verification_loop(db_session, strategy, max_attempts=2)
+
+        assert final is m.StrategyStatus.NEEDS_HUMAN_REVIEW
+        p4 = [e for e in strategy.verified_passes_json if e["pass_no"] == 4]
+        assert [e["result"] for e in p4] == ["PASS", "FAIL"]
+        assert p4[-1]["outcome"] == "compliance_regressed"
+        assert p4[-1]["attempt"] == 2 and p4[-1]["fix_applied"] is False
+        assert dropped in p4[-1]["fix_description"]
+        # Deterministic re-check: no extra model call (11 judges, 1 fix).
+        assert len(fake.judge_calls) == 11 and fake.fix_calls == 1
+
+    def test_rewrite_keeping_approved_elements_still_verifies(
+        self, db_session, monkeypatch, product_with_strategy
+    ):
+        fake = _LaterFixClaude(5, _COMPLIANT_DOC + "\nWarm-up 10 to 40 a day.")
+        monkeypatch.setattr("app.verification.loop.get_client", lambda: fake)
+        strategy = _prepare(db_session, product_with_strategy, _COMPLIANT_DOC)
+
+        assert run_verification_loop(db_session, strategy, max_attempts=2) \
+            is m.StrategyStatus.VERIFIED
+        assert not any(e.get("outcome") == "compliance_regressed"
+                       for e in strategy.verified_passes_json)
+
+
 class TestRevertDetectionUnit:
     def test_exact_match_after_whitespace_normalisation(self):
         history = [_normalize_document("# A\n\nsome   text")]
