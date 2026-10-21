@@ -39,9 +39,11 @@ from app.services.anthropic_client import (JUDGE_TEMPERATURE, TruncatedResponseE
                                             get_client)
 from app.services import notifications, prompt_safety, usage_meter
 from app.verification.passes import (
-    FIXER_PROMPT,
+    FIXER_MATERIAL,
+    FIXER_QUESTION,
     FIXER_SYSTEM,
-    JUDGE_PROMPT,
+    JUDGE_MATERIAL,
+    JUDGE_QUESTION,
     JUDGE_SYSTEM,
     PRECEDENCE_RULE,
     VerificationPassSpec,
@@ -200,13 +202,15 @@ def _judge(spec: VerificationPassSpec, strategy: Strategy, support: str) -> tupl
     data = get_client().complete_json(
         temperature=JUDGE_TEMPERATURE,
         system=JUDGE_SYSTEM,
-        prompt=JUDGE_PROMPT.format(
+        cache_prefix=JUDGE_MATERIAL.format(
+            strategy_document=_document_for_prompt(strategy),
+            support_block=support,
+        ),
+        prompt=JUDGE_QUESTION.format(
             pass_no=spec.pass_no,
             name=spec.name,
             criterion=spec.criterion,
             precedence_rule=PRECEDENCE_RULE,
-            strategy_document=_document_for_prompt(strategy),
-            support_block=support,
         ),
         schema=JUDGE_SCHEMA,
     )
@@ -225,19 +229,19 @@ def _generate_fix(spec: VerificationPassSpec, strategy: Strategy,
     raised ceiling. It is NEVER swallowed into a partial document — persisting
     a truncated rewrite is the bug this whole path exists to prevent.
     """
-    prompt = FIXER_PROMPT.format(
+    material = FIXER_MATERIAL.format(strategy_document=_document_for_prompt(strategy))
+    prompt = FIXER_QUESTION.format(
         pass_no=spec.pass_no,
         name=spec.name,
         # The finding is the judge's output after reading outside text, so it
         # is wrapped too; it still tells the fixer what to change.
         fix_description=prompt_safety.block(fix_description),
         precedence_rule=PRECEDENCE_RULE,
-        strategy_document=_document_for_prompt(strategy),
     )
     ceiling = settings.verification_fixer_max_tokens
     try:
         revised = get_client().complete(
-            system=FIXER_SYSTEM, prompt=prompt, max_tokens=ceiling,
+            system=FIXER_SYSTEM, prompt=prompt, max_tokens=ceiling, cache_prefix=material,
         )
     except TruncatedResponseError as first:
         # One retry at double the ceiling. A document that outgrew the
@@ -253,6 +257,7 @@ def _generate_fix(spec: VerificationPassSpec, strategy: Strategy,
         )
         revised = get_client().complete(
             system=FIXER_SYSTEM, prompt=prompt, max_tokens=retry_ceiling,
+            cache_prefix=material,
         )
     return _strip_echoed_markers(revised).strip()
 

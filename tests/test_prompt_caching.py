@@ -90,3 +90,72 @@ def test_complete_json_passes_the_prefix_through():
                            stop_reason="end_turn"))
     assert client.complete_json(system="S", prompt="q", cache_prefix="doc") == {"a": 1}
     assert client._client.messages.sent[0]["messages"][0]["content"][0]["text"] == "doc"
+
+
+# --- the verification loop: ten passes over one document ------------------
+
+class _Recorder:
+    def __init__(self):
+        self.calls: list[dict] = []
+
+    def complete_json(self, **kw):
+        self.calls.append(kw)
+        return {"result": "PASS"}
+
+
+@pytest.mark.parametrize("flow", ["WITH_CLIENTS", "NO_CLIENTS"])
+def test_every_judge_pass_reads_the_same_cached_prefix(monkeypatch, flow):
+    """The cache only hits when the prefix is byte-identical. Every pass over
+    an unchanged document must send the same prefix -- the document and the
+    research -- with its own criterion only after it."""
+    from app.db.models import FlowType
+    from app.verification import loop as vloop
+    from app.verification.passes import build_passes
+
+    recorder = _Recorder()
+    monkeypatch.setattr(vloop, "get_client", lambda: recorder)
+
+    class _Strategy:
+        strategy_document = "# Strategy\n" + "A long section about pricing. " * 400
+
+    specs = build_passes(getattr(FlowType, flow))
+    for spec in specs:
+        vloop._judge(spec, _Strategy(), "--- research ---\n" + "finding " * 800)
+
+    prefixes = {call["cache_prefix"] for call in recorder.calls}
+    assert len(recorder.calls) == len(specs) >= 9
+    assert len(prefixes) == 1, "a pass changed the cached prefix: every pass would miss"
+    prefix = prefixes.pop()
+    assert "A long section about pricing" in prefix and "finding finding" in prefix
+    for spec, call in zip(specs, recorder.calls):
+        assert spec.criterion not in prefix and f"#{spec.pass_no}" not in prefix
+        assert spec.criterion in call["prompt"]
+
+
+def test_the_fixer_retry_reads_the_document_from_the_cache(monkeypatch):
+    """A rewrite that hits the output ceiling is retried once at a higher
+    one; both calls carry the same document prefix, so the retry reads it."""
+    from app.services.anthropic_client import TruncatedResponseError
+    from app.verification import loop as vloop
+    from app.verification.passes import build_passes
+    from app.db.models import FlowType
+
+    calls: list[dict] = []
+
+    class _Fixer:
+        def complete(self, **kw):
+            calls.append(kw)
+            if len(calls) == 1:
+                raise TruncatedResponseError("cut", limit=kw["max_tokens"])
+            return "# Strategy\nrevised"
+
+    monkeypatch.setattr(vloop, "get_client", lambda: _Fixer())
+
+    class _Strategy:
+        strategy_document = "# Strategy\noriginal"
+
+    spec = build_passes(FlowType.WITH_CLIENTS)[0]
+    vloop._generate_fix(spec, _Strategy(), "tighten the pricing")
+    assert len(calls) == 2 and calls[0]["cache_prefix"] == calls[1]["cache_prefix"]
+    assert "original" in calls[0]["cache_prefix"]
+    assert "tighten the pricing" in calls[0]["prompt"]

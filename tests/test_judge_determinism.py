@@ -31,14 +31,16 @@ class RecordingClient:
         self.calls: list[dict] = []
 
     def complete_json(self, system=None, prompt=None, max_tokens=None,
-                      temperature=None, schema=None) -> dict:
-        self.calls.append({"kind": "json", "system": system, "prompt": prompt,
+                      temperature=None, schema=None, cache_prefix=None) -> dict:
+        self.calls.append({"kind": "json", "system": system,
+                           "prompt": (cache_prefix or "") + (prompt or ""),
                            "max_tokens": max_tokens, "temperature": temperature})
         return dict(self.payload)
 
     def complete(self, system=None, prompt=None, max_tokens=None,
-                 temperature=None) -> str:
-        self.calls.append({"kind": "text", "system": system, "prompt": prompt,
+                 temperature=None, cache_prefix=None) -> str:
+        self.calls.append({"kind": "text", "system": system,
+                           "prompt": (cache_prefix or "") + (prompt or ""),
                            "max_tokens": max_tokens, "temperature": temperature})
         return self.text
 
