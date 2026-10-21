@@ -1,0 +1,4 @@
+{
+  "_about": "Judge calibration (graders.calibrated). A model-judge dimension may gate only when n >= 10 founder-labelled outputs exist for it and the judge (claude-opus-5-5, temperature-free per I4) agrees with the founder on >= 80% of them. No dimension is calibrated yet, so the judge gates nothing: every gating check in evals/ai/golden is a code grader. Filling this needs live outputs (EVAL_ANTHROPIC_API_KEY) and founder labels; procedure in docs/program/ai/eval-baseline.md section 5.",
+  "dimensions": {}
+}

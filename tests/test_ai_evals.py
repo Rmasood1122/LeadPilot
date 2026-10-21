@@ -52,6 +52,28 @@ def test_golden_set_meets_the_program_rules(spec):
     assert not unlisted, f"expect keys whose grader is not listed: {unlisted}"
 
 
+# Touchpoints with no offline golden set, and why. Everything else listed in
+# the AI inventory must have one.
+NOT_OFFLINE = {
+    "T16": "inbound voice-twin assistant runs inside Vapi's live call; nothing to replay",
+    "T36": "manual live-check scripts; they are run by hand against the real gateway",
+}
+
+
+def test_every_inventory_touchpoint_has_a_golden_set():
+    import re
+    from pathlib import Path
+
+    inventory = Path(__file__).resolve().parents[1] / "docs/program/ai/ai-inventory.md"
+    listed = set(re.findall(r"^### (T\d{2}) ", inventory.read_text(encoding="utf-8"), re.M))
+    assert len(listed) >= 36, f"inventory parse found only {sorted(listed)}"
+    have = {spec.id for spec in SPECS}
+    missing = sorted(listed - have - set(NOT_OFFLINE))
+    assert not missing, f"touchpoints with no golden set: {missing}"
+    assert not (have - listed), f"golden sets for touchpoints not in the inventory: {sorted(have - listed)}"
+    assert not (set(NOT_OFFLINE) & have), "a NOT_OFFLINE touchpoint now has a set; drop it from the list"
+
+
 def _params():
     out = []
     for spec, case in CASES:

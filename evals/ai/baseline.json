@@ -1,1 +1,1281 @@
-{"offline": {}, "live": {}}
+{
+ "offline": {
+  "T01": {
+   "slices": {
+    "normal": {
+     "cases": 14,
+     "runs": 14,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T02": {
+   "slices": {
+    "normal": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 16,
+     "runs": 16,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T03": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T04": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T05": {
+   "slices": {
+    "normal": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
+     "cases": 14,
+     "runs": 14,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T06": {
+   "slices": {
+    "consent": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "normal": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T07": {
+   "slices": {
+    "normal": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T08": {
+   "slices": {
+    "consent": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "normal": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T09": {
+   "slices": {
+    "normal": {
+     "cases": 12,
+     "runs": 12,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 13,
+     "runs": 13,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T10": {
+   "slices": {
+    "normal": {
+     "cases": 15,
+     "runs": 15,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 15,
+     "runs": 15,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "consent": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T11": {
+   "slices": {
+    "consent": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "normal": {
+     "cases": 14,
+     "runs": 14,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 14,
+     "runs": 14,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T12": {
+   "slices": {
+    "normal": {
+     "cases": 13,
+     "runs": 13,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T13": {
+   "slices": {
+    "normal": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T14": {
+   "slices": {
+    "normal": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T15": {
+   "slices": {
+    "consent": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T17": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T18": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T19": {
+   "slices": {
+    "normal": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T20": {
+   "slices": {
+    "normal": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 13,
+     "runs": 13,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T21": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "off_topic": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T22": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "off_topic": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T23": {
+   "slices": {
+    "normal": {
+     "cases": 12,
+     "runs": 12,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T24": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 12,
+     "runs": 12,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 1,
+     "runs": 1,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T25": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 12,
+     "runs": 12,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T26": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 14,
+     "runs": 14,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T27": {
+   "slices": {
+    "normal": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 16,
+     "runs": 16,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T28": {
+   "slices": {
+    "normal": {
+     "cases": 9,
+     "runs": 9,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 14,
+     "runs": 14,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T29": {
+   "slices": {
+    "normal": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T30": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T31": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 5,
+     "runs": 5,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "invented": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T32": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 21,
+     "runs": 21,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 4,
+     "runs": 4,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T33": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 7,
+     "runs": 7,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "cross_account": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 12,
+     "runs": 12,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T34": {
+   "slices": {
+    "normal": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "consent": {
+     "cases": 8,
+     "runs": 8,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "edge": {
+     "cases": 11,
+     "runs": 11,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    },
+    "injection": {
+     "cases": 2,
+     "runs": 2,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  },
+  "T35": {
+   "slices": {
+    "normal": {
+     "cases": 10,
+     "runs": 10,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "edge": {
+     "cases": 15,
+     "runs": 15,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "cross_account": {
+     "cases": 6,
+     "runs": 6,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": true
+    }
+   },
+   "pass_at_1": 1.0
+  }
+ },
+ "live": {}
+}
