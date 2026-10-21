@@ -1,0 +1,10 @@
+{
+  "_about": "Phase 2 AI-eval state (docs/program/STAR_VICTORAE.md). live.spent_usd is the program spend ledger that evals/ai/live_eval.py reads before and writes after every live run; the ceiling is $1,100 total, $250 per run.",
+  "phase": 2,
+  "offline": {"status": "in progress"},
+  "live": {
+    "status": "blocked: no live-eval API key (EVAL_ANTHROPIC_API_KEY) from the founders",
+    "spent_usd": 0.0,
+    "runs": []
+  }
+}

@@ -63,12 +63,14 @@ cases:
     expect: {label: false, label_field: automated, calls: 1}
     recorded: {automated: false, reason: "personal redirect"}
   - id: weak-model-error-is-human
+    offline_only: true
     slice: edge
     synthetic: true
     input: {from_address: "desk@northwind.example", subject: "Re: hi", body: "Ticket #77"}
     expect: {label: false, label_field: automated, calls: 1}
     recorded: {__raise__: "simulated outage"}
   - id: weak-model-bad-shape-is-human
+    offline_only: true
     slice: edge
     synthetic: true
     input: {from_address: "desk@northwind.example", subject: "Re: hi", body: "Ticket id 9"}

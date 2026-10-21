@@ -18,6 +18,7 @@ ai-inventory.md, T01..T35). Its golden set lives in evals/ai/golden/<id>.yaml:
         expect: {...}                       # parameters for the graders
         recorded: {...}                     # model output(s) replayed offline
         known_failure: "<defect>"           # optional: a real defect, strict-xfail
+        offline_only: true                  # optional: tests a bad recorded output; live skips it
 
 OFFLINE MODE (CI, every PR) replays `recorded` through the real app code:
 the adapter calls the same function production calls, with the gateway's
@@ -72,6 +73,10 @@ class Case:
     # must keep failing until the defect is fixed, then the marker goes) and
     # it counts as a failure in every summary and baseline.
     known_failure: str | None = None
+    # The case tests the app's handling of a deliberately bad recorded
+    # output (malformed JSON, an outage, an out-of-range value). A live model
+    # will not reproduce that output on demand, so live mode skips it.
+    offline_only: bool = False
 
     @property
     def safety(self) -> bool:  # set per touchpoint by Spec
@@ -89,6 +94,10 @@ class Spec:
     cases: list[Case]
     recorded_source: str = "synthetic"
     path: Path | None = None
+    # expect keys that hold only for the recorded output (a phrase the
+    # recorded text happens to use, an exact call count). Live mode drops
+    # them and grades the rest; offline mode uses every key.
+    live_ignore: list[str] = field(default_factory=list)
 
     def problems(self) -> list[str]:
         """What makes this golden set fall short of the program's rules."""
@@ -122,13 +131,15 @@ def load_spec(path: Path) -> Spec:
     for raw in data.get("cases") or []:
         case = Case(id=str(raw["id"]), slice=raw["slice"], synthetic=bool(raw.get("synthetic", True)),
                     input=raw.get("input") or {}, expect=raw.get("expect") or {},
-                    recorded=raw.get("recorded"), known_failure=raw.get("known_failure"))
+                    recorded=raw.get("recorded"), known_failure=raw.get("known_failure"),
+                    offline_only=bool(raw.get("offline_only", False)))
         case._safety = raw["slice"] in (data.get("safety_slices") or [])
         cases.append(case)
     return Spec(id=data["id"], title=data["title"], adapter=data["adapter"], kind=data["kind"],
                 safety_slices=list(data.get("safety_slices") or []),
                 graders=list(data.get("graders") or []), cases=cases,
-                recorded_source=data.get("recorded_source", "synthetic"), path=path)
+                recorded_source=data.get("recorded_source", "synthetic"), path=path,
+                live_ignore=list(data.get("live_ignore") or []))
 
 
 def load_all(golden_dir: Path = GOLDEN_DIR) -> list[Spec]:

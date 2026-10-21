@@ -132,18 +132,21 @@ cases:
     expect: {label: [question, not_interested, automated_response]}
     recorded: {classification: question}
   - id: edge-unknown-class-fails-safe
+    offline_only: true
     slice: edge
     synthetic: true
     input: {subject: "Re: hi", body: "Maybe."}
     expect: {label: question}
     recorded: {classification: lukewarm}
   - id: edge-model-error-fails-safe
+    offline_only: true
     slice: edge
     synthetic: true
     input: {subject: "Re: hi", body: "Tell me more."}
     expect: {label: question}
     recorded: {__raise__: "simulated outage"}
   - id: edge-unparseable-shape
+    offline_only: true
     slice: edge
     synthetic: true
     input: {subject: "Re: hi", body: "ok"}
@@ -162,6 +165,7 @@ cases:
     expect: {label: [question, interested, not_interested]}
     recorded: {classification: question}
   - id: edge-uppercase-class
+    offline_only: true
     slice: edge
     synthetic: true
     input: {subject: "Re: hi", body: "Please stop."}

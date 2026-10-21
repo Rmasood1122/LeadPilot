@@ -70,24 +70,28 @@ cases:
     recorded: {label: unsubscribe, confidence: 0.95, reason: "asks not to be contacted"}
   # --- edge -----------------------------------------------------------------
   - id: edge-hyphenated-label
+    offline_only: true
     slice: edge
     synthetic: true
     input: {classification: question, body: "Maybe next year."}
     expect: {label: not_now, label_field: label}
     recorded: {label: "Not-Now", confidence: "0.6", reason: "next year"}
   - id: edge-unknown-label-stays-unclassified
+    offline_only: true
     slice: edge
     synthetic: true
     input: {classification: interested, body: "Sure."}
     expect: {label: null, label_field: label}
     recorded: {label: positive, confidence: 0.9}
   - id: edge-model-error-stays-unclassified
+    offline_only: true
     slice: edge
     synthetic: true
     input: {classification: interested, body: "Sounds good."}
     expect: {label: null, label_field: label}
     recorded: {__raise__: "simulated outage"}
   - id: edge-confidence-clamped
+    offline_only: true
     slice: edge
     synthetic: true
     input: {classification: interested, body: "Yes!"}

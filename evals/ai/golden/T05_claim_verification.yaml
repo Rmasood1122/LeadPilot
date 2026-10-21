@@ -177,6 +177,7 @@ cases:
     expect: {forbidden: ["Leeds"], text_field: text}
     recorded: {claims: []}
   - id: inv-model-down-rules-hold
+    offline_only: true
     slice: invented
     synthetic: true
     input:
@@ -212,6 +213,7 @@ cases:
     expect: {forbidden: ["Omnicom"], include: ["We help agencies like yours"], text_field: text}
     recorded: {claims: [{text: "Congrats on your acquisition by Omnicom.", category: news}]}
   - id: edge-model-claim-not-in-text
+    offline_only: true
     slice: edge
     synthetic: true
     input:
@@ -219,6 +221,7 @@ cases:
     expect: {include: ["close the month faster"], text_field: text}
     recorded: {claims: [{text: "A sentence that is not in the message.", category: other}]}
   - id: edge-model-bad-shape
+    offline_only: true
     slice: edge
     synthetic: true
     input:

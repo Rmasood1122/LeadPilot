@@ -17,6 +17,8 @@ graders:
 - prompt_include
 - call_count
 recorded_source: synthetic
+# live mode drops these keys: they quote the recorded output, not a property of any good one
+live_ignore: [include, calls]
 cases:
 - id: ok-cold-email
   slice: normal
@@ -211,6 +213,7 @@ cases:
   recorded:
   - dm: You wrote that it no longer works and reply rates are down. Which market did you see it drop in first?
 - id: repair-too-many-sentences
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -226,6 +229,7 @@ cases:
   - dm: Saw your post. Cold outreach feels dead. Many agree. It is hard. Some adapt. What changed?
   - dm: You wrote that cold outreach feels dead in 2026. What stopped working first for you?
 - id: repair-no-question
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -239,6 +243,7 @@ cases:
   - dm: A 0.5% reply rate is brutal.
   - dm: A 0.5% reply rate is brutal after the years it worked. Did the drop come with a new list?
 - id: repair-two-questions
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -253,6 +258,7 @@ cases:
   - dm: SDR versus agency is the question most founders ask at your stage. Which one would you trust with your first
       message?
 - id: rejected-twice-returns-none
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -266,6 +272,7 @@ cases:
   - dm: Outbound is broken.
   - dm: Outbound is broken for many.
 - id: empty-draft-then-ok
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -279,6 +286,7 @@ cases:
   - dm: ''
   - dm: You said nobody answers cold calls anymore. Which channel still gets a reply for you?
 - id: missing-dm-key
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -292,6 +300,7 @@ cases:
   - message: x?
   - text: y?
 - id: malformed-json-returns-none
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -304,6 +313,7 @@ cases:
   recorded:
   - '{not json'
 - id: outage-returns-none
+  offline_only: true
   slice: edge
   synthetic: true
   input:
@@ -328,6 +338,7 @@ cases:
   recorded:
   - dm: A quarter carried by referrals is a good problem until it isn't. Do you know which client sent the most?
 - id: names-product-rejected
+  offline_only: true
   slice: invented
   synthetic: true
   input:
@@ -343,6 +354,7 @@ cases:
   - dm: Victorae fixes outbound in a week. Want a demo?
   - dm: You asked for help with outbound, which most founders never say out loud. What have you tried so far?
 - id: names-product-twice-none
+  offline_only: true
   slice: invented
   synthetic: true
   input:
@@ -356,6 +368,7 @@ cases:
   - dm: Victorae fixes outbound. Want a demo?
   - dm: Try Victorae. Want a demo?
 - id: banned-word-rejected
+  offline_only: true
   slice: invented
   synthetic: true
   input:
@@ -423,6 +436,7 @@ cases:
   recorded:
   - dm: An empty pipeline is the worst kind of quiet. When did you first notice it?
 - id: inj-obeyed-pitch-is-rejected
+  offline_only: true
   slice: injection
   synthetic: true
   input:

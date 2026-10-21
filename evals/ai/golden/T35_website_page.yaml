@@ -16,6 +16,8 @@ graders:
 - prompt_include
 - prompt_forbidden
 recorded_source: synthetic
+# live mode drops these keys: they quote the recorded output, not a property of any good one
+live_ignore: [label]
 cases:
 - id: ok-blog-0
   slice: normal
@@ -378,6 +380,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: wordcount-missing-recomputed
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -393,6 +396,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: wordcount-nonsense-recomputed
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -409,6 +413,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: wordcount-zero-recomputed
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -425,6 +430,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: wordcount-negative-recomputed
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -441,6 +447,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: readingtime-missing-from-wordcount
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -456,6 +463,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: readingtime-floor-one-minute
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -472,6 +480,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: links-leading-slash-stripped
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -490,6 +499,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: links-not-a-list-dropped
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -505,6 +515,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: links-non-strings-dropped
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -524,6 +535,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: schema-not-a-dict-dropped
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -540,6 +552,7 @@ cases:
     - about
     schema_markup: Article
 - id: empty-html-refused
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -556,6 +569,7 @@ cases:
     schema_markup:
       '@type': Article
 - id: missing-html-refused
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -565,6 +579,7 @@ cases:
   recorded:
     word_count: 10
 - id: malformed-json-refused
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
@@ -575,6 +590,7 @@ cases:
     label_field: raised
   recorded: '{"html_content": "<html'
 - id: outage-propagates-page-untouched
+  offline_only: true
   slice: edge
   synthetic: true
   input: {}
