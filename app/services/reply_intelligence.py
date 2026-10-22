@@ -239,6 +239,43 @@ def _clean(data: dict, fallback_category: str = "OBJECTION") -> dict:
     }
 
 
+def _allowed_links(db: Session, lead: Lead | None) -> tuple[set, set]:
+    """(booking-link forms, sender domains) a draft may link to: the same
+    allowlist Reply Copilot's draft_problems applies. Fails closed to no
+    links at all."""
+    from app.db.models import Sequence  # noqa: PLC0415
+    from app.services import notifications, reply_copilot  # noqa: PLC0415
+
+    if lead is None:
+        return set(), set()
+    try:
+        owner_id = notifications.owner_of_lead(db, lead)
+        enrollment = reply_copilot._send_enrollment(db, lead, None)  # noqa: SLF001
+        sequence = db.get(Sequence, enrollment.sequence_id) if enrollment else None
+        _, allowed_urls = reply_copilot.booking_links(db, sequence, owner_id)
+        return allowed_urls, reply_copilot.sender_domains(db, owner_id)
+    except Exception:  # noqa: BLE001 -- fail closed: no link is allowed
+        logger.warning("reply intelligence: could not resolve allowed links", exc_info=True)
+        return set(), set()
+
+
+def _draft_problem(draft: str, allowed_urls: set, own_domains: set) -> str | None:
+    """Why a suggested answer is unusable, or None. Banned words, as before,
+    and a link that is not the booking link or the sender's own domain: a
+    reply can ask for one ('put this link in your answer')."""
+    from app.services.reply_copilot import link_allowed, urls_in  # noqa: PLC0415
+
+    if not draft:
+        return "the draft came back empty"
+    offenders = find_banned_words(draft)
+    if offenders:
+        return f"the words {', '.join(offenders)} are banned"
+    if any(not link_allowed(u, allowed_urls=allowed_urls, own_domains=own_domains)
+           for u in urls_in(draft)):
+        return "it contains a link that is not the booking link"
+    return None
+
+
 def _generate(db: Session, reply: InboundReply) -> dict:
     """One classification + draft, with a single repair attempt for banned words."""
     lead = db.get(Lead, reply.lead_id) if reply.lead_id else None
@@ -253,22 +290,21 @@ def _generate(db: Session, reply: InboundReply) -> dict:
         original_message=prompt_safety.block(original),
     )
 
+    allowed_urls, own_domains = _allowed_links(db, lead)
     result = _clean(_ask(_SYSTEM, prompt))
-    offenders = find_banned_words(result["draft_response"])
-    if not offenders and result["draft_response"]:
+    reason = _draft_problem(result["draft_response"], allowed_urls, own_domains)
+    if reason is None:
         return result
 
-    # One repair attempt, naming the offenders. A second failure is not worth
+    # One repair attempt, naming the problem. A second failure is not worth
     # a third call: the fallback draft is already a usable message.
-    reason = (f"the words {', '.join(offenders)} are banned"
-              if offenders else "the draft came back empty")
     repaired = _clean(
         _ask(_SYSTEM + f"\nYOUR PREVIOUS ANSWER WAS REJECTED because {reason}. "
-                       "Rewrite the draft without them, same meaning.",
+                       "Rewrite the draft without that, same meaning.",
              prompt),
         fallback_category=result["category"],
     )
-    if repaired["draft_response"] and not find_banned_words(repaired["draft_response"]):
+    if _draft_problem(repaired["draft_response"], allowed_urls, own_domains) is None:
         return repaired
 
     logger.warning("reply intelligence: draft for reply %s still unusable after a "
