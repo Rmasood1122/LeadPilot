@@ -311,7 +311,6 @@ cases:
     expect: {numbers_from: [body, sent_body], text_field: draft_response}
     recorded: {category: BUYING_SIGNAL, confidence: 0.7, next_action: answer,
                draft_response: "Yes - we cut payroll errors by 63% for 40 agencies last year."}
-    known_failure: "app/services/reply_intelligence.py:222-243 never claim-checks the draft (no claim_verification or approved-claims check, unlike reply_copilot.py:721), so an invented statistic the model writes is stored as the suggested answer."
   - id: draft-without-numbers-passes
     slice: invented
     synthetic: true
