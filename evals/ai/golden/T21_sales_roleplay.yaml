@@ -185,7 +185,6 @@ cases:
     offline_only: true
     slice: edge
     synthetic: true
-    known_failure: "app/services/roleplay.py:300 — _clean_reply drops the coaching tell only up to the first '.', so a tell ending in '!' or '?' ('Great question! ...') is shown to the seller verbatim."
     input:
       <<: *base
       seller_turns: ["What would change if month-end took one hour instead of a day?"]
