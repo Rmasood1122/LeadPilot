@@ -504,3 +504,35 @@ class TestForeignLinksStripped:
         with pytest.raises(ValueError):
             self._render(monkeypatch, db_session, verified_strategy, lead,
                          email_sequence.steps[0], "https://evil.example.test/x")
+
+
+class TestBodyLengthCeiling:
+    """T03: the prompt's 'under 140 words' is not a control. A runaway body is
+    refused, not sent, and not cut (a cut body loses its ask)."""
+
+    def _render(self, monkeypatch, db_session, strategy, step, body, lead):
+        from app.services import message_personalization as mp
+
+        class _Stub:
+            def complete_json(self, **kw):
+                return {"subject": "Month-end", "body": body}
+
+        monkeypatch.setattr(mp, "get_client", lambda: _Stub())
+        return mp.render_message(db_session, strategy, lead, step)[1]
+
+    def test_an_over_long_body_is_refused(self, monkeypatch, db_session, lead,
+                                          verified_strategy, email_sequence, fake_claude):
+        from app.services.message_personalization import MAX_BODY_WORDS
+
+        body = "Hi Sara,\n" + "word " * MAX_BODY_WORDS + "\nWorth a chat?"
+        with pytest.raises(ValueError, match="word body"):
+            self._render(monkeypatch, db_session, verified_strategy,
+                         email_sequence.steps[0], body, lead)
+
+    def test_a_body_at_the_limit_is_kept(self, monkeypatch, db_session, lead,
+                                         verified_strategy, email_sequence, fake_claude):
+        from app.services.message_personalization import MAX_BODY_WORDS
+
+        body = " ".join(["word"] * MAX_BODY_WORDS)
+        assert self._render(monkeypatch, db_session, verified_strategy,
+                            email_sequence.steps[0], body, lead) == body

@@ -519,7 +519,6 @@ cases:
     offline_only: true
     slice: edge
     synthetic: true
-    known_failure: "app/services/message_personalization.py:183-187 enforces no length limit; the prompt's 'under 140 words' rule is the only control, so a 300-word body is sent as written"
     input: {playbook: *pb, lead: {full_name: Hugo Brandt, company: Saltmarsh Media}}
     expect: {max_chars: 1100, text_field: body}
     recorded:
