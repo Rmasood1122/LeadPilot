@@ -51,7 +51,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.services import prompt_safety
+from app.services import grounding, prompt_safety
 
 from app.db.models import (
     InboundReply,
@@ -258,6 +258,12 @@ def _clean_extraction(data: object, body: str, today: date) -> dict:
             return_on = parsed if parsed > today else None
         except (TypeError, ValueError):
             return_on = None
+    # T10: brief_for presents reason_text as their words ('They said: ...'),
+    # so it is kept only when the reply contains it. A paraphrase or an
+    # invented reason becomes no reason, and the brief says so.
+    if text and not grounding.appears_in(text, body):
+        logger.info("re-engagement reason %r is not in the reply; not kept", text[:80])
+        text = ""
     return {"reason_kind": kind, "reason_text": text or None, "return_on": return_on}
 
 

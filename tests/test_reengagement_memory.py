@@ -83,6 +83,26 @@ class TestExtract:
         assert result["reason_kind"] == memory.BUDGET      # "budget" is in the body
         assert result["reason_text"] is None
 
+    def test_a_reason_the_reply_never_gave_is_not_kept(self, db_session, fake_claude, lead):
+        """T10: the brief quotes reason_text as their words. A reason that is
+        not in the reply is dropped; the plan (kind, date) stands."""
+        fake_claude.not_now_response = {"reason_kind": "budget",
+                                        "reason_text": "budget frozen until the merger closes",
+                                        "return_on": None}
+        result = memory.extract(db_session, _reply(db_session, lead, body="Not now."),
+                                today=TODAY)
+        assert result["reason_kind"] == memory.BUDGET
+        assert result["reason_text"] is None
+
+    def test_their_own_words_are_kept(self, db_session, fake_claude, lead):
+        fake_claude.not_now_response = {"reason_kind": "budget",
+                                        "reason_text": "Spend is frozen until April",
+                                        "return_on": None}
+        result = memory.extract(
+            db_session, _reply(db_session, lead, body="Thanks. Spend is frozen until April."),
+            today=TODAY)
+        assert result["reason_text"] == "Spend is frozen until April"
+
     def test_a_model_outage_costs_nuance_not_the_plan(self, db_session, fake_claude, lead):
         fake_claude.not_now_response = RuntimeError("anthropic down")
         result = memory.extract(db_session, _reply(db_session, lead), today=TODAY)

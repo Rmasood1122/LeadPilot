@@ -100,6 +100,13 @@ def _plain(text: str | None) -> str:
     return " ".join(re.sub(r"[^\w\s%$]", " ", (text or "").lower()).split())
 
 
+def appears_in(passage: str | None, *sources: str | None) -> bool:
+    """True when `passage` occurs in a source, ignoring case, spacing and
+    punctuation. For text presented as someone's own words."""
+    wanted = _plain(passage)
+    return bool(wanted) and any(wanted in _plain(s) for s in sources)
+
+
 def unsupported_quotes(text: str | None, *sources: str | None) -> list[str]:
     """Quoted passages in `text` (three words or more) that appear in no
     source. A quote attributed to a prospect must be something they wrote."""

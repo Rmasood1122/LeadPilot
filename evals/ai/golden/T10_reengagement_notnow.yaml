@@ -286,7 +286,6 @@ cases:
     input: {body: "Not now."}
     expect: {forbidden: ["merger"], text_field: brief}
     recorded: {reason_kind: budget, reason_text: "budget frozen until the merger with a rival closes", return_on: null, confidence: 0.6}
-    known_failure: "app/services/reengagement_memory.py:237 keeps the model's reason_text without checking it against the reply, and brief_for (:521-523) tells the writer 'They said: \"...\"', so a reason the prospect never gave is quoted back to them."
   - id: reason-from-the-reply-is-quoted
     slice: invented
     synthetic: true
