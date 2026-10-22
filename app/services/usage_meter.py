@@ -82,9 +82,13 @@ ACCOUNT_CAPPED_PURPOSES = (
     "autopilot",        # Autopilot sequence briefs (fixed briefs on refusal)
     "send_time",        # send-time plan at pipeline end (priors on refusal)
 )
+#
+# Help AI v2 adds "help_index": the help-center reindex (embedding the
+# product's own documentation at deploy time). It belongs to no account
+# (user_id NULL), so it is counted, never capped.
 COUNTED_ONLY_PURPOSES = (
     "outreach", "meeting_prep", "call_analysis", "reply_handling", "launch",
-    "support_chat",
+    "support_chat", "help_index",
 )
 
 # A prompt's size in tokens is not known before the call. English averages
@@ -115,10 +119,20 @@ class AccountBudgetExceededError(BudgetExceededError):
     """
 
 
+# provider -> (input price key, output price key). Voyage bills input tokens
+# only, so its output key is None and prices as zero.
 _PRICE_KEYS = {
     "anthropic": ("claude_input_cost_per_mtok", "claude_output_cost_per_mtok"),
     "openai": ("openai_input_cost_per_mtok", "openai_output_cost_per_mtok"),
+    "voyage": ("voyage_embed_cost_per_mtok", None),
+    "voyage_rerank": ("voyage_rerank_cost_per_mtok", None),
 }
+
+
+def _price(session: Session, key: str | None) -> float:
+    from app.services import system_settings  # noqa: PLC0415
+
+    return 0.0 if key is None else float(system_settings.get(session, key))
 
 
 @dataclass
@@ -172,13 +186,10 @@ def note(provider: str, model: str, input_tokens: int, output_tokens: int) -> No
 
 def price_micros(session: Session, provider: str, input_tokens: int,
                  output_tokens: int) -> int:
-    from app.services import system_settings  # noqa: PLC0415
-
     keys = _PRICE_KEYS.get(provider)
     if keys is None:
         return 0
-    price_in = system_settings.get(session, keys[0])
-    price_out = system_settings.get(session, keys[1])
+    price_in, price_out = _price(session, keys[0]), _price(session, keys[1])
     return int(round(input_tokens * price_in + output_tokens * price_out))
 
 
@@ -281,11 +292,8 @@ def account_daily_cap(session: Session, user_id) -> tuple[int | None, str]:
 
 
 def _price_table(session: Session) -> dict:
-    from app.services import system_settings  # noqa: PLC0415
-
     return {
-        provider: (float(system_settings.get(session, keys[0])),
-                   float(system_settings.get(session, keys[1])))
+        provider: (_price(session, keys[0]), _price(session, keys[1]))
         for provider, keys in _PRICE_KEYS.items()
     }
 
