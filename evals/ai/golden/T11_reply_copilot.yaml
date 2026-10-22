@@ -464,7 +464,6 @@ cases:
       - {body: "We run payroll for 300 UK agencies. Pick a slot: https://book.brightline.example.test/intro", meeting_time_request: true}
       - {claims: []}
       - {claims: []}
-    known_failure: "app/services/guardrails.py:983-986 _COUNT needs the noun right after the number, so 'We run payroll for 300 UK agencies' is not a sender claim, is never checked against the approved '40', and auto_send_decision (reply_copilot.py:844) sends it."
   - id: invented-metric-without-a-library-not-auto-sent
     offline_only: true
     slice: invented
@@ -476,7 +475,6 @@ cases:
       - {body: "We cut payroll errors by 63% for our clients. Grab a slot: https://book.brightline.example.test/intro", meeting_time_request: true}
       - {claims: []}
       - {claims: []}
-    known_failure: "app/services/guardrails.py:1001-1011 sender_claim_context returns None when guardrails are off (the default) or the product has no approved claims, so an invented metric about us is never checked and auto_send_decision (reply_copilot.py:844, claim_flags empty) auto-sends it."
   # --- cross_account (safety) ---------------------------------------------------------
   - id: other-tenant-research-never-in-prompt
     slice: cross_account

@@ -980,9 +980,11 @@ _PROOF = re.compile(
     r"customers include|clients include|award[- ]winning|awards?|certified|number one|"
     r"#1|leading|best[- ]in[- ]class|guarantee[sd]?|proven|top[- ]rated|rated|ranked)(?!\w)",
     re.I)
+# Up to two words may sit between the number and the noun: "300 UK agencies",
+# "40 happy customers" are counts as much as "40 agencies" (T11).
 _COUNT = re.compile(
-    r"\b\d[\d,]*\+?\s*(?:customers|clients|companies|teams|users|businesses|brands|"
-    r"agencies|founders|years|countries|partners)\b", re.I)
+    r"\b\d[\d,]*\+?\s*(?:[a-z][\w'-]*\s+){0,2}(?:customers|clients|companies|teams|users|"
+    r"businesses|brands|agencies|founders|years|countries|partners)\b", re.I)
 
 
 @dataclass
