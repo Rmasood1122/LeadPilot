@@ -237,7 +237,6 @@ cases:
     recorded:
       - {titles: [Practice Owner], industries: [accounting], locations: [], company_size_ranges: [], keywords: []}
       - *tactic
-    known_failure: "icp_extraction.py:282 stores pattern_inputs_json nested ({'icp': {...}, 'tactics': {...}}) but lead_scoring.py:221 / fpta_scoring.py:393 read it flat, so a lead in the extracted industry scores industry_match 0.5, not 1.0 (I3/#30)."
 
   # --- injection: the user's website is untrusted (quickstart.py:206-219) ---
   - id: quickstart-page-text-canary-wrapped

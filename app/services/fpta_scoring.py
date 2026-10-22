@@ -43,6 +43,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import Lead, LeadStatus, Message, MessageStatus, Product, Strategy
 from app.services import anthropic_client, lead_scoring, prompt_safety
+from app.services.icp_extraction import stored_icp
 
 logger = logging.getLogger(__name__)
 
@@ -423,7 +424,7 @@ def score_leads(session: Session, strategy: Strategy, leads: list[Lead],
     leads = [lead for lead in leads if not is_customer(lead)]
     if not leads:
         return 0
-    icp = strategy.pattern_inputs_json or {}
+    icp = stored_icp(strategy)
     product = session.get(Product, strategy.product_id)
     brief = f"{product.name} — {product.description}" if product else "(unknown)"
 

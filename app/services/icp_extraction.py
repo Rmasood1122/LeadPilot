@@ -266,6 +266,23 @@ def canonical_pattern_payload(criteria: dict, tactics: dict | None = None) -> di
     }
 
 
+def stored_icp(strategy) -> dict:
+    """The ICP criteria in strategy.pattern_inputs_json.
+
+    ensure_pattern_key stores the canonical payload, which nests them under
+    "icp" next to "tactics". Readers that took the column as a flat ICP saw
+    no industries, sizes or keywords at all (I3/#30). A flat dict, as older
+    rows or hand-set data may hold, is read as it is.
+    """
+    inputs = getattr(strategy, "pattern_inputs_json", None)
+    if not isinstance(inputs, dict):
+        return {}
+    icp = inputs.get("icp")
+    if isinstance(icp, dict):
+        return icp
+    return {} if "tactics" in inputs else inputs
+
+
 def pattern_key_of(payload: dict) -> str:
     """SHA-256 of an already-canonical payload.
 

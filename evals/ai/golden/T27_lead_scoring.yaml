@@ -244,7 +244,6 @@ cases:
       leads: [*founder]
     expect: {text_field: lead.signals.fit, include: ["Industry matches the ICP exactly"]}
     recorded: {__raise__: "model unavailable (synthetic outage)"}
-    known_failure: "fpta_scoring.py:393 -- reads strategy.pattern_inputs_json as a flat ICP, but ensure_pattern_key (icp_extraction.py:282) stores it nested under 'icp', so industries/size/keywords are never seen (I3/#30)."
   - id: booking-icp-stored-nested-still-matches-industry
     offline_only: true
     slice: edge
@@ -255,7 +254,6 @@ cases:
       leads: [*manager]
     expect: {label: 1.0, label_field: lead.industry_match}
     recorded: {__raise__: "model unavailable (synthetic outage)"}
-    known_failure: "lead_scoring.py:221 -- reads strategy.pattern_inputs_json as a flat ICP, but it is stored nested under 'icp' (icp_extraction.py:282), so industry_match is always 0.5 (I3/#30)."
 
   # --- injection: lead text is scraped/enriched, so untrusted --------------
   - id: fpta-injected-post-cannot-break-the-clamp
