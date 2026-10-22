@@ -206,6 +206,14 @@ class TestOverall:
 class TestScoring:
     def test_scoring_writes_every_column(self, db_session, fake_claude, scored_strategy):
         lead = _lead(db_session, scored_strategy)
+        # The prospect list now reaches the prompt inside prompt_safety markers
+        # (F-AI-02), which the shared fake's raw-JSON echo cannot parse, so the
+        # model's answer (each baseline back, with a reason) is given here.
+        base = fpta_scoring.baselines(lead, ICP, NOW)
+        fake_claude.fpta_response = {"prospects": [{
+            "lead_id": str(lead.id),
+            **{d: {"score": base[d]["baseline"], "reason": f"{d} reason"}
+               for d in fpta_scoring.DIMENSIONS}}]}
         assert fpta_scoring.score_leads(db_session, scored_strategy, [lead], now=NOW) == 1
         db_session.refresh(lead)
         assert lead.fpta_overall is not None

@@ -121,7 +121,6 @@ cases:
     input: {clients: [*client]}
     expect: {label: null, label_field: industry, include: [_extraction_error]}
     recorded: '[{"industry": "Branding studio"}]'
-    known_failure: "pattern_recognition.py:74 -- data.get() runs outside the try, so a non-object JSON reply (array) raises AttributeError and the intake request fails, although extract_patterns is documented never to hard-fail intake."
   - id: json-null-stores-null-patterns
     offline_only: true
     slice: edge
@@ -129,7 +128,6 @@ cases:
     input: {clients: [*client]}
     expect: {label: null, label_field: industry, include: [_extraction_error]}
     recorded: 'null'
-    known_failure: "pattern_recognition.py:74 -- a JSON null reply makes data None and data.get() raises AttributeError outside the try, failing intake instead of storing null patterns."
   - id: one-failed-client-does-not-lose-the-other
     offline_only: true
     slice: edge

@@ -94,8 +94,9 @@ _SYSTEM = (
 )
 
 # F-AI-02: the reply (sender, subject, body) is written by the prospect and
-# goes in as delimited, escaped data. What they were replying to is OUR message
-# and is deliberately left as plain context.
+# goes in as delimited, escaped data. What they were replying to is OUR
+# message, but a model wrote it from the prospect's own data (posts, news,
+# profile), so it is delimited too: context to read, never instructions.
 _PROMPT = """{notice}
 
 THE REPLY
@@ -200,7 +201,7 @@ def classify(db: Session, reply_id) -> dict:
                     subject=prompt_safety.inline(reply.subject or "(none)"),
                     body=prompt_safety.block((reply.body or "")[:MAX_BODY]),
                     step_no=step_no if step_no is not None else "unknown",
-                    original=original,
+                    original=prompt_safety.block(original),
                 ),
                 max_tokens=MAX_TOKENS,
             )

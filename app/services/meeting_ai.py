@@ -175,7 +175,8 @@ def generate_meeting_summary(
 
     actual = context.get("actual_minutes")
     prompt = _PROMPT.format(
-        title=context.get("title") or "Sales call",
+        # The title of a booked meeting carries the invitee's self-typed name.
+        title=prompt_safety.inline(context.get("title") or "Sales call"),
         platform=context.get("platform") or "unknown",
         scheduled_minutes=context.get("scheduled_minutes") or "unknown",
         actual_minutes=(f"{actual} minutes" if actual is not None

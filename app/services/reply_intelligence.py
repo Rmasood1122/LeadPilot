@@ -120,7 +120,8 @@ _SYSTEM = (
 
 # F-AI-02: the reply is written by the prospect, and the lead's name, company
 # and title come from scraped enrichment -- all outside text, so all delimited
-# and escaped. The message WE sent stays as plain context.
+# and escaped. The message WE sent is delimited too: a model wrote it from the
+# prospect's own data, so it is context to read, never instructions.
 _PROMPT = """{notice}
 
 THE REPLY WE RECEIVED:
@@ -216,7 +217,7 @@ def _generate(db: Session, reply: InboundReply) -> dict:
         company=prompt_safety.inline(getattr(lead, "company", None) or "unknown"),
         title=prompt_safety.inline(getattr(lead, "title", None) or "unknown"),
         step_no=step_no if step_no is not None else "unknown",
-        original_message=original,
+        original_message=prompt_safety.block(original),
     )
 
     result = _clean(_ask(_SYSTEM, prompt))

@@ -60,7 +60,7 @@ from app.db.models import (
     ResearchStep,
     Strategy,
 )
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -315,23 +315,38 @@ def _block(title: str, value: Any) -> str:
     return f"## {title}\n{value}\n"
 
 
+def _external(title: str, value: Any) -> str:
+    """A section whose content came from outside (the prospect, a provider,
+    a scraped page, or model output derived from those): the same layout as
+    _block, but the content sits inside a prompt_safety block."""
+    if value in (None, "", [], {}):
+        return f"## {title}\n(none on record)\n"
+    if isinstance(value, (dict, list)):
+        value = json.dumps(value, indent=1, default=str)
+    return f"## {title}\n{prompt_safety.block(str(value))}\n"
+
+
 def build_prompt(ctx: dict) -> str:
     enrichment = json.dumps(ctx["enrichment"], default=str)[:4000]
+    # Outside text goes through _external; our own records of what we sent,
+    # the product, ICP and strategy stay plain (wrapping trusted text would
+    # tell the model to disregard it).
     return "\n".join([
-        _block("LEAD PROFILE (from our records)", ctx["profile"]),
-        _block("THE MEETING", ctx["meeting"]),
-        _block("THEIR MOST RECENT LINKEDIN POSTS", ctx["linkedin_posts"]),
-        _block("RECENT COMPANY NEWS", ctx["company_news"]),
-        _block("RAW ENRICHMENT DATA (provider payload, truncated)", enrichment),
+        prompt_safety.NOTICE + "\n",
+        _external("LEAD PROFILE (from our records)", ctx["profile"]),
+        _external("THE MEETING", ctx["meeting"]),
+        _external("THEIR MOST RECENT LINKEDIN POSTS", ctx["linkedin_posts"]),
+        _external("RECENT COMPANY NEWS", ctx["company_news"]),
+        _external("RAW ENRICHMENT DATA (provider payload, truncated)", enrichment),
         _block("MESSAGES WE SENT THEM (oldest first)", ctx["messages_sent"]),
-        _block("THEIR REPLIES (oldest first)", ctx["replies"]),
-        _block("EARLIER MEETINGS WITH THEM", ctx["past_meetings"]),
+        _external("THEIR REPLIES (oldest first)", ctx["replies"]),
+        _external("EARLIER MEETINGS WITH THEM", ctx["past_meetings"]),
         _block("WHAT THE SELLER SELLS", ctx["product"]),
         _block("IDEAL CUSTOMER PROFILE", ctx["icp"]),
-        _block("F-P-T-A SIGNALS (fit / problem / timing / access, with the "
-               "evidence each score was built from)", ctx.get("fpta")),
+        _external("F-P-T-A SIGNALS (fit / problem / timing / access, with the "
+                  "evidence each score was built from)", ctx.get("fpta")),
         _block("STRATEGY DOCUMENT (truncated)", ctx["strategy_document"]),
-        _block("COMPETITOR RESEARCH", ctx["competitor_research"]),
+        _external("COMPETITOR RESEARCH", ctx["competitor_research"]),
         "Return the JSON object now.",
     ])
 

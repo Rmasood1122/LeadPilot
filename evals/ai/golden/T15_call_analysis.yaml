@@ -167,13 +167,15 @@ cases:
     input: {transcript: "AI: Hi.\nUser: Hmm, maybe."}
     expect: {label: answered, label_field: outcome}
     recorded: {outcome: maybe_later, stop_request: false}
-  - id: list-output-becomes-answered
+  - id: list-output-fails-closed
+    # A non-object reply is a ValueError at the gateway (Phase 3 item 1): the task
+    # retries like any failed analysis, and no outcome is invented.
     offline_only: true
     slice: edge
     synthetic: true
     input: {transcript: "AI: Hi.\nUser: Not now."}
-    expect: {label: answered, label_field: outcome, forbidden: ["\"stop_recorded\": true"]}
-    recorded: [["interested"]]
+    expect: {label: null, label_field: outcome, forbidden: ["\"stop_recorded\": true"]}
+    recorded: [["interested"], ["interested"], ["interested"]]
   - id: empty-transcript-no-answer
     slice: edge
     synthetic: true

@@ -286,12 +286,30 @@ class ClaudeClient:
                             temperature=temperature)
         cleaned = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
         try:
-            return json.loads(cleaned)
+            data = json.loads(cleaned)
         except json.JSONDecodeError:
             match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if match:
-                return json.loads(match.group(0))
-            raise ValueError(f"Model did not return valid JSON: {raw[:200]!r}")
+            if not match:
+                raise ValueError(f"Model did not return valid JSON: {raw[:200]!r}") from None
+            data = json.loads(match.group(0))
+        return require_object(data, raw)
+
+
+def require_object(data, raw: str = "") -> dict:
+    """`data` if it is a JSON object, else ValueError.
+
+    Every caller of complete_json reads the reply with .get(); an array, a
+    bare string or `null` used to come back as-is and raise AttributeError
+    at that .get() -- outside the caller's own try in several places
+    (icp_extraction, pattern_recognition, adversarial_review), so code
+    documented never to raise did. ValueError is the failure every caller
+    already handles for unparseable JSON, so a reply of the wrong shape now
+    fails closed the same way.
+    """
+    if not isinstance(data, dict):
+        raise ValueError(f"Model returned JSON {type(data).__name__}, not an object: "
+                         f"{raw[:200]!r}")
+    return data
 
 
 _client: ClaudeClient | None = None

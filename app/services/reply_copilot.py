@@ -622,7 +622,7 @@ def _generate(session: Session, reply: InboundReply, lead: Lead, strategy: Strat
         company=prompt_safety.inline(lead.company or "unknown"),
         title=prompt_safety.inline(lead.title or "unknown"),
         step_no=step_no if step_no is not None else "unknown",
-        original_message=original,
+        original_message=prompt_safety.block(original),
         intent=intent,
         intent_guide=_INTENT_GUIDE[intent],
         playbook=playbook or "(no objection research on file -- make no claims; "

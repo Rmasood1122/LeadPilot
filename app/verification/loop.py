@@ -37,7 +37,7 @@ from app.config import settings
 from app.db.models import FlowType, PastClient, ResearchStep, Strategy, StrategyStatus
 from app.services.anthropic_client import (JUDGE_TEMPERATURE, TruncatedResponseError,
                                             get_client)
-from app.services import notifications, usage_meter
+from app.services import notifications, prompt_safety, usage_meter
 from app.verification.passes import (
     FIXER_PROMPT,
     FIXER_SYSTEM,
@@ -85,9 +85,12 @@ def _support_block(session: Session, strategy: Strategy) -> str:
             f"supersedes {name} sources 1-{idx - 1}" if idx > 1
             else "earliest source"
         )
+        # The label is ours; the synthesis is model output built on outside
+        # text (scraped posts, headlines, enrichment), so it is data (F-AI-02).
         parts.append(
             f"[{name} research | source {idx} of {totals[name]} | "
-            f"phase {r.phase} synthesis | {supersedes}]\n{r.output}"
+            f"phase {r.phase} synthesis | {supersedes}]\n"
+            f"{prompt_safety.block(r.output)}"
         )
 
     if strategy.flow_type is FlowType.WITH_CLIENTS:
@@ -95,12 +98,50 @@ def _support_block(session: Session, strategy: Strategy) -> str:
             select(PastClient).where(PastClient.product_id == strategy.product_id)
         ).scalars().all()
         for i, c in enumerate(clients, 1):
-            parts.append(f"[past-client {i} patterns] {c.extracted_patterns_json}")
+            parts.append(
+                f"[past-client {i} patterns]\n"
+                f"{prompt_safety.block(str(c.extracted_patterns_json))}"
+            )
     elif strategy.gtm_document:
-        parts.append(f"[GTM PLAN]\n{strategy.gtm_document}")
+        parts.append(f"[GTM PLAN]\n{prompt_safety.block(strategy.gtm_document)}")
 
     block = "\n\n".join(parts) or "(no supporting research found)"
-    return block[:_MAX_SUPPORT_CHARS]
+    return _bounded_support(block)
+
+
+def _bounded_support(block: str) -> str:
+    """Cut the support block to _MAX_SUPPORT_CHARS without leaving an
+    EXTERNAL_TEXT block open: a cut that lands inside a block would leave its
+    tail looking like it ends the data, so the block is closed again."""
+    if len(block) <= _MAX_SUPPORT_CHARS:
+        return block
+    cut = block[:_MAX_SUPPORT_CHARS]
+    if cut.rfind(prompt_safety.OPEN) > cut.rfind(prompt_safety.CLOSE):
+        cut = f"{cut}\n{prompt_safety.CLOSE}"
+    return cut
+
+
+def _document_for_prompt(strategy: Strategy) -> str:
+    """The strategy document as the judge and fixer see it: data under review,
+    between markers (F-AI-02). It is model output built on outside text, and
+    after the first fix it is the fixer's own rewrite."""
+    if not strategy.strategy_document:
+        return "(empty)"
+    return prompt_safety.block(strategy.strategy_document)
+
+
+def _strip_echoed_markers(text: str) -> str:
+    """The fixer is told to return the bare document, but a model may echo the
+    single marker pair it was given around it. Remove exactly one OUTER pair
+    -- the text must start with OPEN and end with CLOSE -- and nothing else, so
+    the stored document never carries our markers (it is re-wrapped on the next
+    prompt). Markers anywhere else are left alone for the review layer."""
+    stripped = text.strip()
+    open_, close = prompt_safety.OPEN, prompt_safety.CLOSE
+    if (stripped.startswith(open_) and stripped.endswith(close)
+            and len(stripped) >= len(open_) + len(close)):
+        return stripped[len(open_):len(stripped) - len(close)].strip()
+    return text
 
 
 def _log_attempt(strategy: Strategy, spec: VerificationPassSpec, attempt: int,
@@ -150,7 +191,7 @@ def _judge(spec: VerificationPassSpec, strategy: Strategy, support: str) -> tupl
             name=spec.name,
             criterion=spec.criterion,
             precedence_rule=PRECEDENCE_RULE,
-            strategy_document=strategy.strategy_document or "(empty)",
+            strategy_document=_document_for_prompt(strategy),
             support_block=support,
         ),
     )
@@ -172,9 +213,11 @@ def _generate_fix(spec: VerificationPassSpec, strategy: Strategy,
     prompt = FIXER_PROMPT.format(
         pass_no=spec.pass_no,
         name=spec.name,
-        fix_description=fix_description,
+        # The finding is the judge's output after reading outside text, so it
+        # is wrapped too; it still tells the fixer what to change.
+        fix_description=prompt_safety.block(fix_description),
         precedence_rule=PRECEDENCE_RULE,
-        strategy_document=strategy.strategy_document or "(empty)",
+        strategy_document=_document_for_prompt(strategy),
     )
     ceiling = settings.verification_fixer_max_tokens
     try:
@@ -196,7 +239,7 @@ def _generate_fix(spec: VerificationPassSpec, strategy: Strategy,
         revised = get_client().complete(
             system=FIXER_SYSTEM, prompt=prompt, max_tokens=retry_ceiling,
         )
-    return revised.strip()
+    return _strip_echoed_markers(revised).strip()
 
 
 # ---------------------------------------------------------------------------

@@ -32,7 +32,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Lead, LeadStatus, PlaybookScore, Product, Strategy
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -194,8 +194,12 @@ def _lead_line(lead: Lead, factors: dict) -> dict:
 
 def _model_scores(batch: list[tuple[Lead, dict]], strategy: Strategy,
                   product_brief: str, icp: dict) -> dict[str, dict]:
+    # Lead title, company and enrichment fields were written outside this
+    # system: the lead list goes in one untrusted block (F-AI-02).
+    leads = json.dumps([_lead_line(l, f) for l, f in batch], default=str)
     prompt = (f"PRODUCT: {product_brief}\nICP: {json.dumps(icp, default=str)}\n\n"
-              f"LEADS:\n{json.dumps([_lead_line(l, f) for l, f in batch], default=str)}\n\n"
+              f"{prompt_safety.NOTICE}\n\n"
+              f"LEADS:\n{prompt_safety.block(leads)}\n\n"
               "Return the JSON object now.")
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
                                                        max_tokens=2048)

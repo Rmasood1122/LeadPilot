@@ -405,7 +405,7 @@ EXTRACTOR_SYSTEM = (
 
 
 def _model_claims(session: Session, texts: list[str]) -> dict[str, str]:
-    from app.services import anthropic_client, system_settings  # noqa: PLC0415
+    from app.services import anthropic_client, prompt_safety, system_settings  # noqa: PLC0415
 
     if not system_settings.get(session, "claim_model_extraction_enabled"):
         return {}
@@ -414,7 +414,11 @@ def _model_claims(session: Session, texts: list[str]) -> dict[str, str]:
         return {}
     try:
         data = anthropic_client.get_client().complete_json(
-            system=EXTRACTOR_SYSTEM, prompt=f"MESSAGE:\n{joined[:6000]}", max_tokens=800,
+            # The draft is model text written from the prospect's own data:
+            # it is the thing under review, delimited as data.
+            system=EXTRACTOR_SYSTEM,
+            prompt=f"{prompt_safety.NOTICE}\n\nMESSAGE:\n{prompt_safety.block(joined[:6000])}",
+            max_tokens=800,
             temperature=anthropic_client.JUDGE_TEMPERATURE)
     except Exception as exc:  # noqa: BLE001 -- rules still run
         logger.info("claim extraction model unavailable (%s); rules only", type(exc).__name__)

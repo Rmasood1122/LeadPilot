@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.models import Lead
-from app.services import anthropic_client, crypto
+from app.services import anthropic_client, crypto, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -91,8 +91,13 @@ def write_script(lead: Lead) -> dict:
     profile = meeting_prep.lead_profile(lead)
     posts = meeting_prep._linkedin_posts(lead)
     news = meeting_prep._company_news(lead)
-    prompt = (f"PROSPECT: {profile}\nRECENT LINKEDIN POSTS: {posts}\n"
-              f"RECENT COMPANY NEWS: {news}\n\nReturn the JSON object now.")
+    # F-AI-02: the profile is scraped, the posts were written by the prospect
+    # and the news by third parties -- each is delimited and escaped.
+    prompt = (f"{prompt_safety.NOTICE}\n\n"
+              f"PROSPECT:\n{prompt_safety.block(str(profile))}\n"
+              f"RECENT LINKEDIN POSTS:\n{prompt_safety.block(str(posts))}\n"
+              f"RECENT COMPANY NEWS:\n{prompt_safety.block(str(news))}\n\n"
+              "Return the JSON object now.")
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
                                                        max_tokens=1200)
     script = str((data or {}).get("script") or "").strip()

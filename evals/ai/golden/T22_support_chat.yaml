@@ -192,7 +192,7 @@ cases:
     slice: edge
     synthetic: true
     input: {question: "How do I connect Gmail?"}
-    expect: {label: malformed_response, label_field: reason, include: ["Submit a ticket"], text_field: text}
+    expect: {label: model_error, label_field: reason, include: ["Submit a ticket"], text_field: text}
     recorded: [["on_topic", true]]
   - id: garbled-json-becomes-ticket
     offline_only: true
