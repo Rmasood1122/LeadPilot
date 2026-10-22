@@ -159,7 +159,6 @@ cases:
     input: {notes: "Wants a proposal.", summary: "Dana asked for a proposal for the Studio plan."}
     expect: {label: draft_saved, label_field: draft_status, text_field: body, numbers_from: [notes, summary]}
     recorded: {subject: "Your proposal", body: "Hi Dana,\n\nAs agreed, the Studio plan is $2,400 a year.\n\nMaren"}
-    known_failure: "app/services/meeting_followup.py:308-312 -- generate_email keeps whatever price the model wrote; nothing checks the body against the notes or summary before it is saved as a Gmail draft."
   - id: invented-date
     offline_only: true
     slice: invented
@@ -167,7 +166,6 @@ cases:
     input: {notes: "Will send a proposal.", summary: "Seller will send a proposal."}
     expect: {label: draft_saved, label_field: draft_status, text_field: body, numbers_from: [notes, summary]}
     recorded: {subject: "Proposal", body: "Hi Dana,\n\nYou'll have the proposal by 14 November, and we start on the 1st.\n\nMaren"}
-    known_failure: "app/services/meeting_followup.py:308-312 -- dates the model invents ('by 14 November') go into the draft unchecked against the notes or summary."
   - id: invented-commitment
     offline_only: true
     slice: invented
@@ -175,7 +173,6 @@ cases:
     input: {notes: "Interested; wants pricing.", summary: "Discussed pricing for the Studio plan."}
     expect: {label: draft_saved, label_field: draft_status, text_field: body, forbidden: ["free onboarding", "money-back guarantee"]}
     recorded: {subject: "Next steps", body: "Hi Dana,\n\nAs promised, onboarding is free onboarding for your team and we offer a money-back guarantee.\n\nMaren"}
-    known_failure: "app/services/meeting_followup.py:308-312 -- a commitment nobody made on the call (free onboarding, a guarantee) is saved into the draft; the prompt rule is the only guard."
   - id: faithful-commitment-ok
     slice: invented
     synthetic: true

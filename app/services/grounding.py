@@ -22,8 +22,14 @@ _FUNDING = re.compile(
     r"\bseries\s+[a-h]\b|\b(?:pre-?)?seed\s+(?:round|funding)\b|\bfunding\s+round\b",
     re.IGNORECASE)
 
-_DISCOUNT = re.compile(r"\bdiscount(?:s|ed)?\b|\b\d+\s?%\s+off\b|\bfree\s+(?:months?|trial)\b",
-                       re.IGNORECASE)
+# Offers and promises a writer may not make up: discounts, free extras,
+# guarantees.
+_DISCOUNT = re.compile(
+    r"\bdiscount(?:s|ed)?\b|\b\d+\s?%\s+off\b"
+    r"|\bfree\s+(?:months?|weeks?|trial|onboarding|set-?up|implementation|migration|"
+    r"training|support|consultation|audit)\b"
+    r"|\bmoney[- ]back\b|\bguarantee[ds]?\b",
+    re.IGNORECASE)
 
 _DAY = (r"(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|"
         r"tonight|end\s+of\s+(?:the\s+)?(?:day|week|month|quarter))")

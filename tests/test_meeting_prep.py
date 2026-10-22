@@ -611,6 +611,22 @@ class TestMeetingOutcome:
         assert send.json()["draft_status"] == "sent"
         assert client.post(f"/meeting-outcomes/{body['id']}/send").status_code == 409
 
+    def test_an_invented_price_date_or_promise_is_removed_from_the_draft(
+            self, client, db_session, lead, fake_claude):
+        """T18: the draft reads as the seller's promise. A price, date, free
+        extra or guarantee nobody stated is removed; what the notes support
+        stays."""
+        fake_claude.followup_email_response = {
+            "subject": "Next steps",
+            "body": "Hi Sara,\n\nThanks for today. I'll send the 2-page proposal by Friday."
+                    " The Studio plan is $2,400 a year.\n\nOnboarding is free onboarding and "
+                    "we offer a money-back guarantee.\n\nMaren"}
+        resp = client.post(f"/leads/{lead.id}/meeting-outcome", json={
+            "outcome": "interested", "notes": "Agreed: I send the 2-page proposal by Friday."})
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["followup_body"] == (
+            "Hi Sara,\n\nThanks for today. I'll send the 2-page proposal by Friday.\n\nMaren")
+
     def test_interested_sets_next_action_no_deal(self, client, db_session, lead,
                                                  fake_claude):
         resp = client.post(f"/leads/{lead.id}/meeting-outcome",
