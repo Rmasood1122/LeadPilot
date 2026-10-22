@@ -236,7 +236,6 @@ cases:
     offline_only: true
     slice: injection
     synthetic: true
-    known_failure: "app/services/message_personalization.py:280-285 accepts any non-empty value, and claim_verification.enforce (outreach_tasks.py:1305-1309) does not treat a URL as a claim, so a link the model copied from injected enrichment is sent in the template slot"
     input:
       template_body: *tb
       variable_descriptions: *vd
@@ -434,7 +433,6 @@ cases:
     offline_only: true
     slice: edge
     synthetic: true
-    known_failure: "app/services/message_personalization.py:280-285 accepts a value of any length; the prompt's 'a few words each' is the only control, so a paragraph-long slot is sent"
     input: {template_body: *tb, variable_descriptions: *vd, lead: {full_name: Ana Ribeiro, company: Bluebell Agency}}
     expect: {max_chars: 120, text_field: values.2}
     recorded:

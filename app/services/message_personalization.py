@@ -343,6 +343,11 @@ _LEAD_FIELDS = {
 }
 
 
+# A model-filled template slot is "a few words". Lead-field values
+# ('lead.company' and so on) are the lead's own data and are not capped.
+MAX_WA_VARIABLE_CHARS = 100
+
+
 def render_whatsapp_variables(
     session: Session,
     strategy: Strategy,
@@ -401,6 +406,14 @@ def render_whatsapp_variables(
             value = str(data.get(n) or "").strip()
             if not value:
                 raise ValueError(f"could not fill template variable {{{{{n}}}}}")
+            # The prompt's "a few words each" and the claim check are not link
+            # or length controls. A slot is a short phrase in a template Meta
+            # approved: a URL (an injected one, say) or a paragraph is refused.
+            if _URL_RE.search(value) or re.search(r"\bwww\.", value, re.I):
+                raise ValueError(f"template variable {{{{{n}}}}} contains a link")
+            if len(value) > MAX_WA_VARIABLE_CHARS:
+                raise ValueError(f"template variable {{{{{n}}}}} is {len(value)} characters "
+                                 f"(limit {MAX_WA_VARIABLE_CHARS})")
             values[n] = value
 
     missing = [n for n in numbers if n not in values]

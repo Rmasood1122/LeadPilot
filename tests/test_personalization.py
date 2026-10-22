@@ -536,3 +536,38 @@ class TestBodyLengthCeiling:
         body = " ".join(["word"] * MAX_BODY_WORDS)
         assert self._render(monkeypatch, db_session, verified_strategy,
                             email_sequence.steps[0], body, lead) == body
+
+
+class TestWhatsAppSlotChecks:
+    """T04: a model-filled slot in an approved template is a short phrase.
+    A link (an injected one, say) or a paragraph is refused; the send fails
+    rather than going out."""
+
+    def _fill(self, monkeypatch, db_session, strategy, lead, value):
+        from app.services import message_personalization as mp
+
+        class _Stub:
+            def complete_json(self, **kw):
+                return {"1": value}
+
+        monkeypatch.setattr(mp, "get_client", lambda: _Stub())
+        return mp.render_whatsapp_variables(
+            db_session, strategy, lead, template_body="Hi, about {{1}}.",
+            variable_descriptions={"1": "their pain"}, variable_mapping={})
+
+    @pytest.mark.parametrize("value", ["month-end at https://evil.example.test/x",
+                                       "month-end, see www.evil.example.test"])
+    def test_a_link_in_a_slot_is_refused(self, monkeypatch, db_session,
+                                         verified_strategy, lead, value):
+        with pytest.raises(ValueError, match="link"):
+            self._fill(monkeypatch, db_session, verified_strategy, lead, value)
+
+    def test_a_paragraph_in_a_slot_is_refused(self, monkeypatch, db_session,
+                                              verified_strategy, lead):
+        with pytest.raises(ValueError, match="characters"):
+            self._fill(monkeypatch, db_session, verified_strategy, lead,
+                       "month-end close " * 20)
+
+    def test_a_short_phrase_is_kept(self, monkeypatch, db_session, verified_strategy, lead):
+        assert self._fill(monkeypatch, db_session, verified_strategy, lead,
+                          "month-end close") == {"1": "month-end close"}
