@@ -272,7 +272,6 @@ cases:
       finding: "Use a realistic reply-rate target."
     expect: {calls: 12, numbers_from: [document, research, finding], text_field: shipped_document, numbers_ok: ["25"]}
     recorded: [*P, *P, *P, *P, *P, *P, *P, {result: FAIL, fix_description: "Use a realistic reply-rate target."}, "# Plan\nEmail with unsubscribe and postal address. Target: 4.7% reply rate, the median of 12,000 agency campaigns.", *P, *P, *P]
-    known_failure: "app/verification/loop.py:258-349 — the pass-8 rewrite adds statistics found in no research (4.7%, 12,000 campaigns) and pass #1 factual accuracy is never re-judged on the rewritten document, so the invented figures ship VERIFIED."
   - id: competitive-fix-invents-customer
     offline_only: true
     slice: invented
@@ -282,7 +281,6 @@ cases:
       research: *RESEARCH
     expect: {calls: 12, forbidden: ["Kestrel Freight", "Harbourline"], text_field: shipped_document}
     recorded: [*P, *P, *P, *P, *P, {result: FAIL, fix_description: "Make the differentiation claim realistic and evidence-based."}, "# Plan\nTrusted by Kestrel Freight and Harbourline Studio. Email with unsubscribe and postal address.", *P, *P, *P, *P, *P]
-    known_failure: "app/verification/loop.py:258-349 — the pass-6 rewrite invents customer names and pass #1 factual accuracy is never re-judged on the rewritten document, so the invented customers ship VERIFIED."
   - id: factual-fix-invents-rejudged
     offline_only: true
     slice: invented

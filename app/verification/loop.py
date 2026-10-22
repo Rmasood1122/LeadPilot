@@ -200,6 +200,45 @@ _COMPLIANCE_ELEMENTS: dict[str, re.Pattern[str]] = {
 }
 
 
+# The factual-accuracy pass (#1) is judged once, first. Every later pass's
+# fixer rewrites the whole document, and #1 is never re-judged, so a later
+# rewrite could add a statistic or a customer name the research never had and
+# still ship VERIFIED (T31). Like the legal floor above, this is a
+# deterministic check, not a re-judge: a later rewrite may not add a figure,
+# or a name in a customer/proof phrase, that the research, the document #1
+# approved and the judges' findings do not contain.
+FACTUAL_PASS_KEY = "factual_accuracy"
+
+_CUSTOMER_PROOF = re.compile(
+    r"\b(?:trusted by|used by|relied (?:up)?on by|"
+    r"(?:customers?|clients?)\s+(?:like|include|including|such as)|"
+    r"worked with|partnered with|case stud(?:y|ies)\s+(?:with|from|for))\b", re.I)
+_CAPITALISED = re.compile(r"\b[A-Z][A-Za-z&'-]+\b")
+
+
+def _unsupported_facts(revised: str, sources: list[str]) -> list[str]:
+    """What a rewrite states that none of `sources` contains: figures, and
+    capitalised names in a customer or proof phrase. Deterministic."""
+    from app.services import grounding  # noqa: PLC0415
+
+    problems = []
+    # A numbered-list marker ("4. Next step") is layout, not a figure.
+    unlisted = re.sub(r"(?m)^\s*\d+[.)]\s+", "", revised or "")
+    figures = grounding.unsupported_numbers(unlisted, *sources)
+    if figures:
+        problems.append(f"figures not in the research ({', '.join(figures)})")
+    known = " ".join(sources).lower()
+    names = set()
+    for sentence in re.split(r"(?<=[.!?\n])\s+", revised or ""):
+        match = _CUSTOMER_PROOF.search(sentence)
+        if match:
+            names.update(w for w in _CAPITALISED.findall(sentence[match.end():])
+                         if w.lower() not in known)
+    if names:
+        problems.append(f"customer names not in the research ({', '.join(sorted(names))})")
+    return problems
+
+
 def _compliance_elements(text: str | None) -> frozenset[str]:
     """Names of the compliance elements the document states."""
     return frozenset(name for name, pattern in _COMPLIANCE_ELEMENTS.items()
@@ -382,6 +421,14 @@ def run_verification_loop(session: Session, strategy: Strategy,
     legal_attempts = 0
     legal_approved: frozenset[str] = frozenset()
     legal_regressed = False
+    # The same for the factual pass (#1): its spec, attempts, and the document
+    # it approved; plus every judge finding so far (a fix may use a figure a
+    # finding named).
+    factual_spec: VerificationPassSpec | None = None
+    factual_attempts = 0
+    factual_approved = ""
+    factual_regressed = False
+    findings: list[str] = []
 
     for spec in build_passes(strategy.flow_type):
         passed = False
@@ -404,6 +451,9 @@ def run_verification_loop(session: Session, strategy: Strategy,
                 if spec.key == SHIP_BLOCKING_PASS_KEY:
                     legal_spec, legal_attempts = spec, attempt
                     legal_approved = _compliance_elements(strategy.strategy_document)
+                if spec.key == FACTUAL_PASS_KEY:
+                    factual_spec, factual_attempts = spec, attempt
+                    factual_approved = strategy.strategy_document or ""
                 break
 
             fix_description = fix_description or (
@@ -476,6 +526,7 @@ def run_verification_loop(session: Session, strategy: Strategy,
                 strategy.strategy_document = revised
                 document_history.append(_normalize_document(revised))
             prior_fix_descriptions.append(fix_description)
+            findings.append(fix_description)
             _log_attempt(strategy, spec, attempt, "FAIL", fix_description, bool(revised))
             session.commit()
 
@@ -499,6 +550,25 @@ def run_verification_loop(session: Session, strategy: Strategy,
                         "pass %s marked FAIL", spec.key, dropped, legal_spec.key,
                     )
 
+            # Re-check the factual pass on the rewritten document (see
+            # FACTUAL_PASS_KEY). Deterministic, no model call.
+            if revised and factual_spec is not None and not factual_regressed:
+                invented = _unsupported_facts(revised, [support, factual_approved, *findings])
+                if invented:
+                    factual_regressed = True
+                    factual_attempts += 1
+                    _log_attempt(
+                        strategy, factual_spec, factual_attempts, "FAIL",
+                        f"The rewrite for '{spec.name}' added {'; '.join(invented)}, "
+                        f"which '{factual_spec.name}' never checked. Remove them or "
+                        f"source them.",
+                        False, outcome="facts_regressed",
+                    )
+                    session.commit()
+                    logger.warning("pass %s rewrite added unsupported facts (%s) — pass %s "
+                                   "marked FAIL", spec.key, "; ".join(invented),
+                                   factual_spec.key)
+
         if not passed:
             any_exhausted = True
             logger.warning("pass %s did not pass after %s attempts", spec.key, max_retries)
@@ -506,6 +576,9 @@ def run_verification_loop(session: Session, strategy: Strategy,
     if legal_regressed:
         # Fail closed: a later rewrite removed what the ship-blocking pass
         # approved, so the strategy never counts as verified.
+        any_exhausted = True
+    if factual_regressed:
+        # Fail closed: a later rewrite added facts the factual pass never saw.
         any_exhausted = True
 
     strategy.status = (
