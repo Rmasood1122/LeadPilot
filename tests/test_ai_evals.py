@@ -231,3 +231,23 @@ class TestGraders:
         assert not gr.calibrated({"tone": {"n": 20, "agree": 15}}, "tone")
         assert gr.calibrated({"tone": {"n": 20, "agree": 17}}, "tone")
         assert not gr.calibrated({"tone": {"n": 5, "agree": 5}}, "tone")
+
+
+def test_a_swallowed_replay_exhaustion_fails_the_case():
+    """The app may catch the error a replay raises when it runs out of
+    recorded outputs (claim extraction degrades to rules, for one). The case
+    must still fail: it exercised a path it never recorded."""
+    case = fw.Case(id="c", slice="normal", synthetic=True, input={}, expect={},
+                   recorded={"a": 1})
+
+    def adapter(_inp, client):
+        client.complete_json(system="s", prompt="first")
+        try:
+            client.complete_json(system="s", prompt="second, unrecorded")
+        except fw.ReplayExhausted:
+            pass
+        return {"ok": True}
+
+    result = fw.run_case(SPECS[0], case, adapter, fw.ReplayClient(case.recorded), {})
+    assert "no recorded output" in result.error
+    assert not result.passed

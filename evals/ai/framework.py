@@ -170,6 +170,10 @@ class ReplayClient:
     def __init__(self, recorded: Any):
         self._queue = list(recorded) if isinstance(recorded, list) else [recorded]
         self.calls: list[dict] = []
+        # Calls made after the recorded outputs ran out. The app can catch the
+        # ReplayExhausted (claim extraction degrades to rules, for one), which
+        # would hide that the case exercised a fallback it never recorded.
+        self.exhausted = 0
 
     def _next(self, kind: str, system: str, prompt: str, kwargs: dict) -> Any:
         # A cached prefix (gateway cache_prefix) is read before the prompt;
@@ -178,6 +182,7 @@ class ReplayClient:
         self.calls.append({"kind": kind, "system": system or "", "prompt": full,
                            "kwargs": dict(kwargs)})
         if not self._queue:
+            self.exhausted += 1
             raise ReplayExhausted(f"call {len(self.calls)} has no recorded output")
         out = self._queue.pop(0)
         self.calls[-1]["output"] = out
@@ -254,6 +259,9 @@ def run_case(spec: Spec, case: Case, adapter: Callable, client: Any,
         error = f"{type(exc).__name__}: {exc}"
     latency = time.monotonic() - start
     calls = list(getattr(client, "calls", []))
+    if not error and getattr(client, "exhausted", 0):
+        error = (f"replay: {client.exhausted} call(s) had no recorded output and the "
+                 f"app swallowed the error; record those outputs in the case")
     verdicts = [] if error else grade(spec, case, output, calls, graders)
     return CaseResult(spec.id, case.id, case.slice, case.safety, run, output, calls, verdicts,
                       error=error, latency_s=latency,
