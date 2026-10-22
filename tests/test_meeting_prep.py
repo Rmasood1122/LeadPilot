@@ -381,6 +381,31 @@ class TestGeneration:
         assert sections["discovery_questions"] == ["single string"]
         assert sections["why_they_booked"] == ""
 
+    def test_an_invented_price_and_quote_are_removed(self, db_session, test_user, lead,
+                                                     fake_claude, emitted):
+        """T17: the seller repeats the brief on the call. A price the records
+        never named and a quote the prospect never wrote are removed; the
+        grounded rest is kept."""
+        db_session.add(m.InboundReply(lead_id=lead.id, from_address=lead.email,
+                                      body="Sure, Thursday works.",
+                                      classification="interested"))
+        db_session.commit()
+        fake_claude.meeting_prep_response = {
+            "why_they_booked": 'They said "we are switching providers this quarter". '
+                               "They replied that Thursday works.",
+            "deal_structure": "Offer $4,500 for a year up front.",
+            "talking_points": ["Inspections backlog", "Mention the 73% saving"],
+            "opening_60_seconds": "Thanks for booking.",
+        }
+        brief = _brief(db_session, lead, test_user)
+        assert meeting_prep.generate_brief(db_session, brief.id) == "ready"
+        db_session.refresh(brief)
+        sections = brief.sections_json
+        assert sections["why_they_booked"] == "They replied that Thursday works."
+        assert sections["deal_structure"] == ""
+        assert sections["talking_points"] == ["Inspections backlog"]
+        assert "4,500" not in brief.content_md and "switching providers" not in brief.content_md
+
     def test_reschedule_rearms_reminders(self, db_session, test_user, lead):
         start = datetime.now(UTC) + timedelta(hours=10)
         brief = _brief(db_session, lead, test_user, start=start, ref="ev-1")

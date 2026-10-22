@@ -84,3 +84,43 @@ def problems(text: str | None, *sources: str | None) -> list[str]:
     if offers:
         out.append(f"offers or deadlines not in the source ({', '.join(offers)})")
     return out
+
+
+# A quotation of three words or more, in straight or curly double quotes.
+_QUOTE = re.compile(r"[\"“]([^\"”]{3,400})[\"”]")
+
+
+def _plain(text: str | None) -> str:
+    return " ".join(re.sub(r"[^\w\s%$]", " ", (text or "").lower()).split())
+
+
+def unsupported_quotes(text: str | None, *sources: str | None) -> list[str]:
+    """Quoted passages in `text` (three words or more) that appear in no
+    source. A quote attributed to a prospect must be something they wrote."""
+    known = " ".join(_plain(s) for s in sources)
+    out = []
+    for match in _QUOTE.finditer(text or ""):
+        quoted = _plain(match.group(1))
+        if len(quoted.split()) >= 3 and quoted not in known:
+            out.append(match.group(1).strip())
+    return out
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def drop_ungrounded_sentences(text: str | None, *sources: str | None) -> tuple[str, list[str]]:
+    """(`text` without its ungrounded sentences, the reasons). A sentence is
+    ungrounded when it states a number, funding round, offer or deadline, or
+    quotes a passage, that no source contains."""
+    kept, reasons = [], []
+    for sentence in _SENTENCE_END.split((text or "").strip()):
+        found = problems(sentence, *sources)
+        quotes = unsupported_quotes(sentence, *sources)
+        if quotes:
+            found.append(f"quotes not in the source ({'; '.join(quotes)})")
+        if found:
+            reasons.extend(found)
+        elif sentence:
+            kept.append(sentence)
+    return " ".join(kept), reasons

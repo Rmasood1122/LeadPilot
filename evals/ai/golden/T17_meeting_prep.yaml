@@ -178,7 +178,6 @@ cases:
     input: {strategy_document: "Plans: Studio $1,200 per month."}
     expect: {label: ready, label_field: status, text_field: sections.deal_structure, numbers_from: [strategy_document]}
     recorded: {deal_structure: "Offer $4,500 for a year up front.", talking_points: ["Plans"]}
-    known_failure: "app/services/meeting_prep.py:584 -- clean_sections keeps any number the model wrote; nothing checks the brief's prices against the strategy before the seller reads it."
   - id: invented-quote
     offline_only: true
     slice: invented
@@ -186,7 +185,6 @@ cases:
     input: {replies: ["Sure, Thursday works."]}
     expect: {label: ready, label_field: status, text_field: sections.why_they_booked, forbidden: ["we are switching providers"]}
     recorded: {why_they_booked: "They said \"we are switching providers this quarter\".", talking_points: ["Switching"]}
-    known_failure: "app/services/meeting_prep.py:584 -- why_they_booked is stored as the model wrote it; a quote the prospect never wrote reaches the seller unchecked."
   - id: says-not-covered
     slice: invented
     synthetic: true
