@@ -225,7 +225,9 @@ def _live_embed(documents: list[list[str]], input_type: str) -> list[list[list[f
                         raise ValueError(f"vector of {len(values)} dims, expected {dimension}")
                     out[d][start + int(vector["index"])] = values
         except (KeyError, IndexError, TypeError, ValueError) as exc:
-            raise EmbeddingsUnavailable(f"unexpected Voyage embeddings response: {exc}") from exc
+            # Fixed text: the vendor's payload never becomes our error message.
+            logger.error("voyage embeddings response unusable: %s", type(exc).__name__)
+            raise EmbeddingsUnavailable("unexpected Voyage embeddings response") from exc
     if any(v is None for doc in out for v in doc):
         raise EmbeddingsUnavailable("Voyage returned fewer embeddings than requested")
     return out  # type: ignore[return-value]
@@ -242,7 +244,8 @@ def _live_rerank(query: str, docs: list[str], top_k: int) -> list[RerankResult]:
         results = [RerankResult(int(r["index"]), float(r["relevance_score"]))
                    for r in body["data"]]
     except (KeyError, TypeError, ValueError) as exc:
-        raise EmbeddingsUnavailable(f"unexpected Voyage rerank response: {exc}") from exc
+        logger.error("voyage rerank response unusable: %s", type(exc).__name__)
+        raise EmbeddingsUnavailable("unexpected Voyage rerank response") from exc
     if any(not 0 <= r.index < len(docs) for r in results):
         raise EmbeddingsUnavailable("Voyage rerank returned an index outside the documents")
     results.sort(key=lambda r: (-r.score, r.index))
