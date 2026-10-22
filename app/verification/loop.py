@@ -340,14 +340,24 @@ def _reverts_earlier_state(candidate: str, history: list[str]) -> int | None:
     Exact match after normalisation is the common case; the similarity ratio
     catches a near-revert that differs only by a stray connective, which is
     what a model regenerating "the previous version" actually produces.
+
+    The similarity ratio applies only to states BEFORE the current one (the
+    last entry). A correct, minimal fix is by nature very similar to the
+    document it fixes: on a long document a one-sentence change keeps the
+    ratio above the threshold, so comparing with the current state took every
+    small fix for a revert (T31). Going back to the current state needs an
+    exact match; going back to an earlier one is the oscillation this exists
+    to catch.
     """
     normalized = _normalize_document(candidate)
     if not normalized:
         return None
+    last = len(history) - 1
     for index, previous in enumerate(history):
         if normalized == previous:
             return index
-        if SequenceMatcher(None, normalized, previous).ratio() >= _REVERT_SIMILARITY_THRESHOLD:
+        if index < last and (SequenceMatcher(None, normalized, previous).ratio()
+                             >= _REVERT_SIMILARITY_THRESHOLD):
             return index
     return None
 

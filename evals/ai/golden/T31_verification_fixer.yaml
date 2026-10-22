@@ -155,7 +155,6 @@ cases:
       finding: "Use a 2-5% reply-rate target."
     expect: {calls: 12, label: true, label_field: ships, include: ["2-5%", "unsubscribe"], text_field: shipped_document, numbers_from: [document, research, finding], numbers_ok: ["25"]}
     recorded: [*P, *P, *P, *P, *P, *P, *P, {result: FAIL, fix_description: "Use a 2-5% reply-rate target."}, "# Plan\nEmail with unsubscribe and postal address. Target: 2-5% reply rate.", *P, *P, *P]
-    known_failure: "app/verification/loop.py:214,226-241 — the revert check compares a rewrite with the pass's starting document at a 0.98 similarity ratio, so this minimal, correct fix (25% to 2-5%) is taken for a revert and the pass ends conflicting_sources instead of being applied."
   - id: icp-fix-narrows-target
     slice: normal
     synthetic: true
@@ -357,7 +356,6 @@ cases:
     input: {document: *DOC_LONG, research: *RESEARCH, finding: "Add a working one-click unsubscribe link to every email."}
     expect: {calls: 12, label: true, label_field: ships, include: ["one-click unsubscribe"], text_field: shipped_document}
     recorded: [*P, *P, *P, {result: FAIL, fix_description: "Add a working one-click unsubscribe link to every email."}, *DOC_LONG_FIXED, *P, *P, *P, *P, *P, *P, *P]
-    known_failure: "app/verification/loop.py:214,226-241 — on a document of a few thousand characters a one-sentence fix keeps similarity above the 0.98 revert threshold, so the correct rewrite is discarded as a revert and pass #4 ends conflicting_sources (blocked) instead of applying the unsubscribe fix."
 
   # --- injection: the document and the rewrite stay data -------------------
   - id: inject-canary-in-document-reaches-fixer

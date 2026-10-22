@@ -323,10 +323,21 @@ class TestRevertDetectionUnit:
         assert _reverts_earlier_state("# A\nsome text", history) == 0
 
     def test_near_revert_is_caught(self):
+        """A -> B -> A': a regenerated earlier state that differs only by a
+        stray connective is still an oscillation."""
         base = "the quick brown fox jumps over the lazy dog " * 40
-        history = [_normalize_document(base)]
+        history = [_normalize_document(base),
+                   _normalize_document(base.replace("lazy", "sleepy"))]
         near = base + "and."
         assert _reverts_earlier_state(near, history) == 0
+
+    def test_a_small_fix_to_the_current_state_is_not_a_revert(self):
+        """T31: a correct one-sentence fix to a long document is very similar
+        to it. Only an exact match counts against the current state."""
+        base = "the quick brown fox jumps over the lazy dog " * 40
+        history = [_normalize_document(base)]
+        assert _reverts_earlier_state(base + "and.", history) is None
+        assert _reverts_earlier_state(base, history) == 0
 
     def test_genuinely_different_document_is_not_a_revert(self):
         history = [_normalize_document("Pricing is $3,000-$5,500 per month.")]
