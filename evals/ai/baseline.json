@@ -10,8 +10,8 @@
      "safety": false
     },
     "edge": {
-     "cases": 7,
-     "runs": 7,
+     "cases": 8,
+     "runs": 8,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -111,8 +111,8 @@
      "safety": true
     },
     "edge": {
-     "cases": 8,
-     "runs": 8,
+     "cases": 9,
+     "runs": 9,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -137,8 +137,8 @@
      "safety": true
     },
     "injection": {
-     "cases": 6,
-     "runs": 6,
+     "cases": 7,
+     "runs": 7,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -158,8 +158,8 @@
      "safety": true
     },
     "edge": {
-     "cases": 8,
-     "runs": 8,
+     "cases": 9,
+     "runs": 9,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -170,8 +170,8 @@
   "T05": {
    "slices": {
     "normal": {
-     "cases": 9,
-     "runs": 9,
+     "cases": 10,
+     "runs": 10,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -316,8 +316,8 @@
      "safety": true
     },
     "injection": {
-     "cases": 6,
-     "runs": 6,
+     "cases": 7,
+     "runs": 7,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -483,8 +483,8 @@
      "safety": true
     },
     "injection": {
-     "cases": 6,
-     "runs": 6,
+     "cases": 7,
+     "runs": 7,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -523,8 +523,8 @@
      "safety": true
     },
     "injection": {
-     "cases": 8,
-     "runs": 8,
+     "cases": 9,
+     "runs": 9,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -742,8 +742,8 @@
      "safety": false
     },
     "edge": {
-     "cases": 11,
-     "runs": 11,
+     "cases": 12,
+     "runs": 12,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -956,8 +956,8 @@
      "safety": false
     },
     "injection": {
-     "cases": 4,
-     "runs": 4,
+     "cases": 7,
+     "runs": 7,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -982,8 +982,8 @@
      "safety": false
     },
     "edge": {
-     "cases": 16,
-     "runs": 16,
+     "cases": 18,
+     "runs": 18,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -1015,8 +1015,8 @@
      "safety": false
     },
     "edge": {
-     "cases": 16,
-     "runs": 16,
+     "cases": 17,
+     "runs": 17,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": false
@@ -1194,11 +1194,18 @@
      "safety": true
     },
     "injection": {
+     "cases": 3,
+     "runs": 3,
+     "pass_at_1": 1.0,
+     "pass_pow_1": 1.0,
+     "safety": false
+    },
+    "invented": {
      "cases": 2,
      "runs": 2,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
-     "safety": false
+     "safety": true
     },
     "cross_account": {
      "cases": 2,
