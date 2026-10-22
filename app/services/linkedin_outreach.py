@@ -151,7 +151,13 @@ def _trim(text: str, limit: int) -> str:
 def render(session: Session, strategy: Strategy, lead: Lead, step, action: str) -> dict:
     """{"text", "subject"?} for one LinkedIn touch."""
     from app.services import personalization_context, style_profile  # noqa: PLC0415
-    from app.services.message_personalization import _playbook  # noqa: PLC0415
+    from app.services.message_personalization import (  # noqa: PLC0415
+        _URL_RE,
+        _host,
+        _own_domains,
+        _playbook,
+        strip_foreign_links,
+    )
 
     context, _ = personalization_context.prompt_block(lead)
     # prompt_block leads with the NOTICE when it has content; this prompt
@@ -178,6 +184,12 @@ def render(session: Session, strategy: Strategy, lead: Lead, step, action: str) 
         system=SYSTEM + style_profile.suffix_for_strategy(session, strategy),
         prompt=prompt, max_tokens=1024, schema=LINKEDIN_MESSAGE_SCHEMA)
     text = str((data or {}).get("text") or "").strip()
+    # The prompt's "no links" rule is not a control. Keep only links to the
+    # sender's own domains or ones the step brief (ours) names; a link an
+    # injected profile or post asked for is removed, as in email bodies.
+    allowed = _own_domains(session, strategy) | {
+        _host(u.rstrip(".,;:!?")) for u in _URL_RE.findall(step.template or "")}
+    text = strip_foreign_links(text, None, {h for h in allowed if h})
     if not text:
         raise ValueError("LinkedIn writer returned an empty message")
     limit = CONNECTION_NOTE_MAX if action == "connect" else MESSAGE_MAX
