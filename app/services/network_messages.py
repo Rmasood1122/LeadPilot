@@ -12,6 +12,7 @@ Every path (copy, one-click, bulk) shares these rules:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -111,7 +112,8 @@ def draft(db: Session, user: User, connection_id, product_id) -> LinkedInNetwork
             prompt=prompt, max_tokens=600, schema=NETWORK_MESSAGE_SCHEMA)
     except Exception as exc:  # noqa: BLE001
         raise MessageError(502, "The writer is unavailable. Try again.") from exc
-    text = str((data or {}).get("text") or "").strip()[:MESSAGE_MAX]
+    text = _without_unsupported(
+        str((data or {}).get("text") or "").strip(), prompt, conn.id)[:MESSAGE_MAX]
     if not text:
         raise MessageError(502, "The writer returned nothing. Try again.")
     if existing is None:
@@ -123,6 +125,33 @@ def draft(db: Session, user: User, connection_id, product_id) -> LinkedInNetwork
         existing.status, existing.error, existing.channel = "draft", None, None
     db.commit()
     return existing
+
+
+def _without_unsupported(text: str, prompt: str, connection_id) -> str:
+    """T25: the draft without sentences our records cannot back.
+
+    A LinkedIn connection tells us nothing about a meeting or a conversation,
+    so a sentence that says or implies one ('great meeting you', 'as we
+    discussed') is removed, as the email network refuses it without a two-way
+    thread. A sentence stating a figure, funding round, offer or deadline the
+    prompt (recipient, product, match reasons) lacks is removed too. The
+    user's own edits in save() are theirs and are not checked here."""
+    from app.services import grounding  # noqa: PLC0415
+    from app.services.email_network_messages import _SPOKEN  # noqa: PLC0415
+
+    kept, removed = [], []
+    for sentence in re.split(r"(?<=[.!?])\s+", text):
+        found = grounding.problems(sentence, prompt)
+        if _SPOKEN.search(sentence):
+            found.append("implies a conversation the records do not show")
+        if found:
+            removed.extend(found)
+        elif sentence:
+            kept.append(sentence)
+    if removed:
+        logger.warning("network message for connection %s: removed unsupported sentences: %s",
+                       connection_id, "; ".join(removed))
+    return " ".join(kept)
 
 
 def save(db: Session, user: User, message_id, text: str) -> LinkedInNetworkMessage:
