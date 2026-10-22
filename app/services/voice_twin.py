@@ -464,9 +464,14 @@ _ADV = r"(?:(?:definitely|really|actually|totally|just|certainly|absolutely|hone
 # says "I'm not a recording" is telling the truth.
 _AI_NOUN = (r"(?:ai\b|a\.\s?i\.?|robot\b|bot\b|machine\b|computer\b|automated\b|artificial\b|"
             r"virtual\s+assistant\b)")
+_NAME_APPOSITIVE = r"(?:(?-i:[A-Z][\w'-]*)(?:\s+(?-i:[A-Z][\w'-]*))?,\s*)?"
 _HUMAN_CLAIMS = [
+    # "I'm Priya, a real person": a capitalised name in apposition does not
+    # hide the claim. Case-sensitive, so "I'm sorry, a real person..." is not read
+    # as one.
     ("claims_real_person", re.compile(
-        r"\b(?:i'?m|i\s+am)\s+" + _ADV + r"(?:a\s+)?(?:(?:real|actual|live|genuine)\s+){1,3}"
+        r"\b(?:i'?m|i\s+am)\s+" + _NAME_APPOSITIVE + _ADV
+        + r"(?:a\s+)?(?:(?:real|actual|live|genuine)\s+){1,3}"
         r"(?:person|human)\b", re.I)),
     ("claims_human", re.compile(
         r"\b(?:i'?m|i\s+am)\s+" + _ADV + r"(?:a\s+)?(?:human(?:\s+being)?"

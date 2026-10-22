@@ -949,6 +949,7 @@ class TestReviewL1DetectorPrecision:
     @pytest.mark.parametrize("line", [
         "I'm not an A.I.", "You're talking to a human.", "I'm a real live person.",
         "Not a bot, I promise.", "I am definitely not artificial.", "Nope, real person here!",
+        "I'm Priya, a real person from the team.", "I am Priya Shah, a real human.",
     ])
     def test_misses_are_caught(self, line):
         from app.services import voice_twin
@@ -962,6 +963,7 @@ class TestReviewL1DetectorPrecision:
         "I'm not a human, I'm an AI assistant.",
         "I'm Rehan's AI assistant -- want me to put you through?",
         "Is this Rehan's direct line you want?",
+        "I'm sorry, a real person will call you back about that.",
     ])
     def test_honest_lines_are_not_flagged(self, line):
         """A false positive pauses the whole account, so precision matters."""
