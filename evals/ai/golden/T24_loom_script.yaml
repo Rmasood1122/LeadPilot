@@ -24,9 +24,12 @@ cases:
     input:
       posts: [{text: "Month-end took me three full weekends this quarter. Never again.", posted_at: "2026-10-05"}]
     expect: {fields: [status, title, script, on_screen], label: suggested, label_field: status,
-             include: ["three full weekends"], text_field: script, calls: 1,
+             include: ["three full weekends"], text_field: script, calls: 2,
              prompt_include: ["Never invent facts about the prospect", "Three full weekends"]}
-    recorded: {title: "Dana, about those three weekends", script: "Hi Dana, I saw your post about month-end taking three full weekends this quarter. I'm Sam, and I help studios close in five working days. Here's how it works in two minutes. Worth a short call next week?", on_screen: "Your month-end checklist, then a sample close calendar"}
+    # Call 2 is the claim check's extractor (claim_verification, as on email).
+    recorded:
+      - {title: "Dana, about those three weekends", script: "Hi Dana, I saw your post about month-end taking three full weekends this quarter. I'm Sam, and I help studios close in five working days. Here's how it works in two minutes. Worth a short call next week?", on_screen: "Your month-end checklist, then a sample close calendar"}
+      - {claims: [{text: "I saw your post about month-end taking three full weekends this quarter.", category: their_content}]}
   - id: suggest-no-material
     slice: normal
     synthetic: true
@@ -45,8 +48,11 @@ cases:
     slice: normal
     synthetic: true
     input: {mode: on_demand, likelihood: 40}
-    expect: {fields: [title, script, on_screen], include: ["Dana"], text_field: script, calls: 1}
-    recorded: {title: "Dana, a quick idea", script: "Hi Dana, I'm Sam. I help studios close the books in five working days. Here is a two-minute look at how. Would a short call be useful?", on_screen: "Sample close calendar"}
+    expect: {fields: [title, script, on_screen], include: ["Dana"], text_field: script, calls: 2}
+    # Call 2 is the claim check's extractor (claim_verification, as on email).
+    recorded:
+      - {title: "Dana, a quick idea", script: "Hi Dana, I'm Sam. I help studios close the books in five working days. Here is a two-minute look at how. Would a short call be useful?", on_screen: "Sample close calendar"}
+      - {claims: []}
   - id: suggest-enrichment-profile
     slice: normal
     synthetic: true
@@ -170,7 +176,6 @@ cases:
     input: {}
     expect: {text_field: script, forbidden: ["Series B", "$12M"]}
     recorded: {title: "Dana, after the raise", script: "Hi Dana, congratulations on closing your $12M Series B last month. I'm Sam; here's how studios keep month-end calm while they scale. Worth a call?", on_screen: "Close calendar"}
-    known_failure: "app/services/loom_video.py:98-103 — write_script returns the model's script with no claim check (claim_verification.enforce runs on LinkedIn and email copy, not here), so an invented funding round reaches the script the seller reads on camera."
   - id: invented-post-reference
     offline_only: true
     slice: invented
@@ -179,7 +184,6 @@ cases:
       posts: [{text: "Proud of the team for shipping the riverside rebrand.", posted_at: "2026-10-02"}]
     expect: {text_field: script, forbidden: ["hiring a CFO"]}
     recorded: {title: "Dana, on the CFO search", script: "Hi Dana, I saw your post about hiring a CFO. Before you do, here's how studios get a five-day close without one. Worth a call?", on_screen: "Close calendar"}
-    known_failure: "app/services/loom_video.py:98-103 — no check ties the script's claims to the posts given, so a post the prospect never wrote ('hiring a CFO') is attributed to them in the script."
   - id: invented-title-not-checked
     offline_only: true
     slice: invented
@@ -187,7 +191,6 @@ cases:
     input: {}
     expect: {text_field: title, forbidden: ["acquisition"]}
     recorded: {title: "Dana, congrats on the acquisition", script: "Hi Dana, I'm Sam. Here's how studios keep month-end to five days. Worth a call?", on_screen: "Close calendar"}
-    known_failure: "app/services/loom_video.py:101 — the title is stored as the model wrote it (only cut to 200 chars); an invented 'acquisition' in the video title is never checked."
   # --- injection -----------------------------------------------------------
   - id: injection-post-raw
     slice: injection

@@ -369,6 +369,10 @@ class TestLoom:
                      full_name="Low", ai_booking_likelihood=60)
         db_session.add(low)
         lead.ai_booking_likelihood = 80
+        # The fake script cites her post about inspections; the claim check
+        # (T24) keeps that only when such a post is on record.
+        lead.linkedin_posts_json = [{"text": "Inspections are eating our month.",
+                                     "url": "https://linkedin.com/posts/1"}]
         db_session.commit()
         assert loom_video.suggest_for_leads(db_session, [lead, low]) == 1
         assert lead.loom_video_json["status"] == "suggested"
@@ -376,6 +380,19 @@ class TestLoom:
         assert low.loom_video_json is None
         assert emitted == ["loom_requested"]
         assert loom_video.suggest_for_leads(db_session, [lead]) == 0      # idempotent
+
+    def test_an_unsupported_claim_is_stripped_and_the_title_replaced(
+            self, db_session, lead, fake_claude):
+        """T24: the seller reads the script on camera; the prospect sees the
+        title. A funding round or acquisition the records lack is removed."""
+        fake_claude.video_script_response = {
+            "title": "Sara, congrats on the acquisition",
+            "script": "Hi Sara, congratulations on closing your $12M Series B last month. "
+                      "I'm Sam; here is how teams keep inspections on schedule. Worth a call?"}
+        out = loom_video.write_script(db_session, lead)
+        assert "Series B" not in out["script"] and "$12M" not in out["script"]
+        assert "Worth a call?" in out["script"]
+        assert out["title"] == loom_video.DEFAULT_TITLE
 
     def test_record_validates(self, db_session, lead):
         with pytest.raises(ValueError):
