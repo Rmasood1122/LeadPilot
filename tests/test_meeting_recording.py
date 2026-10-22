@@ -431,3 +431,12 @@ class TestActionItemsGrounded:
              {"text": "Send the quote", "owner": "us", "due": "2026-10-23"}])
         assert [(i["text"], i["due"]) for i in items] == [
             ("Send the contract", None), ("Send the quote", "2026-10-23")]
+
+    def test_a_due_date_on_the_weekday_they_named_is_kept(self, monkeypatch):
+        """'by Friday' resolved to a Friday's date is a stated deadline."""
+        items = self._summarise(
+            monkeypatch, "Seller: I'll send the contract by Friday.",
+            [{"text": "Send the contract", "owner": "us", "due": "2026-10-23"},
+             {"text": "Call back", "owner": "us", "due": "2026-10-26"}])
+        assert [(i["text"], i["due"]) for i in items] == [
+            ("Send the contract", "2026-10-23"), ("Call back", None)]
