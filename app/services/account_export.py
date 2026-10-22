@@ -175,6 +175,7 @@ EXCLUDED: dict[str, str] = {
     "suppression_list": "global do-not-contact list, no owner",
     "system_settings": "deployment configuration, no owner",
     "tutorial_catalogue": "product content, no owner",
+    "help_chunks": "help-center search index built from docs/help-center, no owner",
     "whatsapp_templates": "global, no owner column",
     "task_errors": "operator diagnostics, no owner column",
     "email_verification_tokens": "one-way token hashes only",
