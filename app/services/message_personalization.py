@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Lead, PipelineKind, ResearchStep, SequenceStep, Strategy
-from app.services import prompt_safety
+from app.services import grounding, prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
@@ -508,6 +508,26 @@ FALLBACK_FOLLOWUP_BRIEF = (
 )
 
 
+def _grounded_brief(brief: str, lead: Lead, *sources: str) -> str:
+    """`brief`, or '' when it is not grounded in what the writer was given.
+
+    The brief becomes the next step's template, which every renderer follows
+    as OUR instructions. Its prompt forbids inventing statistics, rounds,
+    discounts and deadlines and adding links; nothing checked. A brief that
+    breaks a rule is replaced by the caller's fixed fallback, not repaired:
+    the fallback is a safe, personalisable brief and costs no second call."""
+    if not brief:
+        return ""
+    found = grounding.problems(brief, *sources)
+    if _URL_RE.search(brief) or re.search(r"\bwww\.", brief, re.I):
+        found.append("a link")
+    if found:
+        logger.warning("brief for lead %s replaced by the fallback: %s",
+                       lead.id, "; ".join(found))
+        return ""
+    return brief
+
+
 def build_followup_brief(
     session: Session,
     strategy: Strategy,
@@ -579,7 +599,9 @@ def build_followup_brief(
                        lead.id, type(exc).__name__, exc)
         brief = ""
 
-    return brief[:2000] or FALLBACK_FOLLOWUP_BRIEF
+    brief = _grounded_brief(brief[:2000], lead, history, product_brief,
+                            _playbook(session, strategy))
+    return brief or FALLBACK_FOLLOWUP_BRIEF
 
 
 # --------------------------------------------------------------------------
@@ -675,4 +697,6 @@ def build_reengagement_brief(
                        lead.id, type(exc).__name__, exc)
         brief = ""
 
-    return brief[:2000] or FALLBACK_REENGAGEMENT_BRIEF
+    brief = _grounded_brief(brief[:2000], lead, history, product_brief,
+                            _playbook(session, strategy))
+    return brief or FALLBACK_REENGAGEMENT_BRIEF

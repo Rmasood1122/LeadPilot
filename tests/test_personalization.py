@@ -571,3 +571,39 @@ class TestWhatsAppSlotChecks:
     def test_a_short_phrase_is_kept(self, monkeypatch, db_session, verified_strategy, lead):
         assert self._fill(monkeypatch, db_session, verified_strategy, lead,
                           "month-end close") == {"1": "month-end close"}
+
+
+class TestGrounding:
+    """app/services/grounding.py: what a model's text states that its source
+    does not. Shared by the brief writers and the other generated copy."""
+
+    def test_numbers_are_compared_as_people_write_them(self):
+        from app.services.grounding import unsupported_numbers
+
+        assert unsupported_numbers("1,200 staff, $2.5M, 63%", "1200 staff 2.5 63") == []
+        assert unsupported_numbers("we cut errors by 63% for 40 agencies",
+                                   "errors are common") == ["40", "63"]
+
+    def test_a_funding_round_needs_a_source(self):
+        from app.services.grounding import unsupported_funding
+
+        assert unsupported_funding("Congrats on the Series B", "raised a series a") == [
+            "series b"]
+        assert unsupported_funding("Congrats on the Series A", "They raised a Series A.") == []
+
+    @pytest.mark.parametrize("text,found", [
+        ("Tell them the 20% discount closes this Friday.", ["closes this friday", "discount"]),
+        ("Reply by Friday please.", ["by friday"]),
+        ("Ask how long close takes today.", []),
+        ("Ask what changes next week.", []),
+    ])
+    def test_offers_and_deadlines(self, text, found):
+        from app.services.grounding import unsupported_offers
+
+        assert unsupported_offers(text, "") == found
+
+    def test_an_offer_the_playbook_makes_is_grounded(self):
+        from app.services.grounding import unsupported_offers
+
+        assert unsupported_offers("Mention the discount for annual plans.",
+                                  "Offer: a discount for annual plans.") == []
