@@ -84,8 +84,12 @@ _INSTRUCTION_LIKE = re.compile(
 def guidance_problem(text: str | None) -> str | None:
     """Why a model-derived value must not become guidance in our prompts,
     or None. Deterministic: a link, or wording that addresses the model."""
+    from app.services.reply_copilot import urls_in  # noqa: PLC0415 -- bare domains
+
     value = text or ""
-    if _LINK_LIKE.search(value):
+    # _LINK_LIKE catches schemes, www., paths and multi-dot hosts; urls_in adds
+    # a bare one-dot domain on a known TLD ("evil.com").
+    if _LINK_LIKE.search(value) or urls_in(value):
         return "contains a link"
     if _INSTRUCTION_LIKE.search(value):
         return "reads as an instruction to the model"
