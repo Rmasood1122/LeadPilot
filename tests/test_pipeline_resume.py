@@ -58,6 +58,20 @@ class TestResumability:
         assert spec.step_no == 26
         assert spec.phase == 3
 
+    @pytest.mark.parametrize("answer", ["", "  \n "])
+    def test_an_empty_answer_is_not_a_completed_step(
+        self, db_session, fake_claude, product_with_strategy, monkeypatch, answer
+    ):
+        """The real client returns '' without raising. Saving it would mark the
+        step done and give every later step nothing to build on."""
+        _, strategy = product_with_strategy(m.FlowType.WITH_CLIENTS)
+        engine.run_step(db_session, strategy, engine.next_step(db_session, strategy))
+        monkeypatch.setattr(fake_claude, "complete", lambda *a, **kw: answer)
+        with pytest.raises(RuntimeError, match="empty answer"):
+            engine.run_step(db_session, strategy, engine.next_step(db_session, strategy))
+        assert _saved_step_nos(db_session, strategy, m.PipelineKind.STRATEGY) == [1]
+        assert engine.next_step(db_session, strategy).step_no == 2
+
 
 class TestFlows:
     def test_flow1_runs_exactly_72(self, db_session, fake_claude, product_with_strategy):

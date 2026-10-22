@@ -216,7 +216,6 @@ cases:
     input: {step_no: 6}
     expect: {label: false, label_field: persisted, calls: 1}
     recorded: ""
-    known_failure: "app/pipeline/engine.py:187-198 — an empty model answer (the real ClaudeClient.complete returns '' without raising) is persisted as a completed research step, unlike the OpenAI path (openai_client.py:81-83) and truncation, which fail closed."
   - id: racing-worker-keeps-first-row
     slice: edge
     synthetic: true
