@@ -35,7 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.models import Product, VoiceProfile
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,10 @@ def clean_dimensions(data: dict) -> tuple[dict, list[str]]:
         re.sub(r"\s+", " ", phrase.strip())[:80]
         for phrase in raw_phrases
         if isinstance(phrase, str) and phrase.strip()
-    ][:MAX_PHRASES]
+    ]
+    # T26: a phrase is pasted into every step brief, so one carrying a link or
+    # an instruction is dropped -- the closed vocabulary above is not enough.
+    phrases = [p for p in phrases if prompt_safety.guidance_problem(p) is None][:MAX_PHRASES]
     return dimensions, phrases
 
 
