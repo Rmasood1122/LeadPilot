@@ -218,3 +218,73 @@ def test_only_api_runs_migrations():
     assert migrators == ["api.json"], (
         f"expected only api.json to run migrations, got {migrators}"
     )
+
+
+# ---------------------------------------------------------------------------
+# The database gets quiet windows between worker bursts.
+# ---------------------------------------------------------------------------
+
+def test_frequent_sweeps_run_only_inside_the_bursts():
+    """Every database sweep that runs more than every few hours sits in the
+    first five minutes of a BEAT_SWEEP_MINUTES burst, so the database hears
+    nothing from beat for the rest of each interval and a database that
+    suspends after 5 idle minutes (Neon's free plan) can sleep. Before, a
+    sweep fired in almost every minute of the hour and the database never
+    slept; the free plan's compute quota ran out.
+
+    beat-heartbeat is exempt: it writes Redis only.
+    """
+    from celery.schedules import crontab
+
+    from app.config import settings
+
+    sweep = settings.beat_sweep_minutes
+    outside = []
+    for name, entry in celery_app.conf.beat_schedule.items():
+        if name == "beat-heartbeat":
+            continue
+        sched = entry["schedule"]
+        assert isinstance(sched, crontab), f"{name}: interval schedules drift off the bursts"
+        if len(sched.hour) < 6 or len(sched.day_of_week) < 7:
+            continue  # every 4+ hours, daily or weekly: a few wakes a day
+        outside += [f"{name} at :{m:02d}" for m in sorted(sched.minute) if m % sweep > 4]
+    assert outside == []
+
+
+def test_the_bursts_leave_most_of_each_interval_quiet():
+    from app.config import settings
+
+    busy = set()
+    for name, entry in celery_app.conf.beat_schedule.items():
+        sched = entry["schedule"]
+        if name == "beat-heartbeat" or len(sched.hour) < 6:
+            continue
+        busy |= set(sched.minute)
+    assert busy == {b + k for b in range(0, 60, settings.beat_sweep_minutes) for k in range(5)}
+
+
+def test_heartbeat_touches_only_redis():
+    import inspect
+
+    import app.workers.beat_heartbeat as hb
+
+    source = inspect.getsource(hb.refresh_celery_heartbeat)
+    assert "get_sync_redis" in source
+    assert "SessionLocal" not in source and "get_db" not in source
+
+
+@pytest.mark.parametrize("minutes", [4, 7, 25, 61])
+def test_a_sweep_interval_that_does_not_fit_the_hour_is_refused(minutes):
+    from pydantic import ValidationError
+
+    from app.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(beat_sweep_minutes=minutes)
+
+
+@pytest.mark.parametrize("minutes", [5, 10, 15, 20, 30, 60])
+def test_a_sweep_interval_that_fits_the_hour_is_accepted(minutes):
+    from app.config import Settings
+
+    assert Settings(beat_sweep_minutes=minutes).beat_sweep_minutes == minutes

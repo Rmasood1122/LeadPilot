@@ -77,7 +77,7 @@ is the actual guarantee.
 
 ### Configuration
 
-`FOLLOWUP_SWEEP_INTERVAL_SECONDS` (1800), `FOLLOWUP_LOCK_TTL_SECONDS` (7200),
+`BEAT_SWEEP_MINUTES` (30; the sweep runs in every worker burst), `FOLLOWUP_LOCK_TTL_SECONDS` (7200),
 and per step `followup_enabled` / `followup_delay_hours` via
 `POST /sequences/{id}/steps/{n}/followup-settings`.
 
@@ -293,7 +293,7 @@ So:
 Everything is documented inline in `.env.example`. In brief:
 
 ```
-FOLLOWUP_SWEEP_INTERVAL_SECONDS=1800
+BEAT_SWEEP_MINUTES=30
 FOLLOWUP_LOCK_TTL_SECONDS=7200
 CALENDAR_SLOT_DAYS_AHEAD=30
 CALENDAR_MIN_NOTICE_MINUTES=60

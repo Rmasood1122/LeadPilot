@@ -42,7 +42,7 @@
 | Admin › System Settings | `meeting_prep_enabled`, `meeting_reminder_24h_enabled`, `meeting_reminder_1h_enabled` |
 | `MEETING_PREP_MAX_TOKENS` (4096) | Output ceiling for one brief |
 | `MEETING_FOLLOWUP_MAX_TOKENS` (1500) | Output ceiling for one follow-up |
-| `MEETING_REMINDER_SWEEP_SECONDS` (300) | Reminder sweep interval |
+| `BEAT_SWEEP_MINUTES` (30) | Reminder sweep interval (every worker burst): the 1h reminder lands between 60 and 30 minutes before the meeting |
 | `RATE_LIMIT_AI_ACTION` (60/h) | Regenerate / log-with-follow-up per user |
 
 Saving drafts needs the `gmail.compose` scope, added to the Gmail OAuth

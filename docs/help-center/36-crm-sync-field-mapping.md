@@ -69,7 +69,7 @@ The 15-minute sweep sends leads that replied or went further: replied, meeting b
 There are two triggers:
 
 - **Straight away**, when a meeting is booked, a reply arrives, a reply is interested, a call completes, a deal is won, you move a lead on the **Pipeline** board, or you create or edit a deal. These pushes send the lead whatever its status, even one the sweep would skip. Edits you make in the CRM table, inline or in bulk, are not pushed straight away; the sweep picks them up.
-- **Every 15 minutes**, a sweep sends what changed since the previous sweep, up to 500 leads and 500 deals per run.
+- **Every 30 minutes**, a sweep sends what changed since the previous sweep, up to 500 leads and 500 deals per run.
 
 **Sync now** on the CRM card sends every eligible record, not only changed ones, up to the same 500 leads and 500 deals, then reads linked records back. It is rate limited: by default 60 times per hour for each CRM.
 
