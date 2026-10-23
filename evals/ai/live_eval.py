@@ -166,11 +166,12 @@ def make_live_client(api_key: str, price: dict, budget: Budget):
             self.cost_usd = 0.0
 
         def complete(self, system: str, prompt: str, max_tokens: int | None = None,
-                     temperature: float | None = None) -> str:
+                     temperature: float | None = None, schema: dict | None = None) -> str:
             self.calls.append({"kind": "text", "system": system or "", "prompt": prompt or "",
-                               "kwargs": {"max_tokens": max_tokens, "temperature": temperature}})
+                               "kwargs": {"max_tokens": max_tokens, "temperature": temperature,
+                                          "schema": schema}})
             return super().complete(system=system, prompt=prompt, max_tokens=max_tokens,
-                                    temperature=temperature)
+                                    temperature=temperature, schema=schema)
 
     return LiveClient()
 

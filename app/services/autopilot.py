@@ -557,6 +557,26 @@ _PLAN_SYSTEM = (
     "delays 1-14 days. No prose, no markdown fences."
 )
 
+# Output contract (Phase 3 item 2). The step cap, the brief length and the
+# 1-14 day delays stay in _valid_steps (the API rejects numeric/length limits).
+PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "steps": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"brief": {"type": "string"},
+                               "delay_days": {"type": "integer"}},
+                "required": ["brief", "delay_days"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["steps"],
+    "additionalProperties": False,
+}
+
 
 def _research(db: Session, strategy: Strategy, phase: int) -> str:
     rows = db.execute(
@@ -617,7 +637,8 @@ def plan_steps(db: Session, strategy: Strategy, channel: str) -> tuple[list[dict
             f"{prompt_safety.block(_research(db, strategy, 8))}\n\n"
             "Write the step briefs now.")
         with usage_meter.owner_scope(db, strategy, "autopilot"):
-            data = get_client().complete_json(system=_PLAN_SYSTEM, prompt=prompt)
+            data = get_client().complete_json(system=_PLAN_SYSTEM, prompt=prompt,
+                                           schema=PLAN_SCHEMA)
             usage_meter.flush_active(db)
         steps = _valid_steps(data, channel)
         if steps:

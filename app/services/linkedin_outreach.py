@@ -58,6 +58,14 @@ SYSTEM = (
     "body under 150 words. Never invent facts about the prospect."
 )
 
+# Phase 3 item 2: only an InMail uses the subject, so it is optional.
+LINKEDIN_MESSAGE_SCHEMA = {
+    "type": "object",
+    "properties": {"text": {"type": "string"}, "subject": {"type": "string"}},
+    "required": ["text"],
+    "additionalProperties": False,
+}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -168,7 +176,7 @@ def render(session: Session, strategy: Strategy, lead: Lead, step, action: str) 
     ])
     data = anthropic_client.get_client().complete_json(
         system=SYSTEM + style_profile.suffix_for_strategy(session, strategy),
-        prompt=prompt, max_tokens=1024)
+        prompt=prompt, max_tokens=1024, schema=LINKEDIN_MESSAGE_SCHEMA)
     text = str((data or {}).get("text") or "").strip()
     if not text:
         raise ValueError("LinkedIn writer returned an empty message")

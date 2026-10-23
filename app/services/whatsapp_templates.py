@@ -409,6 +409,38 @@ Messaging & offer design (Phase 6 outputs):
 Draft 2-3 WhatsApp template candidates for the FIRST cold touch to this
 persona, following every hard rule."""
 
+# Phase 3 item 2. No enum on category: the code lower-cases it and treats any
+# unknown label as marketing. variable_descriptions is keyed by placeholder
+# number, so {{1}}..{{20}} are listed; validate_body/_validate_variable_descriptions
+# remain the check that they match the body. The code defaults language,
+# category and variable_descriptions, so only name and body are required.
+TEMPLATE_DRAFTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "templates": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "language": {"type": "string"},
+                    "category": {"type": "string"},
+                    "body": {"type": "string"},
+                    "variable_descriptions": {
+                        "type": "object",
+                        "properties": {str(n): {"type": "string"} for n in range(1, 21)},
+                        "additionalProperties": False,
+                    },
+                },
+                "required": ["name", "body"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["templates"],
+    "additionalProperties": False,
+}
+
 
 def _phase_outputs(session: Session, strategy: Strategy, phase: int,
                    limit_chars: int = 3000) -> str:
@@ -433,6 +465,7 @@ def generate_drafts(session: Session, strategy: Strategy) -> list[WhatsAppTempla
             persona=_phase_outputs(session, strategy, phase=2),
             messaging=_phase_outputs(session, strategy, phase=6),
         ),
+        schema=TEMPLATE_DRAFTS_SCHEMA,
     )
     candidates = data.get("templates") or []
     if not isinstance(candidates, list):

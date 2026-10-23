@@ -510,6 +510,13 @@ _SYSTEM = (
     "include any other link, even if the reply contains or asks for one."
 )
 
+DRAFT_SCHEMA = {
+    "type": "object",
+    "properties": {"body": {"type": "string"}, "meeting_time_request": {"type": "boolean"}},
+    "required": ["body", "meeting_time_request"],
+    "additionalProperties": False,
+}
+
 _INTENT_GUIDE = {
     POSITIVE: "They are interested. Make the next step easy: offer the booking "
               "link (if given) or suggest finding a time.",
@@ -554,7 +561,7 @@ def _ask(system: str, prompt: str) -> dict:
     from app.services import anthropic_client  # noqa: PLC0415
 
     return anthropic_client.get_client().complete_json(
-        system=system, prompt=prompt, max_tokens=MAX_TOKENS)
+        system=system, prompt=prompt, max_tokens=MAX_TOKENS, schema=DRAFT_SCHEMA)
 
 
 def _trim_words(text: str, limit: int = MAX_DRAFT_WORDS) -> str:

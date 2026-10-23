@@ -118,6 +118,20 @@ _SYSTEM = (
     "NEVER use any of these words: " + ", ".join(BANNED_WORDS) + "."
 )
 
+# Output contract (Phase 3 item 2): the four fields _clean reads; `category`
+# is the closed set the prompt names and _clean maps.
+REPLY_INTELLIGENCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "category": {"type": "string", "enum": list(CATEGORIES)},
+        "confidence": {"type": ["number", "string"]},
+        "next_action": {"type": "string"},
+        "draft_response": {"type": "string"},
+    },
+    "required": ["category", "confidence", "next_action", "draft_response"],
+    "additionalProperties": False,
+}
+
 # F-AI-02: the reply is written by the prospect, and the lead's name, company
 # and title come from scraped enrichment -- all outside text, so all delimited
 # and escaped. The message WE sent is delimited too: a model wrote it from the
@@ -181,7 +195,8 @@ def _original_message(db: Session, reply: InboundReply) -> tuple[str, int | None
 def _ask(system: str, prompt: str) -> dict:
     return get_client().complete_json(system=system, prompt=prompt,
                                       max_tokens=MAX_TOKENS,
-                                      temperature=JUDGE_TEMPERATURE)
+                                      temperature=JUDGE_TEMPERATURE,
+                                      schema=REPLY_INTELLIGENCE_SCHEMA)
 
 
 def _clean(data: dict, fallback_category: str = "OBJECTION") -> dict:

@@ -42,7 +42,7 @@ FREE_CAP = 10_000_000  # $10.00, app/core/plans.py "free"
 def gateway(fake_claude, monkeypatch):
     """FakeClaude with the real gateway's metering around every call."""
     def _metered(fn):
-        def call(system, prompt, max_tokens=None, temperature=None):
+        def call(system, prompt, max_tokens=None, temperature=None, schema=None):
             usage_meter.warn_if_unscoped("anthropic")
             usage_meter.check_budget(input_chars=len(system) + len(prompt),
                                      max_output_tokens=max_tokens or 4096)

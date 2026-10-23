@@ -113,6 +113,79 @@ OUTPUT — respond with ONLY this JSON object:
   "schema_markup": {{ JSON-LD object }}
 }}"""
 
+# Phase 3 item 2. The API needs every object closed, so schema_markup cannot
+# be a free-form object: it lists the JSON-LD properties the five page types
+# above call for (Article, Review, Organization, WebPage, LocalBusiness). The
+# code keeps any dict, so none of them is required.
+_LD_THING = {
+    "type": "object",
+    "properties": {"@type": {"type": "string"}, "name": {"type": "string"},
+                   "url": {"type": "string"}},
+    "additionalProperties": False,
+}
+_LD_ADDRESS = {
+    "type": "object",
+    "properties": {"@type": {"type": "string"}, "streetAddress": {"type": "string"},
+                   "addressLocality": {"type": "string"},
+                   "addressRegion": {"type": "string"},
+                   "postalCode": {"type": "string"},
+                   "addressCountry": {"type": "string"}},
+    "additionalProperties": False,
+}
+_LD_REVIEW = {
+    "type": "object",
+    "properties": {
+        "@type": {"type": "string"},
+        "name": {"type": "string"},
+        "reviewBody": {"type": "string"},
+        "author": _LD_THING,
+        "itemReviewed": _LD_THING,
+        "reviewRating": {
+            "type": "object",
+            "properties": {"@type": {"type": "string"},
+                           "ratingValue": {"type": ["number", "string"]},
+                           "bestRating": {"type": ["number", "string"]}},
+            "additionalProperties": False,
+        },
+    },
+    "additionalProperties": False,
+}
+PAGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "html_content": {"type": "string"},
+        "word_count": {"type": "integer"},
+        "reading_time_mins": {"type": "integer"},
+        "internal_links": {"type": "array", "items": {"type": "string"}},
+        "schema_markup": {
+            "type": "object",
+            "properties": {
+                "@context": {"type": "string"},
+                "@type": {"type": ["string", "array"], "items": {"type": "string"}},
+                "name": {"type": "string"},
+                "headline": {"type": "string"},
+                "description": {"type": "string"},
+                "url": {"type": "string"},
+                "inLanguage": {"type": "string"},
+                "datePublished": {"type": "string"},
+                "dateModified": {"type": "string"},
+                "author": _LD_THING,
+                "publisher": _LD_THING,
+                "mainEntityOfPage": {"type": "string"},
+                "areaServed": {"type": "string"},
+                "telephone": {"type": "string"},
+                "address": _LD_ADDRESS,
+                "review": _LD_REVIEW,
+                "itemReviewed": _LD_THING,
+            },
+            "additionalProperties": False,
+        },
+    },
+    "required": ["html_content", "word_count", "reading_time_mins", "internal_links",
+                 "schema_markup"],
+    "additionalProperties": False,
+}
+
 
 # BR-D1 (docs/program/brand/rename-inventory.md §4). Pages belong either to
 # our own marketing site (workspace_id NULL) or to a customer's workspace.
@@ -219,6 +292,7 @@ def generate_page_html(
             today=datetime.now(timezone.utc).date().isoformat(),
         ),
         max_tokens=MAX_TOKENS,
+        schema=PAGE_SCHEMA,
     )
 
     html_content = str((data or {}).get("html_content") or "").strip()

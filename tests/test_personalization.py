@@ -199,7 +199,7 @@ class TestRenderPrompt:
         seen = []
         real = fake_claude.complete_json
         monkeypatch.setattr(fake_claude, "complete_json",
-                            lambda system, prompt, max_tokens=None:
+                            lambda system, prompt, max_tokens=None, schema=None:
                             seen.append(system) or real(system, prompt, max_tokens))
         render_whatsapp_variables(db_session, verified_strategy, lead,
                                   template_body="Hi {{1}}", variable_descriptions={"1": "pain"},

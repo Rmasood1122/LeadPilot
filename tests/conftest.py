@@ -215,6 +215,8 @@ class FakeClaude:
         # Part 1 Feature 2 (fpta_scoring). Default: echo each prospect's
         # baselines back unchanged with a canned reason, so a test that does
         # not care about the model still exercises the real merge path.
+        # Phase 3 item 2: the schema each complete_json call passed (None if none).
+        self.json_schemas: list[dict | None] = []
         self.fpta_response: object | None = None
         self.fpta_prompts: list[str] = []
         # Part 1 Feature 7 (reengagement_memory). Same contract as the rest.
@@ -262,7 +264,8 @@ class FakeClaude:
         }
 
     # ---- text completions (pipeline steps + fixes) ----
-    def complete(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None) -> str:
+    def complete(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None,
+                 schema=None) -> str:
         if self.fail_after is not None and self.completions >= self.fail_after:
             raise RuntimeError("simulated crash: model call failed")
         self.completions += 1
@@ -285,8 +288,10 @@ class FakeClaude:
         return f"Mock research output #{self.completions}"
 
     # ---- JSON completions (patterns + verification judge) ----
-    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None) -> dict:
+    def complete_json(self, system: str, prompt: str, max_tokens: int | None = None, temperature=None,
+                      schema=None) -> dict:
         self.completions += 1
+        self.json_schemas.append(schema)
         if "Reply Copilot drafter" in system:  # F04
             self.reply_copilot_prompts.append(prompt)
             self.reply_copilot_systems.append(system)

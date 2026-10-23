@@ -73,7 +73,7 @@ def icp_prompts(fake_claude):
     prompts = []
     original = fake_claude.complete_json
 
-    def _wrapped(system, prompt, max_tokens=None, temperature=None):
+    def _wrapped(system, prompt, max_tokens=None, temperature=None, schema=None):
         if "ICP extraction" in system:
             prompts.append(prompt)
         return original(system=system, prompt=prompt, max_tokens=max_tokens,
@@ -89,7 +89,7 @@ def metered(fake_claude):
     check the budget BEFORE the call, note tokens AFTER it."""
     original = fake_claude.complete_json
 
-    def _wrapped(system, prompt, max_tokens=None, temperature=None):
+    def _wrapped(system, prompt, max_tokens=None, temperature=None, schema=None):
         usage_meter.check_budget(input_chars=len(prompt), max_output_tokens=200)
         out = original(system=system, prompt=prompt, max_tokens=max_tokens,
                        temperature=temperature)

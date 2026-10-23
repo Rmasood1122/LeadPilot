@@ -54,6 +54,13 @@ DETECTOR_SYSTEM = (
     'Respond with ONLY JSON: {"automated": true|false, "reason": "<short>"}.'
 )
 
+DETECTOR_SCHEMA = {
+    "type": "object",
+    "properties": {"automated": {"type": "boolean"}, "reason": {"type": "string"}},
+    "required": ["automated", "reason"],
+    "additionalProperties": False,
+}
+
 
 # --------------------------------------------------------------------------
 # Feature A3: header and out-of-office detectors, used by the real-time
@@ -143,7 +150,8 @@ def is_automated(from_address: str | None, subject: str | None, body: str | None
                         f"FROM: {prompt_safety.inline(from_address)}\n"
                         f"SUBJECT: {prompt_safety.inline(subject or '(none)')}\n\n"
                         f"BODY:\n{prompt_safety.block((body or '')[:3000])}\n\n"
-                        "Automated or human?"))
+                        "Automated or human?"),
+                schema=DETECTOR_SCHEMA)
             if bool(data.get("automated")):
                 return True, str(data.get("reason") or found[0])[:200]
         except Exception:  # noqa: BLE001 -- when unsure, it is a human reply

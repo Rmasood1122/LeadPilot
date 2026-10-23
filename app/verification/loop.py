@@ -55,6 +55,20 @@ _MAX_SUPPORT_CHARS = 60_000  # keep judge prompts bounded
 # Upper bound for the one retry in _generate_fix.
 _MODEL_MAX_OUTPUT_TOKENS = 128_000
 
+# Output contract (Phase 3 item 2) for the judge (JUDGE_SYSTEM in passes.py).
+# "result" is required and is the exact key _judge reads; it is a string, not
+# an enum, because _judge upper-cases it. Anything but PASS -- a missing or
+# unexpected verdict included -- still fails the pass (fail closed).
+JUDGE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "result": {"type": "string"},
+        "fix_description": {"type": ["string", "null"]},
+    },
+    "required": ["result"],
+    "additionalProperties": False,
+}
+
 
 def _support_block(session: Session, strategy: Strategy) -> str:
     """Evidence the judge sees: phase syntheses, patterns, GTM doc.
@@ -194,6 +208,7 @@ def _judge(spec: VerificationPassSpec, strategy: Strategy, support: str) -> tupl
             strategy_document=_document_for_prompt(strategy),
             support_block=support,
         ),
+        schema=JUDGE_SCHEMA,
     )
     passed = str(data.get("result", "")).strip().upper() == "PASS"
     return passed, data.get("fix_description")

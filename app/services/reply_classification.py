@@ -44,6 +44,15 @@ _SYSTEM = (
     "helpdesk tickets, no-reply bots -- are automated_response."
 )
 
+# Output contract (Phase 3 item 2): the class set the prompt names, which is
+# exactly the set _classify maps. Sent only to models that support it.
+CLASSIFICATION_SCHEMA = {
+    "type": "object",
+    "properties": {"classification": {"type": "string", "enum": list(REPLY_CLASSES)}},
+    "required": ["classification"],
+    "additionalProperties": False,
+}
+
 # F-AI-02: the sender, subject and body are written by whoever sent the email.
 # They go in as delimited, escaped data, under an explicit notice.
 _PROMPT = """{notice}
@@ -87,6 +96,7 @@ def _classify(from_address: str, subject: str | None, body: str) -> str:
                 subject=prompt_safety.inline(subject or "(none)"),
                 body=prompt_safety.block((body or "")[:4000]),
             ),
+            schema=CLASSIFICATION_SCHEMA,
         )
         cls = str(data.get("classification", "")).strip().lower()
         if cls in REPLY_CLASSES:

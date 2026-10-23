@@ -72,6 +72,13 @@ SYSTEM = (
     "support."
 )
 
+EMAIL_NETWORK_MESSAGE_SCHEMA = {
+    "type": "object",
+    "properties": {"subject": {"type": "string"}, "body": {"type": "string"}},
+    "required": ["subject", "body"],
+    "additionalProperties": False,
+}
+
 
 class MessageError(Exception):
     def __init__(self, status: int, detail: str):
@@ -342,7 +349,8 @@ def draft(db: Session, user: User, contact_id, product_id) -> EmailNetworkMessag
     try:
         data = anthropic_client.get_client().complete_json(
             system=SYSTEM + style_profile.system_suffix(user.style_profile_json),
-            prompt=prompt, max_tokens=700)
+            prompt=prompt, max_tokens=700,
+            schema=EMAIL_NETWORK_MESSAGE_SCHEMA)
     except Exception as exc:  # noqa: BLE001
         raise MessageError(502, "The writer is unavailable. Try again.") from exc
     subject = " ".join(str((data or {}).get("subject") or "").split())[:SUBJECT_MAX]

@@ -43,6 +43,15 @@ LEAD:
 {context}{booking_line}
 Write the email for THIS lead now."""
 
+# Phase 3 item 2: the reply render_message reads. The code falls back on a
+# missing subject and raises on an empty body.
+MESSAGE_SCHEMA = {
+    "type": "object",
+    "properties": {"subject": {"type": "string"}, "body": {"type": "string"}},
+    "required": ["subject", "body"],
+    "additionalProperties": False,
+}
+
 
 def _playbook(session: Session, strategy: Strategy) -> str:
     rows = session.execute(
@@ -179,6 +188,7 @@ def render_message(
             enrichment=prompt_safety.inline(str(highlights)[:1500]),
             booking_line=booking_line,
         ),
+        schema=MESSAGE_SCHEMA,
     )
     subject = str(data.get("subject") or "").strip() or "Quick question"
     body = str(data.get("body") or "").strip()
@@ -219,6 +229,16 @@ LEAD:
 - Enrichment highlights: {enrichment}
 
 Return the JSON object of values now."""
+
+# Phase 3 item 2: the variable numbers are the template's own {{n}}, known only
+# at call time, so {{1}}..{{20}} are listed and none is required (the code
+# raises on any requested number left empty). A template with more than 20
+# variables cannot be filled by a constrained model.
+WHATSAPP_VARIABLES_SCHEMA = {
+    "type": "object",
+    "properties": {str(n): {"type": "string"} for n in range(1, 21)},
+    "additionalProperties": False,
+}
 
 # Deterministic 'lead.<field>' sources — no model call needed for these.
 _LEAD_FIELDS = {
@@ -282,6 +302,7 @@ def render_whatsapp_variables(
                 company=prompt_safety.inline(lead.company or "unknown"),
                 enrichment=prompt_safety.inline(str(enrichment)[:1500]),
             ),
+            schema=WHATSAPP_VARIABLES_SCHEMA,
         )
         for n in briefs:
             value = str(data.get(n) or "").strip()
@@ -362,6 +383,14 @@ CHANNEL FOR THIS FOLLOW-UP: {channel}
 
 Write the brief for the next touch now."""
 
+# Phase 3 item 2: both brief writers (follow-up and re-engagement) answer this.
+BRIEF_SCHEMA = {
+    "type": "object",
+    "properties": {"brief": {"type": "string"}},
+    "required": ["brief"],
+    "additionalProperties": False,
+}
+
 # Used when the model call fails. A generic brief still produces a message the
 # render path will personalize from real lead data, which is a far better
 # outcome than a follow-up that silently never sends because Anthropic was
@@ -436,6 +465,7 @@ def build_followup_brief(
                 company=prompt_safety.inline(lead.company or "their company"),
                 channel=channel,
             ),
+            schema=BRIEF_SCHEMA,
         )
         brief = str((data or {}).get("brief") or "").strip()
     except Exception as exc:  # noqa: BLE001 — see the docstring
@@ -531,6 +561,7 @@ def build_reengagement_brief(
                 channel=channel,
             ).replace("Write the brief for the next touch now.",
                       "Write the brief for the re-engagement message now."),
+            schema=BRIEF_SCHEMA,
         )
         brief = str((data or {}).get("brief") or "").strip()
     except Exception as exc:  # noqa: BLE001 — see the docstring

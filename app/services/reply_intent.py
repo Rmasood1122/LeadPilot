@@ -93,6 +93,21 @@ _SYSTEM = (
     "`reason` quotes or paraphrases the reply -- never invent detail."
 )
 
+# Output contract (Phase 3 item 2). `label` is not an enum: _clean normalises
+# variants ("Not-Now") and deliberately leaves an unknown label UNCLASSIFIED
+# rather than forcing a guess. `confidence` may come back as a string; _clean
+# coerces it.
+INTENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "label": {"type": "string"},
+        "confidence": {"type": ["number", "string"]},
+        "reason": {"type": "string"},
+    },
+    "required": ["label", "confidence", "reason"],
+    "additionalProperties": False,
+}
+
 # F-AI-02: the reply (sender, subject, body) is written by the prospect and
 # goes in as delimited, escaped data. What they were replying to is OUR
 # message, but a model wrote it from the prospect's own data (posts, news,
@@ -204,6 +219,7 @@ def classify(db: Session, reply_id) -> dict:
                     original=prompt_safety.block(original),
                 ),
                 max_tokens=MAX_TOKENS,
+                schema=INTENT_SCHEMA,
             )
             result = _clean(answer)
             if result is None:

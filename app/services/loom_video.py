@@ -51,6 +51,15 @@ SYSTEM = (
     "clear ask at the end. Never invent facts about the prospect."
 )
 
+# Phase 3 item 2: on_screen is optional (the code stores "" without it).
+LOOM_SCRIPT_SCHEMA = {
+    "type": "object",
+    "properties": {"title": {"type": "string"}, "script": {"type": "string"},
+                   "on_screen": {"type": "string"}},
+    "required": ["title", "script"],
+    "additionalProperties": False,
+}
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -99,7 +108,8 @@ def write_script(lead: Lead) -> dict:
               f"RECENT COMPANY NEWS:\n{prompt_safety.block(str(news))}\n\n"
               "Return the JSON object now.")
     data = anthropic_client.get_client().complete_json(system=SYSTEM, prompt=prompt,
-                                                       max_tokens=1200)
+                                                       max_tokens=1200,
+                                                       schema=LOOM_SCRIPT_SCHEMA)
     script = str((data or {}).get("script") or "").strip()
     if not script:
         raise ValueError("empty video script")

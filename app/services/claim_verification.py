@@ -403,6 +403,23 @@ EXTRACTOR_SYSTEM = (
     'If there are none, respond {"claims": []}.'
 )
 
+EXTRACTOR_SCHEMA = {
+    "type": "object",
+    "properties": {"claims": {"type": "array", "items": {
+        "type": "object",
+        "properties": {
+            "text": {"type": "string"},
+            "category": {"type": "string", "enum": [
+                "funding", "headcount", "hiring", "job_change", "news", "metrics",
+                "expansion", "their_content", "other"]},
+        },
+        "required": ["text", "category"],
+        "additionalProperties": False,
+    }}},
+    "required": ["claims"],
+    "additionalProperties": False,
+}
+
 
 def _model_claims(session: Session, texts: list[str]) -> dict[str, str]:
     from app.services import anthropic_client, prompt_safety, system_settings  # noqa: PLC0415
@@ -419,7 +436,8 @@ def _model_claims(session: Session, texts: list[str]) -> dict[str, str]:
             system=EXTRACTOR_SYSTEM,
             prompt=f"{prompt_safety.NOTICE}\n\nMESSAGE:\n{prompt_safety.block(joined[:6000])}",
             max_tokens=800,
-            temperature=anthropic_client.JUDGE_TEMPERATURE)
+            temperature=anthropic_client.JUDGE_TEMPERATURE,
+            schema=EXTRACTOR_SCHEMA)
     except Exception as exc:  # noqa: BLE001 -- rules still run
         logger.info("claim extraction model unavailable (%s); rules only", type(exc).__name__)
         return {}

@@ -31,7 +31,7 @@ class RecordingClient:
         self.calls: list[dict] = []
 
     def complete_json(self, system=None, prompt=None, max_tokens=None,
-                      temperature=None) -> dict:
+                      temperature=None, schema=None) -> dict:
         self.calls.append({"kind": "json", "system": system, "prompt": prompt,
                            "max_tokens": max_tokens, "temperature": temperature})
         return dict(self.payload)

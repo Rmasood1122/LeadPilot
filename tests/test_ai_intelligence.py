@@ -386,7 +386,7 @@ class TestMutation:
         prompts: list[str] = []
         real = fake_claude.complete_json
 
-        def _capture(system, prompt, max_tokens=None, temperature=None):
+        def _capture(system, prompt, max_tokens=None, temperature=None, schema=None):
             if "personalization engine" in system:
                 prompts.append(prompt)
             return real(system, prompt, max_tokens)
