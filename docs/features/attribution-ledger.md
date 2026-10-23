@@ -58,7 +58,7 @@ a hook that will be forgotten in the thirteenth.
 One idempotent sweep over outcomes with no ledger entry covers every path, past
 and future, and **back-fills history for free**.
 `UNIQUE(outcome_kind, outcome_id)` is what makes running it forever safe — it
-literally cannot double-credit, so the quarter-hourly cadence costs nothing but
+literally cannot double-credit, so the half-hourly cadence costs nothing but
 the scan.
 
 ## Which outcomes are credited

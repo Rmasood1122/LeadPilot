@@ -8,7 +8,7 @@ repo root for documentation of every variable.
 from functools import lru_cache
 from urllib.parse import urlparse
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -113,8 +113,20 @@ class Settings(BaseSettings):
     send_window_skip_weekends: bool = True
     bounce_rate_pause_threshold: float = 0.03
     bounce_min_sends: int = 10          # don't judge bounce rate on tiny samples
-    reply_poll_interval_seconds: int = 300
-    dispatch_interval_seconds: int = 60
+    # Celery beat runs every sub-hourly database sweep (dispatch, reply
+    # polling, follow-ups, reminders, plan holds, CRM sync...) together, once
+    # every `beat_sweep_minutes`, at the same minutes of the hour; hourly
+    # sweeps join the first burst of the hour. Between bursts the worker sends
+    # the database nothing, so a database that suspends when idle (Neon's free
+    # plan, after 5 minutes) can sleep. Must divide 60 and be at least 5: each
+    # burst spreads its jobs over minutes +0..+4. Lower it for faster sends and
+    # reply pickup on a database that does not bill for idle time.
+    beat_sweep_minutes: int = Field(default=30, ge=5, le=60)
+    # GET /health and GET /status/public reuse a successful database check for
+    # this long instead of running SELECT 1 again. Render probes /health every
+    # few seconds; without this the probe alone kept the database awake around
+    # the clock. A failed check is never reused. 0 = check on every request.
+    health_db_check_ttl_seconds: int = Field(default=1800, ge=0)
     ooo_reschedule_days: int = 7        # out-of-office: pause + retry after N days
 
     # --- Calendly (M3) -------------------------------------------------------
@@ -372,12 +384,8 @@ class Settings(BaseSettings):
     meeting_ai_max_tokens: int = 4096
 
     # --- Engagement Hub: automated follow-up (Feature 1) ------------------
-    # How often check_followup_due sweeps for enrollments whose last message
-    # has gone unanswered past its step's followup_delay_hours. 30 minutes is
-    # the brief's figure: the delays it enforces are measured in days, so a
-    # finer sweep buys nothing and a coarser one makes a 24h setting land
-    # anywhere in a wide band.
-    followup_sweep_interval_seconds: int = 1800
+    # check_followup_due runs in every beat burst (beat_sweep_minutes, 30 by
+    # default): the delays it enforces are measured in days.
     # TTL on the Redis idempotency lock a follow-up send takes. Two hours: far
     # longer than any send can take, far shorter than the shortest useful
     # follow-up delay, so a crashed worker's lock cannot survive to block the
@@ -391,9 +399,9 @@ class Settings(BaseSettings):
     meeting_prep_max_tokens: int = 4096
     # The post-meeting follow-up is one short email.
     meeting_followup_max_tokens: int = 1500
-    # How often the reminder sweep looks for meetings 24h / 1h out. Five
-    # minutes keeps the one-hour reminder within five minutes of the hour.
-    meeting_reminder_sweep_seconds: int = 300
+    # The 24h / 1h reminder sweep runs in every beat burst
+    # (beat_sweep_minutes), so the one-hour reminder lands between one hour
+    # and one sweep interval before the meeting.
 
     # --- Pipeline engine -------------------------------------------------
     pipeline_step_timeout_seconds: int = 300
@@ -555,6 +563,16 @@ class Settings(BaseSettings):
     # before rotating SECRET_KEY, or reports signed earlier will no longer
     # verify against GET /audit/public-key.
     audit_signing_key: str = ""
+
+    @field_validator("beat_sweep_minutes")
+    @classmethod
+    def _sweep_divides_the_hour(cls, v: int) -> int:
+        # The bursts sit at fixed minutes of every hour (app/workers/
+        # celery_app.py); a value that does not divide 60 would leave a short
+        # gap at the top of each hour.
+        if 60 % v:
+            raise ValueError("BEAT_SWEEP_MINUTES must divide 60 (5, 6, 10, 12, 15, 20, 30 or 60)")
+        return v
 
     @property
     def billing_stub_mode(self) -> bool:
