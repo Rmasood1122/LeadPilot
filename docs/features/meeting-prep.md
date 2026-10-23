@@ -21,7 +21,7 @@
    connected, a Slack message with the "why they booked" and opening script
    inline and a link to the **Meeting Prep** tab of `/leads/detail`.
 
-2. **Reminders.** A Beat sweep every 5 minutes sends a "coming up" reminder
+2. **Reminders.** A Beat sweep in every worker burst (`BEAT_SWEEP_MINUTES`, 30) sends a "coming up" reminder
    once within 24h of the call and a 1-hour reminder whose body is the opening
    script. Both are claimed with a conditional UPDATE, so they are
    at-most-once across workers. A cancellation (Calendly `invitee.canceled` or

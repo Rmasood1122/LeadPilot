@@ -67,7 +67,7 @@ Changes are pushed straight away on key events (meeting booked, reply, call, dea
 - A converted Salesforce lead becomes an opportunity; "Closed - Not Converted" becomes disqualified.
 - A HubSpot deal created on a linked contact is imported as a Victorae deal.
 
-A CRM change never moves a lead backwards and never reopens a closed lead. Closing a lead in this way stops its sequences. The 15-minute sweep reads linked records back without any setup in your CRM; your CRM admin can also add webhooks to make changes arrive immediately.
+A CRM change never moves a lead backwards and never reopens a closed lead. Closing a lead in this way stops its sequences. The 30-minute sweep reads linked records back without any setup in your CRM; your CRM admin can also add webhooks to make changes arrive immediately.
 
 ## How do I get Slack notifications?
 
