@@ -172,7 +172,10 @@ class ReplayClient:
         self.calls: list[dict] = []
 
     def _next(self, kind: str, system: str, prompt: str, kwargs: dict) -> Any:
-        self.calls.append({"kind": kind, "system": system or "", "prompt": prompt or "",
+        # A cached prefix (gateway cache_prefix) is read before the prompt;
+        # the prompt-level graders see both, in that order.
+        full = (kwargs.get("cache_prefix") or "") + (prompt or "")
+        self.calls.append({"kind": kind, "system": system or "", "prompt": full,
                            "kwargs": dict(kwargs)})
         if not self._queue:
             raise ReplayExhausted(f"call {len(self.calls)} has no recorded output")

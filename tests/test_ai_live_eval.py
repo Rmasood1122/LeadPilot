@@ -218,3 +218,27 @@ def test_case_level_live_ignore_adds_to_the_sets():
                 live_ignore=["label"])], live_ignore=["include"])
     [(_s, case)] = le.live_cases([spec], None)
     assert case.expect == {"forbidden": ["y"]}
+
+
+def test_cache_tokens_are_charged_and_counted(fake_sdk, monkeypatch):
+    """Phase 3 item 3: a cached call's writes (1.25x) and reads (0.1x) are
+    priced into the run's spend, and counted for the report's hit rate."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "anthropic_model", "claude-sonnet-4-6")
+
+    class CachedMessages(FakeMessages):
+        def create(self, **kwargs):
+            resp = super().create(**kwargs)
+            resp.usage.cache_creation_input_tokens = 2000
+            resp.usage.cache_read_input_tokens = 3000
+            return resp
+
+    fake_sdk.messages_factory = CachedMessages
+    budget = le.Budget(1.0)
+    client = le.make_live_client("sk-eval", PRICE, budget)
+    client.complete(system="S", prompt="P", max_tokens=200, cache_prefix="shared doc")
+    billed_in = 1000 + 1.25 * 2000 + 0.1 * 3000
+    assert budget.spent == pytest.approx((billed_in * 3.0 + 100 * 15.0) / 1e6)
+    assert budget.tokens == {"input": 1000, "cache_write": 2000, "cache_read": 3000}
+    assert client.calls[0]["prompt"] == "shared docP"

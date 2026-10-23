@@ -93,6 +93,8 @@ class Budget:
         self.limit = limit_usd
         self.spent = 0.0
         self.exhausted = ""
+        # Phase 3 item 3: raw token counts, for the cache hit rate in the report.
+        self.tokens = {"input": 0, "cache_write": 0, "cache_read": 0}
 
     def admit(self, worst_usd: float) -> None:
         if self.exhausted or self.spent + worst_usd > self.limit:
@@ -118,15 +120,33 @@ class _MeteredMessages:
         self._inner, self._price, self._budget, self._owner = inner, price, budget, owner
 
     def _admit(self, kwargs: dict) -> None:
-        chars = len(str(kwargs.get("system") or "")) + sum(
-            len(str(m.get("content") or "")) for m in kwargs.get("messages") or [])
-        self._budget.admit(worst_case_usd(self._price, chars, int(kwargs.get("max_tokens") or 0)))
+        from app.services.anthropic_client import CACHE_WRITE_MULTIPLIER  # noqa: PLC0415
+
+        chars = float(len(str(kwargs.get("system") or "")))
+        for message in kwargs.get("messages") or []:
+            content = message.get("content") or ""
+            blocks = content if isinstance(content, list) else [{"text": content}]
+            for block in blocks:
+                # A cached block may be written this call: 1.25x the input price.
+                weight = CACHE_WRITE_MULTIPLIER if block.get("cache_control") else 1.0
+                chars += weight * len(str(block.get("text") or ""))
+        self._budget.admit(worst_case_usd(self._price, int(chars),
+                                          int(kwargs.get("max_tokens") or 0)))
 
     def _charge(self, resp) -> Any:
+        from app.config import settings  # noqa: PLC0415
+        from app.services.anthropic_client import billed_input_tokens  # noqa: PLC0415
+
         usage = getattr(resp, "usage", None)
-        usd = actual_usd(self._price, int(getattr(usage, "input_tokens", 0) or 0),
+        tin = int(getattr(usage, "input_tokens", 0) or 0)
+        write = int(getattr(usage, "cache_creation_input_tokens", 0) or 0)
+        read = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+        usd = actual_usd(self._price, billed_input_tokens(settings.anthropic_model, tin, write, read),
                          int(getattr(usage, "output_tokens", 0) or 0))
         self._budget.charge(usd)
+        self._budget.tokens["input"] += tin
+        self._budget.tokens["cache_write"] += write
+        self._budget.tokens["cache_read"] += read
         self._owner.cost_usd += usd
         return resp
 
@@ -166,12 +186,15 @@ def make_live_client(api_key: str, price: dict, budget: Budget):
             self.cost_usd = 0.0
 
         def complete(self, system: str, prompt: str, max_tokens: int | None = None,
-                     temperature: float | None = None, schema: dict | None = None) -> str:
-            self.calls.append({"kind": "text", "system": system or "", "prompt": prompt or "",
+                     temperature: float | None = None, schema: dict | None = None,
+                     cache_prefix: str | None = None) -> str:
+            self.calls.append({"kind": "text", "system": system or "",
+                               "prompt": (cache_prefix or "") + (prompt or ""),
                                "kwargs": {"max_tokens": max_tokens, "temperature": temperature,
-                                          "schema": schema}})
+                                          "schema": schema, "cache_prefix": cache_prefix}})
             return super().complete(system=system, prompt=prompt, max_tokens=max_tokens,
-                                    temperature=temperature, schema=schema)
+                                    temperature=temperature, schema=schema,
+                                    cache_prefix=cache_prefix)
 
     return LiveClient()
 
@@ -328,6 +351,9 @@ def run(args) -> int:
         "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "spent_usd": round(budget.spent, 6), "wall_s": round(time.monotonic() - started, 1),
         "stopped_early": stopped, "gate": {"ok": decision.ok, "reasons": decision.reasons},
+        "tokens": budget.tokens,
+        "cache_hit_rate": round(budget.tokens["cache_read"] / max(
+            1, sum(budget.tokens.values())), 4),
         "summary": summary,
         "errors": [{"tp": r.touchpoint, "case": r.case, "run": r.run, "error": r.error}
                    for r in results if r.error],

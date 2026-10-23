@@ -7,6 +7,7 @@ test suite mocks exactly one thing (`get_client`).
 """
 
 import json
+import math
 import logging
 import re
 
@@ -122,6 +123,27 @@ STRUCTURED_OUTPUT_MODELS = frozenset({
 })
 
 
+# Phase 3 item 3: prompt caching prices (Anthropic API reference, read
+# 2026-10-21). A 5-minute cache write costs 1.25x the input price; a read
+# costs 0.1x, except on the models listed. The usage meter is fed
+# input-equivalent tokens priced with these, so spend caps stay exact.
+CACHE_WRITE_MULTIPLIER = 1.25
+CACHE_READ_MULTIPLIER = 0.1
+CACHE_READ_MULTIPLIER_BY_MODEL = {"claude-opus-5-5": 0.05, "claude-fable-5-1": 0.025}
+
+
+def billed_input_tokens(model: str, input_tokens: int, cache_write_tokens: int,
+                        cache_read_tokens: int) -> int:
+    """Uncached input plus cache writes and reads, as input-token equivalents
+    at their own prices -- what the call cost, in the unit the meter prices.
+    The API reports cache tokens separately from input_tokens, so metering
+    input_tokens alone would under-count every cached call."""
+    base = re.sub(r"-\d{8}$", "", (model or "").strip())
+    read = CACHE_READ_MULTIPLIER_BY_MODEL.get(base, CACHE_READ_MULTIPLIER)
+    return int(math.ceil(input_tokens + CACHE_WRITE_MULTIPLIER * cache_write_tokens
+                         + read * cache_read_tokens))
+
+
 def supports_structured_output(model: str) -> bool:
     """Whether `model` accepts output_config.format."""
     base = re.sub(r"-\d{8}$", "", (model or "").strip())
@@ -204,7 +226,8 @@ class ClaudeClient:
         reraise=True,
     )
     def complete(self, system: str, prompt: str, max_tokens: int | None = None,
-                 temperature: float | None = None, schema: dict | None = None) -> str:
+                 temperature: float | None = None, schema: dict | None = None,
+                 cache_prefix: str | None = None) -> str:
         """One text completion. Returns concatenated text blocks.
 
         `temperature` is omitted from the request when None, which leaves the
@@ -231,14 +254,27 @@ class ClaudeClient:
         from app.services import usage_meter  # noqa: PLC0415
 
         usage_meter.warn_if_unscoped("anthropic")
+        prefix_chars = len(cache_prefix or "")
         usage_meter.check_budget(
-            input_chars=len(system) + len(prompt), max_output_tokens=limit
+            # Worst case: the prefix is written to the cache (1.25x input).
+            input_chars=len(system) + len(prompt)
+            + math.ceil(prefix_chars * CACHE_WRITE_MULTIPLIER),
+            max_output_tokens=limit,
         )
+        if cache_prefix:
+            # Phase 3 item 3: the stable material first, with a breakpoint at
+            # its end; the system prompt and this block are cached together.
+            # Only the part after it changes from call to call.
+            content = [{"type": "text", "text": cache_prefix,
+                        "cache_control": {"type": "ephemeral"}},
+                       {"type": "text", "text": prompt}]
+        else:
+            content = prompt
         request = dict(
             model=settings.anthropic_model,
             max_tokens=limit,
             system=system,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": content}],
         )
         if temperature is not None:
             # Only sent when a caller asked for it. Absent, the account/API
@@ -270,15 +306,18 @@ class ClaudeClient:
         # answer was still paid for.
         from app.services import usage_meter  # noqa: PLC0415
 
+        in_tokens = int(getattr(resp.usage, "input_tokens", 0) or 0)
+        cache_write = int(getattr(resp.usage, "cache_creation_input_tokens", 0) or 0)
+        cache_read = int(getattr(resp.usage, "cache_read_input_tokens", 0) or 0)
         usage_meter.note("anthropic", settings.anthropic_model,
-                         getattr(resp.usage, "input_tokens", 0) or 0,
+                         billed_input_tokens(settings.anthropic_model, in_tokens,
+                                             cache_write, cache_read),
                          out_tokens if isinstance(out_tokens, int) else 0)
         logger.info(
-            "anthropic call ok model=%s in_tokens=%s out_tokens=%s stop_reason=%s",
-            settings.anthropic_model,
-            getattr(resp.usage, "input_tokens", "?"),
-            out_tokens,
-            stop_reason,
+            "anthropic call ok model=%s in_tokens=%s cache_write=%s cache_read=%s "
+            "out_tokens=%s stop_reason=%s",
+            settings.anthropic_model, in_tokens, cache_write, cache_read,
+            out_tokens, stop_reason,
         )
         if stop_reason == "max_tokens":
             raise TruncatedResponseError(
@@ -291,7 +330,8 @@ class ClaudeClient:
         return text
 
     def complete_json(self, system: str, prompt: str, max_tokens: int | None = None,
-                      temperature: float | None = None, schema: dict | None = None) -> dict:
+                      temperature: float | None = None, schema: dict | None = None,
+                      cache_prefix: str | None = None) -> dict:
         """Completion that must return a single JSON object.
 
         The system prompt should already demand JSON-only output; this
@@ -305,7 +345,7 @@ class ClaudeClient:
         than being forced to 0 here.
         """
         raw = self.complete(system=system, prompt=prompt, max_tokens=max_tokens,
-                            temperature=temperature, schema=schema)
+                            temperature=temperature, schema=schema, cache_prefix=cache_prefix)
         cleaned = re.sub(r"```(?:json)?", "", raw).strip().strip("`").strip()
         try:
             data = json.loads(cleaned)

@@ -191,16 +191,18 @@ class TestLoopNeverPersistsTruncation:
 
         class Client:
             def complete_json(self, system, prompt, max_tokens=None, temperature=None,
-                              schema=None):
+                              schema=None, cache_prefix=None):
                 import re
                 pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
                 if pass_no == 1:
                     return {"result": "FAIL", "fix_description": "fix the pricing"}
                 return {"result": "PASS"}
 
-            def complete(self, system, prompt, max_tokens=None, temperature=None):
+            def complete(self, system, prompt, max_tokens=None, temperature=None,
+                         cache_prefix=None):
                 return _client_with(raw).complete(
-                    system=system, prompt=prompt, max_tokens=max_tokens)
+                    system=system, prompt=prompt, max_tokens=max_tokens,
+                    cache_prefix=cache_prefix)
 
         monkeypatch.setattr("app.verification.loop.get_client", lambda: Client())
 
@@ -219,15 +221,17 @@ class TestLoopNeverPersistsTruncation:
 
         class Client:
             def complete_json(self, system, prompt, max_tokens=None, temperature=None,
-                              schema=None):
+                              schema=None, cache_prefix=None):
                 import re
                 pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
                 return ({"result": "FAIL", "fix_description": "fix it"}
                         if pass_no == 1 else {"result": "PASS"})
 
-            def complete(self, system, prompt, max_tokens=None, temperature=None):
+            def complete(self, system, prompt, max_tokens=None, temperature=None,
+                         cache_prefix=None):
                 return _client_with(raw).complete(
-                    system=system, prompt=prompt, max_tokens=max_tokens)
+                    system=system, prompt=prompt, max_tokens=max_tokens,
+                    cache_prefix=cache_prefix)
 
         monkeypatch.setattr("app.verification.loop.get_client", lambda: Client())
 
@@ -249,7 +253,7 @@ class TestLoopNeverPersistsTruncation:
 
         class Client:
             def complete_json(self, system, prompt, max_tokens=None, temperature=None,
-                              schema=None):
+                              schema=None, cache_prefix=None):
                 import re
                 pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
                 if pass_no == 1 and not getattr(self, "_seen", False):
@@ -257,9 +261,11 @@ class TestLoopNeverPersistsTruncation:
                     return {"result": "FAIL", "fix_description": "fix it"}
                 return {"result": "PASS"}
 
-            def complete(self, system, prompt, max_tokens=None, temperature=None):
+            def complete(self, system, prompt, max_tokens=None, temperature=None,
+                         cache_prefix=None):
                 return _client_with(raw).complete(
-                    system=system, prompt=prompt, max_tokens=max_tokens)
+                    system=system, prompt=prompt, max_tokens=max_tokens,
+                    cache_prefix=cache_prefix)
 
         monkeypatch.setattr("app.verification.loop.get_client", lambda: Client())
 

@@ -177,7 +177,7 @@ def judge(claude, section_title: str, claude_text: str, gpt_text: str) -> list[d
 
 
 def run_step(session: Session, strategy: Strategy, spec, *, system: str,
-             prompt: str, claude) -> str:
+             prompt: str, claude, cache_prefix: str | None = None) -> str:
     """Run one synthesis step on both models. Returns Claude's answer.
 
     Writes model outputs and zones to the session WITHOUT committing -- the
@@ -188,7 +188,7 @@ def run_step(session: Session, strategy: Strategy, spec, *, system: str,
 
     openai = get_openai_client(session)
     if openai is None:
-        return claude.complete(system=system, prompt=prompt)
+        return claude.complete(system=system, prompt=prompt, cache_prefix=cache_prefix)
 
     with ThreadPoolExecutor(max_workers=1) as pool:
         # A worker thread does not inherit context variables, so without
@@ -196,9 +196,12 @@ def run_step(session: Session, strategy: Strategy, spec, *, system: str,
         # never recorded, even inside the pipeline scope (P0-5b). The copy
         # holds the SAME scope object, so the thread's notes land in it.
         future = pool.submit(contextvars.copy_context().run,
-                             _timed, openai.complete, system, prompt)
+                             _timed, openai.complete, system,
+                             # GPT-4o reads the same brief, in the same order.
+                             (cache_prefix or "") + prompt)
         started = time.monotonic()
-        claude_text = claude.complete(system=system, prompt=prompt)  # may raise: pipeline retries
+        claude_text = claude.complete(system=system, prompt=prompt,  # may raise: pipeline retries
+                                      cache_prefix=cache_prefix)
         claude_ms = int((time.monotonic() - started) * 1000)
         gpt_text, gpt_error, gpt_ms = future.result()
 

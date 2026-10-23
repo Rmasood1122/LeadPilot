@@ -48,8 +48,8 @@ class FakeOpenAI:
     def __init__(self, text="Lead with LinkedIn, then email.", error=None):
         self.text, self.error, self.calls = text, error, []
 
-    def complete(self, system, prompt, max_tokens=4096, temperature=None):
-        self.calls.append(prompt)
+    def complete(self, system, prompt, max_tokens=4096, temperature=None, cache_prefix=None):
+        self.calls.append((cache_prefix or "") + prompt)  # what the model reads
         if self.error:
             raise self.error
         return self.text
@@ -200,9 +200,10 @@ class TestMarketIntel:
         market_intel.ensure_signals(db_session, verified_strategy)
         assert calls["news"] == 1                             # once per strategy
 
-        phase_1 = engine._context_block(db_session, verified_strategy, _spec(1))
-        phase_2 = engine._context_block(db_session, verified_strategy, _spec(10))
-        phase_3 = engine._context_block(db_session, verified_strategy, _spec(19))
+        # (stable, phase) parts; the signals live in the stable, cached part.
+        phase_1 = "\n".join(engine._context_block(db_session, verified_strategy, _spec(1)))
+        phase_2 = "\n".join(engine._context_block(db_session, verified_strategy, _spec(10)))
+        phase_3 = "\n".join(engine._context_block(db_session, verified_strategy, _spec(19)))
         assert "Live market signals" in phase_1
         assert "Live market signals" in phase_3
         assert "Live market signals" not in phase_2
