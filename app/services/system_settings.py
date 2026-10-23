@@ -79,6 +79,12 @@ DEFAULTS: dict[str, tuple[Any, str]] = {
                                    "(consensus engine)."),
     "openai_output_cost_per_mtok": (10.0, "USD per million OpenAI output "
                                     "tokens."),
+    "voyage_embed_cost_per_mtok": (0.12, "USD per million Voyage embedding "
+                                   "tokens (voyage-context-4; help center "
+                                   "index and support questions)."),
+    "voyage_rerank_cost_per_mtok": (0.02, "USD per million Voyage rerank "
+                                    "tokens (rerank-3-lite; query tokens x "
+                                    "documents + document tokens)."),
     "voice_cost_per_minute": (0.15, "USD per AI-call minute, all-in "
                               "(Vapi/ElevenLabs + telephony)."),
     # Feature Group 5 -- LinkedIn
