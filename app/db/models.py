@@ -6234,6 +6234,47 @@ class AgentRun(Base):
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
+
+class HelpChunk(Base):
+    """One help-center chunk in the search index (Help AI v2, Phase 2).
+
+    Built ONLY from docs/help-center by scripts/help_center/reindex.py. Nothing
+    from a user's question or account is ever written here, and no row belongs
+    to an account -- it is product documentation, identical for everyone.
+
+    Two PostgreSQL-only columns are not mapped here and exist only after
+    alembic 0094 runs on PostgreSQL with pgvector:
+      embedding  halfvec(1024)  HNSW, halfvec_cosine_ops (m=16, ef_construction=64)
+      body_tsv   tsvector GENERATED from heading + body, GIN-indexed
+    app/services/help_index.py reads and writes them with SQL. Leaving them
+    out of the model is what lets the SQLite suite create this table.
+    """
+
+    __tablename__ = "help_chunks"
+
+    # Stable chunk id, "<article-id>#<heading-slug>" (help_center._chunk_article).
+    id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    article_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    heading: Mapped[str] = mapped_column(String(300), nullable=False)
+    # "Article title > Section heading" (merged sections joined with " + ").
+    heading_path: Mapped[str] = mapped_column(Text, nullable=False)
+    # Site link: "/help/<article-id>/" plus "#<heading anchor>" when the chunk
+    # is not the article intro. Phase 4 cites from this, never from the model.
+    url: Mapped[str] = mapped_column(String(400), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # Empty by decision (DECISIONS HELPAI-VENDOR): contextualized embeddings
+    # carry the article context, so no generated context sentence is stored.
+    context_sentence: Mapped[str] = mapped_column(Text, nullable=False, default="",
+                                                  server_default="")
+    # sha256 of the embedding input (chunk text + its article's text).
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    # NULL until a vector is stored for the current content_hash.
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True),
+                                                         nullable=True)
+    # "<embedding model>@<dimension>" that produced the vector; "" when none.
+    model: Mapped[str] = mapped_column(String(80), nullable=False, default="",
+                                       server_default="")
+
 # Product defect #2: fill outcomes.strategy_id / outcomes.variant on every new
 # Outcome (the learning loop and A/B promotion read those columns). Imported
 # last so the listener module can import the classes above.

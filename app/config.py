@@ -302,6 +302,31 @@ class Settings(BaseSettings):
     # not. The widget hides itself and the endpoint returns 503.
     support_chat_enabled: bool = True
 
+    # --- Help AI v2: embeddings + rerank (Voyage) -------------------------
+    # The ONLY embedding vendor (docs/program/DECISIONS.md HELPAI-VENDOR), and
+    # app/services/embeddings_client.py is the only module that calls it.
+    voyage_api_key: str = ""
+    # EMBEDDINGS_MODE -- mock | live. EMPTY MEANS AUTO, exactly like AI_MODE:
+    # "live" when VOYAGE_API_KEY is set, "mock" otherwise. Mock vectors are
+    # deterministic feature hashes (no network); they exist for tests and
+    # development and are never written to a production index unless asked
+    # (scripts/help_center/reindex.py --allow-mock).
+    embeddings_mode: str = ""
+    # Contextualized chunk embeddings: each chunk is embedded with its whole
+    # article as context, which replaces a generated "context sentence".
+    voyage_embed_model: str = "voyage-context-4"
+    # Must equal the help_chunks.embedding column width (halfvec(1024),
+    # alembic 0094). voyage-context-4 supports 256/512/1024/2048.
+    voyage_embed_dimension: int = 1024
+    voyage_rerank_model: str = "rerank-3-lite"
+    # Per HTTP attempt. A query embedding sits in front of a support answer,
+    # so a slow vendor must fall back to BM25 quickly rather than hang the
+    # widget; the reindex job tolerates the same bound per batch.
+    voyage_timeout_seconds: float = 15.0
+    # Attempts per request, transient failures only (network, timeout, 429,
+    # 5xx). Backoff doubles from 1s.
+    voyage_max_attempts: int = 3
+
     # KILL SWITCH. get_current_user rejects unverified users only while this is
     # true. It exists because that dependency is the single chokepoint every
     # authenticated route shares: if verification ever locks real users out,

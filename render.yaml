@@ -95,6 +95,9 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
+      # Help AI v2 (Voyage). Empty: help-center index text-only, retrieval BM25.
+      - key: VOYAGE_API_KEY
+        sync: false
       - key: CORS_ORIGINS          # comma-separated, NEVER a JSON array
         sync: false
       - key: PUBLIC_BASE_URL       # this service's own https URL

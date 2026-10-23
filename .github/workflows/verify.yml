@@ -36,7 +36,10 @@ jobs:
     timeout-minutes: 25
     services:
       postgres:
-        image: postgres:16
+        # PostgreSQL 16 with pgvector 0.8.1: alembic 0094 (help_chunks) needs
+        # halfvec + HNSW, and tests/integration/test_help_index_pg.py is the
+        # Help AI v2 Phase 2 exit gate (it fails, never skips, under CI).
+        image: pgvector/pgvector:0.8.1-pg16
         env:
           POSTGRES_USER: leadpilot
           POSTGRES_PASSWORD: leadpilot

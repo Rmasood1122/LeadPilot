@@ -26,6 +26,25 @@ Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
   **Process miss, caught:** item 2's first full run BLOCKed (pass rate 0.99898). A test fake in `tests/help_center/` did not accept `schema=`. The per-group checks had searched only `tests/*.py`. Fixed (`c2a64e6`); searches now include subdirectories.
 
   Report: `docs/program/ai/phase3-item3-prompt-caching.md`.
+- 2026-10-22 — **Help AI v2 Phase 2 (indexing)** on `claude/awesome-lovelace-okii9j`, after PR #112 (Phase 1) merged. Plan and evidence: `docs/program/plans/help-ai-v2-02-indexing.md`.
+
+  **Done**
+  - `app/services/embeddings_client.py`: the only Voyage gateway. Contextualized embeddings and rerank, a hash-vector mock, retries and timeouts, metered through `usage_meter` as `voyage` / `voyage_rerank`.
+  - Alembic `0094_help_chunks`: halfvec(1024) + HNSW, and a generated tsvector + GIN. Without pgvector the table is created text-only; SQLite gets only the mapped columns.
+  - `app/services/help_index.py`.
+  - `scripts/help_center/reindex.py`: idempotent, prints a diff, with `--check`.
+  - A non-fatal reindex in `scripts/render_api_entrypoint.sh`.
+  - The committed `index_manifest.json`, checked in CI.
+  - CI's PostgreSQL moved to `pgvector/pgvector:0.8.1-pg16`.
+  - DECISIONS HELPAI-RERANK (`rerank-3-lite`) and HELPAI-INDEX.
+
+  **Exit gate 2 (local PostgreSQL 16.15 + pgvector 0.8.1, mock vectors)**
+  - Second reindex: 0 writes, 0 re-embeds.
+  - Vector search: 10/10 fixed golden queries top-1. HNSW is used, and its order equals an exact scan.
+
+  **Not verified:** real Voyage calls and quality (no key in this environment); Neon's pgvector version (founder query pending).
+
+  **Reported, not fixed:** `docker-compose.yml` and `docker-compose.prod.yml` still use `postgres:16-alpine` (no pgvector). Switching an existing alpine data volume to the Debian-based pgvector image risks collation changes, so that is its own change.
 - 2026-10-21 — **Victorae Phase 3 item 2 (output contracts)**, local commits on top of PR #122 (item 1, open). Phase 2 (#121) was merged 18:11Z from the web UI with no review recorded, not via `safe_merge.sh` (MERGE-B bypass, reported).
 
   **Done**
