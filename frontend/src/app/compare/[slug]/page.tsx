@@ -24,13 +24,13 @@ function load(slug: string) {
   return comparison(slug.slice(PREFIX.length));
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
-  const c = load(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const c = load((await params).slug);
   return { title: c.title, description: c.description, ...canonicalMeta(comparisonPath(c.slug)) };
 }
 
-export default function ComparisonPage({ params }: { params: { slug: string } }) {
-  const c = load(params.slug);
+export default async function ComparisonPage({ params }: { params: Promise<{ slug: string }> }) {
+  const c = load((await params).slug);
   const others = COMPARISONS.filter((o) => o.slug !== c.slug);
   return (
     <ContentPage
