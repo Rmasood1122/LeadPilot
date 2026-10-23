@@ -25,12 +25,11 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  // ── TypeScript + ESLint (inherited from M5, not changed) ────────────────
+  // ── TypeScript (inherited from M5, not changed) ─────────────────────────
+  // Next 16 no longer lints during builds and rejects an `eslint` key here;
+  // lint runs as its own step (`npm run lint`, CI verify-frontend).
   typescript: {
     ignoreBuildErrors: false,   // strict — keep this
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
 
   // ── Environment variable passthrough ────────────────────────────────────
@@ -53,6 +52,9 @@ const nextConfig = {
   // the intake wizard's step) and causing tests navigating right after
   // login to intermittently bounce back to /login. Excluding these
   // output-only directories stops the watcher from ever seeing them.
+  // Next 16 builds with Turbopack by default and refuses a webpack config
+  // under it, so every `next dev` / `next build` script passes --webpack: the
+  // bundler this app has always shipped with.
   webpack: (config) => {
     config.watchOptions = {
       ...config.watchOptions,
