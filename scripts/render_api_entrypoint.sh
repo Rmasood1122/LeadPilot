@@ -47,6 +47,18 @@ PORT="${PORT:-10000}"
 echo "[api-entrypoint] running database migrations"
 python -m app.db.migrate
 
+# Help AI v2: bring the help-center search index (help_chunks) up to date
+# with docs/help-center in this image. Idempotent -- unchanged chunks are
+# neither written nor re-embedded, so a normal deploy costs nothing -- and
+# NON-FATAL by design: under `set -e` a failure here would keep the API down,
+# while the support assistant's BM25 path needs no index at all. `timeout`
+# bounds the boot delay if the embedding vendor is slow; whatever was not
+# embedded is picked up by the next deploy (or a manual run, see
+# docs/program/plans/help-ai-v2-02-indexing.md).
+echo "[api-entrypoint] reindexing the help center"
+timeout 180 python -m scripts.help_center.reindex \
+  || echo "[api-entrypoint] help-center reindex did not complete (exit $?); serving with the existing index"
+
 echo "[api-entrypoint] migrations complete; starting uvicorn on 0.0.0.0:${PORT}"
 exec uvicorn app.main:app \
   --host 0.0.0.0 \
