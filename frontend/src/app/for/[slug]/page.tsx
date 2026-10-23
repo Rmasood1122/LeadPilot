@@ -19,13 +19,13 @@ export function generateStaticParams() {
 
 const pathOf = (slug: string) => `/for/${slug}/`;
 
-export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
-  const p = forPage(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const p = forPage((await params).slug);
   return { title: p.title, description: p.description, ...canonicalMeta(pathOf(p.slug)) };
 }
 
-export default function ForPage({ params }: { params: { slug: string } }) {
-  const p = forPage(params.slug);
+export default async function ForPage({ params }: { params: Promise<{ slug: string }> }) {
+  const p = forPage((await params).slug);
   return (
     <ContentPage
       jsonLd={pageGraph({ path: pathOf(p.slug), breadcrumb: p.eyebrow })}
