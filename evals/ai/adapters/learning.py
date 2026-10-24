@@ -256,11 +256,15 @@ def icp_extraction(inp: dict, client) -> dict | None:
         lead = seed_lead(db, strategy, title="Practice Owner",
                          enrichment_json={"organization": {
                              "industry": inp.get("lead_industry", "accounting")}})
-        icp = strategy.pattern_inputs_json or {}
-        _fit, fit_signals = fpta_scoring.fit_signals(lead, icp)
-        return {"pattern_key": strategy.pattern_key, "pattern_inputs": icp,
-                "industry_match": lead_scoring.industry_match(lead, icp),
-                "fit_signals": fit_signals}
+        # Score through the real scorers (heuristic path, no model call), so
+        # the case measures what they read from the stored column.
+        lead_scoring.score_leads(db, strategy, [lead], now=NOW, use_model=False)
+        fpta_scoring.score_leads(db, strategy, [lead], now=NOW, use_model=False)
+        db.refresh(lead)
+        return {"pattern_key": strategy.pattern_key,
+                "pattern_inputs": strategy.pattern_inputs_json or {},
+                "industry_match": _booking_out(lead)["industry_match"],
+                "fit_signals": _fpta_out(lead)["signals"].get("fit")}
     finally:
         db.close()
 

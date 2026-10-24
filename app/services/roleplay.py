@@ -26,6 +26,7 @@ number from JSON is spelled differently on SQLite and PostgreSQL.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timezone
 
 from sqlalchemy import func, select
@@ -336,6 +337,9 @@ def _transcript(rows: list[RoleplayTurn]) -> str:
                      for t in rows)
 
 
+_SENTENCE_END = re.compile(r"[.!?]+")
+
+
 def _clean_reply(text: str, persona: dict) -> str:
     """Strip the ways a model breaks character even when told not to.
 
@@ -349,8 +353,10 @@ def _clean_reply(text: str, persona: dict) -> str:
     for tell in ("Great question", "Good question", "That's a great",
                  "As your prospect", "As the prospect", "(As ", "[As "):
         if cleaned.startswith(tell):
-            # Drop the coaching sentence, keep whatever followed it.
-            _, _, rest = cleaned.partition(".")
+            # Drop the coaching sentence, keep whatever followed it. The
+            # sentence can end in '!' or '?' as well as '.'.
+            end = _SENTENCE_END.search(cleaned)
+            rest = cleaned[end.end():] if end else ""
             cleaned = rest.strip() or cleaned
             break
     return cleaned[:2000]

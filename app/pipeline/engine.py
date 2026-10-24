@@ -197,6 +197,12 @@ def run_step(session: Session, strategy: Strategy, spec: StepSpec) -> None:
     else:
         output = claude.complete(system=SYSTEM_PROMPT, prompt=prompt, cache_prefix=prefix)
 
+    # An empty answer is not research. Persisting it would mark the step done
+    # and feed nothing to every later step; fail closed and let the worker
+    # retry, as the OpenAI path and a truncated answer already do.
+    if not (output or "").strip():
+        raise RuntimeError(f"step {spec.id}: the model returned an empty answer")
+
     session.add(
         ResearchStep(
             strategy_id=strategy.id,

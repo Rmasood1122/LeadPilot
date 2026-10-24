@@ -339,6 +339,15 @@ class TestSession:
         assert not result["prospect"].startswith("Great question")
         assert "parked this last year" in result["prospect"]
 
+    @pytest.mark.parametrize("tell", ["Great question!", "Good question?!", "Great question!!"])
+    def test_a_coaching_tell_ending_in_other_punctuation_is_stripped(
+            self, db_session, fake_claude, lead, brief, test_user, tell):
+        session = roleplay.start(db_session, test_user, lead=lead, brief=brief, now=NOW)
+        fake_claude.roleplay_reply_response = f"{tell} Honestly, we parked this last year."
+        result = roleplay.reply(db_session, session, "What stopped it last time?")
+        assert "question" not in result["prospect"].lower()
+        assert result["prospect"] == "Honestly, we parked this last year."
+
     def test_a_prospect_prefix_is_stripped(self, db_session, fake_claude, lead, brief,
                                            test_user):
         session = roleplay.start(db_session, test_user, lead=lead, brief=brief, now=NOW)

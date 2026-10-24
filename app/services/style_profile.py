@@ -17,12 +17,15 @@ email the user pasted can never end up in a stranger's inbox.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
 from app.db.models import User
-from app.services import anthropic_client
+from app.services import anthropic_client, prompt_safety
+
+logger = logging.getLogger(__name__)
 
 MAX_SAMPLES = 5
 MIN_SAMPLE_CHARS = 40
@@ -93,10 +96,18 @@ def _clean_profile(data: dict) -> dict:
     data = data if isinstance(data, dict) else {}
 
     def _s(v, n=300):
-        return str(v).strip()[:n] if isinstance(v, (str, int, float)) else ""
+        text = str(v).strip()[:n] if isinstance(v, (str, int, float)) else ""
+        # T26: free text here becomes part of every outbound writer's SYSTEM
+        # prompt. A value with a link or an instruction in it is dropped.
+        problem = prompt_safety.guidance_problem(text)
+        if problem:
+            logger.warning("style profile: dropped a value that %s", problem)
+            return ""
+        return text
 
     def _list(v, n=6):
-        return [_s(x, 200) for x in (v or []) if isinstance(x, str) and x.strip()][:n]
+        kept = [_s(x, 200) for x in (v or []) if isinstance(x, str) and x.strip()]
+        return [x for x in kept if x][:n]
 
     try:
         formality = max(1, min(5, int(round(float(data.get("formality"))))))

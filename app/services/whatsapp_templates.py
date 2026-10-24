@@ -480,16 +480,44 @@ def _phase_outputs(session: Session, strategy: Strategy, phase: int,
     return joined[:limit_chars] or "(no outputs recorded for this phase)"
 
 
+_LINK_IN_BODY = re.compile(r"https?://|\bwww\.", re.I)
+# Rule 2 of _GENERATE_SYSTEM: no guarantees and no false urgency.
+_GUARANTEE_OR_URGENCY = re.compile(
+    r"\bguarantee[ds]?\b|\btoday only\b|\blimited[- ]time\b|\bact now\b|"
+    r"\blast chance\b|\bhurry\b|\bends (?:today|tonight|soon)\b", re.I)
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+_SLOT = re.compile(r"\{\{\s*\d+\s*\}\}")
+
+
+def generated_body_problems(body: str, source: str) -> list[str]:
+    """Why a model-drafted template body breaks the drafter's hard rules
+    ([] = none). Deterministic. A drafted body has no link (nothing in the
+    research is ours to link to), no guarantee or urgency, and no number the
+    strategy research does not contain."""
+    problems = []
+    if _LINK_IN_BODY.search(body):
+        problems.append("it contains a link")
+    hits = sorted({m.group(0).lower() for m in _GUARANTEE_OR_URGENCY.finditer(body)})
+    if hits:
+        problems.append(f"it promises or pressures ({', '.join(hits)})")
+    known = set(_NUMBER.findall(source or ""))
+    invented = sorted({n for n in _NUMBER.findall(_SLOT.sub("", body))
+                       if n not in known})
+    if invented:
+        problems.append(f"it states numbers not in the research ({', '.join(invented)})")
+    return problems
+
+
 def generate_drafts(session: Session, strategy: Strategy) -> list[WhatsAppTemplate]:
     """Claude-drafted candidates from the strategy's own research. Saved
     as DRAFTS; the user reviews and submits each explicitly. Candidates
     that fail local validation are dropped (logged), not 'fixed' silently."""
+    persona = _phase_outputs(session, strategy, phase=2)
+    messaging = _phase_outputs(session, strategy, phase=6)
+    source = f"{persona}\n{messaging}"
     data = get_client().complete_json(
         system=_GENERATE_SYSTEM,
-        prompt=_GENERATE_PROMPT.format(
-            persona=_phase_outputs(session, strategy, phase=2),
-            messaging=_phase_outputs(session, strategy, phase=6),
-        ),
+        prompt=_GENERATE_PROMPT.format(persona=persona, messaging=messaging),
         schema=TEMPLATE_DRAFTS_SCHEMA,
     )
     candidates = data.get("templates") or []
@@ -505,6 +533,13 @@ def generate_drafts(session: Session, strategy: Strategy) -> list[WhatsAppTempla
         except ValueError:
             category = WhatsAppTemplateCategory.MARKETING
         body = str(cand.get("body", "")).strip()
+        problems = generated_body_problems(body, source)
+        if problems:
+            # T33: _GENERATE_SYSTEM's rules are not controls. A candidate that
+            # breaks them is dropped like any other invalid one, not fixed.
+            logger.info("dropped generated template %r: %s", cand.get("name"),
+                        "; ".join(problems))
+            continue
         if category is not WhatsAppTemplateCategory.MARKETING and is_promotional(body):
             # T33: the model's label is not trusted for a promotional body.
             logger.info("generated template %r labelled %s is promotional; saved as marketing",

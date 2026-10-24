@@ -48,6 +48,7 @@ from sqlalchemy.orm import Session
 
 from app.db.models import FlowType, PastClient, Product, Strategy
 from app.services import prompt_safety
+from app.services.icp_extraction import stored_icp
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ def build_queries(session: Session, strategy: Strategy) -> list[str]:
             industry = str((client.extracted_patterns_json or {}).get("industry") or "").strip()
             if industry and industry.lower() not in (q.lower() for q in queries):
                 queries.append(industry)
-    icp = strategy.pattern_inputs_json or {}
+    icp = stored_icp(strategy)
     for industry in (icp.get("industries") or []):
         if isinstance(industry, str) and industry.lower() not in (q.lower() for q in queries):
             queries.append(industry)

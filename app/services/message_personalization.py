@@ -123,6 +123,10 @@ LEAD:
 {context}{booking_line}
 Write the email for THIS lead now."""
 
+# A hard ceiling on a generated email body. The prompt asks for under 140
+# words; this leaves room for normal variance and refuses a runaway answer.
+MAX_BODY_WORDS = 200
+
 # Phase 3 item 2: the reply render_message reads. The code falls back on a
 # missing subject and raises on an empty body.
 MESSAGE_SCHEMA = {
@@ -276,6 +280,13 @@ def render_message(
         body = strip_foreign_links(body, booking_url, _own_domains(session, strategy))
     if not body:
         raise ValueError("personalization returned an empty body")
+    words = len(body.split())
+    if words > MAX_BODY_WORDS:
+        # The prompt asks for under 140 words; that rule is not a control.
+        # Refuse rather than cut: a cut body loses its ask. The send task's
+        # retry asks the model again.
+        raise ValueError(f"personalization returned a {words}-word body "
+                         f"(limit {MAX_BODY_WORDS})")
     return subject, body
 
 
@@ -330,6 +341,11 @@ _LEAD_FIELDS = {
     "lead.company": lambda lead: lead.company,
     "lead.email": lambda lead: lead.email,
 }
+
+
+# A model-filled template slot is "a few words". Lead-field values
+# ('lead.company' and so on) are the lead's own data and are not capped.
+MAX_WA_VARIABLE_CHARS = 100
 
 
 def render_whatsapp_variables(
@@ -390,6 +406,14 @@ def render_whatsapp_variables(
             value = str(data.get(n) or "").strip()
             if not value:
                 raise ValueError(f"could not fill template variable {{{{{n}}}}}")
+            # The prompt's "a few words each" and the claim check are not link
+            # or length controls. A slot is a short phrase in a template Meta
+            # approved: a URL (an injected one, say) or a paragraph is refused.
+            if _URL_RE.search(value) or re.search(r"\bwww\.", value, re.I):
+                raise ValueError(f"template variable {{{{{n}}}}} contains a link")
+            if len(value) > MAX_WA_VARIABLE_CHARS:
+                raise ValueError(f"template variable {{{{{n}}}}} is {len(value)} characters "
+                                 f"(limit {MAX_WA_VARIABLE_CHARS})")
             values[n] = value
 
     missing = [n for n in numbers if n not in values]

@@ -24,6 +24,8 @@ wrapped: wrapping trusted text would tell the model to disregard it.
 
 from __future__ import annotations
 
+import re
+
 OPEN = "<<<EXTERNAL_TEXT"
 CLOSE = "EXTERNAL_TEXT>>>"
 
@@ -58,3 +60,33 @@ def inline(text: str | None) -> str:
     prompt with a line break."""
     folded = " ".join(escape(text).split())
     return f"{OPEN} {folded} {CLOSE}"
+
+
+# --- free text a model derived from untrusted text ---------------------------
+#
+# Some values are written by a model reading untrusted text (a style sample, a
+# founder's post) and are then placed in OUR prompts as guidance: the style
+# profile's tone and do/don't lists, a voice profile's signature phrases. They
+# cannot be wrapped (wrapping guidance tells the model to ignore it), so a
+# value that carries a link or reads as an instruction is dropped instead.
+
+_LINK_LIKE = re.compile(
+    r"https?://|\bwww\.|\b(?:[a-z0-9-]+\.)+[a-z]{2,}/\S*|\b(?:[a-z0-9-]+\.){2,}[a-z]{2,}\b",
+    re.IGNORECASE)
+_INSTRUCTION_LIKE = re.compile(
+    r"\b(?:ignore|disregard|forget|override)\b.{0,40}?"
+    r"\b(?:rules?|instructions?|above|previous|prior|brief|prompt)\b"
+    r"|\bfrom now on\b|\byou are now\b|\bsystem prompt\b"
+    r"|^\s*(?:system|ai|assistant)\s*:",
+    re.IGNORECASE)
+
+
+def guidance_problem(text: str | None) -> str | None:
+    """Why a model-derived value must not become guidance in our prompts,
+    or None. Deterministic: a link, or wording that addresses the model."""
+    value = text or ""
+    if _LINK_LIKE.search(value):
+        return "contains a link"
+    if _INSTRUCTION_LIKE.search(value):
+        return "reads as an instruction to the model"
+    return None

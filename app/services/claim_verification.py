@@ -302,7 +302,9 @@ def _supported(category: str, sentence: str, evidence: list[Evidence], lead: Lea
 # --------------------------------------------------------------------------
 
 
-_SENTENCE = re.compile(r"[^.!?\n]+(?:[.!?]+|$)\s*")
+# A sentence ends at . ! ? or a line break, but not at a decimal point
+# ("$2.5M", "4.7%"): splitting there strips the "$2." half and sends the rest.
+_SENTENCE = re.compile(r"(?:[^.!?\n]|(?<=\d)\.(?=\d))+(?:[.!?]+|$)\s*")
 
 
 def _hook_line(lead: Lead) -> str:

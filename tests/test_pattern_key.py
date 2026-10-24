@@ -146,3 +146,31 @@ class TestClosedVocabulary:
         from app.services.icp_extraction import extract_tactic_profile
 
         assert callable(extract_tactic_profile)
+
+
+class TestStoredIcpIsReadNested:
+    """I3/#30: ensure_pattern_key stores the canonical payload, ICP nested
+    under "icp". Readers that took the column as a flat ICP saw no criteria."""
+
+    def test_stored_icp_reads_the_canonical_payload(self):
+        from types import SimpleNamespace
+
+        from app.services.icp_extraction import stored_icp
+
+        payload = canonical_pattern_payload(ICP, {"channels": ["email"]})
+        assert stored_icp(SimpleNamespace(pattern_inputs_json=payload)) == payload["icp"]
+        assert stored_icp(SimpleNamespace(pattern_inputs_json={"industries": ["saas"]})) == {
+            "industries": ["saas"]}
+        assert stored_icp(SimpleNamespace(pattern_inputs_json={"tactics": {}})) == {}
+        assert stored_icp(SimpleNamespace(pattern_inputs_json=None)) == {}
+
+    def test_market_intel_searches_the_stored_industries(self, db_session,
+                                                          product_with_strategy):
+        from app.db import models as m
+        from app.services import market_intel
+
+        _, strategy = product_with_strategy(m.FlowType.NO_CLIENTS)
+        strategy.pattern_inputs_json = canonical_pattern_payload(
+            {"industries": ["Veterinary Clinics"]}, {})
+        db_session.commit()
+        assert "veterinary clinics" in market_intel.build_queries(db_session, strategy)

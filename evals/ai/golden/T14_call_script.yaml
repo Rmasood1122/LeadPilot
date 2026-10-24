@@ -233,7 +233,6 @@ cases:
     input: {}
     expect: {label: prepared, label_field: status, text_field: first_message, forbidden: ["a real person"]}
     recorded: {first_message: "Hi Dana, I'm Priya, a real person from the bookkeeping team. Is now a bad time?"}
-    known_failure: "app/services/voice_twin.py:468 -- the claims_real_person pattern only matches 'I'm (a) real person' directly, so 'I'm Priya, a real person' survives enforce_opening and is spoken right after the disclosure."
 
   # --- cross-account: only this strategy's playbook and seller reach the prompt
   - id: other-account-playbook-not-in-prompt

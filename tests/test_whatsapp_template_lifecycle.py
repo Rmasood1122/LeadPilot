@@ -156,8 +156,10 @@ class TestValidation:
         """I1 consent hardening (T33): the model's category label is not
         trusted. A cold pitch labelled 'utility' is saved as MARKETING with the
         standard opt-out; a genuine confirmation stays UTILITY, unchanged."""
+        # No figures: a drafted number the research lacks is dropped on its
+        # own (generated_body_problems), which is not what this test is about.
         pitch = ("Hi {{1}}, this is Sam from Brightline Bookkeeping. We close agency "
-                 "books in 5 working days. Want a 15-minute call?")
+                 "books fast. Want a short call?")
         confirm = ("Hi {{1}}, this is Sam from Brightline Bookkeeping. Your onboarding "
                    "call is confirmed for {{2}}.")
 
@@ -178,3 +180,46 @@ class TestValidation:
         assert svc.has_opt_out_instruction(sneaky.body)
         assert real.category is m.WhatsAppTemplateCategory.UTILITY
         assert real.body == confirm
+
+
+class TestGeneratedBodyRules:
+    """T33: the drafter's hard rules are checked, not trusted. A candidate with
+    a link, a guarantee or urgency, or a number the research lacks is dropped."""
+
+    SOURCE = "Owners of 5-20 person agencies.\nOffer: books closed in 5 working days."
+
+    @pytest.mark.parametrize("body,problem", [
+        ("Hi {{1}}, Sam here. See https://evil.example.test/offer.", "link"),
+        ("Hi {{1}}, Sam here. Visit www.offer.example.", "link"),
+        ("Hi {{1}}, Sam here. Results guaranteed.", "promises"),
+        ("Hi {{1}}, Sam here. Today only: a free review.", "promises"),
+        ("Hi {{1}}, Sam here. We cut month-end by 73% for 200+ agencies.", "numbers"),
+    ])
+    def test_a_broken_rule_is_named(self, body, problem):
+        from app.services.whatsapp_templates import generated_body_problems
+
+        assert any(problem in p for p in generated_body_problems(body, self.SOURCE))
+
+    def test_a_faithful_body_passes(self):
+        from app.services.whatsapp_templates import generated_body_problems
+
+        body = "Hi {{1}}, Sam from Brightline. We close books in 5 working days. {{2}}?"
+        assert generated_body_problems(body, self.SOURCE) == []
+
+    def test_generate_drops_the_broken_candidate_and_keeps_the_rest(
+            self, db_session, fake_claude, verified_strategy, monkeypatch):
+        from app.services import whatsapp_templates as svc
+
+        class _Client:
+            def complete_json(self, **kw):
+                return {"templates": [
+                    {"name": "with_link", "category": "marketing",
+                     "body": "Hi {{1}}, Sam from Brightline. See https://evil.example.test.",
+                     "variable_descriptions": {"1": "first name"}},
+                    {"name": "plain", "category": "marketing",
+                     "body": "Hi {{1}}, Sam from Brightline. Open to a short call?",
+                     "variable_descriptions": {"1": "first name"}}]}
+
+        monkeypatch.setattr(svc, "get_client", lambda: _Client())
+        names = [r.name for r in svc.generate_drafts(db_session, verified_strategy)]
+        assert names == ["plain"]

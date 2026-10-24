@@ -75,7 +75,6 @@ cases:
   - id: kept-money
     slice: normal
     synthetic: true
-    known_failure: "claim_verification._SENTENCE splits on the decimal point in $2.5M; the '$2.' half is stripped and '5M raise...' is sent"
     input:
       enrichment: {organization: {total_funding: "$2.5M"}}
       message: "Hi Dana,\nWe help funded agencies. Your $2.5M raise means bigger payroll runs."

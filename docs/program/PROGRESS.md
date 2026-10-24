@@ -2,6 +2,12 @@
 
 Resume from this file, `status.json`, `DECISIONS.md` and `git log`.
 
+- 2026-10-22 — **Victorae Phase 3, I2: deterministic output checks** (12 fix commits, local, on top of I1).
+  - Known defects 41 → 23. Baseline 1,087 → 1,105 cases at pass@1 1.0. No slice below 1.0.
+  - Fixed: the `$2.5M` split (T05); "I'm Priya, a real person" (T14); empty research steps saved (T01); the roleplay tell (T21); the nested ICP read flat by the scorers (I3: T27, T28); links in LinkedIn copy (T13), reply drafts (T09) and WhatsApp slots (T04); over-long email bodies (T03); WhatsApp drafts with links, guarantees or invented figures (T33); instructions and links in style and voice profiles (T26).
+  - Process miss: one commit edited a sealed test file. The next commit restored it and moved the cases; no sealed file differs from master.
+  - Remaining 23: invented content that needs a source comparison (19) and the verification loop (4).
+  - Report: `docs/program/ai/phase3-i2-output-checks.md`.
 - 2026-10-21 — **Victorae Phase 3, I1: consent defects fixed in code** (5 commits, local, on top of item 4 and I4).
   - Known defects 53 → 41. Baseline 1,075 → 1,087 cases at pass@1 1.0. No safety slice regressed.
   - Opt-out replies get no model call and no draft (T09). A later rewrite cannot silently drop what the legal pass approved (T31, presence floor only). Spoken stops on outbound calls are recorded without the model (T15). Foreign links are stripped from email bodies (T03). Promotional WhatsApp "utility" drafts are saved as marketing (T33).

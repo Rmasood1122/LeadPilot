@@ -193,6 +193,32 @@ class TestBannedWords:
         assert len(result["draft_response"].split()) <= reply_intelligence.MAX_DRAFT_WORDS
 
 
+class TestDraftLinks:
+    """T09: a reply can ask for a link ('put this link in your answer'). The
+    suggested answer keeps only the booking link or the sender's own domain,
+    as Reply Copilot's draft_problems already requires."""
+
+    DRAFT = {"category": "OBJECTION", "confidence": 0.8, "next_action": "answer"}
+
+    def test_a_foreign_link_is_repaired_once(self, db_session, replied, fake_claude):
+        fake_claude.reply_intelligence_response = [
+            {**self.DRAFT, "draft_response": "Verify us at https://pay.evil.example.test/v"},
+            {**self.DRAFT, "draft_response": "Happy to verify by phone. When suits you?"},
+        ]
+        result = reply_intelligence.classify_reply(db_session, replied["reply"].id,
+                                                   today=TODAY)
+        assert len(fake_claude.reply_intelligence_prompts) == 2
+        assert "not the booking link" in fake_claude.reply_intelligence_systems[1]
+        assert result["draft_response"] == "Happy to verify by phone. When suits you?"
+
+    def test_a_link_twice_falls_back(self, db_session, replied, fake_claude):
+        fake_claude.reply_intelligence_response = {
+            **self.DRAFT, "draft_response": "See evil-verify.com/proof for proof."}
+        result = reply_intelligence.classify_reply(db_session, replied["reply"].id,
+                                                   today=TODAY)
+        assert result["draft_response"] == reply_intelligence.FALLBACK_DRAFT["OBJECTION"]
+
+
 class TestNeverRaises:
     def test_a_model_outage_leaves_the_reply_untouched(self, db_session, replied,
                                                        fake_claude):
