@@ -144,6 +144,29 @@ def billed_input_tokens(model: str, input_tokens: int, cache_write_tokens: int,
                          + read * cache_read_tokens))
 
 
+# I4 (Phase 3): models that reject a non-default temperature with HTTP 400 --
+# the parameter is removed on Fable 5/5.1, Opus 5.5/5/4.8/4.7 and Sonnet 5, and
+# only the default is accepted on Sonnet 5.5 and Haiku 5.5 (Anthropic API
+# reference, read 2026-10-21). On these models a judge cannot be pinned to 0;
+# sending it would make every judge call fail, so it is omitted and logged.
+# F-AI-03's pin still holds on every model that accepts it (claude-sonnet-4-6,
+# the default). Judge reproducibility on a temperature-free model is then a
+# measured property -- the live eval's pass^3 per safety slice -- and is part
+# of what the founders approve with a model change (docs/program/ai/
+# phase3-i4-temperature.md).
+TEMPERATURE_FREE_MODELS = frozenset({
+    "claude-fable-5-1", "claude-fable-5", "claude-opus-5-5", "claude-opus-5",
+    "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-5-5",
+    "claude-haiku-5-5",
+})
+
+
+def accepts_temperature(model: str) -> bool:
+    """Whether `model` accepts a non-default temperature."""
+    base = re.sub(r"-\d{8}$", "", (model or "").strip())
+    return base not in TEMPERATURE_FREE_MODELS
+
+
 def supports_structured_output(model: str) -> bool:
     """Whether `model` accepts output_config.format."""
     base = re.sub(r"-\d{8}$", "", (model or "").strip())
@@ -276,10 +299,14 @@ class ClaudeClient:
             system=system,
             messages=[{"role": "user", "content": content}],
         )
-        if temperature is not None:
+        if temperature is not None and accepts_temperature(settings.anthropic_model):
             # Only sent when a caller asked for it. Absent, the account/API
             # default applies, which is what every generation path wants.
             _set_temperature(request, temperature, self._client.messages)
+        elif temperature is not None:
+            # I4: this model rejects a non-default temperature (HTTP 400).
+            logger.info("temperature %s not sent: %s does not accept it",
+                        temperature, settings.anthropic_model)
         if schema is not None and supports_structured_output(settings.anthropic_model):
             # The model can only emit JSON that matches `schema`; on any other
             # model the request is unchanged (see STRUCTURED_OUTPUT_MODELS).
