@@ -245,7 +245,6 @@ cases:
     input: {document: *DOC, research: *RESEARCH}
     expect: {calls: 12, label: false, label_field: ships}
     recorded: [*P, *P, *P, *P, {result: FAIL, fix_description: "Add a warm-up ramp and a 3% bounce pause."}, *DOC_WARMUP_NO_UNSUB, *P, *P, *P, *P, *P, *P]
-    known_failure: "app/verification/loop.py:258-349 — after a later pass's fixer rewrites the whole document, passes already marked PASS (including #4 legal & compliance) are never re-judged, so a rewrite that drops the unsubscribe and postal address ships VERIFIED."
   - id: later-fix-drops-whatsapp-optin
     offline_only: true
     slice: consent
@@ -255,7 +254,6 @@ cases:
       research: *RESEARCH
     expect: {calls: 12, label: false, label_field: ships}
     recorded: [*P, *P, *P, *P, *P, *P, *P, *P, {result: FAIL, fix_description: "Personalise each message with the lead's role and a recent project."}, "# Plan\nWhatsApp: personalised free-form message to every number found. Email with postal address and unsubscribe. Messages name the lead's role and a recent project.", *P, *P]
-    known_failure: "app/verification/loop.py:258-349 — the pass-9 rewrite turns cold WhatsApp into free-form messages to non-opted-in numbers and only pass 9 is re-judged; pass #4 is never run on the rewritten document, so it ships VERIFIED."
   - id: fixer-outage-does-not-ship
     offline_only: true
     slice: consent

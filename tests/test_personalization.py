@@ -446,3 +446,61 @@ def test_sourcing_captures_linkedin_url(db_session, lead_batch, fake_source, fak
     source_leads_impl(db_session, lead_batch.id, source=fake_source)
     assert db_session.query(m.Lead).filter_by(external_id="x1").one().linkedin_url \
         == "https://linkedin.com/in/ab"
+
+
+class TestForeignLinksStripped:
+    """I1 consent hardening (T03): a link the model writes into the body must
+    point at the sender's booking page or the sender's / this app's own
+    domain. A model-written opt-out link to a third party is removed (the
+    compliant footer carries the real unsubscribe); other foreign links are
+    stripped; the booking link and own-domain links survive."""
+
+    def _render(self, monkeypatch, db_session, strategy, lead, step, body, booking=None):
+        from app.services import message_personalization as mp
+
+        class _Stub:
+            def complete_json(self, **kw):
+                return {"subject": "Month-end", "body": body}
+
+        monkeypatch.setattr(mp, "get_client", lambda: _Stub())
+        return mp.render_message(db_session, strategy, lead, step, booking)[1]
+
+    def test_model_written_opt_out_link_is_removed(self, monkeypatch, db_session, lead,
+                                                   verified_strategy, email_sequence,
+                                                   fake_claude):
+        body = self._render(
+            monkeypatch, db_session, verified_strategy, lead, email_sequence.steps[0],
+            "Hi Sara,\nWe close books in 5 days. Worth a chat?\n"
+            "To opt out visit https://optout.example.test/remove?u=sara")
+        assert "optout.example.test" not in body and "opt out" not in body.lower()
+        assert body == "Hi Sara,\nWe close books in 5 days. Worth a chat?"
+
+    def test_foreign_link_stripped_but_booking_and_own_domain_kept(
+            self, monkeypatch, db_session, lead, test_user, verified_strategy,
+            email_sequence, fake_claude):
+        test_user.email = "owner@brightline.example"
+        db_session.commit()
+        body = self._render(
+            monkeypatch, db_session, verified_strategy, lead, email_sequence.steps[0],
+            "Hi Sara, details: https://evil.example.test/login. "
+            "Book here: https://cal.example.test/brightline/15min?tid=1 "
+            "or see https://www.brightline.example/pricing and "
+            "http://frontend.test/v?t=abc",
+            booking="https://cal.example.test/brightline/15min?tid=1")
+        assert "evil.example.test" not in body
+        assert "https://cal.example.test/brightline/15min?tid=1" in body
+        assert "https://www.brightline.example/pricing" in body
+        assert "http://frontend.test/v?t=abc" in body
+        # another page on the booking host is not the sender's booking page
+        body = self._render(
+            monkeypatch, db_session, verified_strategy, lead, email_sequence.steps[0],
+            "Hi Sara, book: https://cal.example.test/someone-else",
+            booking="https://cal.example.test/brightline/15min")
+        assert "someone-else" not in body
+
+    def test_body_that_is_only_a_foreign_link_fails_closed(
+            self, monkeypatch, db_session, lead, verified_strategy, email_sequence,
+            fake_claude):
+        with pytest.raises(ValueError):
+            self._render(monkeypatch, db_session, verified_strategy, lead,
+                         email_sequence.steps[0], "https://evil.example.test/x")

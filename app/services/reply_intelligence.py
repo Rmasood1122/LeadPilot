@@ -61,6 +61,24 @@ MAX_TOKENS = 1000
 # starting point stored on a column, not a constant the UI has to mirror.
 RESCHEDULE_DAYS = 30
 
+# CONSENT GUARD (I1). A reply that asks to stop contact or to erase data is
+# NEVER handed a sales draft and NEVER moves a sequence, whatever the model
+# would say. Decided by rules before any model call (so it cannot be argued
+# out of by the reply text, and costs nothing):
+#   * routing class `unsubscribe_request` (reply_classification folds GDPR
+#     erasure requests into it -- there is no separate erasure class);
+#   * Feature 1 intent label `unsubscribe` (reply_intent);
+#   * opt-out / erasure wording in the prospect's NEW text, the same detector
+#     Reply Copilot uses (reply_copilot.opt_out_language), which covers a
+#     reply whose routing class is not stored yet or was misread.
+# Fail closed: any one of the three is enough.
+OPT_OUT_ROUTING = frozenset({"unsubscribe_request"})
+OPT_OUT_INTENTS = frozenset({"unsubscribe"})
+# Stored as ai_next_action on an opted-out reply, so the CRM can tell "the
+# prospect opted out, deliberately no draft" from "never classified" (both
+# have category NULL).
+OPT_OUT_NEXT_ACTION = "honor_opt_out"
+
 # The step a BUYING_SIGNAL prepares. `current_step` records the last step
 # SENT (app/services/sequence_engine.py::schedule_next_step), so lining the
 # enrollment up at step 3 means setting it to 2.
@@ -259,6 +277,40 @@ def _generate(db: Session, reply: InboundReply) -> dict:
     return {**result, "draft_response": FALLBACK_DRAFT[result["category"]]}
 
 
+def opt_out_reason(reply: InboundReply) -> str | None:
+    """Why this reply must get no draft and no sequence move, else None.
+
+    Pure over the reply row; never raises (an error while checking the
+    wording is treated as an opt-out -- fail closed)."""
+    routing = (getattr(reply, "classification", None) or "").strip().lower()
+    if routing in OPT_OUT_ROUTING:
+        return f"routing_{routing}"
+    intent = (getattr(reply, "intent_label", None) or "").strip().lower()
+    if intent in OPT_OUT_INTENTS:
+        return f"intent_{intent}"
+    try:
+        from app.services.reply_copilot import opt_out_language  # noqa: PLC0415
+
+        if opt_out_language(reply.body) or opt_out_language(reply.subject):
+            return "opt_out_language"
+    except Exception:  # noqa: BLE001 -- fail closed
+        logger.exception("reply intelligence: opt-out check failed for reply %s",
+                         getattr(reply, "id", None))
+        return "opt_out_check_failed"
+    return None
+
+
+def _opt_out_result(reason: str) -> dict:
+    """The stored result for an opted-out reply: no category, no draft, no
+    reschedule, an explicit next action, and classified_at set so the reply
+    task treats it as done (and a forced re-run clears any older draft)."""
+    return {"category": None, "confidence": None,
+            "next_action": OPT_OUT_NEXT_ACTION, "draft_response": None,
+            "reschedule_date": None,
+            "classified_at": datetime.now(timezone.utc),
+            "enrollments_advanced": 0, "opt_out": reason}
+
+
 def prepare_step_three(db: Session, lead_id, step: int = BUYING_SIGNAL_STEP) -> int:
     """Line every enrollment for `lead_id` up so its next step is `step`.
 
@@ -329,6 +381,15 @@ def classify_reply(db: Session, reply_id, today: date | None = None) -> dict:
         if reply is None:
             raise LookupError(f"inbound reply {reply_id} not found")
 
+        # Consent guard BEFORE the model call: an opt-out / erasure reply gets
+        # no draft, no category side effect (never prepare_step_three), and
+        # costs no tokens. See OPT_OUT_ROUTING.
+        reason = opt_out_reason(reply)
+        if reason is not None:
+            logger.info("reply intelligence: reply %s is an opt-out (%s) -- no draft",
+                        reply.id, reason)
+            return _opt_out_result(reason)
+
         result = _generate(db, reply)
         result["reschedule_date"] = (
             today + timedelta(days=RESCHEDULE_DAYS)
@@ -364,6 +425,12 @@ def apply(db: Session, reply: InboundReply, result: dict) -> InboundReply:
     """
     if result.get("error"):
         return reply
+    # Defence in depth: whatever result a caller passes, an opted-out reply
+    # never stores a sales draft or a category.
+    reason = opt_out_reason(reply)
+    if reason is not None:
+        result = {**_opt_out_result(reason),
+                  "classified_at": result.get("classified_at")}
     try:
         reply.reply_category = result["category"]
         reply.category_confidence = result["confidence"]

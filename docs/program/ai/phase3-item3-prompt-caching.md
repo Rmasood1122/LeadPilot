@@ -40,6 +40,15 @@ In items 3 and 4 the question now follows the long material it is about, which t
 | PostgreSQL integration suite: end-to-end pipeline against the HTTP Anthropic mock | 155 passed |
 | Evals (T01, T02, T30, T31 and all others) | unchanged: all pass; 53 known defects still strict-xfail |
 
+## Evidence run (clean worktree, commit `619ac0e`, tree `a84be15`)
+
+| Command | Result |
+|---|---|
+| `scripts/gate/quick_gate.sh` | 8/8 PASS, stamped; tests step 3,967 passed, 53 xfailed |
+| `python3 evals/run_evals.py` | exit 0; 7,872 tests; full and compliance pass rate 1.0 |
+| `python3 evals/tools/promote.py` | **PROMOTE**, 1 soft WARN on runtime (1,651 s vs 900 s), as on #121 and #122 |
+| `python3 evals/fixtures/verify_block_fixtures.py` | all 3 hard gates fire |
+
 ## Not measured: hit rate and cost
 
 The exit gate asks for cost from metering, not estimates. **There is none yet: live mode is blocked on the eval key.** When it runs, the live report's `cache_hit_rate` and `spent_usd` are the measure, and production's `ApiUsage` rows now carry billed tokens.

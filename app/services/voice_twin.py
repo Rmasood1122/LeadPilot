@@ -542,9 +542,13 @@ def post_call_check(db: Session, call: Call, messages: list | None = None) -> di
 
     * an assistant turn that claims to be human -> compliance incident,
       owner notified, the account's AI calls paused;
-    * an INBOUND caller who asked not to be called -> number suppressed (the
-      existing stop handling: the lead's unsubscribe, or a suppression-list
-      entry for a number that is no lead).
+    * a caller (INBOUND or OUTBOUND) who asked not to be called -> number
+      suppressed (the existing stop handling: the lead's unsubscribe, or a
+      suppression-list entry for a number that is no lead). Only the
+      caller's turns are read, never the assistant's ("I won't call again").
+      This runs before, and regardless of, the model analysis, so an outage,
+      unparseable output or a missed stop_request cannot leave the person
+      callable.
     """
     result: dict = {"claims": [], "paused": False, "stop": False}
     if call.user_id is None:
@@ -558,7 +562,7 @@ def post_call_check(db: Session, call: Call, messages: list | None = None) -> di
     if labels:
         result["claims"] = sorted(labels)
         result["paused"] = _record_incident(db, call, sorted(labels))
-    if call.direction == "inbound" and caller_asked_to_stop(caller):
+    if caller_asked_to_stop(caller):
         result["stop"] = suppress_caller(db, call)
     db.commit()
     return result
@@ -603,25 +607,55 @@ def _record_incident(db: Session, call: Call, labels: list[str]) -> bool:
     return newly
 
 
+CALL_STOP_SOURCE = "call_stop_request"
+
+
+def _call_stop_already_recorded(db: Session, lead: Lead) -> bool:
+    """True when this person's spoken stop is already in force: their number
+    is suppressed AND a phone stop request unsubscribed them. Lets the
+    post-call check, the analysis and its retries all call suppress_caller
+    while the unsubscribe (outcome + consent ledger) is written once. A
+    re-consented lead (suppression lifted) is unsubscribed again."""
+    from app.db.models import Outcome, OutcomeEvent  # noqa: PLC0415
+    from app.workers.lead_tasks import is_suppressed  # noqa: PLC0415
+
+    if not lead.phone or not is_suppressed(db, phone=lead.phone):
+        return False
+    rows = db.execute(select(Outcome.meta_json).where(
+        Outcome.lead_id == lead.id, Outcome.event == OutcomeEvent.UNSUBSCRIBED,
+        Outcome.channel == "phone")).scalars()
+    return any((meta or {}).get("source") == CALL_STOP_SOURCE for meta in rows)
+
+
 def suppress_caller(db: Session, call: Call) -> bool:
-    """The existing stop handling, for an inbound caller."""
+    """The existing stop handling, for the other party on a call (an inbound
+    caller or an outbound callee). Idempotent: returns False, and writes
+    nothing, when the stop is already recorded."""
     from app.services import consent  # noqa: PLC0415
     from app.services import sequence_engine as engine  # noqa: PLC0415
     from app.workers.lead_tasks import is_suppressed, suppression_phone  # noqa: PLC0415
 
     lead = db.get(Lead, call.lead_id) if call.lead_id is not None else None
     if lead is not None:
-        engine.unsubscribe_lead(db, lead, source="call_stop_request", channel="phone")
+        if _call_stop_already_recorded(db, lead):
+            return False
+        engine.unsubscribe_lead(db, lead, source=CALL_STOP_SOURCE, channel="phone")
         return True
-    number = call.from_number
+    # No lead: suppress the other party's number -- the caller on an inbound
+    # call, the dialled number on an outbound one.
+    inbound = call.direction == "inbound"
+    number = call.from_number if inbound else call.to_number
     if not number or is_suppressed(db, phone=number):
         return False
     from app.db.models import SuppressionEntry  # noqa: PLC0415
 
-    db.add(SuppressionEntry(phone=suppression_phone(number), reason="inbound_call_stop_request"))
+    db.add(SuppressionEntry(phone=suppression_phone(number),
+                            reason="inbound_call_stop_request" if inbound
+                            else "outbound_call_stop_request"))
     consent.record(db, lead=None, kind=consent.SUPPRESSED, channel=consent.PHONE,
-                   source="call_stop_request", identifier=number,
-                   detail="asked not to be called, on an inbound AI-answered call",
+                   source=CALL_STOP_SOURCE, identifier=number,
+                   detail=("asked not to be called, on an inbound AI-answered call" if inbound
+                           else "asked not to be called, on an outbound AI call"),
                    user_id=call.user_id, commit=False)
     return True
 

@@ -219,7 +219,6 @@ cases:
     expect: {labels: [null, ""], label_field: draft_response, calls: 0}
     recorded: {category: OBJECTION, confidence: 0.6, next_action: answer,
                draft_response: "Fair point. Could I send you the short version before you go?"}
-    known_failure: "app/services/reply_intelligence.py:286-316 classify_reply never reads reply.classification (and reply_tasks.py:100-105 calls it for every reply), so an unsubscribe_request reply is sent to the model and a sales draft is stored on ai_draft_response."
   - id: gdpr-erasure-reply-gets-no-draft
     slice: consent
     synthetic: true
@@ -227,7 +226,6 @@ cases:
     expect: {labels: [null, ""], label_field: draft_response, calls: 0}
     recorded: {category: OBJECTION, confidence: 0.5, next_action: answer,
                draft_response: "Understood. Before you go, can I ask what put you off?"}
-    known_failure: "app/services/reply_intelligence.py:286-316 classify_reply has no opt-out guard (routing class, intent label or phrase check), so an erasure/unsubscribe reply gets a model call and a sales draft."
   - id: unsubscribe-intent-label-gets-no-draft
     slice: consent
     synthetic: true
@@ -235,7 +233,6 @@ cases:
     expect: {labels: [null, ""], label_field: draft_response, calls: 0}
     recorded: {category: OBJECTION, confidence: 0.6, next_action: answer,
                draft_response: "No problem. Is it the timing or the offer?"}
-    known_failure: "app/services/reply_intelligence.py:286-316 classify_reply ignores intent_label=unsubscribe, so a do-not-contact reply still gets a sales draft."
   - id: unsubscribe-mislabelled-buying-does-not-move-step
     offline_only: true
     slice: consent
@@ -244,7 +241,6 @@ cases:
     expect: {label: 1, label_field: current_step, calls: 0}
     recorded: {category: BUYING_SIGNAL, confidence: 0.7, next_action: send_step_3_product_intro,
                draft_response: "Thanks! Would a short call this week suit?"}
-    known_failure: "app/services/reply_intelligence.py:323-324 runs prepare_step_three on a BUYING_SIGNAL without checking the reply's routing class, so an unsubscribe reply the model mislabels lines the stopped enrollment up at step 3 (and gets a draft)."
   - id: unsubscribe-mislabelled-buying-stays-stopped
     offline_only: true
     slice: consent

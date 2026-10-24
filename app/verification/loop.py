@@ -26,6 +26,7 @@ NEEDS_HUMAN_REVIEW for an unsatisfiable reason:
 """
 
 import logging
+import re
 from datetime import datetime, timezone
 from difflib import SequenceMatcher
 
@@ -160,9 +161,54 @@ def _strip_echoed_markers(text: str) -> str:
     return text
 
 
+# ---------------------------------------------------------------------------
+# Ship-blocking pass protection (consent hardening, T31)
+# ---------------------------------------------------------------------------
+# Every fixer rewrites the WHOLE document, but a pass is only ever judged once
+# in order. Without this check, a pass-5..10 rewrite that silently drops the
+# unsubscribe link, the postal address, the GDPR basis or the WhatsApp
+# template/opt-in rule would ship VERIFIED, because pass #4 already said PASS
+# about a document that no longer exists.
+#
+# Design, chosen as the minimal sound one:
+# * Only the ship-blocking pass is protected. Pass #4 is the only pass whose
+#   criterion says the strategy cannot ship without it; the other passes are
+#   quality checks, and re-judging all ten after every rewrite would multiply
+#   the judge spend for no legal gain.
+# * The re-check is DETERMINISTIC, not another judge call: the compliance
+#   elements present in the document pass #4 approved must still be present
+#   after every later rewrite. A model re-judge could itself be talked out of
+#   the requirement and adds spend; a rule cannot and costs nothing, so the
+#   attempt log and usage metering only ever reflect real model calls.
+# * It fails closed and is sticky: one rewrite that drops an approved element
+#   marks pass #4 FAIL (outcome "compliance_regressed") and the strategy ends
+#   NEEDS_HUMAN_REVIEW. A later rewrite restoring the element does not clear
+#   it -- a human looks. It is a single check per applied rewrite, so it adds
+#   no loop and cannot run unbounded.
+# * Presence is a floor, not a full legal review: a rewrite that keeps the
+#   words but negates them is not caught here (ASSUMPTION: the pass-#4 judge
+#   plus the send-path guards cover that).
+SHIP_BLOCKING_PASS_KEY = "legal_compliance"
+
+_COMPLIANCE_ELEMENTS: dict[str, re.Pattern[str]] = {
+    "unsubscribe": re.compile(r"\bunsubscribe\b|\bopt[- ]?out\b", re.I),
+    "postal address": re.compile(
+        r"\b(?:postal|physical|mailing|business|street)\s+address\b", re.I),
+    "GDPR lawful basis": re.compile(r"\blawful basis\b|\blegitimate interest\b", re.I),
+    "WhatsApp approved template": re.compile(r"\bapproved\s+(?:\w+\s+)?templates?\b", re.I),
+    "WhatsApp opt-in": re.compile(r"\bopt(?:ed)?[- ]?in\b", re.I),
+}
+
+
+def _compliance_elements(text: str | None) -> frozenset[str]:
+    """Names of the compliance elements the document states."""
+    return frozenset(name for name, pattern in _COMPLIANCE_ELEMENTS.items()
+                     if pattern.search(text or ""))
+
+
 def _log_attempt(strategy: Strategy, spec: VerificationPassSpec, attempt: int,
                  result: str, fix_description: str | None, fix_applied: bool,
-                 conflict: dict | None = None) -> None:
+                 conflict: dict | None = None, outcome: str | None = None) -> None:
     entry = {
         "pass_no": spec.pass_no,
         "key": spec.key,
@@ -183,6 +229,8 @@ def _log_attempt(strategy: Strategy, spec: VerificationPassSpec, attempt: int,
             else "conflicting_sources"
         )
         entry["conflict"] = conflict
+    if outcome is not None:
+        entry["outcome"] = outcome
     strategy.verified_passes_json = [*(strategy.verified_passes_json or []), entry]
     flag_modified(strategy, "verified_passes_json")
 
@@ -317,6 +365,13 @@ def run_verification_loop(session: Session, strategy: Strategy,
 
     max_retries = max_attempts if max_attempts is not None else max_attempts_for(strategy)
     any_exhausted = False
+    # Set when the ship-blocking pass (#4) ends PASS: its spec, how many
+    # attempts it logged, and the compliance elements of the document it
+    # approved. Every later rewrite must keep those elements.
+    legal_spec: VerificationPassSpec | None = None
+    legal_attempts = 0
+    legal_approved: frozenset[str] = frozenset()
+    legal_regressed = False
 
     for spec in build_passes(strategy.flow_type):
         passed = False
@@ -336,6 +391,9 @@ def run_verification_loop(session: Session, strategy: Strategy,
             if passed:
                 _log_attempt(strategy, spec, attempt, "PASS", None, False)
                 session.commit()
+                if spec.key == SHIP_BLOCKING_PASS_KEY:
+                    legal_spec, legal_attempts = spec, attempt
+                    legal_approved = _compliance_elements(strategy.strategy_document)
                 break
 
             fix_description = fix_description or (
@@ -411,9 +469,34 @@ def run_verification_loop(session: Session, strategy: Strategy,
             _log_attempt(strategy, spec, attempt, "FAIL", fix_description, bool(revised))
             session.commit()
 
+            # Re-check the ship-blocking pass on the rewritten document (see
+            # SHIP_BLOCKING_PASS_KEY). Deterministic, no model call.
+            if revised and legal_spec is not None and not legal_regressed:
+                dropped = sorted(legal_approved - _compliance_elements(revised))
+                if dropped:
+                    legal_regressed = True
+                    legal_attempts += 1
+                    _log_attempt(
+                        strategy, legal_spec, legal_attempts, "FAIL",
+                        f"The rewrite for '{spec.name}' removed compliance elements "
+                        f"that '{legal_spec.name}' had approved: {', '.join(dropped)}. "
+                        f"Restore them; the strategy cannot ship without them.",
+                        False, outcome="compliance_regressed",
+                    )
+                    session.commit()
+                    logger.warning(
+                        "pass %s rewrite dropped approved compliance elements %s — "
+                        "pass %s marked FAIL", spec.key, dropped, legal_spec.key,
+                    )
+
         if not passed:
             any_exhausted = True
             logger.warning("pass %s did not pass after %s attempts", spec.key, max_retries)
+
+    if legal_regressed:
+        # Fail closed: a later rewrite removed what the ship-blocking pass
+        # approved, so the strategy never counts as verified.
+        any_exhausted = True
 
     strategy.status = (
         StrategyStatus.NEEDS_HUMAN_REVIEW if any_exhausted else StrategyStatus.VERIFIED

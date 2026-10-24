@@ -222,6 +222,65 @@ class TestNeverRaises:
         assert reply.reply_category == "BUYING_SIGNAL"
 
 
+class TestConsentGuard:
+    """I1: an opt-out or erasure reply gets no sales draft, no model call and
+    never moves a sequence, whatever the model would have said."""
+
+    BUYING = {"category": "BUYING_SIGNAL", "confidence": 0.9,
+              "next_action": "send_step_3", "draft_response": "Would a call suit?"}
+
+    @pytest.mark.parametrize("classification,intent_label,body", [
+        ("unsubscribe_request", None, "Please remove me from your list."),
+        ("unsubscribe_request", None, "Delete my data and do not contact me again."),
+        ("not_interested", "unsubscribe", "Not for us."),
+        # routing not stored yet / misread: the wording alone is enough
+        (None, None, "Great product but please stop emailing me."),
+        ("interested", None, "Delete my data please."),
+    ])
+    def test_opt_out_gets_no_draft_no_call_and_no_step_move(
+            self, db_session, replied, fake_claude, classification, intent_label, body):
+        fake_claude.reply_intelligence_response = self.BUYING
+        reply = replied["reply"]
+        reply.classification = classification
+        reply.intent_label = intent_label
+        reply.body = body
+        replied["enrollment"].current_step = 1
+        db_session.commit()
+
+        result = reply_intelligence.classify_reply(db_session, reply.id, today=TODAY)
+        reply_intelligence.apply(db_session, reply, result)
+
+        assert fake_claude.reply_intelligence_prompts == []
+        db_session.refresh(reply)
+        db_session.refresh(replied["enrollment"])
+        assert reply.ai_draft_response is None
+        assert reply.reply_category is None
+        assert reply.ai_next_action == reply_intelligence.OPT_OUT_NEXT_ACTION
+        assert reply.classified_at is not None
+        assert replied["enrollment"].current_step == 1
+        assert replied["enrollment"].status is m.EnrollmentStatus.STOPPED
+
+    def test_apply_never_stores_a_draft_on_an_opted_out_reply(self, db_session,
+                                                              replied):
+        reply = replied["reply"]
+        reply.classification = "unsubscribe_request"
+        db_session.commit()
+
+        reply_intelligence.apply(db_session, reply, {
+            **self.BUYING, "reschedule_date": None,
+            "classified_at": datetime.now(timezone.utc)})
+
+        assert reply.ai_draft_response is None and reply.reply_category is None
+
+    def test_an_ordinary_reply_still_gets_its_draft(self, db_session, replied,
+                                                    fake_claude):
+        fake_claude.reply_intelligence_response = self.BUYING
+        result = reply_intelligence.classify_reply(db_session, replied["reply"].id,
+                                                   today=TODAY)
+        assert result["draft_response"] == "Would a call suit?"
+        assert len(fake_claude.reply_intelligence_prompts) == 1
+
+
 class TestTask:
     def test_classifies_and_persists_every_field(self, db_session, replied, fake_claude):
         fake_claude.reply_intelligence_response = {

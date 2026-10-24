@@ -5,6 +5,8 @@ persisted on the message row BEFORE any send happens.
 """
 
 import logging
+import re
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,6 +16,84 @@ from app.services import prompt_safety
 from app.services.anthropic_client import get_client
 
 logger = logging.getLogger(__name__)
+
+# I1 consent hardening (T03 c-model-foreign-unsubscribe-link, i-obeyed-link):
+# a URL in the model's body must point at the sender's own booking page or
+# the sender's / this app's own domain. Anything else (a model-written
+# "unsubscribe" link to a third party, a link copied from injected lead text)
+# is removed before the body is persisted or sent. The real one-click
+# unsubscribe is added by sequence_engine.build_compliant_email. Same URL
+# shape as evals/ai/graders.py URL_RE.
+_URL_RE = re.compile(r"https?://[^\s\"'<>)\]]+", re.IGNORECASE)
+_OPT_OUT_WORDS = re.compile(r"(?i)\b(?:unsubscribe|opt[ -]?out|remove (?:me|you)|stop (?:receiving|these))\b")
+
+
+def _host(url: str | None) -> str:
+    try:
+        return (urlparse(url or "").hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+
+
+def _own_domains(session: Session, strategy: Strategy) -> set[str]:
+    """This app's public hosts plus the account owner's business domains
+    (login address and connected mailboxes; consumer webmail excluded)."""
+    from app.config import settings  # noqa: PLC0415
+    from app.services import deliverability  # noqa: PLC0415
+
+    hosts = {_host(settings.frontend_url), _host(settings.public_base_url)}
+    try:
+        product = strategy.product
+        user = product.user if product is not None else None
+        if user is not None:
+            email = (user.email or "").strip().lower()
+            if "@" in email:
+                domain = email.rsplit("@", 1)[1]
+                if domain not in deliverability.CONSUMER_DOMAINS:
+                    hosts.add(domain)
+            hosts.update(d for d, _ in deliverability.sending_domains(session, user.id))
+    except Exception:  # noqa: BLE001 -- fail closed: fewer allowed links
+        logger.warning("could not resolve the sender's own domains", exc_info=True)
+    return {h for h in hosts if h}
+
+
+def _link_allowed(url: str, booking_url: str | None, own: set[str]) -> bool:
+    host = _host(url)
+    if not host:
+        return False
+    if booking_url:
+        b = urlparse(booking_url)
+        if host == _host(booking_url) and urlparse(url).path.rstrip("/").startswith(
+                b.path.rstrip("/")):
+            return True
+    # Exact host, or its www. form. Other subdomains are not trusted: a
+    # shared parent domain would otherwise admit any host under it.
+    return host in own or (host.startswith("www.") and host[4:] in own)
+
+
+def strip_foreign_links(body: str, booking_url: str | None, own_domains: set[str]) -> str:
+    """Remove every URL outside the allowlist from a model-written body.
+    A line that offered an opt-out through such a link is dropped whole (the
+    compliant footer carries the real one). Deterministic; no model call."""
+    out: list[str] = []
+    removed: list[str] = []
+    for line in body.split("\n"):
+        bad = [u.rstrip(".,;:!?") for u in _URL_RE.findall(line)
+               if not _link_allowed(u.rstrip(".,;:!?"), booking_url, own_domains)]
+        if not bad:
+            out.append(line)
+            continue
+        removed.extend(bad)
+        if _OPT_OUT_WORDS.search(line):
+            continue
+        for u in bad:
+            line = line.replace(u, "")
+        line = re.sub(r"[ \t]{2,}", " ", line)
+        line = re.sub(r"\s+([.,;:!?])", r"\1", line).rstrip(" :").rstrip()
+        out.append(line)
+    if removed:
+        logger.warning("removed %d off-allowlist link(s) from a generated body", len(removed))
+    return "\n".join(out).strip()
 
 _SYSTEM = (
     "You are Victorae's message personalization engine. You write one "
@@ -192,6 +272,8 @@ def render_message(
     )
     subject = str(data.get("subject") or "").strip() or "Quick question"
     body = str(data.get("body") or "").strip()
+    if body:
+        body = strip_foreign_links(body, booking_url, _own_domains(session, strategy))
     if not body:
         raise ValueError("personalization returned an empty body")
     return subject, body

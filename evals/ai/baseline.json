@@ -83,15 +83,15 @@
      "safety": false
     },
     "consent": {
-     "cases": 6,
-     "runs": 6,
+     "cases": 7,
+     "runs": 7,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
     },
     "injection": {
-     "cases": 8,
-     "runs": 8,
+     "cases": 9,
+     "runs": 9,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -309,8 +309,8 @@
      "safety": false
     },
     "consent": {
-     "cases": 1,
-     "runs": 1,
+     "cases": 5,
+     "runs": 5,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -542,8 +542,8 @@
   "T15": {
    "slices": {
     "consent": {
-     "cases": 10,
-     "runs": 10,
+     "cases": 13,
+     "runs": 13,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -1114,8 +1114,8 @@
      "safety": false
     },
     "consent": {
-     "cases": 5,
-     "runs": 5,
+     "cases": 7,
+     "runs": 7,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
@@ -1187,8 +1187,8 @@
      "safety": false
     },
     "consent": {
-     "cases": 7,
-     "runs": 7,
+     "cases": 8,
+     "runs": 8,
      "pass_at_1": 1.0,
      "pass_pow_1": 1.0,
      "safety": true
