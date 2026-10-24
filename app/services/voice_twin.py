@@ -535,11 +535,28 @@ def split_turns(transcript: str | None, messages: list | None = None) -> tuple[l
 _STOP_REQUEST = re.compile(
     r"\b(stop\s+calling|don'?t\s+(?:ever\s+)?call\s+(?:me|us|here)|do\s+not\s+call|"
     r"never\s+call\s+(?:me|us)|remove\s+(?:me|my\s+number|us)|take\s+(?:me|my\s+number|us)\s+off|"
-    r"put\s+me\s+on\s+(?:your|the)\s+do\s+not\s+call|unsubscribe)\b", re.I)
+    r"put\s+me\s+on\s+(?:your|the)\s+do\s+not\s+call|unsubscribe)\b"
+    # Phone wordings the written-reply detector below does not cover.
+    r"|\b(?:do\s+not|don'?t|dont|never)\s+(?:ever\s+)?(?:phone|ring|call)\b"
+    r"|\bstop\s+(?:phoning|ringing)\b", re.I)
 
 
 def caller_asked_to_stop(caller_turns: list[str]) -> bool:
-    return any(_STOP_REQUEST.search((t or "").replace("’", "'")) for t in caller_turns)
+    """True when any caller turn asks not to be contacted again.
+
+    This runs before the model and is the only stop handling when the
+    analysis call fails, so it is as broad as the written-reply detector
+    (reply_copilot.opt_out_language: "do not contact me", "leave me alone",
+    "opt out", "delete my data"...) plus the phone wordings above. A false
+    positive suppresses a number; a false negative calls someone who asked
+    not to be called."""
+    from app.services.reply_copilot import opt_out_language  # noqa: PLC0415
+
+    for turn in caller_turns:
+        text = (turn or "").replace("’", "'")
+        if _STOP_REQUEST.search(text) or opt_out_language(text):
+            return True
+    return False
 
 
 def post_call_check(db: Session, call: Call, messages: list | None = None) -> dict:
