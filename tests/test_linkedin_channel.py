@@ -399,7 +399,7 @@ class TestRenderLinks:
         out = self._render(monkeypatch, db_session, verified_strategy, lead,
                            "Hi Dana, our guide: guides.ours.com/payroll. Useful?",
                            "share guides.ours.com/payroll")
-        assert "guides.ours.com/payroll" in out["text"]
+        assert out["text"] == "Hi Dana, our guide: guides.ours.com/payroll. Useful?"
 
     def test_a_link_the_brief_names_is_kept(self, monkeypatch, db_session,
                                             verified_strategy):

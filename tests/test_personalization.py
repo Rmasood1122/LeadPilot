@@ -554,7 +554,7 @@ class TestForeignLinksStripped:
         body = self._render(
             monkeypatch, db_session, verified_strategy, lead, email_sequence.steps[0],
             "Hi Sara, pricing is on brightline.com/pricing and www.brightline.com.")
-        assert "brightline.com/pricing" in body and "www.brightline.com" in body
+        assert body == "Hi Sara, pricing is on brightline.com/pricing and www.brightline.com."
 
 
 class TestBodyLengthCeiling:
