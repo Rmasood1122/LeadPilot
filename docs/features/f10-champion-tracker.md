@@ -256,7 +256,7 @@ on an earlier record, not in a retry back-off, oldest first — within the run c
 unit cap. Idempotent: a checked lead is fresh for N days; a move is unique
 per old lead; a plan is created once per move.
 
-Beat `champion-reverify-held` every 15 minutes at :07/:22/:37/:52
+Beat `champion-reverify-held` in every worker burst (30 minutes by default, at +2)
 (`leadpilot.champion.reverify_held`, `default` queue): leads with held
 messages — released when no longer stale, otherwise re-verified within the
 same caps. **With the flag off this sweep releases every remaining hold**, so

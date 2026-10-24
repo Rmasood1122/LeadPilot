@@ -53,7 +53,7 @@ revenue analytics.
 Each counted event carries the attribution ledger's verdict for the outcome
 that counted it: `direct_reply` (1.0, a fact), `thread_match` (0.85),
 `last_touch` (decaying guess), `none` (nothing was sent before it), or
-**`pending`** — the outcome exists but the quarter-hourly attribution sweep has
+**`pending`** — the outcome exists but the half-hourly attribution sweep has
 not written its ledger entry yet. Pending is shown as pending, never guessed.
 A held meeting inherits the lead's latest `meeting_booked` entry at or before
 the meeting; with none, it is `pending`.

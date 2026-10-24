@@ -168,7 +168,7 @@ facts:
   phrase: accepts up to 20 steps
   expr: app.core.plans.SEQUENCE_STEP_CAP
 - article: 08
-  phrase: within about 15 minutes
+  phrase: within about 30 minutes
   expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
 - article: 08
   phrase: reason of at least 10 characters
@@ -187,7 +187,7 @@ facts:
   expr: app.config.Settings.model_fields['ooo_reschedule_days'].default
 - article: 08
   phrase: Every 30 minutes, Victorae looks
-  expr: app.config.Settings.model_fields['followup_sweep_interval_seconds'].default // 60
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['check-followup-due']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['check-followup-due']['schedule'].minute)[0]
 - article: 08
   phrase: (72 hours by default; you can set 1 to 2,160 hours)
   expr: app.api.sequences.StepIn.model_fields['followup_delay_hours'].default
@@ -203,11 +203,11 @@ facts:
   phrase: ceiling of **100 emails per day**
   expr: app.config.Settings.model_fields['gmail_daily_cap'].default
 - article: 09
-  phrase: every 60 seconds
-  expr: app.config.Settings.model_fields['dispatch_interval_seconds'].default
+  phrase: due messages every 30 minutes by default
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['dispatch-due-messages']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['dispatch-due-messages']['schedule'].minute)[0]
 - article: 09
-  phrase: for replies every 5 minutes by default
-  expr: app.config.Settings.model_fields['reply_poll_interval_seconds'].default // 60
+  phrase: for replies every 30 minutes by default
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['poll-gmail-replies']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['poll-gmail-replies']['schedule'].minute)[0]
 - article: 09
   phrase: Once at least 10 messages have been sent
   expr: app.config.Settings.model_fields['bounce_min_sends'].default
@@ -226,7 +226,7 @@ facts:
   expr: app.config.Settings.model_fields['whatsapp_template_body_max_chars'].default
   shows: '{v:,}'
 - article: '11'
-  phrase: within about 15 minutes
+  phrase: within about 30 minutes
   expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
 - article: '11'
   phrase: cut to at most 300 characters
@@ -293,13 +293,8 @@ facts:
   phrase: reason of at least 10 characters
   expr: app.services.adversarial_review.MIN_OVERRIDE_REASON
 - article: '13'
-  phrase: every 300 seconds (5 minutes)
-  expr: app.config.Settings.model_fields['reply_poll_interval_seconds'].default
-  shows: '{v} seconds'
-- article: '13'
-  phrase: every 300 seconds (5 minutes)
-  expr: app.config.Settings.model_fields['reply_poll_interval_seconds'].default // 60
-  shows: ({v} minutes
+  phrase: The default is every 30 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['poll-gmail-replies']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['poll-gmail-replies']['schedule'].minute)[0]
 - article: '13'
   phrase: picks up again after 7 days by default
   expr: app.config.Settings.model_fields['ooo_reschedule_days'].default
@@ -326,6 +321,9 @@ facts:
   phrase: once the call is within 24 hours
   expr: int(app.workers.meeting_prep_tasks.REMINDER_24H.total_seconds() // 3600)
 - article: '15'
+  phrase: checks run every 30 minutes by default
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['send-meeting-reminders']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['send-meeting-reminders']['schedule'].minute)[0]
+- article: '15'
   phrase: closed automatically 6 hours after
   expr: int(__import__('re').search(r'timedelta\(hours=(\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/workers/calendar_tasks.py').read_text()).group(1))
 - article: '15'
@@ -336,8 +334,8 @@ facts:
   expr: app.services.meeting_recording.MAX_TRANSCRIPT_CHARS
   shows: '{v:,}'
 - article: '16'
-  phrase: in a sweep every 15 minutes
-  expr: int(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'] // 60)
+  phrase: in a sweep every 30 minutes
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'].minute)[0]
 - article: '16'
   phrase: tried 6 times in total
   expr: app.services.webhook_delivery.MAX_ATTEMPTS
@@ -421,7 +419,7 @@ facts:
   expr: app.services.attribution.LAST_TOUCH_BANDS[1][0] // 24
   shows: within {v} days
 - article: '18'
-  phrase: Attribution is updated every 15 minutes
+  phrase: Attribution is updated every 30 minutes
   expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['attribution-sweep']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['attribution-sweep']['schedule'].minute)[0]
 - article: '18'
   phrase: deployment** over the last 90 days
@@ -627,9 +625,9 @@ facts:
   expr: app.core.billing_catalog.PAY_PER_MEETING_PLAN['grace_hours']
 - article: '22'
   phrase: It runs every 30 minutes
-  expr: int(app.workers.celery_app.celery_app.conf.beat_schedule['charge-due-meetings']['schedule'] // 60)
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['charge-due-meetings']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['charge-due-meetings']['schedule'].minute)[0]
 - article: '22'
-  phrase: within about 15 minutes
+  phrase: within about 30 minutes
   expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
 - article: '22'
   phrase: Running a 30-day pilot?
@@ -755,6 +753,9 @@ facts:
   phrase: below 1.5% it is archived
   expr: app.services.system_settings.DEFAULTS['conversion_archive_threshold'][0]
   shows: '{v:.1%}'
+- article: '27'
+  phrase: checks for due messages every 30 minutes by default
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['dispatch-due-messages']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['dispatch-due-messages']['schedule'].minute)[0]
 - article: '27'
   phrase: it runs 72 or 144 steps once per strategy
   expr: len(app.pipeline.registry.STRATEGY_STEPS)
@@ -969,7 +970,7 @@ facts:
   phrase: an email 30 days ahead
   expr: app.core.billing_catalog.RENEWAL_NOTICE_DAYS
 - article: '40'
-  phrase: a background check runs every 15 minutes
+  phrase: a background check runs every 30 minutes
   expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['plan-hold-release']['schedule'].minute)[0]
 - article: '40'
   phrase: once-per-account 14-day free trial
@@ -1171,8 +1172,8 @@ facts:
   phrase: gets a date 30 days out
   expr: int(__import__('re').search(r'date\.today\(\) \+ timedelta\(days=(\d+)\)', (__import__('pathlib').Path(app.__file__).parents[1] / 'app/services/crm_sync.py').read_text()).group(1))
 - article: '36'
-  phrase: '**Every 15 minutes**'
-  expr: int(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'] // 60)
+  phrase: '**Every 30 minutes**'
+  expr: sorted(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'].minute)[1] - sorted(app.workers.celery_app.celery_app.conf.beat_schedule['crm-sync']['schedule'].minute)[0]
 - article: '36'
   phrase: up to 500 leads and 500 deals per run
   expr: app.services.crm_sync.PUSH_BATCH_LIMIT

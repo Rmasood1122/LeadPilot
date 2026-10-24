@@ -36,12 +36,32 @@ CELERY_HEARTBEAT_TTL_SECONDS = 120  # if key is older than 2 minutes, workers ar
 CELERY_CHECK_FAILED = "heartbeat check failed"
 
 
+# When check_database last succeeded (time.monotonic()), per process.
+_db_ok_at: float | None = None
+
+
 def check_database(db) -> dict[str, Any]:
-    """`SELECT 1` on the request's session. {"status": "ok"} or "down"."""
+    """`SELECT 1` on the request's session. {"status": "ok"} or "down".
+
+    A success is reused for settings.health_db_check_ttl_seconds without
+    querying again. Render probes /health every few seconds, and a SELECT 1
+    each time kept a database that suspends when idle (Neon) awake around the
+    clock. A failure is never reused: while the database is down, every check
+    queries it. The cost: a database that goes down is reported "ok" until
+    the last success is older than the TTL.
+    """
+    global _db_ok_at
+    from app.config import settings  # noqa: PLC0415
+
+    ttl = settings.health_db_check_ttl_seconds
+    if ttl and _db_ok_at is not None and time.monotonic() - _db_ok_at < ttl:
+        return {"status": "ok"}
     try:
         db.execute(text("SELECT 1"))
+        _db_ok_at = time.monotonic()
         return {"status": "ok"}
     except Exception as e:
+        _db_ok_at = None
         logger.error("health.database_unreachable", error=str(e))
         return {"status": "down", "error": "connection failed"}
 

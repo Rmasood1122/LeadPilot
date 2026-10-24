@@ -28,7 +28,7 @@ closed, disqualified) become HubSpot **contacts** / Salesforce **leads**, matche
 by email; turn on *Sync new leads* to push every verified lead as well. Deals
 become HubSpot **deals** (associated with the contact) / Salesforce
 **opportunities**. Pushes happen immediately on key events (meeting booked,
-reply, call, deal won, kanban move, deal edit) and in a 15-minute sweep.
+reply, call, deal won, kanban move, deal edit) and in a 30-minute sweep (each worker burst).
 
 **CRM → Victorae.** Only records Victorae linked, and only forward:
 
@@ -47,7 +47,7 @@ A CRM change never moves a lead backwards and never reopens a closed lead —
 which also stops Victorae and the CRM from overwriting each other. Closing a
 lead stops its sequences.
 
-Changes arrive two ways: the 15-minute sweep reads every linked record back
+Changes arrive two ways: the 30-minute sweep reads every linked record back
 (no CRM configuration needed), and webhooks make it immediate:
 - **HubSpot:** in the app's Webhooks settings, target
   `<PUBLIC_BASE_URL>/webhooks/hubspot`, subscribe to `contact.propertyChange`

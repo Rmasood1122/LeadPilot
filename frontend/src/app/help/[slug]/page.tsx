@@ -24,8 +24,8 @@ function describe(text: string): string {
   return plain.length <= 155 ? plain : `${plain.slice(0, 152).replace(/\s+\S*$/, "")}…`;
 }
 
-export function generateMetadata({ params }: { params: { slug: string } }): Metadata {
-  const a = helpArticle(params.slug);
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const a = helpArticle((await params).slug);
   return {
     title: `${a.title} | Victorae help | Calendarharvest`,
     description: describe(a.lead[0] ?? a.title),
@@ -33,8 +33,8 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
   };
 }
 
-export default function HelpArticlePage({ params }: { params: { slug: string } }) {
-  const a = helpArticle(params.slug);
+export default async function HelpArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const a = helpArticle((await params).slug);
   return (
     <ContentPage
       jsonLd={pageGraph({ path: pathOf(a.id), breadcrumb: a.title })}
