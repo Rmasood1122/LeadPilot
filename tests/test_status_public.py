@@ -434,6 +434,74 @@ class TestAiGatewayProbe:
             assert route.call_count == 2
 
 
+class _CountingSession:
+    """A working session that counts the statements it runs."""
+
+    def __init__(self):
+        self.statements = 0
+
+    def execute(self, *args, **kwargs):
+        self.statements += 1
+
+
+class TestDatabaseCheckReuse:
+    """check_database reuses a success for HEALTH_DB_CHECK_TTL_SECONDS.
+
+    Render probes /health every few seconds; a SELECT 1 on each probe kept the
+    Neon database (which suspends after 5 idle minutes) awake around the
+    clock, and the free plan's compute quota ran out.
+    """
+
+    def test_a_success_is_reused_within_the_ttl(self, monkeypatch):
+        from app.config import settings
+        clock = [100.0]
+        monkeypatch.setattr(health_checks.time, "monotonic", lambda: clock[0])
+        monkeypatch.setattr(settings, "health_db_check_ttl_seconds", 1800)
+        db = _CountingSession()
+        assert health_checks.check_database(db) == {"status": "ok"}
+        clock[0] += 1799
+        assert health_checks.check_database(db) == {"status": "ok"}
+        assert db.statements == 1
+        clock[0] += 2
+        assert health_checks.check_database(db) == {"status": "ok"}
+        assert db.statements == 2
+
+    def test_a_failure_is_never_reused(self, monkeypatch):
+        from app.config import settings
+        monkeypatch.setattr(settings, "health_db_check_ttl_seconds", 1800)
+        down = {"status": "down", "error": "connection failed"}
+        assert health_checks.check_database(_BrokenSession()) == down
+        db = _CountingSession()
+        assert health_checks.check_database(db) == {"status": "ok"}
+        assert db.statements == 1
+
+    def test_a_failure_drops_an_earlier_success(self, monkeypatch):
+        from app.config import settings
+        monkeypatch.setattr(settings, "health_db_check_ttl_seconds", 1800)
+        assert health_checks.check_database(_CountingSession()) == {"status": "ok"}
+        clock = [health_checks.time.monotonic() + 1801]
+        monkeypatch.setattr(health_checks.time, "monotonic", lambda: clock[0])
+        assert health_checks.check_database(_BrokenSession())["status"] == "down"
+        clock[0] += 1
+        assert health_checks.check_database(_BrokenSession())["status"] == "down"
+
+    def test_ttl_zero_checks_every_time(self, monkeypatch):
+        from app.config import settings
+        monkeypatch.setattr(settings, "health_db_check_ttl_seconds", 0)
+        db = _CountingSession()
+        health_checks.check_database(db)
+        health_checks.check_database(db)
+        assert db.statements == 2
+
+    def test_repeated_health_probes_query_the_database_once(self, make_client, async_redis):
+        _run(async_redis.set(HEARTBEAT_KEY, str(time.time())))
+        db = _CountingSession()
+        client = make_client(db=db, redis=async_redis)
+        for _ in range(5):
+            assert client.get("/health").status_code == 200
+        assert db.statements == 1
+
+
 class TestCaching:
     def test_second_call_within_30s_is_served_from_cache(self, make_client, async_redis, monkeypatch):
         calls = {"db": 0}

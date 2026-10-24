@@ -236,8 +236,8 @@ schedule.
   the hub) and **in-app** (the Autopilot card on the strategy page and the
   diagnostics panel) — once per distinct reason (a reason that persists is not
   re-sent; a new one is).
-* **Resume: a beat sweep, not hooks.** `leadpilot.autopilot.sweep` runs every
-  15 minutes (`:03/:18/:33/:48`, clear of the other sweeps) over enabled
+* **Resume: a beat sweep, not hooks.** `leadpilot.autopilot.sweep` runs in
+  every worker burst (30 minutes by default, at +2) over enabled
   Autopilot rows and calls `advance` (which does nothing for a paused
   campaign but say so). Chosen over hooks
   because a prerequisite can appear through many unrelated paths (Gmail OAuth

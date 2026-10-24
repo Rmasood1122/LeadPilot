@@ -5,7 +5,7 @@
 (default **0.0** = data credits counted but not priced) ·
 **Service** `app/services/spend_guard.py` ·
 **API** `app/api/spend_guard.py` ·
-**Worker** `app/workers/spend_guard_tasks.py` (alert sweep, every 15 minutes) ·
+**Worker** `app/workers/spend_guard_tasks.py` (alert sweep, every worker burst: 30 minutes by default) ·
 **UI** `/analytics/usage` (`frontend/src/components/analytics/SpendGuardPanel.tsx`,
 helpers `frontend/src/lib/spendGuard.ts`) ·
 **Migration** `0078_spend_guard` (three new tables, create-only).
@@ -195,7 +195,7 @@ F01's metric keeps its meaning.
   `evaluate_alerts(force_cap_reached=True)`. Same unique key, so still once
   per month. Its email says "Your monthly spend cap is stopping work".
 * Otherwise evaluated after every lead-batch stage, when the cap is changed,
-  and by a beat sweep every 15 minutes over accounts with a cap (an allowed
+  and by a beat sweep every 30 minutes (each worker burst) over accounts with a cap (an allowed
   pre-check commits nothing before the endpoint's own commit, so it leaves
   alerts to the sweep). Each alert insert runs in a SAVEPOINT, so a racing
   duplicate rolls back only itself.
