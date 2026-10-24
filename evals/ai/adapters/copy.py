@@ -182,7 +182,7 @@ def loom_script(inp: dict, client) -> dict | None:
         with use_client(client):
             if inp.get("mode") == "on_demand":
                 try:
-                    return loom_video.write_script(lead)
+                    return loom_video.write_script(db, lead)
                 except Exception as exc:  # noqa: BLE001
                     return _failed(exc)
             stored = loom_video.suggest(db, lead)

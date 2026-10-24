@@ -39,6 +39,7 @@ draft_error.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -316,9 +317,12 @@ def generate_email(db: Session, row: MeetingOutcome, lead: Lead, user: User) -> 
     # other outreach copy call (style_profile.system_suffix).
     from app.services.style_profile import system_suffix  # noqa: PLC0415
 
+    from app.services import grounding  # noqa: PLC0415
+
+    prompt = build_prompt(db, row, lead, user)
     data = anthropic_client.get_client().complete_json(
         system=SYSTEM + system_suffix(getattr(user, "style_profile_json", None)),
-        prompt=build_prompt(db, row, lead, user),
+        prompt=prompt,
         max_tokens=settings.meeting_followup_max_tokens,
         schema=FOLLOWUP_EMAIL_SCHEMA,
     )
@@ -326,6 +330,22 @@ def generate_email(db: Session, row: MeetingOutcome, lead: Lead, user: User) -> 
     body = str((data or {}).get("body") or "").strip()
     if not subject or not body:
         raise ValueError("the model returned an empty follow-up email")
+    # T18: the draft goes to the seller's Gmail and reads as their promise. A
+    # sentence with a price, date, discount, free extra or guarantee that the
+    # notes, summary, brief, product and strategy do not contain is removed.
+    # The source is the prompt below its first two lines, which are our
+    # outcome label and guidance, not facts.
+    source = "\n".join(prompt.split("\n")[2:])
+    lines, removed = [], []
+    for line in body.split("\n"):
+        kept, reasons = grounding.drop_ungrounded_sentences(line, source)
+        removed.extend(reasons)
+        if kept or not line.strip():
+            lines.append(kept)
+    if removed:
+        logger.warning("meeting follow-up %s: removed ungrounded sentences: %s",
+                       row.id, "; ".join(removed)[:2000])
+    body = re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
     return {"subject": subject[:300], "body": body[:6000]}
 
 

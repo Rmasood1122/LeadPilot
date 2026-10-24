@@ -259,7 +259,11 @@ class _LaterFixClaude:
         pass_no = int(re.search(r"criterion #(\d+)", prompt, re.I).group(1))
         self.judge_calls.append(pass_no)
         if pass_no == self.fail_pass and self.judge_calls.count(pass_no) == 1:
-            return {"result": "FAIL", "fix_description": "Add a warm-up ramp."}
+            # The finding names the figures the rewrite then uses, as a real
+            # research-backed finding does; an unsourced figure would trip the
+            # factual floor (T31), which is not what these tests are about.
+            return {"result": "FAIL",
+                    "fix_description": "Add a warm-up ramp of 10 to 40 a day."}
         return {"result": "PASS"}
 
     def complete(self, system, prompt, cache_prefix=None, **_kw) -> str:
@@ -317,16 +321,55 @@ class TestShipBlockingPassRechecked:
                        for e in strategy.verified_passes_json)
 
 
+class TestFactualPassRechecked:
+    """T31: the factual pass (#1) is judged once, first. A later rewrite that
+    adds a figure or a customer name nobody sourced must not ship VERIFIED."""
+
+    @pytest.mark.parametrize("addition", [
+        "\nTarget: 4.7% reply rate, the median of 12,000 agency campaigns.",
+        "\nTrusted by Kestrel Freight and Harbourline Studio.",
+    ])
+    def test_a_later_rewrite_adding_unsourced_facts_needs_review(
+        self, db_session, monkeypatch, product_with_strategy, addition
+    ):
+        fake = _LaterFixClaude(5, _COMPLIANT_DOC + addition)
+        monkeypatch.setattr("app.verification.loop.get_client", lambda: fake)
+        strategy = _prepare(db_session, product_with_strategy, _COMPLIANT_DOC)
+
+        assert run_verification_loop(db_session, strategy, max_attempts=2) \
+            is m.StrategyStatus.NEEDS_HUMAN_REVIEW
+        regressed = [e for e in strategy.verified_passes_json
+                     if e.get("outcome") == "facts_regressed"]
+        assert len(regressed) == 1 and regressed[0]["key"] == "factual_accuracy"
+
+    def test_list_markers_and_sourced_figures_are_not_facts(self):
+        from app.verification.loop import _unsupported_facts
+
+        assert _unsupported_facts("1. Email first\n2. Warm up 10 to 40 a day.",
+                                  ["research: warm-up from 10 to 40 a day"]) == []
+
+
 class TestRevertDetectionUnit:
     def test_exact_match_after_whitespace_normalisation(self):
         history = [_normalize_document("# A\n\nsome   text")]
         assert _reverts_earlier_state("# A\nsome text", history) == 0
 
     def test_near_revert_is_caught(self):
+        """A -> B -> A': a regenerated earlier state that differs only by a
+        stray connective is still an oscillation."""
         base = "the quick brown fox jumps over the lazy dog " * 40
-        history = [_normalize_document(base)]
+        history = [_normalize_document(base),
+                   _normalize_document(base.replace("lazy", "sleepy"))]
         near = base + "and."
         assert _reverts_earlier_state(near, history) == 0
+
+    def test_a_small_fix_to_the_current_state_is_not_a_revert(self):
+        """T31: a correct one-sentence fix to a long document is very similar
+        to it. Only an exact match counts against the current state."""
+        base = "the quick brown fox jumps over the lazy dog " * 40
+        history = [_normalize_document(base)]
+        assert _reverts_earlier_state(base + "and.", history) is None
+        assert _reverts_earlier_state(base, history) == 0
 
     def test_genuinely_different_document_is_not_a_revert(self):
         history = [_normalize_document("Pricing is $3,000-$5,500 per month.")]

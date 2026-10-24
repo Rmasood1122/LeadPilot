@@ -175,6 +175,20 @@ class TestDraft:
                         json={"connection_id": str(world["conn"].id), "product_id": str(p2.id)})
         assert r.status_code == 404
 
+    def test_an_invented_meeting_or_round_is_removed_from_the_draft(
+            self, client, world, claude):
+        """T25: a LinkedIn connection shows no meeting and no funding. The
+        draft keeps only what the records can back."""
+        claude.reply = {"text": "Hi Ana, great meeting you at the Leeds summit. "
+                                "Congrats on the Series B. Quick question about inspections?"}
+        r = _draft(client, world)
+        assert r.status_code == 200
+        assert r.json()["text"] == "Quick question about inspections?"
+
+    def test_a_draft_that_was_only_invention_is_502(self, client, world, claude):
+        claude.reply = {"text": "As we discussed, congrats on the Series B."}
+        assert _draft(client, world).status_code == 502
+
     def test_empty_model_reply_is_502(self, client, world, claude):
         claude.reply = {"text": "  "}
         assert _draft(client, world).status_code == 502

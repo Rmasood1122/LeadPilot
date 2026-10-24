@@ -572,8 +572,14 @@ def _trim_words(text: str, limit: int = MAX_DRAFT_WORDS) -> str:
 
 
 def draft_problems(body: str, *, allowed_urls: set, forbidden: list[str],
-                   own_domains: set = frozenset()) -> list[str]:
-    """Why a generated draft is unusable ([] = usable). Pure."""
+                   own_domains: set = frozenset(), claims_on_file: bool = True,
+                   product_name: str = "") -> list[str]:
+    """Why a generated draft is unusable ([] = usable). Pure.
+
+    `claims_on_file` False means the prompt said "make no claims about us"
+    (no approved-claims library applies): a proof claim about us -- a metric,
+    a count, 'trusted by' -- then breaks that rule, and nothing downstream
+    would check it (T11)."""
     from app.services import guardrails, reply_intelligence  # noqa: PLC0415
 
     if not (body or "").strip():
@@ -591,6 +597,9 @@ def draft_problems(body: str, *, allowed_urls: set, forbidden: list[str],
                if not link_allowed(u, allowed_urls=allowed_urls, own_domains=own_domains)]
     if foreign:
         problems.append("it contains a link that is not the booking link")
+    if not claims_on_file and any(guardrails.is_sender_claim(sentence, product_name)
+                                  for sentence in re.split(r"(?<=[.!?])\s+", body)):
+        problems.append("it makes a claim about us, and no approved claims are on file")
     return problems
 
 
@@ -643,14 +652,16 @@ def _generate(session: Session, reply: InboundReply, lead: Lead, strategy: Strat
     data = _ask(_SYSTEM, prompt)
     body = _trim_words(str((data or {}).get("body") or "").strip())
     problems = draft_problems(body, allowed_urls=allowed_urls, forbidden=forbidden,
-                              own_domains=own_domains)
+                              own_domains=own_domains, claims_on_file=bool(claims),
+                              product_name=product.name if product else "")
     if problems:
         data = _ask(_SYSTEM + "\nYOUR PREVIOUS ANSWER WAS REJECTED because "
                     + "; ".join(problems) + ". Rewrite it without that, same meaning.",
                     prompt)
         body = _trim_words(str((data or {}).get("body") or "").strip())
         problems = draft_problems(body, allowed_urls=allowed_urls, forbidden=forbidden,
-                                  own_domains=own_domains)
+                                  own_domains=own_domains, claims_on_file=bool(claims),
+                                  product_name=product.name if product else "")
         if problems:
             logger.warning("reply copilot: draft for reply %s unusable after a repair "
                            "attempt (%s) -- no draft", reply.id, "; ".join(problems))

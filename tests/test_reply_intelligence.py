@@ -219,6 +219,31 @@ class TestDraftLinks:
         assert result["draft_response"] == reply_intelligence.FALLBACK_DRAFT["OBJECTION"]
 
 
+class TestDraftGrounding:
+    """T09: a figure the reply and our message never gave is not stored as
+    the suggested answer."""
+
+    DRAFT = {"category": "OBJECTION", "confidence": 0.8, "next_action": "answer"}
+
+    def test_an_invented_statistic_is_repaired_then_falls_back(self, db_session, replied,
+                                                               fake_claude):
+        fake_claude.reply_intelligence_response = {
+            **self.DRAFT,
+            "draft_response": "Yes - we cut payroll errors by 63% for 40 agencies last year."}
+        result = reply_intelligence.classify_reply(db_session, replied["reply"].id,
+                                                   today=TODAY)
+        assert len(fake_claude.reply_intelligence_prompts) == 2
+        assert "numbers not in the source" in fake_claude.reply_intelligence_systems[1]
+        assert result["draft_response"] == reply_intelligence.FALLBACK_DRAFT["OBJECTION"]
+
+    def test_a_draft_without_figures_is_kept(self, db_session, replied, fake_claude):
+        fake_claude.reply_intelligence_response = {
+            **self.DRAFT, "draft_response": "Fair question. Can I show you how it works?"}
+        result = reply_intelligence.classify_reply(db_session, replied["reply"].id,
+                                                   today=TODAY)
+        assert result["draft_response"] == "Fair question. Can I show you how it works?"
+
+
 class TestNeverRaises:
     def test_a_model_outage_leaves_the_reply_untouched(self, db_session, replied,
                                                        fake_claude):

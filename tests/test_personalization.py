@@ -369,6 +369,10 @@ class TestLoom:
                      full_name="Low", ai_booking_likelihood=60)
         db_session.add(low)
         lead.ai_booking_likelihood = 80
+        # The fake script cites her post about inspections; the claim check
+        # (T24) keeps that only when such a post is on record.
+        lead.linkedin_posts_json = [{"text": "Inspections are eating our month.",
+                                     "url": "https://linkedin.com/posts/1"}]
         db_session.commit()
         assert loom_video.suggest_for_leads(db_session, [lead, low]) == 1
         assert lead.loom_video_json["status"] == "suggested"
@@ -376,6 +380,19 @@ class TestLoom:
         assert low.loom_video_json is None
         assert emitted == ["loom_requested"]
         assert loom_video.suggest_for_leads(db_session, [lead]) == 0      # idempotent
+
+    def test_an_unsupported_claim_is_stripped_and_the_title_replaced(
+            self, db_session, lead, fake_claude):
+        """T24: the seller reads the script on camera; the prospect sees the
+        title. A funding round or acquisition the records lack is removed."""
+        fake_claude.video_script_response = {
+            "title": "Sara, congrats on the acquisition",
+            "script": "Hi Sara, congratulations on closing your $12M Series B last month. "
+                      "I'm Sam; here is how teams keep inspections on schedule. Worth a call?"}
+        out = loom_video.write_script(db_session, lead)
+        assert "Series B" not in out["script"] and "$12M" not in out["script"]
+        assert "Worth a call?" in out["script"]
+        assert out["title"] == loom_video.DEFAULT_TITLE
 
     def test_record_validates(self, db_session, lead):
         with pytest.raises(ValueError):
@@ -571,3 +588,39 @@ class TestWhatsAppSlotChecks:
     def test_a_short_phrase_is_kept(self, monkeypatch, db_session, verified_strategy, lead):
         assert self._fill(monkeypatch, db_session, verified_strategy, lead,
                           "month-end close") == {"1": "month-end close"}
+
+
+class TestGrounding:
+    """app/services/grounding.py: what a model's text states that its source
+    does not. Shared by the brief writers and the other generated copy."""
+
+    def test_numbers_are_compared_as_people_write_them(self):
+        from app.services.grounding import unsupported_numbers
+
+        assert unsupported_numbers("1,200 staff, $2.5M, 63%", "1200 staff 2.5 63") == []
+        assert unsupported_numbers("we cut errors by 63% for 40 agencies",
+                                   "errors are common") == ["40", "63"]
+
+    def test_a_funding_round_needs_a_source(self):
+        from app.services.grounding import unsupported_funding
+
+        assert unsupported_funding("Congrats on the Series B", "raised a series a") == [
+            "series b"]
+        assert unsupported_funding("Congrats on the Series A", "They raised a Series A.") == []
+
+    @pytest.mark.parametrize("text,found", [
+        ("Tell them the 20% discount closes this Friday.", ["closes this friday", "discount"]),
+        ("Reply by Friday please.", ["by friday"]),
+        ("Ask how long close takes today.", []),
+        ("Ask what changes next week.", []),
+    ])
+    def test_offers_and_deadlines(self, text, found):
+        from app.services.grounding import unsupported_offers
+
+        assert unsupported_offers(text, "") == found
+
+    def test_an_offer_the_playbook_makes_is_grounded(self):
+        from app.services.grounding import unsupported_offers
+
+        assert unsupported_offers("Mention the discount for annual plans.",
+                                  "Offer: a discount for annual plans.") == []

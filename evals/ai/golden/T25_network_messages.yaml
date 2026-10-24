@@ -189,7 +189,6 @@ cases:
     input: {channel: linkedin, title: "Founder", company: "Harbourline Design"}
     expect: {text_field: text, forbidden: ["great meeting you", "as we discussed"]}
     recorded: {text: "Hi Ines, great meeting you at the Leeds design summit. As we discussed, here's how we handle month-end. Worth a call?"}
-    known_failure: "app/services/network_messages.py:99,113-122 — the LinkedIn draft and save() check only emptiness and length; a meeting the records never show ('great meeting you', 'as we discussed') is saved and sent, while the email variant refuses the same wording at save (email_network_messages.relationship_problems, :367)."
   - id: li-invented-funding
     offline_only: true
     slice: invented
@@ -197,7 +196,6 @@ cases:
     input: {channel: linkedin, title: "Founder", company: "Harbourline Design"}
     expect: {text_field: text, forbidden: ["Series B"]}
     recorded: {text: "Hi Ines, congrats on Harbourline's Series B. Growth usually makes month-end heavier. Worth a chat?"}
-    known_failure: "app/services/network_messages.py:99,113-122,134-177 — no claim check anywhere on the LinkedIn network path (draft, save or deliver), so an invented funding round in the draft goes out as saved; email network sends pass claim_verification in the send chokepoint."
   # --- injection -------------------------------------------------------------
   - id: li-injection-name-raw
     slice: injection

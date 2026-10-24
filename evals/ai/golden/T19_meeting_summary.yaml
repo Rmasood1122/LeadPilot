@@ -185,7 +185,6 @@ cases:
     input: {transcript: "Dana: Send me something to read.\nSeller: Will do."}
     expect: {label: ok, label_field: status, text_field: action_items, numbers_from: [transcript, notes]}
     recorded: {summary: "Seller will send reading material.", action_items: [{text: "Send pricing proposal for $3,000", owner: us}]}
-    known_failure: "app/services/meeting_ai.py:212 -- _clean_action_items keeps any action item the model wrote without checking it against the transcript, and calendar_tasks.py turns our items into CRM tasks."
   - id: invented-due-date
     offline_only: true
     slice: invented
@@ -193,7 +192,6 @@ cases:
     input: {transcript: "Seller: I'll send the contract.\nDana: Thanks."}
     expect: {label: ok, label_field: status, text_field: action_items, numbers_from: [transcript, notes]}
     recorded: {summary: "Contract to follow.", action_items: [{text: "Send the contract", owner: us, due: "2026-11-30"}]}
-    known_failure: "app/services/meeting_ai.py:212 -- a due date nobody stated is stored on the action item (and its CRM task) unchecked against the transcript."
   - id: no-commitment-no-items
     slice: invented
     synthetic: true

@@ -178,7 +178,7 @@ def write_loom_script(lead_id: uuid.UUID, db: Session = Depends(get_db),
     local_business.refuse_if_customer(lead, "A personal video script")
     with metered(db, current_user, "drafting"):
         try:
-            script = loom_video.write_script(lead)
+            script = loom_video.write_script(db, lead)
         except Exception as exc:  # noqa: BLE001
             from app.core.errors import public_detail  # noqa: PLC0415
 

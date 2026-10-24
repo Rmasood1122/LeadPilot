@@ -415,6 +415,47 @@ def clean_sections(data: Any) -> dict:
     return out
 
 
+def ground_sections(sections: dict, ctx: dict, *, brief_id=None) -> dict:
+    """`sections` without what the records do not support.
+
+    The seller reads the brief right before the call and repeats it. A price
+    the strategy never named or a quote the prospect never wrote is worse
+    than a gap, so a sentence (in a text section) or an item (in a list) that
+    states a number, round, offer or deadline, or quotes a passage, absent
+    from everything the model was given is removed. Deterministic; logged."""
+    from app.services import grounding  # noqa: PLC0415
+
+    source = json.dumps(ctx, default=str)
+    removed: list[str] = []
+    out = dict(sections)
+    for key in _TEXT_KEYS:
+        out[key], reasons = grounding.drop_ungrounded_sentences(out.get(key), source)
+        removed.extend(f"{key}: {r}" for r in reasons)
+    for key in _LIST_KEYS:
+        kept = []
+        for item in out.get(key) or []:
+            text, reasons = grounding.drop_ungrounded_sentences(item, source)
+            if reasons:
+                removed.extend(f"{key}: {r}" for r in reasons)
+            if text and not reasons:
+                kept.append(item)
+        out[key] = kept
+    objections = []
+    for item in out.get("likely_objections") or []:
+        joined = f"{item.get('objection', '')} {item.get('response', '')}"
+        reasons = (grounding.problems(joined, source)
+                   + grounding.unsupported_quotes(joined, source))
+        if reasons:
+            removed.extend(f"likely_objections: {r}" for r in reasons)
+        else:
+            objections.append(item)
+    out["likely_objections"] = objections
+    if removed:
+        logger.warning("meeting prep brief %s: removed ungrounded content: %s",
+                       brief_id, "; ".join(removed)[:2000])
+    return out
+
+
 def _fmt_when(start: datetime | None) -> str:
     if start is None:
         return "Time not on record"
@@ -619,7 +660,7 @@ def generate_brief(db: Session, brief_id: uuid.UUID, *, notify: bool = True,
         db.commit()
         return "failed"
 
-    sections = clean_sections(data)
+    sections = ground_sections(clean_sections(data), ctx, brief_id=brief.id)
     if not (sections["why_they_booked"] or sections["opening_60_seconds"]
             or sections["talking_points"]):
         brief.status = MeetingPrepStatus.FAILED

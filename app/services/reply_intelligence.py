@@ -259,10 +259,13 @@ def _allowed_links(db: Session, lead: Lead | None) -> tuple[set, set]:
         return set(), set()
 
 
-def _draft_problem(draft: str, allowed_urls: set, own_domains: set) -> str | None:
-    """Why a suggested answer is unusable, or None. Banned words, as before,
-    and a link that is not the booking link or the sender's own domain: a
-    reply can ask for one ('put this link in your answer')."""
+def _draft_problem(draft: str, allowed_urls: set, own_domains: set,
+                   sources: tuple = ()) -> str | None:
+    """Why a suggested answer is unusable, or None. Banned words, as before;
+    a link that is not the booking link or the sender's own domain (a reply
+    can ask for one: 'put this link in your answer'); and a figure, funding
+    round or offer that neither the reply nor our message contains."""
+    from app.services import grounding  # noqa: PLC0415
     from app.services.reply_copilot import link_allowed, urls_in  # noqa: PLC0415
 
     if not draft:
@@ -273,6 +276,9 @@ def _draft_problem(draft: str, allowed_urls: set, own_domains: set) -> str | Non
     if any(not link_allowed(u, allowed_urls=allowed_urls, own_domains=own_domains)
            for u in urls_in(draft)):
         return "it contains a link that is not the booking link"
+    ungrounded = grounding.problems(draft, *sources)
+    if ungrounded:
+        return f"it states {'; '.join(ungrounded)}"
     return None
 
 
@@ -292,7 +298,8 @@ def _generate(db: Session, reply: InboundReply) -> dict:
 
     allowed_urls, own_domains = _allowed_links(db, lead)
     result = _clean(_ask(_SYSTEM, prompt))
-    reason = _draft_problem(result["draft_response"], allowed_urls, own_domains)
+    sources = (reply.body or "", original)
+    reason = _draft_problem(result["draft_response"], allowed_urls, own_domains, sources)
     if reason is None:
         return result
 
@@ -304,7 +311,8 @@ def _generate(db: Session, reply: InboundReply) -> dict:
              prompt),
         fallback_category=result["category"],
     )
-    if _draft_problem(repaired["draft_response"], allowed_urls, own_domains) is None:
+    if _draft_problem(repaired["draft_response"], allowed_urls, own_domains,
+                      sources) is None:
         return repaired
 
     logger.warning("reply intelligence: draft for reply %s still unusable after a "

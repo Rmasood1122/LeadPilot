@@ -26,6 +26,8 @@ not in the transcript or the notes, it does not go in the summary.
 from __future__ import annotations
 
 import logging
+import re
+from datetime import date
 from typing import Any
 
 from app.config import settings
@@ -175,6 +177,42 @@ def _clean_action_items(value: Any, limit: int = 20) -> list[dict]:
     return items
 
 
+def _weekday_stated(due: str, material: str) -> bool:
+    """True when `due` is a date whose weekday the transcript or notes name
+    ('by Friday' resolved to that Friday's date). The model was given the
+    meeting date, so a weekday is a stated deadline, not an invented one."""
+    try:
+        weekday = date.fromisoformat(str(due)[:10]).strftime("%A").lower()
+    except ValueError:
+        return False
+    return re.search(rf"\b{weekday}\b", material or "", re.I) is not None
+
+
+def _ground_action_items(items: list[dict], material: str) -> list[dict]:
+    """T19: action items checked against what was actually said.
+
+    Our items become CRM tasks (calendar_tasks.py). An item whose text states
+    a figure, round, offer or deadline the transcript and notes lack is
+    dropped; a due date neither contains is cleared (the item stays, with no
+    date). Deterministic; logged."""
+    from app.services import grounding  # noqa: PLC0415
+
+    kept = []
+    for item in items:
+        found = grounding.problems(item["text"], material)
+        if found:
+            logger.warning("meeting summary: dropped action item %r: %s",
+                           item["text"][:80], "; ".join(found))
+            continue
+        if (item["due"] and grounding.unsupported_numbers(item["due"], material)
+                and not _weekday_stated(item["due"], material)):
+            logger.warning("meeting summary: cleared due date %s on %r: not in the "
+                           "transcript or notes", item["due"], item["text"][:80])
+            item = {**item, "due": None}
+        kept.append(item)
+    return kept
+
+
 def _duration_minutes(start, end) -> int | None:
     if not start or not end:
         return None
@@ -239,7 +277,8 @@ def generate_meeting_summary(
     return {
         "summary": str(data.get("summary") or "").strip()[:4000],
         "key_points": _clean_strings(data.get("key_points"), limit=6),
-        "action_items": _clean_action_items(data.get("action_items")),
+        "action_items": _ground_action_items(_clean_action_items(data.get("action_items")),
+                                             material),
         "next_steps": _clean_strings(data.get("next_steps"), limit=6),
         # An unrecognised sentiment becomes "unknown" rather than being passed
         # through: the UI colours a chip from this value, and an unmapped one

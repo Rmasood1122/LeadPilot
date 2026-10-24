@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.db.models import Lead
+from app.db.models import Lead, Strategy
 from app.services import anthropic_client, crypto, prompt_safety
 
 logger = logging.getLogger(__name__)
@@ -59,6 +59,9 @@ LOOM_SCRIPT_SCHEMA = {
     "required": ["title", "script"],
     "additionalProperties": False,
 }
+
+
+DEFAULT_TITLE = "A quick video for you"
 
 
 def _now() -> datetime:
@@ -94,8 +97,8 @@ def is_recorded(lead: Lead) -> bool:
     return s.get("status") == "recorded" and bool(s.get("embed_id"))
 
 
-def write_script(lead: Lead) -> dict:
-    from app.services import meeting_prep  # noqa: PLC0415
+def write_script(session: Session, lead: Lead) -> dict:
+    from app.services import claim_verification, meeting_prep  # noqa: PLC0415
 
     profile = meeting_prep.lead_profile(lead)
     posts = meeting_prep._linkedin_posts(lead)
@@ -113,7 +116,22 @@ def write_script(lead: Lead) -> dict:
     script = str((data or {}).get("script") or "").strip()
     if not script:
         raise ValueError("empty video script")
-    return {"title": str(data.get("title") or "A quick video for you").strip()[:200],
+    title = str((data or {}).get("title") or "").strip()[:200]
+    # T24: the seller reads the script on camera and the title is what the
+    # prospect sees. Every claim about the prospect is checked against the
+    # stored evidence, as on LinkedIn and email copy: an unsupported sentence
+    # is stripped, an unsupported title replaced.
+    strategy = session.get(Strategy, lead.strategy_id) if lead.strategy_id else None
+    checked = claim_verification.enforce(session, strategy=strategy, lead=lead, message=None,
+                                         channel="loom",
+                                         fields={"subject": title, "script": script})
+    script = (checked.get("script") or "").strip()
+    title = (checked.get("subject") or "").strip()
+    if title == claim_verification.GENERIC_SUBJECT:
+        title = ""
+    if not script:
+        raise ValueError("empty video script")
+    return {"title": title or DEFAULT_TITLE,
             "script": script[:3000],
             "on_screen": str(data.get("on_screen") or "").strip()[:500]}
 
@@ -129,7 +147,7 @@ def suggest(session: Session, lead: Lead, now: datetime | None = None) -> bool:
             return False
         if state(lead).get("status") in ("suggested", "recorded", "skipped"):
             return False
-        script = write_script(lead)
+        script = write_script(session, lead)
         lead.loom_video_json = {"status": "suggested", **script,
                                 "suggested_at": (now or _now()).isoformat()}
         session.commit()
