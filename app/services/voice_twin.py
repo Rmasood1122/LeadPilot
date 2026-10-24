@@ -762,7 +762,7 @@ def record_consent(db: Session, user: User, *, signature: str, own_voice: bool,
     from app.services import security_audit  # noqa: PLC0415
 
     if not enabled(db):
-        raise VoiceTwinError("Voice cloning is not enabled on this Vectorae.", 409)
+        raise VoiceTwinError("Voice cloning is not enabled on this Victorae.", 409)
     if version != CONSENT_VERSION:
         raise VoiceTwinError("The consent text has changed -- reload the page and read it "
                              "again.", 409)
@@ -847,7 +847,7 @@ def _transition(db: Session, clone: VoiceClone, allowed_from, **values) -> bool:
 def assert_can_upload(db: Session, user: User) -> VoiceClone:
     """Every cheap check BEFORE the request body is read (L3)."""
     if not enabled(db):
-        raise VoiceTwinError("Voice cloning is not enabled on this Vectorae.", 409)
+        raise VoiceTwinError("Voice cloning is not enabled on this Victorae.", 409)
     clone = live_clone(db, user.id)
     if clone is None:
         raise VoiceTwinError("Sign the consent first: no recording is accepted before it.",
@@ -913,7 +913,7 @@ def upload_sample(db: Session, user: User, *, filename: str, content_type: str,
 def submit(db: Session, user: User) -> VoiceClone:
     """The person finished uploading: move to verification. Commits."""
     if not enabled(db):
-        raise VoiceTwinError("Voice cloning is not enabled on this Vectorae.", 409)
+        raise VoiceTwinError("Voice cloning is not enabled on this Victorae.", 409)
     clone = live_clone(db, user.id)
     if clone is None or clone.status != "collecting" or clone.sample_count < 1:
         raise VoiceTwinError("Upload at least one recording first.", 409)
