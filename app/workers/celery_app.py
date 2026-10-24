@@ -250,12 +250,31 @@ def _aggregation_hour() -> int:
         return 2
 
 
+# The database sweeps below that run more than once a day are grouped into
+# bursts: every settings.beat_sweep_minutes (30 by default), at the same
+# minutes of the hour, each job at its own offset of 0-4 minutes into the
+# burst; hourly jobs join the burst at the top of the hour. Between bursts the
+# worker leaves the database alone, so a database that suspends when idle
+# (Neon's free plan, after 5 minutes) can sleep. Before this, a sweep fired
+# almost every minute somewhere in the hour and the database never slept.
+# Jobs that run every few hours or daily keep their own times.
+def _sweep(offset: int) -> crontab:
+    """Every burst, `offset` minutes in (0-4)."""
+    minutes = range(offset, 60, settings.beat_sweep_minutes)
+    return crontab(minute=",".join(str(m) for m in minutes))
+
+
+def _hourly(offset: int = 4) -> crontab:
+    """Once an hour, in the burst at the top of the hour."""
+    return crontab(minute=offset)
+
+
 celery_app.conf.beat_schedule = {
     # Voice twin: retry ElevenLabs deletes of revoked voice clones and expire
     # clones unused for 3 years (docs/features/voice-twin.md). Hourly.
     "voice-clone-housekeeping": {
         "task": "app.workers.call_tasks.voice_clone_housekeeping",
-        "schedule": 3600.0,
+        "schedule": _hourly(),
     },
     # Private LinkedIn network: re-score stored connections every Monday 04:10 UTC.
     "linkedin-network-weekly-refresh": {
@@ -267,13 +286,16 @@ celery_app.conf.beat_schedule = {
         "task": "leadpilot.network.email_weekly_refresh",
         "schedule": crontab(day_of_week="monday", hour=4, minute=25),
     },
+    # Replies are polled first in each burst and due messages dispatched a
+    # minute later, so a reply that arrived since the last burst is on record
+    # before the next step is sent.
     "dispatch-due-messages": {
         "task": "leadpilot.outreach.dispatch",
-        "schedule": float(settings.dispatch_interval_seconds),
+        "schedule": _sweep(1),
     },
     "poll-gmail-replies": {
         "task": "leadpilot.outreach.poll_replies",
-        "schedule": float(settings.reply_poll_interval_seconds),
+        "schedule": _sweep(0),
     },
     # M8-C1: nightly learning-loop aggregation
     "learning-loop-aggregation": {
@@ -297,19 +319,19 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.support_tasks.purge_old_chats",
         "schedule": crontab(hour=3, minute=20),
     },
-    # Engagement Hub, Feature 1: the automated follow-up sweep. Every 30
-    # minutes by default (FOLLOWUP_SWEEP_INTERVAL_SECONDS). It only ENQUEUES;
-    # each send goes through the same compliance path as any other message.
+    # Engagement Hub, Feature 1: the automated follow-up sweep, every burst.
+    # It only ENQUEUES; each send goes through the same compliance path as any
+    # other message.
     "check-followup-due": {
         "task": "leadpilot.outreach.check_followup_due",
-        "schedule": float(settings.followup_sweep_interval_seconds),
+        "schedule": _sweep(2),
     },
     # Feature 5: opt-in post-sequence re-engagement. Hourly: its delays are
     # measured in weeks. Enqueues at most each campaign's remaining
     # re-engagement allowance; every send is re-gated in send_message_impl.
     "check-reengagement-due": {
         "task": "leadpilot.outreach.check_reengagement_due",
-        "schedule": 3600.0,
+        "schedule": _hourly(),
     },
     # Engagement Hub, Feature 3: close meetings nobody pressed End on. Hourly
     # rather than on a schedule tied to meeting times, because the thing being
@@ -318,20 +340,20 @@ celery_app.conf.beat_schedule = {
     # enrollment paused, so this is not cosmetic.
     "close-stale-meetings": {
         "task": "app.workers.calendar_tasks.close_stale_meetings",
-        "schedule": 3600.0,
+        "schedule": _hourly(),
     },
     # Feature 3: mark recording-provider transcripts that never arrived as
     # timed out. The notes-only summary already exists; this only ends the wait.
     "expire-transcript-waits": {
         "task": "app.workers.calendar_tasks.expire_transcript_waits",
-        "schedule": 600.0,
+        "schedule": _sweep(3),
     },
-    # Feature Group 7: 24h and 1h pre-meeting reminders. Every five minutes;
-    # each reminder is claimed with a conditional UPDATE, so overlapping
-    # sweeps cannot double-send (see meeting_prep_tasks).
+    # Feature Group 7: 24h and 1h pre-meeting reminders, every burst; each
+    # reminder is claimed with a conditional UPDATE, so overlapping sweeps
+    # cannot double-send (see meeting_prep_tasks).
     "send-meeting-reminders": {
         "task": "app.workers.meeting_prep_tasks.send_meeting_reminders",
-        "schedule": float(settings.meeting_reminder_sweep_seconds),
+        "schedule": _sweep(1),
     },
     # Feature Group 1: mutate campaigns idle for N days with zero replies.
     # Daily, after the learning-loop aggregation (:05) and promotion (:35) so
@@ -361,7 +383,7 @@ celery_app.conf.beat_schedule = {
     # linked records back. Catches every status change no event announces.
     "crm-sync": {
         "task": "app.workers.crm_tasks.sync_all",
-        "schedule": 900.0,
+        "schedule": _sweep(4),
     },
     # F05 Guardrails Studio: customers / open deals / churned from the CRM
     # (and Victorae's own deals) into each account's exclusion lists. Daily:
@@ -381,25 +403,24 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.reply_tasks.run_reengagement_memory",
         "schedule": crontab(hour=5, minute=50),
     },
-    # Part 1 Feature 8: which touch earned each booking. Quarter-hourly at
-    # :35 (clear of the learning-loop jobs at :05/:15/:25/:50) because the
-    # question is asked the moment the meeting lands, not the next morning.
+    # Part 1 Feature 8: which touch earned each booking. Every burst, because
+    # the question is asked the moment the meeting lands, not the next
+    # morning; **Recompute** runs it on demand.
     "attribution-sweep": {
         "task": "app.workers.analytics_tasks.run_attribution_sweep",
-        "schedule": crontab(minute="5,20,35,50"),
+        "schedule": _sweep(3),
     },
     "deliverability-checks": {
         "task": "app.workers.deliverability_tasks.run_daily_checks",
         "schedule": crontab(hour=6, minute=10),
     },
-    # Part 1 Feature 4: per-MAILBOX health. Every four hours at :05, because
-    # the two signals it exists to catch -- a complaint spike and a volume
-    # spike -- do their damage inside a day, which a daily sweep would only
-    # notice the morning after. Offset from the domain sweep above so the two
-    # never run in the same minute on the shared `default` queue.
+    # Part 1 Feature 4: per-MAILBOX health. Every four hours, because the two
+    # signals it exists to catch -- a complaint spike and a volume spike -- do
+    # their damage inside a day, which a daily sweep would only notice the
+    # morning after. At :04, inside the burst at the top of the hour.
     "refresh-mailbox-health": {
         "task": "app.workers.deliverability_tasks.refresh_mailbox_health",
-        "schedule": crontab(hour="*/4", minute=5),
+        "schedule": crontab(hour="*/4", minute=4),
     },
     # F03: the Google Postmaster spam-rate import. Daily -- Postmaster data
     # is daily and lags a day or two. 07:25, clear of the domain sweep (06:10)
@@ -432,10 +453,10 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=1, minute=0),
     },
     # Section E: charge pay-per-meeting usage whose 48h cancellation grace has
-    # passed. Every 30 minutes, so a charge lands within half an hour of it.
+    # passed. Every burst, so a charge lands within one interval of it.
     "charge-due-meetings": {
         "task": "app.workers.billing_tasks.charge_due_meetings",
-        "schedule": 1800.0,
+        "schedule": _sweep(4),
     },
     # Annual billing: auto-renewal notices (acknowledgment, trial ending,
     # 30 days before an annual renewal). Daily at 15:10 UTC -- morning in the
@@ -444,62 +465,58 @@ celery_app.conf.beat_schedule = {
         "task": "app.workers.billing_tasks.send_renewal_notices",
         "schedule": crontab(hour=15, minute=10),
     },
-    # Feature A2: chain newly recorded audit events every five minutes.
+    # Feature A2: chain newly recorded audit events, every burst.
     "seal-audit-trails": {
         "task": "app.workers.audit_tasks.seal_audit_trails",
-        "schedule": 300.0,
+        "schedule": _sweep(3),
     },
     # Feature A4: suggest (or switch to) the next channel for quiet leads.
     "detect-channel-stagnation": {
         "task": "app.workers.channel_tasks.detect_channel_stagnation",
-        "schedule": crontab(minute=25),
+        "schedule": _hourly(),
     },
     # Feature A5: cool / archive leads that went cold between sends.
     "rescore-conversion-probability": {
         "task": "app.workers.conversion_tasks.rescore_conversion_probability",
-        "schedule": crontab(minute=40),
+        "schedule": _hourly(),
     },
     # F07: Spend Guard alerts (no-op while spend_guard_enabled is off).
     "sweep-spend-alerts": {
         "task": "app.workers.spend_guard_tasks.sweep_spend_alerts",
-        "schedule": 900.0,
+        "schedule": _sweep(4),
     },
     # F09: end pilots whose 30 days are over (verdict), send the weekly
-    # scorecard once per pilot per week, send the verdict notice. Hourly at
-    # :55 -- clear of the :05/:20/:35/:50 attribution sweep whose entries the
-    # verdict reads, and of the :25/:40 hourly sweeps. A no-op while
-    # pilot_mode_enabled is off.
+    # scorecard once per pilot per week, send the verdict notice. Hourly, a
+    # minute after the attribution sweep (+3) whose entries the verdict reads.
+    # A no-op while pilot_mode_enabled is off.
     "pilot-mode-sweep": {
         "task": "app.workers.pilot_tasks.run_pilot_sweep",
-        "schedule": crontab(minute=55),
+        "schedule": _hourly(),
     },
-    # F10 Champion Tracker. Held messages are re-verified every 15 minutes
-    # (at :07/:22/:37/:52, clear of the :05/:20/:35/:50 attribution sweep);
-    # the champion refresh runs daily at 04:40, before the 05:50 re-engagement
+    # F10 Champion Tracker. Held messages are re-verified every burst; the
+    # champion refresh runs daily at 04:40, before the 05:50 re-engagement
     # memory sweep, so a job change found overnight is in the morning list.
     # Both are no-ops with the flag off except releasing any leftover holds.
     "champion-reverify-held": {
         "task": "leadpilot.champion.reverify_held",
-        "schedule": crontab(minute="7,22,37,52"),
+        "schedule": _sweep(2),
     },
     "champion-refresh": {
         "task": "leadpilot.champion.refresh",
         "schedule": crontab(hour=4, minute=40),
     },
-    # Plan holds (app/services/plan_holds.py): every 15 minutes at
-    # :11/:26/:41/:56, clear of the attribution (:05/:20/:35/:50) and champion
-    # (:07/:22/:37/:52) sweeps. Releases holds the owner's plan covers again.
+    # Plan holds (app/services/plan_holds.py): every burst. Releases holds the
+    # owner's plan covers again.
     "plan-hold-release": {
         "task": "leadpilot.plan_holds.release",
-        "schedule": crontab(minute="11,26,41,56"),
+        "schedule": _sweep(2),
     },
-    # Autopilot launch (app/services/autopilot.py): every 15 minutes at
-    # :03/:18/:33/:48, clear of the other quarter-hour sweeps. Resumes a
+    # Autopilot launch (app/services/autopilot.py): every burst. Resumes a
     # waiting channel once its prerequisite appears; enrolls newly verified
     # leads of strategies with Autopilot on. Nothing here sends.
     "autopilot-sweep": {
         "task": "leadpilot.autopilot.sweep",
-        "schedule": crontab(minute="3,18,33,48"),
+        "schedule": _sweep(2),
     },
     # Best time to send: the accounts' learned rates into Redis every 6 hours
     # (app/services/send_time.py refresh_learning) -- the send path only reads.

@@ -12,7 +12,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { HomeVideo } from "@/components/home/HomeVideo";
 import { VIDEO } from "@/components/home/content";
 
-let playSpy: ReturnType<typeof vi.fn<[], Promise<void>>>;
+let playSpy: ReturnType<typeof vi.fn<(this: HTMLMediaElement) => Promise<void>>>;
 
 function stubMotion(reduce: boolean) {
   vi.stubGlobal("matchMedia", (q: string) => ({
@@ -23,7 +23,7 @@ function stubMotion(reduce: boolean) {
 }
 
 beforeEach(() => {
-  playSpy = vi.fn<[], Promise<void>>(function (this: HTMLMediaElement) {
+  playSpy = vi.fn<(this: HTMLMediaElement) => Promise<void>>(function (this: HTMLMediaElement) {
     Object.defineProperty(this, "paused", { value: false, configurable: true });
     this.dispatchEvent(new Event("play"));
     return Promise.resolve();

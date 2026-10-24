@@ -734,7 +734,7 @@ class TestAlerts:
 
         entry = celery_app.conf.beat_schedule["sweep-spend-alerts"]
         assert entry["task"] == "app.workers.spend_guard_tasks.sweep_spend_alerts"
-        assert entry["schedule"] == 900.0
+        assert sorted(entry["schedule"].minute) == [4, 34]  # a 30-minute burst, +4
 
 
 # --------------------------------------------------------------------------
