@@ -1708,3 +1708,16 @@ def wa_outbound(lead, *, kind="template", template="intro_v1",
         lead_id=lead.id, to_address=lead.phone or "", body=body,
         metadata=metadata,
     )
+
+
+@pytest.fixture(autouse=True)
+def fresh_health_db_check(monkeypatch):
+    """No test sees another test's cached database check.
+
+    app/services/health_checks.check_database reuses a success for
+    HEALTH_DB_CHECK_TTL_SECONDS (in-process). Without this reset, a test that
+    makes the database fail would read the "ok" an earlier test cached.
+    """
+    from app.services import health_checks
+
+    monkeypatch.setattr(health_checks, "_db_ok_at", None)

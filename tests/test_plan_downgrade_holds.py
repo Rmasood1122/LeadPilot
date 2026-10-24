@@ -365,7 +365,7 @@ class TestReleaseSweep:
         importlib.import_module("app.workers.plan_hold_tasks")
         entry = celery_app.conf.beat_schedule["plan-hold-release"]
         assert entry["task"] == "leadpilot.plan_holds.release"
-        assert sorted(entry["schedule"].minute) == [11, 26, 41, 56]
+        assert sorted(entry["schedule"].minute) == [2, 32]  # every 30-minute burst, +2
         assert "leadpilot.plan_holds.release" in celery_app.tasks
         assert celery_app.amqp.router.route({}, entry["task"])["queue"].name == "default"
 
